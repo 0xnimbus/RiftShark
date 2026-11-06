@@ -2714,3 +2714,28 @@ def crescent_guardian(defn):
             Replacement("enter_ready", lambda g, s, ev: ev.get("uid") == s and ev.get("add_paid"),
                         lambda g, s, ev: dict(ev, ready=True), label="enter ready if [Chaos] was paid", zone="any",
                         source_text=defn.text)]
+
+
+@script("Here to Help")
+def here_to_help(defn):
+    # [Hidden] [Action]  You may play a unit from hand to a battlefield you control, reducing its cost by [3].
+    from .. import payment
+
+    def cost_at(g, p, u, loc):
+        e, pw = g.card_cost(p, u, "hand", loc)
+        return max(0, e - 3), pw
+
+    def bfs(g, p, u):
+        return [("bf", b.idx) for b in g.battlefields if b.controller == p
+                and g.can_pay(p, *cost_at(g, p, u, ("bf", b.idx)), purpose=payment.purpose_of_card(g, u))]
+
+    units = lambda g, c: [u for u in g.players[c.controller].hand if u in g.objects
+                          and "unit" in g.objects[u].base_defn().types and bfs(g, c.controller, u)]
+    pick = lambda g, c: (c.vars.get("__ht") or (None,))[0]
+    locs = lambda g, c: bfs(g, c.controller, pick(g, c)) if pick(g, c) is not None else []
+    return [SpellEffect([O.ChooseFromList(units, out="__ht", n=1, up_to=True, label="play a unit for [3] less"),
+                         O.If(lambda g, c: pick(g, c) is not None, [
+                             O.ChooseFromList(locs, out="__htl", label="to which battlefield?"),
+                             O.PlayCard(pick, loc=Ref("__htl"),
+                                        alt_cost=lambda g, c: cost_at(g, c.controller, pick(g, c), c.vars.get("__htl")))])],
+                        label=defn.name, source_text=defn.text)]

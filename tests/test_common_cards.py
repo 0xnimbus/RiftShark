@@ -1216,3 +1216,13 @@ def test_crescent_guardian_pays_chaos_after_a_spell_to_enter_ready(db, decks):
             break
         g.choose(("pass",) if ("pass",) in d.options else d.options[0])
     assert asked and g.objects[cg].zone == "board" and not g.objects[cg].exhausted
+
+
+def test_here_to_help_plays_a_unit_to_your_battlefield_for_three_less(db, decks):
+    g = main_phase(db, decks)
+    g.set_bf_controller(0, 0); g.bump()
+    u = _card_in(g, db, 0, "Rell, Magnetic", "hand")
+    e, pw = g.card_cost(0, u, "hand")
+    _rune_setup(g, db, 0, [g.objects[u].base_defn().domains[0]] * max(len(pw), max(0, e - 3)))
+    _run_spell(g, db, "Here to Help", picks=[(u,)])
+    assert g.objects[u].zone == "board" and g.objects[u].location == ("bf", 0)
