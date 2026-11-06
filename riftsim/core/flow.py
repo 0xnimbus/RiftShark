@@ -19,6 +19,8 @@ PHASES = ["awaken", "beginning", "scoring", "channel", "draw", "main", "ending",
 
 def _depends_on_choice(ins):
     """A choice restricted by an earlier choice (\"a unit there\") can't be checked before that choice is made."""
+    if getattr(ins, "depends", False):
+        return True
     w = getattr(ins.sel, "where", None) or ""
     return w.startswith("loc:")
 

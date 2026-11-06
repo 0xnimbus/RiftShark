@@ -702,16 +702,19 @@ def parse_sentence(s, state):
     m = re.match(r"return a friendly unit and an enemy unit to their owners' hands$", sl)
     if m:
         return [O.Choose(Sel("unit", side="friendly"), out="__f"), O.Choose(Sel("unit", side="enemy"), out="__e"), O.ToHand(Ref("__f")), O.ToHand(Ref("__e"))]
-    m = re.match(r"counter an enemy spell or ability that chooses a friendly (?:unit or gear|unit|gear)$", sl)
+    m = re.match(r"counter an enemy spell or ability that chooses a friendly (unit or gear|unit|gear)$", sl)
     if m:
-        def _enemy_item_targeting_mine(g, c, u):
+        kinds = {"unit or gear": ("unit", "gear"), "unit": ("unit",), "gear": ("gear",)}[m.group(1)]
+
+        def _enemy_item_targeting_mine(g, c, u, kinds=kinds):
+            # Not So Fast: an enemy chain item whose choices include a unit/gear I control
             for it in g.chain:
-                if it.uid == u and it.controller != c.controller and it.ctx is not None:
-                    for v in it.ctx.vars.values():
-                        for x in (v if isinstance(v, (tuple, list)) else [v]):
-                            o = g.objects.get(x) if isinstance(x, str) else None
-                            if o is not None and o.controller == c.controller and o.zone == "board":
-                                return True
+                if it.uid == u and it.controller != c.controller and it.ctx is not None and not it.removed:
+                    for x in g._target_uids(it.ctx):
+                        o = g.objects.get(x) if isinstance(x, int) else None
+                        if o is not None and o.zone == "board" and o.controller == c.controller \
+                                and set(kinds) & set(g.chars(x).types):
+                            return True
             return False
         return [O.Choose(Sel("card", zone="any", pred=_enemy_item_targeting_mine), out="__sp", targeted=True),
                 O.CounterItem(lambda g, c: next((it.id for it in g.chain if it.uid == c.vars.get("__sp") and it.controller != c.controller), None))]
@@ -724,8 +727,11 @@ def parse_sentence(s, state):
             ma, mb = g.chars(a).might or 0, g.chars(b).might or 0
             g.add_mod(a, "might", mb - ma, "turn", c.source)
             g.add_mod(b, "might", ma - mb, "turn", c.source)
-        return [O.Choose(Sel("unit", where="battlefield"), out="__a"),
-                O.Choose(Sel("unit", where="battlefield", pred=lambda g, c, u: c.vars.get("__a") is not None and u != c.vars["__a"] and g.objects[u].location == g.objects[c.vars["__a"]].location), out="__b"),
+        partner = lambda g, c, u: any(v != u and g.objects[v].location == g.objects[u].location
+                                      for v in g.units_at(g.objects[u].location))
+        second = O.Choose(Sel("unit", where="battlefield", pred=lambda g, c, u: c.vars.get("__a") is not None and u != c.vars["__a"] and g.objects[u].location == g.objects[c.vars["__a"]].location), out="__b")
+        second.depends = True          # legality is checked through the first choice (it needs a partner there)
+        return [O.Choose(Sel("unit", where="battlefield", pred=partner), out="__a"), second,
                 O.Do(_swap, label="swap mights")]
     m = re.match(r"move me to its location and it to my original location$", sl)
     if m:
@@ -1213,7 +1219,7 @@ TRIGGER_PATTERNS = [
     (r"when you play a card on an opponent's turn", lambda g, s, ev: ev.get("kind") == "play" and ev.get("player") == g.objects[s].controller and g.turn_player != ev["player"]),
     (r"when you play a spell on an opponent's turn", lambda g, s, ev: ev.get("kind") == "play" and ev.get("player") == g.objects[s].controller and ev.get("card_type") == "spell" and g.turn_player != ev["player"]),
     (r"when you play a unit during a showdown", lambda g, s, ev: ev.get("kind") == "play" and ev.get("player") == g.objects[s].controller and ev.get("card_type") == "unit" and g.showdown is not None),
-    (r"when you play your first card each turn", lambda g, s, ev: ev.get("kind") == "play" and ev.get("player") == g.objects[s].controller and len(g.players[ev["player"]].played_this_turn) == 1),
+    (r"when you play your first card each turn", lambda g, s, ev: ev.get("kind") == "play" and not ev.get("token") and ev.get("player") == g.objects[s].controller and len(g.players[ev["player"]].played_this_turn) == 1),
     (r"when you play a card with energy cost \[(\d+)\] or more", "you_play_card"),
     (r"when you play me from face ?down on your turn", lambda g, s, ev: ev.get("kind") == "play" and ev.get("uid") == s and ev.get("from_zone") == "facedown" and g.turn_player == ev.get("player")),
     (r"when a unit you control becomes mighty", "unit_becomes_mighty"),

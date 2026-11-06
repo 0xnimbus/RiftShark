@@ -8,7 +8,8 @@ from riftsim.core.cards import CardDB
 from riftsim.core.deck import Deck
 from riftsim.core.scripts import script_all
 from test_targeting import main_phase
-from test_champions import put
+from test_champions import put, _card_in, settle
+from test_targeting import give
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -336,3 +337,50 @@ def test_gold_pays_the_hide_cost(db, decks):
             break
         g.choose(d.options[0])
     assert g.objects[card].zone == "facedown" and g.objects[gold].zone != "board"
+
+
+# ---------------------------------------------------------------- Riven deck audit (2026-11-06 18:45)
+def test_switcheroo_playable_with_two_units_at_one_battlefield(db, decks):
+    from riftsim.core.vm import Context
+    g = main_phase(db, decks)
+    a = put(g, db, 0, "Stellacorn Herder", ("bf", 0))
+    b = put(g, db, 1, "Stellacorn Herder", ("bf", 0), exclude=(a,))
+    s = give(g, 0, "Switcheroo", db)
+    assert ("play", s) in g.legal_actions(0)
+    g.do_kill([b], Context(0, None)); g.bump()
+    assert ("play", s) not in g.legal_actions(0)          # no partner at the same battlefield
+
+
+def test_not_so_fast_counters_an_enemy_spell_choosing_my_unit(db, decks):
+    from riftsim.core.objects import ChainItem
+    from riftsim.core.vm import Context
+    g = main_phase(db, decks)
+    mine = put(g, db, 0, "Stellacorn Herder", ("bf", 0))
+    sp = _card_in(g, db, 1, "Get Excited!", "hand")
+    g._to_zone(g.objects[sp], "chain"); g.bump()
+    ctx = Context(1, sp)
+    ctx.vars["t"] = mine
+    ctx.vars["__targets"] = [("t", None)]
+    it = ChainItem(900, "spell", 1, uid=sp, label="Get Excited!", ctx=ctx)
+    it.cost, it.finalized, it.code = {"energy": 0, "power": []}, True, []
+    g.chain.append(it)
+    nsf = next(c for c in db if c.name == "Not So Fast")
+    ch = next(i for i in nsf.abilities[-1].target_code if type(i).__name__ == "Choose")
+    assert g.choice_candidates(Context(0, None), ch.sel, targeted=True) == [sp]
+    ctx.vars["t"] = put(g, db, 1, "Stellacorn Herder", ("bf", 0), exclude=(mine,))   # now it chooses its own unit
+    assert g.choice_candidates(Context(0, None), ch.sel, targeted=True) == []
+
+
+def test_astral_heron_ignores_token_plays(db, decks):
+    g = main_phase(db, decks)
+    h = put(g, db, 0, "Astral Heron", ("bf", 0))
+    s = give(g, 0, "Discipline", db)
+    a = put(g, db, 0, "Stellacorn Herder", ("base", 0), exclude=(h,))
+    g.players[0].played_this_turn = []
+    g.run(); g.choose(("play", s)); settle(g, picks=[a])
+    assert sum(t["kind"] == "cost_reduce" for t in g.turn_effects) == 1
+    n = len(g.events)
+    from riftsim.core.vm import Context
+    g.play_token(0, "Gold", ("base", 0), ctx=Context(0, None)); settle(g)
+    assert not [e for e in g.events[n:] if e["kind"] == "trigger" and g.objects[e["source"]].defn.name == "Astral Heron"]
+    assert sum(t["kind"] == "cost_reduce" for t in g.turn_effects) == 1          # the discount waits for the next card
