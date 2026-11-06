@@ -31,6 +31,7 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
 | 2026-11-06 17:21 | 47% used, resets 12:50 PM | 29% used, resets Mon 10:00 AM | +3% in 21 min; adaptive + sharded round-robin, mulligan coach UI, Emperor's Dais may-pay and Gold payment fixes; PR #2 (focus/damage UI) merged |
 | 2026-11-06 17:42 | 50% used, resets 12:50 PM | 29% used, resets Mon 10:00 AM | +3% in 21 min; 14 cards scripted (none 85 -> 71): Hard Bargain, Kraken Hunter, Commander Ledros, Mageseeker Warden, Temporal Portal... |
 | 2026-11-06 18:04 | 2% used, resets 5:50 PM | 30% used, resets Mon 10:00 AM | new 5h window; Derrick (17:44): scripting stopped, round-robin redone (out/rr_1745, adaptive max 20, expert; container restart killed the first try, runner now resumes from partial.jsonl); UI asks went to the UI thread |
+| 2026-11-06 18:25 | 2% used, resets 5:50 PM | 30% used, resets Mon 10:00 AM | round-robin 871 games, 44/45 matchups settled |
 
 ## Where things stand
 
