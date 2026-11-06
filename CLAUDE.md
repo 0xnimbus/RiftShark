@@ -29,6 +29,7 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
 | 2026-11-06 16:39 | 38% used, resets 12:50 PM | 28% used, resets Mon 10:00 AM | +5% in 28 min; round-robins paused by Derrick (16:12) for a full rules audit: keyword data, damage assignment, moves, burn out fixed (report: RULES.md audit section) |
 | 2026-11-06 17:00 | 44% used, resets 12:50 PM | 28% used, resets Mon 10:00 AM | +6% in 21 min; hidden-card targeting fix, AI never sees hidden info (determinize everywhere), engine ~25% faster |
 | 2026-11-06 17:21 | 47% used, resets 12:50 PM | 29% used, resets Mon 10:00 AM | +3% in 21 min; adaptive + sharded round-robin, mulligan coach UI, Emperor's Dais may-pay and Gold payment fixes; PR #2 (focus/damage UI) merged |
+| 2026-11-06 17:42 | 50% used, resets 12:50 PM | 29% used, resets Mon 10:00 AM | +3% in 21 min; 14 cards scripted (none 85 -> 71): Hard Bargain, Kraken Hunter, Commander Ledros, Mageseeker Warden, Temporal Portal... |
 
 ## Where things stand
 
@@ -41,7 +42,7 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   `flow.py` (turns, HOT FEPR chain, cleanups per CR 323, showdowns, combat per CR 466-468, scoring);
   `deck.py`; `scripts/` (keywords → auto-grammar → manual overrides).
 - `tools/smoke_core.py N SEED`: random-play games; last run 40/40 games without crash, ~0.1 s per game.
-- Script coverage (2026-11-06 16:11): auto 628, manual 401, keywords-only 28, partial 23, none 93, vanilla 23.
+- Script coverage (2026-11-06 17:40): auto 628, manual 428, keywords-only 23, partial 23, none 71, vanilla 23.
   RAD gallery data had wrong types/domains/tags on 84 cards: checked against the card images, fixed in data/cards/overrides.json.
   Common cards are hand-scripted in `riftsim/core/scripts/cards_common.py` (tests: tests/test_common_cards.py).
   Hand scripts for staples/legends/champions live in `riftsim/core/scripts/cards_staples.py` (tests: tests/test_legends.py, tests/test_champions.py).
