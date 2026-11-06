@@ -534,3 +534,38 @@ def test_orianna_first_gear_each_turn_costs_1_any_less(db, decks):
     assert e1 == e0 - 1 and len(p1) == max(0, len(p0) - 1)
     g._use_play_effects(0, a)
     assert g.card_cost(0, a, "hand", ("base", 0)) == (e0, p0)
+
+
+def test_ivern_friend_gains_the_chosen_tag_as_played(db, decks):
+    g = main_phase(db, decks)
+    iv = _card_in(g, db, 0, "Ivern, Friend to All", "hand")
+    it = g._play(0, iv, ("base", 0))
+    it.cost = {"energy": 0, "power": []}
+    g.pending = None
+    for _ in range(30):
+        d = g.run()
+        if d.kind == "mode":
+            g.choose(next(o for o, l in zip(d.options, d.labels) if l == "Cat")); continue
+        if d.kind == "action" and not g.chain:
+            break
+        g.choose(("pass",) if ("pass",) in d.options else d.options[0])
+    assert g.objects[iv].zone == "board" and "Cat" in g.chars(iv).tags
+
+
+def test_aphelios_modes_once_each_per_turn(db, decks):
+    g = main_phase(db, decks)
+    ap = put(g, db, 0, "Aphelios, Exalted", ("base", 0))
+    eq = next(c for c in db if c.type == "gear" and c.is_equipment and not c.is_token)
+    labels = []
+    for i in range(2):
+        e = put(g, db, 0, eq.name, ("base", 0), exclude=(ap,))
+        g.emit("attach", uid=e, to=ap, player=0)
+        g.dirty = True; g.pending = None
+        for _ in range(30):
+            d = g.run()
+            if d.kind == "mode":
+                labels.append(tuple(d.labels)); g.choose(d.options[0]); continue
+            if d.kind == "action" and not g.chain:
+                break
+            g.choose(("pass",) if ("pass",) in d.options else d.options[0])
+    assert len(labels) == 2 and len(labels[1]) == len(labels[0]) - 1

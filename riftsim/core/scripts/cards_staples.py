@@ -1250,3 +1250,38 @@ def orianna_marvel(defn):
         return _at_bf(g, src) and g.objects[uid].base_defn().type == "gear"
     return {"abilities": [Static("self", "rule", ("cost_reduce_once", applies), label=defn.name, source_text=defn.text)],
             "replace": True}
+
+
+@script("Aphelios, Exalted")
+def aphelios_exalted(defn):
+    # When you attach an Equipment to me, choose one that hasn't been chosen this turn — Ready 2 runes. / Channel 1 rune
+    # exhausted. / [Buff] a friendly unit.
+    exhausted_runes = lambda g, c: [r for r in g.players[c.controller].runes if g.objects[r].exhausted]
+
+    def equipment_attached(g, s, ev):
+        return ev.get("kind") == "attach" and ev.get("to") == s and ev.get("uid") in g.objects and \
+            g.objects[ev["uid"]].base_defn().is_equipment
+    modes = [("Ready 2 runes", [O.ChooseFromList(exhausted_runes, out="__ar", n=2, label="ready 2 runes"), O.Ready(Ref("__ar"))]),
+             ("Channel 1 rune exhausted", [O.Channel(1, exhausted=True)]),
+             ("Buff a friendly unit", [O.Choose(Sel("unit", side="friendly"), out="t"), O.Buff(Ref("t"))])]
+    return {"abilities": [Triggered(equipment_attached, [O.ChooseMode(modes, exclude_used=True)], label=defn.name,
+                                    source_text=defn.text)], "replace": True}
+
+
+@script("Ivern, Friend to All")
+def ivern_friend(defn):
+    # As you play me, choose Bird, Cat, Dog, or Poro. I gain that tag.
+    # When I conquer or hold, score 1 point if your units have all of the following tags among them — Bird, Cat, Dog, and Poro.
+    pets = ("Bird", "Cat", "Dog", "Poro")
+    choose_tag = [O.ChooseMode([(t, [O.GiveTag(Ref("self"), t, duration="permanent")]) for t in pets])]
+
+    def all_pets(g, c):
+        tags = set()
+        for u, o in g.objects.items():
+            if o.zone == "board" and o.controller == c.controller and "unit" in g.chars(u).types:
+                tags |= set(g.chars(u).tags)
+        return all(t in tags for t in pets)
+    score = [O.If(all_pets, [O.GainPoints(1)])]
+    return {"abilities": [PlayPermission("as_play", value=choose_tag, label="choose Bird, Cat, Dog, or Poro"),
+                          Triggered("conquer_self", list(score), label=defn.name, source_text=defn.text),
+                          Triggered("hold_self", list(score), label=defn.name, source_text=defn.text)], "replace": True}
