@@ -221,6 +221,31 @@ def adaptive_round_robin(paths, a):
     state = {pq: {"n": 0, "wins": 0, "running": 0, "next": 0} for pq in pairs}
     results = []
     t = time.time()
+    # resumable: every finished game is appended to partial.jsonl; a restart replays those first
+    part = os.path.join(a.out, "partial.jsonl")
+    os.makedirs(a.out, exist_ok=True)
+    cached = {}
+    if os.path.exists(part):
+        for line in open(part):
+            try:
+                r = json.loads(line)
+            except ValueError:
+                continue
+            cached[(r.get("seed"), a.policy)] = r
+    for pq in pairs:
+        st = state[pq]
+        while not pair_done(st["wins"], st["n"], a) and st["next"] < 2 * a.adaptive:
+            r = cached.get((a.seed + 1000 * all_pairs.index(pq) + st["next"], a.policy))
+            if r is None:
+                break
+            st["next"] += 1
+            results.append(r)
+            if not r.get("crash") and r.get("winner") is not None:
+                st["n"] += 1
+                st["wins"] += r["paths"][r["winner"]] == pq[0]
+    if results:
+        print(f"resumed {len(results)} games from {part}", file=sys.stderr)
+    log = open(part, "a")
     with ProcessPoolExecutor(max_workers=a.workers) as ex:
         live = {}
 
@@ -243,6 +268,7 @@ def adaptive_round_robin(paths, a):
                 pq = live.pop(f)
                 r = f.result()
                 results.append(r)
+                log.write(json.dumps(r) + "\n"); log.flush()
                 st = state[pq]
                 st["running"] -= 1
                 if not r.get("crash") and r.get("winner") is not None:
