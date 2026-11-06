@@ -661,6 +661,7 @@ class Game(flow.FlowMixin):
                 if not ps.deck:
                     continue
             u = self._draw_raw(p)
+            self.turn_memo[("draws", p)] = self.turn_memo.get(("draws", p), 0) + 1
             self.log("draw", player=p, uid=u)
             self.emit("draw", player=p, uid=u, ctx=ctx)
 
@@ -695,6 +696,8 @@ class Game(flow.FlowMixin):
         if o is None or o.zone != "board" or not o.exhausted:
             return False
         if o.stunned:
+            return False
+        if any(src == uid for src, _ in self.rules("cant_ready")):
             return False
         o.exhausted = False
         self.bump()
@@ -753,6 +756,8 @@ class Game(flow.FlowMixin):
         by = ctx.controller if ctx else None
         bonus = 0
         if ctx is not None and not combat:
+            for src_r, v in self.rules("bonus_damage", player=ctx.controller):
+                bonus += v
             for t in self.consume_turn_effects("bonus_damage", player=ctx.controller):
                 if t.get("spell_only") and not (ctx.item is not None and self._item_is_spell(ctx.item)):
                     continue
@@ -816,7 +821,7 @@ class Game(flow.FlowMixin):
             ev = self.replace_event({"kind": "die", "uid": u, "player": o.controller, "loc": o.location, "killer": killer,
                                      "in_combat": in_combat or self.combat is not None and o.location == ("bf", self.combat["bf"]),
                                      "card_type": "unit" if "unit" in self.chars(u).types else "gear", "by": by,
-                                     "token": o.defn.is_token, "might": self.chars(u).might})
+                                     "token": o.defn.is_token, "might": self.chars(u).might, "stunned": o.stunned, "buffed": o.buffs > 0})
             if ev is None:
                 continue
             if ev.get("replaced_with") == "recall":
@@ -1291,6 +1296,8 @@ class Game(flow.FlowMixin):
             for u in cands:
                 o = self.objects[u]
                 if o.zone == "board" and not self.is_friendly(o.controller, ctx.controller):
+                    if self.chars(u).keywords.get("untargetable"):
+                        continue
                     d = self.keyword_value(u, "deflect")
                     if d and not self.can_pay(ctx.controller, 0, ["any"] * (d + paid)):
                         continue

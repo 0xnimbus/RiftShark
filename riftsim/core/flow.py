@@ -11,7 +11,7 @@ import itertools
 from .abilities import Activated, PlayPermission, Static
 from .objects import ChainItem
 from .vm import Context, Decision, Frame, Instr, compile_effect, run_vm, resume_vm, val
-from .ops import Choose
+from .ops import Choose, May, SetVar, Do
 
 PHASES = ["awaken", "beginning", "scoring", "channel", "draw", "main", "ending", "expiration"]
 
@@ -258,6 +258,8 @@ class FlowMixin:
         for u, o in list(self.objects.items()):
             if o.zone == "board" and o.controller == p and o.exhausted:
                 if o.stunned:
+                    continue
+                if any(src == u for src, _ in self.rules("cant_ready")):
                     continue
                 o.exhausted = False
         self.bump()
@@ -690,7 +692,16 @@ class FlowMixin:
 
     def _finalize(self, it):
         ctx = it.ctx
-        code = list(it.target_code or []) + [_FinalizeCosts(it.id)]
+        pre = []
+        if it.kind in ("spell", "unit", "gear"):
+            for ab in self._abilities_of(it.uid, self.objects[it.uid]):
+                if isinstance(ab, PlayPermission) and ab.perm == "additional_cost":
+                    req, ins, mandatory = ab.value
+                    if mandatory:
+                        pre += list(ins) + [SetVar("__add", True), Do(lambda g, c: c.paid.__setitem__("add", True))]
+                    else:
+                        pre.append(May(list(ins) + [Do(lambda g, c: c.paid.__setitem__("add", True))], label="pay the additional cost", out="__addq"))
+        code = compile_effect(pre) + list(it.target_code or []) + [_FinalizeCosts(it.id)]
         self.vm_frames.append(Frame(code, ctx, tag=("finalize", it.id)))
 
     def _finalized(self, item_id):
@@ -833,13 +844,18 @@ class FlowMixin:
         o.played_from = ctx.played_from
         c = self.chars(it.uid)
         if "unit" in c.types:
-            o.exhausted = not ctx.paid.get("accelerate", False)
-            if ctx.paid.get("accelerate"):
-                o.exhausted = False
-            for d in self.consume_turn_effects("enter_ready", player=p):
-                o.exhausted = False
+            ready = bool(ctx.paid.get("accelerate", False))
+            if self.consume_turn_effects("enter_ready", player=p):
+                ready = True
+            ev = self.replace_event({"kind": "enter_ready", "uid": it.uid, "player": p, "ready": ready, "loc": loc})
+            if ev is not None:
+                ready = bool(ev.get("ready"))
+            o.exhausted = not ready
         else:
-            o.exhausted = False
+            ev = self.replace_event({"kind": "enter_ready", "uid": it.uid, "player": p, "ready": True, "loc": loc})
+            o.exhausted = not (ev.get("ready", True) if ev else True)
+        if ctx.paid.get("add"):
+            o.temp["add_paid"] = True
         self.bump()
         self.log("enter", uid=it.uid, name=o.defn.name, loc=loc, player=p, ready=not o.exhausted)
         self.emit("enter", uid=it.uid, player=p, loc=loc, card_type="unit" if "unit" in c.types else "gear", token=False, ctx=ctx)
@@ -1059,6 +1075,13 @@ class FlowMixin:
                 return False
         if z == "hand" and self.rules("cant_play_from_hand", player=p):
             return False
+        for ab in self._abilities_of(uid, o):
+            if isinstance(ab, PlayPermission) and ab.perm == "additional_cost":
+                req, ins, mandatory = ab.value
+                if mandatory and req is not None:
+                    ctx = Context(p, uid, here=None)
+                    if not req.candidates(self, ctx):
+                        return False
         if "spell" in o.base_defn().types:
             for src, v in self.rules("cant_play_spells"):
                 if self.objects[src].controller != p and v is True:
