@@ -54,7 +54,7 @@ def default_data_dir():
 def best_spec():
     p = os.path.join(MODELS, "best.json")
     if not os.path.exists(p):
-        return "expert"
+        return "learned:heuristic"      # strongest AI without a trained net
     with open(p) as f:
         return json.load(f)["spec"]
 
@@ -200,7 +200,12 @@ def train(files, out, hidden=48, epochs=40, lr=2e-3, l2=1e-3, seed=0, warm=None,
     std = Xt.std(0) + 1e-3
     Zt, Zv = (Xt - mean) / std, (Xv - mean) / std
     n_in = X.shape[1]
-    if warm and len(warm["mean"]) == n_in and len(warm["b1"]) == hidden:
+    from riftsim.core.learn.features import H_INDEX
+    # residual base: the hand-written score's logit; the MLP learns a correction (starts near zero)
+    Ot = np.arctanh(np.clip(Xt[:, H_INDEX], -0.999999, 0.999999))
+    Ov = np.arctanh(np.clip(Xv[:, H_INDEX], -0.999999, 0.999999))
+    hs = float(warm.get("h_scale", 1.0)) if warm and "h_scale" in warm else 1.0
+    if warm and "h_scale" in warm and len(warm["mean"]) == n_in and len(warm["b1"]) == hidden:
         W1, b1 = np.array(warm["w1"]), np.array(warm["b1"])
         W2, b2 = np.array(warm["w2"]), float(warm["b2"])
         # the warm net expects the old standardisation: fold it into the first layer
@@ -210,23 +215,23 @@ def train(files, out, hidden=48, epochs=40, lr=2e-3, l2=1e-3, seed=0, warm=None,
     else:
         W1 = rs.randn(hidden, n_in) * math.sqrt(1.0 / n_in)
         b1 = np.zeros(hidden)
-        W2 = rs.randn(hidden) * math.sqrt(1.0 / hidden)
+        W2 = rs.randn(hidden) * 0.01
         b2 = 0.0
-    params = [W1, b1, W2, np.array(b2)]
+    params = [W1, b1, W2, np.array(b2), np.array(hs)]
     m = [np.zeros_like(p) for p in params]
     v = [np.zeros_like(p) for p in params]
 
-    def forward(Z, P):
+    def forward(Z, O, P):
         H = np.tanh(Z @ P[0].T + P[1])
-        o = H @ P[2] + P[3]
+        o = H @ P[2] + P[3] + P[4] * O
         return H, 1 / (1 + np.exp(-np.clip(o, -30, 30)))
 
-    def loss(Z, Yy, P):
-        _, pr = forward(Z, P)
+    def loss(Z, O, Yy, P):
+        _, pr = forward(Z, O, P)
         pr = np.clip(pr, 1e-6, 1 - 1e-6)
         return float(-(Yy * np.log(pr) + (1 - Yy) * np.log(1 - pr)).mean()), float(((pr > 0.5) == (Yy > 0.5)).mean())
 
-    best = (loss(Zv, Yv, params)[0], [p.copy() for p in params])
+    best = (loss(Zv, Ov, Yv, params)[0], [p.copy() for p in params])
     step = 0
     bs = 512
     stale = 0
@@ -234,20 +239,21 @@ def train(files, out, hidden=48, epochs=40, lr=2e-3, l2=1e-3, seed=0, warm=None,
         idx = rs.permutation(len(Zt))
         for s in range(0, len(idx), bs):
             b = idx[s:s + bs]
-            Z, Yy = Zt[b], Yt[b]
-            H, pr = forward(Z, params)
+            Z, Yy, O = Zt[b], Yt[b], Ot[b]
+            H, pr = forward(Z, O, params)
             go = (pr - Yy) / len(b)                       # d loss / d logit
             gW2 = H.T @ go + l2 * params[2]
             gb2 = go.sum()
             gH = np.outer(go, params[2]) * (1 - H ** 2)
             gW1 = gH.T @ Z + l2 * params[0]
             gb1 = gH.sum(0)
+            ga = float(go @ O)
             step += 1
-            for i, gr in enumerate((gW1, gb1, gW2, np.array(gb2))):
+            for i, gr in enumerate((gW1, gb1, gW2, np.array(gb2), np.array(ga))):
                 m[i] = 0.9 * m[i] + 0.1 * gr
                 v[i] = 0.999 * v[i] + 0.001 * gr ** 2
                 params[i] = params[i] - lr * (m[i] / (1 - 0.9 ** step)) / (np.sqrt(v[i] / (1 - 0.999 ** step)) + 1e-8)
-        vl, va = loss(Zv, Yv, params)
+        vl, va = loss(Zv, Ov, Yv, params)
         if vl < best[0] - 1e-4:
             best = (vl, [p.copy() for p in params])
             stale = 0
@@ -257,15 +263,18 @@ def train(files, out, hidden=48, epochs=40, lr=2e-3, l2=1e-3, seed=0, warm=None,
                 break
         print(f"epoch {ep + 1}: val loss {vl:.4f} acc {va:.3f}", file=sys.stderr)
     params = best[1]
-    tl, ta = loss(Zt, Yt, params)
-    vl, va = loss(Zv, Yv, params)
+    tl, ta = loss(Zt, Ot, Yt, params)
+    vl, va = loss(Zv, Ov, Yv, params)
+    hl, ha = loss(Zv, Ov, Yv, [params[0], params[1], params[2] * 0, np.array(0.0), np.array(1.0)])
     base = float(Yv.mean())
     base_loss = float(-(Yv * math.log(max(base, 1e-6)) + (1 - Yv) * math.log(max(1 - base, 1e-6))).mean())
     info = {"positions": int(len(Y)), "games": int(len(games)), "train_loss": round(tl, 4), "val_loss": round(vl, 4),
-            "val_acc": round(va, 4), "val_loss_constant": round(base_loss, 4), "hidden": hidden,
+            "val_acc": round(va, 4), "val_loss_constant": round(base_loss, 4), "val_loss_heuristic": round(hl, 4),
+            "h_scale": round(float(params[4]), 4), "hidden": hidden,
             "warm_start": bool(warm and len(warm["mean"]) == n_in)}
     d = {"meta": dict(meta or {}, **info), "mean": mean.tolist(), "std": std.tolist(), "w1": params[0].tolist(),
-         "b1": params[1].tolist(), "w2": params[2].tolist(), "b2": float(params[3])}
+         "b1": params[1].tolist(), "w2": params[2].tolist(), "b2": float(params[3]),
+         "h_index": H_INDEX, "h_scale": float(params[4])}
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     with open(out, "w") as f:
         json.dump(d, f, separators=(",", ":"))
@@ -344,7 +353,7 @@ def generation(a):
     buffer = sorted(glob.glob(os.path.join(data_dir, "gen_*.npz")))[-a.buffer:]
     warm = None
     bp = os.path.join(MODELS, "best.json")
-    if os.path.exists(bp):
+    if os.path.exists(bp) and json.load(open(bp)).get("model"):
         warm = json.load(open(os.path.join(MODELS, json.load(open(bp))["model"])))
     out = os.path.join(MODELS, f"{name}.json")
     info = train(buffer, out, warm=warm, seed=gen,
@@ -368,6 +377,16 @@ def generation(a):
     return entry
 
 
+def record_baseline(res, note=""):
+    bp = os.path.join(MODELS, "baselines.json")
+    rows = json.load(open(bp)) if os.path.exists(bp) else []
+    rows.append(dict({k: res[k] for k in ("candidate", "best", "games", "wins", "draws", "score", "interval", "timeouts")},
+                     date=datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"), note=note))
+    json.dump(rows, open(bp, "w"), indent=1)
+    hp = os.path.join(MODELS, "history.json")
+    write_ladder(json.load(open(hp)) if os.path.exists(hp) else [])
+
+
 def write_ladder(hist):
     lines = ["# Learned AI generations", "",
              "Each generation trains the value net on self-play of the best AI so far, then plays it head to head "
@@ -381,6 +400,15 @@ def write_ladder(hist):
                      f"{t['val_loss']} ({t['val_loss_constant']}) | {t['val_acc']} | {100 * g['score']:.1f}% "
                      f"({100 * g['interval'][0]:.0f}-{100 * g['interval'][1]:.0f}) vs {g['best']} | {g['games']} | "
                      f"{'yes' if h['promoted'] else 'no'} |")
+    bp = os.path.join(MODELS, "baselines.json")
+    if os.path.exists(bp):
+        lines += ["", "## Control matches", "",
+                  "`learned:heuristic` uses the same turn-boundary lookahead with the hand-written score instead of a net, "
+                  "so it separates what the lookahead gains from what the trained net gains.", "",
+                  "| date | AI | opponent | score (95% interval) | games | note |", "|---|---|---|---|---|---|"]
+        for b in json.load(open(bp)):
+            lines.append(f"| {b['date']} | {b['candidate']} | {b['best']} | {100 * b['score']:.1f}% "
+                         f"({100 * b['interval'][0]:.0f}-{100 * b['interval'][1]:.0f}) | {b['games']} | {b.get('note', '')} |")
     with open(os.path.join(MODELS, "ladder.md"), "w") as f:
         f.write("\n".join(lines) + "\n")
 
@@ -406,6 +434,7 @@ def main():
     q.add_argument("candidate")
     q.add_argument("best")
     q.add_argument("--games", type=int, default=200)
+    q.add_argument("--record", metavar="NOTE", help="append the result to models/baselines.json (control matches)")
     for p in (g, s, q):
         p.add_argument("--workers", type=int, default=os.cpu_count() or 2)
         p.add_argument("--seed", type=int, default=0)
@@ -417,7 +446,10 @@ def main():
     elif a.cmd == "train":
         print(train(a.files, a.out, hidden=a.hidden))
     elif a.cmd == "gate":
-        print(json.dumps(gate(a.candidate, a.best, a.games, a.workers, a.seed), indent=1))
+        res = gate(a.candidate, a.best, a.games, a.workers, a.seed)
+        print(json.dumps(res, indent=1))
+        if a.record is not None:
+            record_baseline(res, a.record)
 
 
 if __name__ == "__main__":

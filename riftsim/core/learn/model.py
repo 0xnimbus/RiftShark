@@ -22,6 +22,9 @@ class ValueNet:
         self.mean, self.std = d["mean"], d["std"]
         self.w1, self.b1 = d["w1"], d["b1"]        # w1: hidden x inputs
         self.w2, self.b2 = d["w2"], d["b2"]        # w2: hidden
+        # residual form: logit = h_scale * atanh(x[h_index]) + MLP(x), i.e. the hand-written score is the base and the
+        # net learns a correction to it (models without these keys are a plain MLP)
+        self.h_index, self.h_scale = d.get("h_index"), d.get("h_scale", 0.0)
 
     @classmethod
     def load(cls, path):
@@ -31,6 +34,8 @@ class ValueNet:
     def predict_x(self, x):
         z = [(v - m) / s for v, m, s in zip(x, self.mean, self.std)]
         out = self.b2
+        if self.h_index is not None:
+            out += self.h_scale * math.atanh(max(-0.999999, min(0.999999, x[self.h_index])))
         for row, b, w in zip(self.w1, self.b1, self.w2):
             h = b
             for a, c in zip(row, z):
@@ -69,7 +74,8 @@ _CACHE = {}
 def best_path():
     """The promoted generation (models/best.json points at it)."""
     with open(os.path.join(MODELS_DIR, "best.json")) as f:
-        return os.path.join(MODELS_DIR, json.load(f)["model"])
+        m = json.load(f).get("model")
+    return os.path.join(MODELS_DIR, m) if m else "heuristic"     # no net has beaten the hand-written score yet
 
 
 def load(path=None):

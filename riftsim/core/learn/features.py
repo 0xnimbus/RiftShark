@@ -15,6 +15,7 @@ MAX_BF = 3
 # so the net must know where in the turn it is (without this, gen 1 rated "end my turn" above every attack because
 # the next own decision came in the opponent's Beginning phase with their runes and units still exhausted)
 PHASES = ("beginning", "main", "ending", "other")
+H_INDEX = 11 + len(PHASES)     # position of tanh(heuristic / 150) in the vector (the net's residual base)
 
 
 def _bucket(name):

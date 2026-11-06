@@ -26,7 +26,7 @@ from . import model as M
 
 def _resolve(ref):
     if not ref:
-        return M.best_path()
+        return M.best_path()      # may be "heuristic"
     if ref == "heuristic":
         return ref
     if os.path.sep in ref or ref.endswith(".json"):

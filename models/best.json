@@ -1,5 +1,6 @@
 {
- "model": "gen_001.json",
- "spec": "learned:gen_001",
- "generation": 1
+ "model": null,
+ "spec": "learned:heuristic",
+ "generation": 0,
+ "note": "gen 1 beat expert 85% but lost 25-35 to the same lookahead with the hand-written score; that lookahead is the AI to beat"
 }
