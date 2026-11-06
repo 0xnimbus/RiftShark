@@ -45,6 +45,13 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   imported from the GitHub repo through Derrick's Vercel account in Chrome on 2026-11-06; live at https://riftshark.vercel.app/play.html
   (auto-deploys on push to main; verified in Derrick's Chrome). The deck lists on the page only show decks that pass
   Deck.validate (fully scripted). GitHub Pages stays as a fallback.
+- UI redesign (2026-11-06 03:30, branch claude/project-thread-awnl3n): playmat board in `web/board.js` (turn/phase bar, score pips,
+  legend/champion/rune zones, battlefields with art, exhausted = rotated + dimmed + label, card preview tooltip with text and
+  status help, "why can't I play this"), plain-language log and decision explanations (`RiftBoard.say/describe/explain`, already
+  covers pay/order_triggers/mulligan), click a glowing hand card to play it. Play page no longer greys out: `PlaySession.apply` →
+  `ai_step` (one AI decision per call, shown from a display queue while the opponent hand shows "thinking") → `grade`.
+  Left to do: compact layout for small screens, animate cards moving between zones, check pay/order_triggers/mulligan labels once
+  the engine thread lands them.
 - Main deck = 39 cards + chosen champion (CR 103.3). `When you play me` triggers fire from the chain.
 - `riftsim/` top level still holds the v1 simplified engine (engine.py, policies.py, replay.py, runner.py, cli.py).
   It will be replaced by v2 equivalents.

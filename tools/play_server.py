@@ -80,6 +80,15 @@ class H(SimpleHTTPRequestHandler):
             if self.path.startswith("/api/choose"):
                 with LOCK:
                     return self._json(SESSION.choose(body.get("index")))
+            if self.path.startswith("/api/apply"):
+                with LOCK:
+                    return self._json(SESSION.apply(body.get("index")))
+            if self.path.startswith("/api/ai_step"):
+                with LOCK:
+                    return self._json(SESSION.ai_step())
+            if self.path.startswith("/api/grade"):
+                with LOCK:
+                    return self._json(SESSION.grade())
         except Exception as e:  # report engine errors to the page instead of dropping the connection
             return self._json({"ok": False, "error": f"{type(e).__name__}: {e}"}, 500)
         return self._json({"ok": False, "error": "unknown endpoint"}, 404)
