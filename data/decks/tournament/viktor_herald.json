@@ -1,0 +1,111 @@
+{
+ "name": "Viktor, Herald of the Arcane (Calvin Jin, 5th Riftbound Showdown 25k LDXP Sacramento)",
+ "legend": "OPP-265",
+ "champion": "OGN-246",
+ "main": [
+  {
+   "id": "UNL-153",
+   "name": "Carrion Dredger",
+   "count": 3
+  },
+  {
+   "id": "VEN-135",
+   "name": "Kennen, Keeper of Balance",
+   "count": 1
+  },
+  {
+   "id": "OGN-116",
+   "name": "Thousand-Tailed Watcher",
+   "count": 1
+  },
+  {
+   "id": "RAD-116",
+   "name": "Concert Poster",
+   "count": 3
+  },
+  {
+   "id": "UNL-078",
+   "name": "Sprite Fountain",
+   "count": 3
+  },
+  {
+   "id": "SFD-161",
+   "name": "B.F. Sword",
+   "count": 1
+  },
+  {
+   "id": "SFD-080",
+   "name": "Bellows Breath",
+   "count": 3
+  },
+  {
+   "id": "OGN-095",
+   "name": "Stupefy",
+   "count": 3
+  },
+  {
+   "id": "SFD-162",
+   "name": "Blood Money",
+   "count": 1
+  },
+  {
+   "id": "OGN-209",
+   "name": "Cull the Weak",
+   "count": 3
+  },
+  {
+   "id": "OGN-220",
+   "name": "Facebreaker",
+   "count": 1
+  },
+  {
+   "id": "OGN-213",
+   "name": "Hidden Blade",
+   "count": 3
+  },
+  {
+   "id": "OGN-224",
+   "name": "Salvage",
+   "count": 1
+  },
+  {
+   "id": "UNL-165",
+   "name": "Shadow's Call",
+   "count": 3
+  },
+  {
+   "id": "SFD-070",
+   "name": "Wages of Pain",
+   "count": 3
+  },
+  {
+   "id": "OGN-221",
+   "name": "Imperial Decree",
+   "count": 3
+  },
+  {
+   "id": "UNL-069",
+   "name": "Sprite Burst",
+   "count": 3
+  }
+ ],
+ "runes": {
+  "mind": 5,
+  "order": 7
+ },
+ "battlefields": [
+  "UNL-210",
+  "SFD-215",
+  "SFD-216"
+ ],
+ "source": {
+  "url": "https://riftdecks.com/riftbound-metagame/deck-viktor-herald-of-the-arcane-337263",
+  "player": "Calvin Jin",
+  "placement": 5,
+  "tournament": "Riftbound Showdown 25k LDXP Sacramento",
+  "players": 755,
+  "date": "2026-10-24",
+  "set": "Radiance",
+  "sideboard": []
+ }
+}

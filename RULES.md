@@ -39,6 +39,18 @@ are enforced. Paying Energy/Power in effects is always optional (CR 445.2). The 
 recycling a ready rune without exhausting it first, which is strictly dominated (the extra [1] can never hurt).
 The built-in AIs do not float resources outside payments; that is an AI limitation, not a rule.
 
+## Choices and targets (exact since 2026-11-06)
+
+- Spells, triggered and activated abilities make their choices while being finalized on the chain (CR 355.3-355.5,
+  355.12, 355.14.b): targets, "choose a battlefield", move destinations, and choices inside "you may ..." (the may itself
+  is decided on resolution). Opponents see the targets before they react; Deflect costs and "when chosen" triggers use them.
+- On resolution, a target that changed zones or no longer meets its requirements is unaffected; the rest of the spell
+  still happens (CR 359.3.e). Hidden cards keep the "at this battlefield" restriction (CR 359.3.e.2.a).
+- Groups of targets "at the same location" (Bellows Breath) are chosen together; if they split up, the controller picks
+  one location's group (CR 355.11.b).
+- Choices among hidden cards (hand, deck) and choices inside conditionals stay at resolution, as printed.
+- `riftsim/core/targeting.py` does the split; `tests/test_targeting.py` covers it.
+
 ## Simplifications (results can differ from paper play) — every item here is a bug to fix (owner rule: no simplifications)
 
 - Simultaneous triggers are ordered automatically (turn player first, then in object order), not by player choice.

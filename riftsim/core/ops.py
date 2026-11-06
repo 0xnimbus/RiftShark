@@ -7,6 +7,7 @@ Conventions
 """
 from __future__ import annotations
 
+import copy
 import itertools
 
 from .selectors import Sel
@@ -173,9 +174,17 @@ class Choose(Instr):
     When a chosen object is required but none exists, stores None (instruction using it is ignored).
     `targeted` marks the choice as targeting (Deflect costs, 'when you choose me' triggers, hidden restrictions)."""
 
-    def __init__(self, sel, out="t", n=1, up_to=False, player=None, targeted=True, label=None, distinct=True, allow_none=False):
+    def __init__(self, sel, out="t", n=1, up_to=False, player=None, targeted=True, label=None, distinct=True, allow_none=False,
+                 same_loc=False):
+        # "up to three units at the same location" (Bellows Breath): a group of targets that must share a location
+        # (CR 355.11), not a location chosen first.
+        if isinstance(sel, Sel) and sel.where == "loc:__tloc" and n != 1:
+            sel = copy.copy(sel)
+            sel.where = None
+            same_loc = True
         self.sel, self.out, self.n, self.up_to, self.player = sel, out, n, up_to, player
         self.targeted, self.label, self.distinct, self.allow_none = targeted, label, distinct, allow_none
+        self.same_loc = same_loc
 
     def run(self, game, ctx):
         p = _player(game, ctx, self.player)
@@ -197,7 +206,14 @@ class Choose(Instr):
         opts = []
         lo = 0 if self.up_to else maxn
         for k in range(lo, maxn + 1):
-            opts += [tuple(c) for c in itertools.combinations(cands, k)]
+            opts += [tuple(c) for c in itertools.combinations(cands, k)
+                     if not self.same_loc or len({game.objects[u].location for u in c}) <= 1]
+        if not opts and self.same_loc:
+            groups = {}
+            for u in cands:
+                groups.setdefault(game.objects[u].location, []).append(u)
+            k = min(n, max(len(v) for v in groups.values())) if groups else 0
+            opts = [tuple(c) for v in groups.values() for c in itertools.combinations(v, k)] or [()]
         if len(opts) == 1:
             ctx.vars[self.out] = opts[0]
             return None

@@ -1,0 +1,161 @@
+{
+ "name": "Irelia, Blade Dancer (Arito, 2nd Convergence IV)",
+ "legend": "OPP-195",
+ "champion": "SFD-057",
+ "main": [
+  {
+   "id": "VEN-101",
+   "name": "Gust Monk",
+   "count": 1
+  },
+  {
+   "id": "UNL-221",
+   "name": "Lonely Poro",
+   "count": 1
+  },
+  {
+   "id": "UNL-053",
+   "name": "Scuttle Crab",
+   "count": 1
+  },
+  {
+   "id": "OGN-199",
+   "name": "Tideturner",
+   "count": 3
+  },
+  {
+   "id": "RAD-042A",
+   "name": "Orianna, Exquisite",
+   "count": 3
+  },
+  {
+   "id": "SFD-048",
+   "name": "Stellacorn Herder",
+   "count": 3
+  },
+  {
+   "id": "UNL-150",
+   "name": "Vex, Apathetic",
+   "count": 1
+  },
+  {
+   "id": "SFD-051",
+   "name": "Guardian Angel",
+   "count": 2
+  },
+  {
+   "id": "SFD-133",
+   "name": "Boots of Swiftness",
+   "count": 2
+  },
+  {
+   "id": "SFD-139",
+   "name": "Edge of Night",
+   "count": 2
+  },
+  {
+   "id": "OGN-043",
+   "name": "Charm",
+   "count": 2
+  },
+  {
+   "id": "SFD-196",
+   "name": "Defiant Dance",
+   "count": 3
+  },
+  {
+   "id": "OGN-045",
+   "name": "Defy",
+   "count": 3
+  },
+  {
+   "id": "OGN-046",
+   "name": "En Garde",
+   "count": 1
+  },
+  {
+   "id": "RAD-034",
+   "name": "Hunker Down",
+   "count": 1
+  },
+  {
+   "id": "VEN-031",
+   "name": "Twilight Shroud",
+   "count": 1
+  },
+  {
+   "id": "RAD-032",
+   "name": "Battle Preparations",
+   "count": 1
+  },
+  {
+   "id": "OGN-058",
+   "name": "Discipline",
+   "count": 3
+  },
+  {
+   "id": "SFD-045",
+   "name": "Not So Fast",
+   "count": 1
+  },
+  {
+   "id": "OGN-172",
+   "name": "Rebuke",
+   "count": 1
+  },
+  {
+   "id": "OGN-173",
+   "name": "Ride the Wind",
+   "count": 2
+  },
+  {
+   "id": "UNL-128",
+   "name": "Star-Crossed",
+   "count": 1
+  }
+ ],
+ "runes": {
+  "calm": 6,
+  "chaos": 6
+ },
+ "battlefields": [
+  "UNL-205",
+  "SFD-218",
+  "OGN-289"
+ ],
+ "source": {
+  "url": "https://riftdecks.com/riftbound-metagame/deck-irelia-blade-dancer-341750",
+  "player": "Arito",
+  "placement": 2,
+  "tournament": "Convergence IV",
+  "players": 272,
+  "date": "2026-10-31",
+  "set": "Radiance",
+  "sideboard": [
+   [
+    "Decree of Focus",
+    2
+   ],
+   [
+    "Gust",
+    2
+   ],
+   [
+    "Abandon",
+    1
+   ],
+   [
+    "Ravenbloom Prefect",
+    2
+   ],
+   [
+    "Adaptatron",
+    2
+   ],
+   [
+    "Vex, Apathetic",
+    1
+   ]
+  ]
+ }
+}

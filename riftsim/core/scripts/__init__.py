@@ -38,6 +38,9 @@ class SpellEffect:
 
     def __init__(self, effect=None, targets=None, label="", source_text=""):
         from ..vm import compile_effect
+        if targets is None:
+            from ..targeting import split_choices
+            targets, effect = split_choices(effect)      # choices are made as the spell is played (CR 355)
         self.code = compile_effect(effect)
         self.target_code = compile_effect(targets)
         self.label, self.source_text, self.zone, self.cond, self.keyword = label, source_text, "chain", None, None

@@ -1,0 +1,111 @@
+{
+ "name": "Rogue Assassin (Alex Gorica, 2nd Riftbound Showdown 25k LDXP Sacramento)",
+ "legend": "VEN-189*",
+ "champion": "VEN-021A",
+ "main": [
+  {
+   "id": "UNL-003",
+   "name": "Mischievous Marai",
+   "count": 1
+  },
+  {
+   "id": "VEN-028",
+   "name": "Mournful Witness",
+   "count": 3
+  },
+  {
+   "id": "OGN-039",
+   "name": "Kai'Sa, Survivor",
+   "count": 3
+  },
+  {
+   "id": "OGN-012",
+   "name": "Noxus Hopeful",
+   "count": 1
+  },
+  {
+   "id": "SFD-048",
+   "name": "Stellacorn Herder",
+   "count": 3
+  },
+  {
+   "id": "VEN-037",
+   "name": "Tomb-Raider Barbara",
+   "count": 1
+  },
+  {
+   "id": "OGN-067",
+   "name": "Blitzcrank, Impassive",
+   "count": 2
+  },
+  {
+   "id": "VEN-044",
+   "name": "Astral Heron",
+   "count": 3
+  },
+  {
+   "id": "SFD-022",
+   "name": "Long Sword",
+   "count": 3
+  },
+  {
+   "id": "OGN-077",
+   "name": "Zhonya's Hourglass",
+   "count": 3
+  },
+  {
+   "id": "OGN-045",
+   "name": "Defy",
+   "count": 3
+  },
+  {
+   "id": "VEN-140",
+   "name": "Shuriken Flip",
+   "count": 3
+  },
+  {
+   "id": "OGN-057",
+   "name": "Block",
+   "count": 1
+  },
+  {
+   "id": "OGN-058",
+   "name": "Discipline",
+   "count": 3
+  },
+  {
+   "id": "OGN-029",
+   "name": "Falling Star",
+   "count": 3
+  },
+  {
+   "id": "SFD-045",
+   "name": "Not So Fast",
+   "count": 1
+  },
+  {
+   "id": "UNL-042",
+   "name": "Back Off",
+   "count": 2
+  }
+ ],
+ "runes": {
+  "calm": 5,
+  "fury": 7
+ },
+ "battlefields": [
+  "SFD-209",
+  "OGN-287",
+  "OGN-296"
+ ],
+ "source": {
+  "url": "https://riftdecks.com/riftbound-metagame/deck-akali-rogue-assassin-337268",
+  "player": "Alex Gorica",
+  "placement": 2,
+  "tournament": "Riftbound Showdown 25k LDXP Sacramento",
+  "players": 755,
+  "date": "2026-10-24",
+  "set": "Radiance",
+  "sideboard": []
+ }
+}

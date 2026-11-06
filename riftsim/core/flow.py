@@ -17,6 +17,12 @@ from . import payment
 PHASES = ["awaken", "beginning", "scoring", "channel", "draw", "main", "ending", "expiration"]
 
 
+def _depends_on_choice(ins):
+    """A choice restricted by an earlier choice (\"a unit there\") can't be checked before that choice is made."""
+    w = getattr(ins.sel, "where", None) or ""
+    return w.startswith("loc:")
+
+
 class _FinalizeCosts(Instr):
     """Last instruction of a finalize program: Deflect costs, optional additional costs
     (Accelerate, Repeat), then the base cost."""
@@ -1175,10 +1181,9 @@ class FlowMixin:
             if z == "facedown":
                 ctx.target_bf = self.objects[uid].hidden_at
             for ins in tc:
-                if isinstance(ins, Choose) and not ins.up_to and not ins.allow_none:
+                if isinstance(ins, Choose) and not ins.up_to and not ins.allow_none and not _depends_on_choice(ins):
                     if not self.choice_candidates(ctx, ins.sel, targeted=ins.targeted):
                         return False
-                    break
         return True
 
     def _can_activate(self, p, uid, idx, ab):
@@ -1226,10 +1231,9 @@ class FlowMixin:
         if ab.targets:
             ctx = Context(p, uid, here=o.place)
             for ins in ab.target_code:
-                if isinstance(ins, Choose) and not ins.up_to and not ins.allow_none:
+                if isinstance(ins, Choose) and not ins.up_to and not ins.allow_none and not _depends_on_choice(ins):
                     if not self.choice_candidates(ctx, ins.sel, targeted=ins.targeted):
                         return False
-                    break
         return True
 
     def _move_actions(self, p):

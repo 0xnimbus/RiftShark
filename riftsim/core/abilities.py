@@ -15,6 +15,7 @@ Trigger conditions
 from __future__ import annotations
 
 from .vm import compile_effect
+from .targeting import split_choices
 
 
 def _ev_is(ev, kind):
@@ -247,6 +248,9 @@ class Triggered(Ability):
         super().__init__(label, zone, cond, source_text, keyword)
         self.event, self.filt, self.targets, self.effect = event, filt, targets, effect
         self.optional, self.once_per_turn = optional, once_per_turn
+        if targets is None:
+            targets, effect = split_choices(effect)      # choices are made as the trigger is finalized (CR 355, 382)
+            self.targets, self.effect = targets or None, effect
         self.code = compile_effect(effect)
         self.target_code = compile_effect(targets)
         self.store = store or {}       # event field -> ctx var name to copy when triggering
@@ -278,6 +282,9 @@ class Activated(Ability):
         self.cost = dict(cost or {})
         self.timing, self.targets, self.effect = timing, targets, effect
         self.once_per_turn, self.is_add = once_per_turn, is_add
+        if targets is None and not is_add:
+            targets, effect = split_choices(effect)      # choices are made as the ability is activated (CR 355)
+            self.targets, self.effect = targets or None, effect
         self.code = compile_effect(effect)
         self.target_code = compile_effect(targets)
         self.is_equip, self.is_empower = is_equip, is_empower

@@ -1,0 +1,139 @@
+{
+ "name": "Master Yi, Wuju Bladesman (Derpinox, 24th Convergence IV)",
+ "legend": "OPP-019",
+ "champion": "UNL-113",
+ "main": [
+  {
+   "id": "UNL-221",
+   "name": "Lonely Poro",
+   "count": 3
+  },
+  {
+   "id": "OGN-136",
+   "name": "Pit Rookie",
+   "count": 3
+  },
+  {
+   "id": "UNL-053",
+   "name": "Scuttle Crab",
+   "count": 3
+  },
+  {
+   "id": "OGN-132",
+   "name": "First Mate",
+   "count": 3
+  },
+  {
+   "id": "SFD-057",
+   "name": "Irelia, Fervent",
+   "count": 2
+  },
+  {
+   "id": "UNL-120A",
+   "name": "Rengar, Trophy Hunter",
+   "count": 3
+  },
+  {
+   "id": "OGN-077",
+   "name": "Zhonya's Hourglass",
+   "count": 2
+  },
+  {
+   "id": "OGN-043",
+   "name": "Charm",
+   "count": 3
+  },
+  {
+   "id": "OGN-045",
+   "name": "Defy",
+   "count": 3
+  },
+  {
+   "id": "OGN-046",
+   "name": "En Garde",
+   "count": 3
+  },
+  {
+   "id": "SFD-097",
+   "name": "Punch First",
+   "count": 3
+  },
+  {
+   "id": "OGN-156",
+   "name": "Sabotage",
+   "count": 1
+  },
+  {
+   "id": "VEN-031",
+   "name": "Twilight Shroud",
+   "count": 1
+  },
+  {
+   "id": "OGN-058",
+   "name": "Discipline",
+   "count": 3
+  },
+  {
+   "id": "UNL-192",
+   "name": "Alpha Strike",
+   "count": 1
+  },
+  {
+   "id": "VEN-083",
+   "name": "Rampage",
+   "count": 2
+  }
+ ],
+ "runes": {
+  "body": 7,
+  "calm": 5
+ },
+ "battlefields": [
+  "SFD-207",
+  "SFD-217",
+  "UNL-215"
+ ],
+ "source": {
+  "url": "https://riftdecks.com/riftbound-metagame/deck-master-yi-wuju-bladesman-341772",
+  "player": "Derpinox",
+  "placement": 24,
+  "tournament": "Convergence IV",
+  "players": 272,
+  "date": "2026-10-31",
+  "set": "Radiance",
+  "sideboard": [
+   [
+    "Decree of Strength",
+    2
+   ],
+   [
+    "Repulse",
+    1
+   ],
+   [
+    "Sabotage",
+    1
+   ],
+   [
+    "Twilight Shroud",
+    1
+   ],
+   [
+    "Unyielding Spirit",
+    1
+   ],
+   [
+    "Not So Fast",
+    1
+   ],
+   [
+    "Alpha Strike",
+    1
+   ],
+   [
+    "Tomb-Raider Barbara",
+    2
+   ]
+  ]
+ }
+}

@@ -1,0 +1,146 @@
+{
+ "name": "Gloomist (vince, 9th Convergence IV)",
+ "legend": "UNL-193",
+ "champion": "UNL-150",
+ "main": [
+  {
+   "id": "VEN-043",
+   "name": "Steel Paws",
+   "count": 3
+  },
+  {
+   "id": "RAD-107",
+   "name": "Bedeviling Stranger",
+   "count": 1
+  },
+  {
+   "id": "OGN-044",
+   "name": "Clockwork Keeper",
+   "count": 1
+  },
+  {
+   "id": "UNL-141",
+   "name": "Evelynn, Entrancing",
+   "count": 2
+  },
+  {
+   "id": "VEN-101",
+   "name": "Gust Monk",
+   "count": 1
+  },
+  {
+   "id": "UNL-036",
+   "name": "Mutated Mouser",
+   "count": 1
+  },
+  {
+   "id": "RAD-103",
+   "name": "Gutter Guardian",
+   "count": 2
+  },
+  {
+   "id": "VEN-099",
+   "name": "Tornado Warrior",
+   "count": 3
+  },
+  {
+   "id": "OGN-167",
+   "name": "Ember Monk",
+   "count": 1
+  },
+  {
+   "id": "UNL-143",
+   "name": "Kha'Zix, Mutating Horror",
+   "count": 1
+  },
+  {
+   "id": "OGN-067",
+   "name": "Blitzcrank, Impassive",
+   "count": 1
+  },
+  {
+   "id": "VEN-044",
+   "name": "Astral Heron",
+   "count": 3
+  },
+  {
+   "id": "OGN-204",
+   "name": "Seal of Discord",
+   "count": 1
+  },
+  {
+   "id": "OGN-077",
+   "name": "Zhonya's Hourglass",
+   "count": 2
+  },
+  {
+   "id": "SFD-133",
+   "name": "Boots of Swiftness",
+   "count": 3
+  },
+  {
+   "id": "SFD-139",
+   "name": "Edge of Night",
+   "count": 1
+  },
+  {
+   "id": "SFD-056",
+   "name": "Sterak's Gage",
+   "count": 1
+  },
+  {
+   "id": "RAD-044",
+   "name": "Hunting Blind",
+   "count": 1
+  },
+  {
+   "id": "OGN-045",
+   "name": "Defy",
+   "count": 2
+  },
+  {
+   "id": "RAD-029",
+   "name": "Life from Stone",
+   "count": 1
+  },
+  {
+   "id": "OGN-058",
+   "name": "Discipline",
+   "count": 2
+  },
+  {
+   "id": "OGN-172",
+   "name": "Rebuke",
+   "count": 1
+  },
+  {
+   "id": "SFD-145",
+   "name": "Switcheroo",
+   "count": 3
+  },
+  {
+   "id": "UNL-042",
+   "name": "Back Off",
+   "count": 1
+  }
+ ],
+ "runes": {
+  "calm": 6,
+  "chaos": 6
+ },
+ "battlefields": [
+  "RAD-157",
+  "OGN-278",
+  "OGN-288"
+ ],
+ "source": {
+  "url": "https://riftdecks.com/riftbound-metagame/deck-vex-gloomist-341757",
+  "player": "vince",
+  "placement": 9,
+  "tournament": "Convergence IV",
+  "players": 272,
+  "date": "2026-10-31",
+  "set": "Radiance",
+  "sideboard": []
+ }
+}

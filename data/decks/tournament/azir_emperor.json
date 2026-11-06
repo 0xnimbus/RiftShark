@@ -1,0 +1,106 @@
+{
+ "name": "Azir, Emperor of the Sands (Andrew L McDonald, 40th Riftbound Showdown 25k LDXP Sacramento)",
+ "legend": "OPP-197",
+ "champion": "SFD-177",
+ "main": [
+  {
+   "id": "RAD-129",
+   "name": "Trifarian Captain",
+   "count": 3
+  },
+  {
+   "id": "VEN-135",
+   "name": "Kennen, Keeper of Balance",
+   "count": 1
+  },
+  {
+   "id": "UNL-176",
+   "name": "Vi, Peacekeeper",
+   "count": 1
+  },
+  {
+   "id": "SFD-033",
+   "name": "Doran's Shield",
+   "count": 3
+  },
+  {
+   "id": "SFD-153",
+   "name": "Eye of the Herald",
+   "count": 3
+  },
+  {
+   "id": "SFD-042",
+   "name": "Brutalizer",
+   "count": 3
+  },
+  {
+   "id": "VEN-027",
+   "name": "Hand Hammer",
+   "count": 3
+  },
+  {
+   "id": "SFD-161",
+   "name": "B.F. Sword",
+   "count": 3
+  },
+  {
+   "id": "OGN-045",
+   "name": "Defy",
+   "count": 3
+  },
+  {
+   "id": "RAD-032",
+   "name": "Battle Preparations",
+   "count": 1
+  },
+  {
+   "id": "SFD-163",
+   "name": "Deathgrip",
+   "count": 1
+  },
+  {
+   "id": "OGN-058",
+   "name": "Discipline",
+   "count": 3
+  },
+  {
+   "id": "OGN-213",
+   "name": "Hidden Blade",
+   "count": 3
+  },
+  {
+   "id": "UNL-042",
+   "name": "Back Off",
+   "count": 2
+  },
+  {
+   "id": "SFD-154",
+   "name": "Guards!",
+   "count": 3
+  },
+  {
+   "id": "SFD-198",
+   "name": "Arise!",
+   "count": 3
+  }
+ ],
+ "runes": {
+  "calm": 7,
+  "order": 5
+ },
+ "battlefields": [
+  "SFD-210",
+  "SFD-217",
+  "OGN-294"
+ ],
+ "source": {
+  "url": "https://riftdecks.com/riftbound-metagame/deck-azir-emperor-of-the-sands-337377",
+  "player": "Andrew L McDonald",
+  "placement": 40,
+  "tournament": "Riftbound Showdown 25k LDXP Sacramento",
+  "players": 755,
+  "date": "2026-10-24",
+  "set": "Radiance",
+  "sideboard": []
+ }
+}
