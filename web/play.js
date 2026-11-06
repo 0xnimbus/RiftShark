@@ -1,16 +1,44 @@
-/* Play & coach page: talks to tools/play_server.py (local). */
+/* Play & coach page: talks to tools/play_server.py when it is running, else runs the engine in a web worker (Pyodide). */
 (function () {
   const $ = (s, el) => (el || document).querySelector(s);
   fetch("data/cards.json").then(r => r.json()).then(j => RiftBoard.setCards(j)).catch(() => {});
-  const api = async (path, body) => {
+  /* Backend: the local server's /api/* when it answers, otherwise the engine in a web worker (Pyodide). */
+  let worker = null, nextId = 1; const pending = {};
+  function workerApi(path, body) {
+    if (!worker) {
+      worker = new Worker("engine_worker.js");
+      worker.onmessage = e => {
+        if (e.data.progress !== undefined) { $("#status").textContent = e.data.progress; return; }
+        const p = pending[e.data.id]; delete pending[e.data.id];
+        if (!p) return;
+        e.data.error ? p.reject(new Error(e.data.error)) : p.resolve(e.data.result);
+      };
+      worker.onerror = e => { for (const k in pending) { pending[k].reject(new Error(e.message)); delete pending[k]; } };
+    }
+    const cmd = path.replace("/api/", "");
+    return new Promise((resolve, reject) => { const id = nextId++; pending[id] = { resolve, reject }; worker.postMessage({ id, cmd, args: body || {} }); });
+  }
+  const serverApi = async (path, body) => {
     const r = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
     return r.json();
   };
+  let backend = null;  // "server" | "browser"
+  async function detectBackend() {
+    try {
+      const j = await serverApi("/api/decks");
+      if (j && j.server) { backend = "server"; return j; }
+    } catch (e) { /* static host */ }
+    backend = "browser";
+    $("#mode").textContent = "Running in your browser (no server): the first start downloads the engine, and the AI thinks more slowly than the local server.";
+    $("#ai").value = "mcts:60"; $("#analysis").value = 60;
+    return workerApi("/api/decks");
+  }
+  const api = (path, body) => backend === "server" ? serverApi(path, body) : workerApi(path, body);
   let cur = null;
   function busy(on, msg) { document.body.classList.toggle("busy", on); $("#status").textContent = msg || ""; }
 
   async function loadDecks() {
-    const j = await api("/api/decks");
+    const j = await detectBackend();
     for (const id of ["deck0", "deck1"]) {
       $("#" + id).innerHTML = j.decks.map(d => `<option value="${d.path}">${d.name}</option>`).join("");
     }
@@ -62,6 +90,7 @@
   async function choose(i) {
     busy(true, "grading your move and letting the AI reply…");
     try { show(await api("/api/choose", { index: i })); }
+    catch (e) { $("#status").textContent = "error: " + e.message; }
     finally { busy(false); }
   }
   $("#btn-new").addEventListener("click", async () => {
@@ -71,7 +100,8 @@
                                    analysis: +$("#analysis").value, seed: +$("#seed").value }));
       $("#review").textContent = "Every move you make is rated against the engine's best line.";
       $("#summary").textContent = "–";
-    } finally { busy(false); }
+    } catch (e) { $("#status").textContent = "error: " + e.message; }
+    finally { busy(false); }
   });
   $("#btn-hint").addEventListener("click", async () => {
     busy(true, "thinking…");
@@ -80,6 +110,6 @@
       $("#hint").innerHTML = j.ok ? j.options.map(o => `${o.win_pct}% · ${o.label}`).join("<br>") : j.error;
     } finally { busy(false); }
   });
-  loadDecks();
-  api("/api/state").then(show).catch(() => {});
+  loadDecks().then(() => { if (backend === "server") api("/api/state").then(show).catch(() => {}); })
+    .catch(e => { $("#status").textContent = "could not load the engine: " + e.message; });
 })();

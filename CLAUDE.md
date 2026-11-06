@@ -34,7 +34,12 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   Frontend reads the latest batch/replays from Supabase and falls back to `web/data`.
 - `tests/test_core_v2.py` is the v2 regression suite (pytest -q tests/).
 - Play & coach (Derrick's request 2026-11-06): `tools/play_server.py` + `web/play.html` + `riftsim/core/analysis.py`.
-  Grades use MCTS win% loss vs best option; thresholds in analysis.GRADES. Local only (Python backend).
+  Grades use MCTS win% loss vs best option; thresholds in analysis.GRADES. `riftsim/core/playsession.py` is shared by the
+  server and the browser build: `tools/build_web_engine.py` copies the engine + cards + decks into `web/engine/`
+  (gitignored, built by the Pages workflow) and `web/engine_worker.js` runs it with Pyodide 0.27 from jsdelivr when
+  `/api/decks` does not answer. Measured in headless Chromium: ~6 s to start, 5-11 s per move at mcts:60/analysis 60.
+  Derrick's PC has only Python 3.10 and Claude's auto-mode there refused to run the cloned server; the browser build is the
+  way for him to play until GitHub Pages is enabled (repo private: needs Pro plan or public repo).
 - Main deck = 39 cards + chosen champion (CR 103.3). `When you play me` triggers fire from the chain.
 - `riftsim/` top level still holds the v1 simplified engine (engine.py, policies.py, replay.py, runner.py, cli.py).
   It will be replaced by v2 equivalents.
