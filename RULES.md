@@ -8,7 +8,7 @@ under the rules as modelled here. Anything listed under *Simplifications* is whe
 
 - 1v1 mode: 8 points to win, 2 battlefields (one picked at random from each deck's three), 12-rune rune deck,
   40-card main deck including the Chosen Champion (which starts in the Champion Zone), legend on the board.
-- Turn structure: Awaken (ready, stunned objects stay exhausted), Beginning, Scoring (hold), Channel (2 runes; the
+- Turn structure: Awaken (ready everything; stun only stops combat damage and ends in the end-of-turn cleanup, CR 424.1), Beginning, Scoring (hold), Channel (2 runes; the
   second player channels 3 on their first turn), Draw, Main, Ending (end-of-turn cleanup, buffs/mods expire),
   Expiration. Extra turns via a turn queue (Time Warp).
 - The chain with HOT FEPR ordering, priority vs focus, Neutral/Showdown × Open/Closed states, reactions and actions,
@@ -63,6 +63,16 @@ The built-in AIs do not float resources outside payments; that is an AI limitati
   one location's group (CR 355.11.b).
 - Choices among hidden cards (hand, deck) and choices inside conditionals stay at resolution, as printed.
 - `riftsim/core/targeting.py` does the split; `tests/test_targeting.py` covers it.
+
+## Rules audit (2026-11-06)
+
+`tools/rules_audit.py N SEED [policy]` plays games between the tournament decks and checks every action decision against
+an independent reading of the rules (moves, play timing and locations, hiding, passing) and board invariants (zones,
+runes, cleanups, scoring, Channel Phase counts). Fixed by the audit: card-level vs mentioned keywords and numbered
+keywords (`cards._card_level_keyword`), multi-origin and stunned moves, the second player's first channel, victory
+before trigger ordering, full combat damage assignment (CR 467.2.c, lethal counted after replacement and prevention),
+untruncated discard/recycle choices, repeated burn out (CR 432), Focus passing after units in showdowns.
+Interpretation: a unit no damage can kill may absorb any part of combat damage (CR 467.2.c.6 "if able").
 
 ## Simplifications (results can differ from paper play) — every item here is a bug to fix (owner rule: no simplifications)
 
