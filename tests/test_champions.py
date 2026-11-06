@@ -687,3 +687,88 @@ def test_ahri_counts_a_static_minus_might_that_starts_applying(db, decks):
     g.do_stun(foe, None)
     settle(g)
     assert g.chars(ahri).might == base + 1
+
+
+def test_rell_magnetic_plays_a_cheap_equipment_free_and_attaches_it(db, decks):
+    g = main_phase(db, decks)
+    rell = put(g, db, 0, "Rell, Magnetic", ("base", 0))
+    eq = _card_in(g, db, 0, "Doran's Blade", "hand")
+    big = _card_in(g, db, 0, "Rell, Magnetic", "hand")       # not an Equipment: not offered
+    runes_ready = sum(1 for u in g.players[0].runes if not g.objects[u].exhausted)
+    g.emit("attack", uid=rell, player=0, loc=("bf", 0))
+    seen = []
+    for _ in range(40):
+        d = g.run()
+        if d.kind in ("pick", "pick_many") or (d.kind == "choose" and eq in d.options):
+            seen.append(list(d.options))
+            g.choose(next(o for o in d.options if o == eq or o == (eq,))); continue
+        if d.kind == "yesno":
+            g.choose(True); continue
+        if d.kind == "action" and not g.chain:
+            break
+        g.choose(("pass",) if ("pass",) in d.options else d.options[0])
+    assert g.objects[eq].zone == "board" and g.objects[eq].attached_to == rell
+    assert sum(1 for u in g.players[0].runes if not g.objects[u].exhausted) == runes_ready
+    assert all(big not in o and (big,) not in o for o in seen)
+
+
+def test_ashe_focused_banishes_a_card_until_they_hold(db, decks):
+    g = main_phase(db, decks)
+    ashe = put(g, db, 0, "Ashe, Focused", ("base", 0))
+    hand1 = list(g.players[1].hand)
+    target = hand1[0]
+    g.emit("play", uid=ashe, player=0, card_type="unit")
+    for _ in range(40):
+        d = g.run()
+        if d.kind == "choose" and target in d.options:
+            g.choose(target); continue
+        if d.kind == "action" and not g.chain:
+            break
+        g.choose(("pass",) if ("pass",) in d.options else d.options[0])
+    assert g.objects[target].zone == "banish"
+    g._to_zone(g.objects[ashe], "trash"); g.bump()            # even if Ashe left the board
+    g.emit("hold", player=0, loc=("bf", 0), bf=0, units=())    # my hold: nothing
+    settle(g)
+    assert g.objects[target].zone == "banish"
+    g.emit("hold", player=1, loc=("bf", 1), bf=1, units=())
+    settle(g)
+    assert g.objects[target].zone == "hand"
+
+
+def test_soraka_saves_smaller_friendly_units_here_and_takes_damage_last(db, decks):
+    g = main_phase(db, decks)
+    bf = ("bf", 0)
+    sor = put(g, db, 0, "Soraka, Wanderer", bf)
+    small = put(g, db, 0, "Ahri, Confident", bf, exclude=(sor,))
+    g.add_mod(small, "might", -2, "turn"); g.objects[small].damage = 1
+    big = put(g, db, 0, "Sivir, Ambitious", bf, exclude=(sor, small))
+    g.do_kill([small])
+    assert g.objects[small].zone == "board" and g.objects[small].location == ("base", 0)
+    assert g.objects[small].exhausted and g.objects[small].damage == 0
+    g.do_kill([big])                                   # 7 [M] is not less than Soraka's 4
+    assert g.objects[big].zone == "trash"
+    other = put(g, db, 0, "Gangplank, Naval", bf, exclude=(sor, small, big))
+    plans = g._damage_plans([sor, other], 3)
+    assert all(p[0] == 0 for p in plans)               # Gangplank (6 [M]) must take lethal before Soraka gets any
+
+
+def test_sivir_ambitious_deals_the_excess_after_conquering(db, decks):
+    g = main_phase(db, decks)
+    bf = ("bf", 0)
+    sv = put(g, db, 0, "Sivir, Ambitious", bf)
+    foe = put(g, db, 1, "Gangplank, Naval", ("bf", 1))
+    hp = g.chars(foe).might
+    g.combat = {"attacker": 0, "defender": 1, "bf": 0}
+    g.turn_memo[("combat_excess", 0)] = 4
+    g.emit("conquer", player=0, loc=bf, bf=0, units=(sv,))
+    g.combat = None
+    settle(g)
+    assert g.objects[foe].damage == 0                  # 4 excess: no trigger
+    g.combat = {"attacker": 0, "defender": 1, "bf": 0}
+    g.turn_memo[("combat_excess", 0)] = 5
+    g.emit("conquer", player=0, loc=bf, bf=0, units=(sv,))
+    g.combat = None
+    settle(g)
+    bonus = sum(v for _, v in g.rules("bonus_damage", player=0)) + \
+        sum(v for src, v in g.rules("bonus_damage_here") if g.objects[src].place == ("bf", 1))   # battlefield bonus
+    assert [e["amount"] for e in g.events if e["kind"] == "damage" and e.get("uid") == foe] == [5 + bonus]

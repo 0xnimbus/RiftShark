@@ -1368,3 +1368,90 @@ def ahri_confident(defn):
     return {"abilities": [Static("self", "rule", ("watch_might_reductions",), label="watches -[M]"),
                           Triggered(reduced_here, [O.GiveMight(Ref("self"), 1)], label=defn.name, source_text=defn.text)],
             "replace": True}
+
+
+def _mark_played(var, key, value):
+    """After PlayCard stored the played uid in ctx.vars[var], set key on its chain item's ctx."""
+    def run(g, c):
+        for it in g.chain:
+            if it.uid == c.vars.get(var) and it.uid is not None:
+                it.ctx.vars[key] = value(g, c) if callable(value) else value
+    return run
+
+
+@script("Rell, Magnetic")
+def rell_magnetic(defn):
+    # [Tank]   (keyword)
+    # When I attack, you may play an Equipment with Energy cost no more than [2], ignoring its cost, and attach it to me.
+    def options(g, c):
+        return [u for u in g.players[c.controller].hand if g.objects[u].base_defn().is_equipment
+                and (g.objects[u].base_defn().energy or 0) <= 2]
+    body = [O.ChooseFromList(options, out="__eq", up_to=True, label="play an Equipment costing [2] or less"),
+            O.Do(_unwrap("__eq")),
+            O.If(Ref("__eq"), [O.PlayCard(Ref("__eq"), ignore="all", out="__eqp"),
+                               O.Do(_mark_played("__eqp", "__attach_to", lambda g, c: c.source))])]
+    return {"abilities": [Triggered("attack_self", [O.If(lambda g, c: bool(options(g, c)), body)],
+                                    label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Ashe, Focused")
+def ashe_focused(defn):
+    # When you play me, choose an opponent. They reveal their hand. Choose a card revealed this way and banish it.
+    # When they hold, return it to their hand (even if I'm no longer on the board).
+    def reveal(g, c):
+        p = c.vars.get("__opp")
+        if p is not None:
+            g.emit("reveal", player=p, cards=list(g.players[p].hand), ctx=c)
+
+    def their_hold(g, s, ev):
+        return ev.get("kind") == "hold"
+
+    back = [O.ToHand(lambda g, c: [c.vars["__ab"]] if c.vars.get("__ab") in g.objects
+                     and g.objects[c.vars["__ab"]].zone == "banish" else [])]
+    return {"abilities": [Triggered("play_self", [
+        O.ChoosePlayer(out="__opp", opponent=True),
+        O.Do(reveal, label="reveal hand"),
+        O.Choose(lambda g, c: list(g.players[c.vars["__opp"]].hand) if c.vars.get("__opp") is not None else [],
+                 out="__ab", targeted=False),
+        O.If(Ref("__ab"), [O.Banish(Ref("__ab")),
+                           O.Delayed(their_hold, back, filt=lambda g, c, ev: ev.get("player") == c.vars.get("__opp"),
+                                     expires=None, once=True, label="Ashe: return the banished card")])],
+        label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Sivir, Ambitious")
+def sivir_ambitious(defn):
+    # [Deflect 2]   (keyword)
+    # When I conquer after an attack, if you assigned 5 or more excess damage to enemy units, you may deal that much
+    # to an enemy unit.   (excess of this combat: flow turn_memo ("combat_excess", player))
+    def conquer_after_attack(g, s, ev):
+        me = g.objects[s]
+        return (ev.get("kind") == "conquer" and s in ev.get("units", ()) and g.combat is not None
+                and g.combat["attacker"] == me.controller and g.turn_memo.get(("combat_excess", me.controller), 0) >= 5)
+    amount = lambda g, c: c.vars.get("__sx", 0)
+    store = O.Do(lambda g, c: c.vars.__setitem__("__sx", g.turn_memo.get(("combat_excess", c.controller), 0)))
+    return {"abilities": [Triggered(conquer_after_attack, [
+        store,
+        O.May([O.Choose(Sel("unit", side="enemy"), out="t"), O.Deal(amount, Ref("t"))], label="deal the excess to an enemy unit")],
+        label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Soraka, Wanderer")
+def soraka_wanderer(defn):
+    # I must be assigned combat damage last.
+    # If another unit you control here would die, if it has less Might than me, instead heal it, exhaust it, and
+    # recall it.
+    from ..abilities import Replacement
+
+    def saves(g, s, ev):
+        me = g.objects[s]
+        u = ev.get("uid")
+        if u == s or u not in g.objects or ev.get("card_type") != "unit":
+            return False
+        o = g.objects[u]
+        return (o.controller == me.controller and o.location == me.location
+                and (g.chars(u).might or 0) < (g.chars(s).might or 0))
+    return {"abilities": [Static("self", "rule", ("assigned_damage_last",), label="assigned combat damage last",
+                                 source_text=defn.text),
+                          Replacement("die", saves, lambda g, s, ev: dict(ev, replaced_with="recall", exhaust=True),
+                                      label=defn.name, source_text=defn.text)], "replace": True}

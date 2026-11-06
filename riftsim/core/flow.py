@@ -764,17 +764,22 @@ class FlowMixin:
 
     def _damage_plans(self, targets, total):
         """Enumerate legal combat damage assignments (CR 467.2.c): lethal first, Tank first, Backline last."""
+        last = {src for src, _ in self.rules("assigned_damage_last")}
         info = []
         for u in targets:
             c = self.chars(u)
             need = max(1, (c.might or 0) - self.objects[u].damage)
             prio = 0 if c.keywords.get("tank") else (2 if c.keywords.get("backline") else 1)
+            if u in last:
+                prio = 3            # Soraka, Wanderer: "I must be assigned combat damage last"
             info.append((u, need, prio))
-        groups = [[t for t in info if t[2] == k] for k in (0, 1, 2)]
+        groups = [[t for t in info if t[2] == k] for k in (0, 1, 2, 3)]
         plans = set()
         for perm0 in itertools.permutations(groups[0]):
             for perm1 in itertools.permutations(groups[1]):
-                for perm2 in itertools.permutations(groups[2]):
+                for perm2 in itertools.permutations(groups[2] + groups[3]):
+                    if groups[3] and any(t[2] == 3 for t in perm2[:len(groups[2])]):
+                        continue
                     order = list(perm0) + list(perm1) + list(perm2)
                     plan = {u: 0 for u in targets}
                     rem = total
@@ -810,11 +815,15 @@ class FlowMixin:
                 if amt:
                     dealt.append((ctx_d, u, amt))
         self.log("combat_damage", bf=c["bf"], assignments=[(self.label(u), a) for _, u, a in dealt])
+        for q in (c["attacker"], c["defender"]):
+            self.turn_memo[("combat_excess", q)] = 0       # excess assigned in this combat (Sivir, Ambitious)
         for ctx, u, amt in dealt:
             hp = (self.chars(u).might or 0) - self.objects[u].damage
             excess = max(0, amt - max(0, hp))
             if excess:
                 key = ("excess_damage", ctx.controller)
+                self.turn_memo[key] = self.turn_memo.get(key, 0) + excess
+                key = ("combat_excess", ctx.controller)
                 self.turn_memo[key] = self.turn_memo.get(key, 0) + excess
             self.do_deal([u], amt, ctx, source_uid=None, combat=True)
         self.dirty = True
@@ -1192,6 +1201,10 @@ class FlowMixin:
             self.emit("arrive", uid=it.uid, player=p, loc=loc, ctx=ctx)
             if loc[0] == "bf":
                 self._apply_contested(loc, p)
+        host = ctx.vars.get("__attach_to")          # "play an Equipment ... and attach it to me" (Rell, Magnetic)
+        if host is not None and "gear" in c.types and self.objects.get(host) is not None \
+                and self.objects[host].zone == "board":
+            self.do_attach(it.uid, host, ctx)
         ctx.here = loc
         self.dirty = True
 
