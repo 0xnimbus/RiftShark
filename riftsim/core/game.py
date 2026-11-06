@@ -622,6 +622,7 @@ class Game(flow.FlowMixin):
         ctx.vars["self"] = uid
         if ev.get("kind") == "play" and ev.get("uid") == uid:
             ctx.shown_off = self.shown_off.get(uid)      # "When you play me, if you showed off" (CR 832.1.c.1)
+            ctx.paid = dict(ev.get("paid") or {})          # "When you play me, if you paid the additional cost"
         for k, v in ab.store.items():
             ctx.vars[v] = ev.get(k)
         if ev.get("kind") == "die":
@@ -1380,6 +1381,26 @@ class Game(flow.FlowMixin):
             o.mods.append(Mod("control", o.owner, duration, ctx.source if ctx else None, self.tick()))
         self.bump()
         self.dirty = True
+
+    def _end_control_durations(self):
+        """'You control it until I leave the board' (Akshan, Mischievous): duration ("until_leaves", src, stamp)."""
+        for o in self.objects.values():
+            if not o.mods:
+                continue
+            for m in list(o.mods):
+                if m.kind != "control" or not isinstance(m.duration, tuple) or m.duration[0] != "until_leaves":
+                    continue
+                so = self.objects.get(m.duration[1])
+                if so is not None and so.zone == "board" and so.entered_stamp == m.duration[2]:
+                    continue
+                o.mods.remove(m)
+                if o.zone == "board" and o.controller != m.value:
+                    o.controller = m.value
+                    if o.location is not None and o.location[0] == "base":
+                        o.location = ("base", o.controller)
+                    self.log("control_ends", uid=o.uid, player=o.controller)
+                    self.bump()
+                    self.dirty = True
 
     def facedown_cards(self, bf_idx, p):
         """Player p's facedown cards at a battlefield (one, or more with 'hide an additional card here')."""

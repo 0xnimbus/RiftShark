@@ -1455,3 +1455,81 @@ def soraka_wanderer(defn):
                                  source_text=defn.text),
                           Replacement("die", saves, lambda g, s, ev: dict(ev, replaced_with="recall", exhaust=True),
                                       label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Azir, Ascendant")
+def azir_ascendant(defn):
+    # [Calm]: [Action] — Choose a unit you control. Move me to its location and it to my original location. If it's
+    # equipped, you may attach one of its Equipment to me. Use only once per turn.
+    def its_equipment(g, c):
+        t = c.vars.get("t")
+        return [a for a in (g.objects[t].attachments if t in g.objects else ())
+                if g.objects[a].base_defn().is_equipment] if t is not None else []
+    eff = [O.SwapLocations(Ref("self"), Ref("t")),
+           O.If(lambda g, c: bool(its_equipment(g, c)), [
+               O.ChooseFromList(its_equipment, out="__eq", up_to=True, label="attach one of its Equipment to me"),
+               O.Do(_unwrap("__eq")),
+               O.If(Ref("__eq"), [O.Attach(Ref("__eq"), Ref("self"))])])]
+    return {"abilities": [Activated({"energy": 0, "power": ["calm"]}, eff,
+                                    targets=[O.Choose(Sel("unit", side="friendly", other=True), out="t")],
+                                    timing="action", once_per_turn=True, label="swap places with a unit you control",
+                                    source_text=defn.text)], "replace": True}
+
+
+@script("Rumble, Hotheaded")
+def rumble_hotheaded(defn):
+    # Your Mechs each have [Assault].   (auto-scripted static, kept: replace=False)
+    # When I conquer, you may recycle another friendly unit to play a Mech from your trash. Reduce its Energy cost by
+    # the Might of the unit you recycled.
+    def mechs(g, c):
+        return [u for u in g.players[c.controller].trash if g.objects[u].base_defn().is_unit
+                and "Mech" in g.objects[u].base_defn().tags]
+
+    def others(g, c):
+        return [u for u, o in g.objects.items() if u != c.source and o.zone == "board" and o.controller == c.controller
+                and "unit" in g.chars(u).types]
+
+    def remember(g, c):
+        c.vars["__rm"] = g.chars(c.vars["__rr"]).might or 0
+
+    def cost(g, c):
+        u = c.vars.get("__mech")
+        e, pw = g.card_cost(c.controller, u, "trash", None)
+        return (max(0, e - c.vars.get("__rm", 0)), pw)
+    body = [O.Choose(others, out="__rr", targeted=False), O.Do(remember), O.Recycle(Ref("__rr")),
+            O.ChooseFromList(mechs, out="__mech", label="play a Mech from your trash"),
+            O.Do(_unwrap("__mech")),
+            O.If(Ref("__mech"), [O.PlayCard(Ref("__mech"), alt_cost=cost)])]
+    return {"abilities": [Triggered("conquer_self", [
+        O.If(lambda g, c: bool(mechs(g, c)) and bool(others(g, c)), [O.May(body, label="recycle another friendly unit")])],
+        label=defn.name, source_text=defn.text)], "replace": False}
+
+
+@script("Akshan, Mischievous")
+def akshan_mischievous(defn):
+    # [Weaponmaster]   You may pay [Body][Body] as an additional cost to play me.   (auto, kept: replace=False)
+    # When you play me, if you paid the additional cost, move an enemy gear to your base. You control it until I leave
+    # the board. If it's an Equipment, attach it to me.
+    def steal(g, c):
+        t = c.vars.get("t")
+        o = g.objects.get(t)
+        me = g.objects.get(c.source)
+        if o is None or o.zone != "board" or me is None:
+            return
+        if o.attached_to is not None:
+            g.do_detach(t, c)
+        o.location = ("base", c.controller)
+        g.log("move", uid=t, to=o.location)
+        if o.controller != c.controller:
+            prev = o.controller
+            o.controller = c.controller
+            if me.zone == "board":
+                from ..objects import Mod
+                o.mods.append(Mod("control", prev, ("until_leaves", c.source, me.entered_stamp), c.source, g.tick()))
+        g.bump()
+        g.dirty = True
+        if o.base_defn().is_equipment and me.zone == "board":
+            g.do_attach(t, c.source, c)
+    return {"abilities": [Triggered("play_self", [O.Choose(Sel("gear", side="enemy"), out="t"), O.Do(steal, label="take the gear")],
+                                    filt=lambda g, s, ev: bool((ev.get("paid") or {}).get("add")),
+                                    label=defn.name, source_text=defn.text)], "replace": False}

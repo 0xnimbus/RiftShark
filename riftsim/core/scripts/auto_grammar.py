@@ -1848,7 +1848,7 @@ def script_line(defn, line):
         if cm:
             c2 = parse_condition(cm.group(1))
             rest = cm.group(2)
-            filt = lambda g, s, e, c2=c2: _cond_from_src(g, s, c2)
+            filt = lambda g, s, e, c2=c2: _cond_from_src(g, s, c2, e)
         optional = rest.lower().startswith("you may ")
         store = {}
         if isinstance(ev, str) and ev in STORE_EVENT_TARGET:
@@ -1911,7 +1911,7 @@ def script_line(defn, line):
                     PlayPermission("cost", cost_mod=lambda g, u, e, p, n=n: (max(0, e - n), p) if g.objects[u].temp.get("add_paid") else (e, p), label=line)]
         after = parse_sentence(extra, {"tcount": 0}) if extra else []
         return [PlayPermission("additional_cost", value=(None, ins, False), label=line)] + \
-               ([Triggered("play_self", after, filt=lambda g, s, ev: g.objects[s].temp.get("add_paid"), label=line[:40], source_text=line)] if after else [])
+               ([Triggered("play_self", after, filt=lambda g, s, ev: g.objects[s].temp.get("add_paid") or bool((ev.get("paid") or {}).get("add")), label=line[:40], source_text=line)] if after else [])
     m = re.match(r"(?:your )?spells and abilities deal (\d+) bonus damage\.?$", bl)
     if m:
         return [Static("self", "rule", ("bonus_damage", int(m.group(1))), label=line, source_text=line)]
@@ -1944,11 +1944,16 @@ def script_line(defn, line):
     return stat
 
 
-def _cond_from_src(g, s, c2):
+def _cond_from_src(g, s, c2, ev=None):
     from ..vm import Context
     o = g.objects[s]
     ctx = Context(o.controller, s, here=o.location)
     ctx.shown_off = g.shown_off.get(s)
+    if ev is not None:
+        ctx.event = ev
+        ctx.vars["ev"] = ev
+        if ev.get("kind") == "play" and ev.get("uid") == s:
+            ctx.paid = dict(ev.get("paid") or {})      # "When you play me, if you paid the additional cost"
     return bool(c2(g, ctx))
 
 

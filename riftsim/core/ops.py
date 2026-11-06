@@ -751,7 +751,8 @@ class PlayCard(Instr):
         return self._play(game, ctx, val(game, ctx, self.card), choice)
 
     def _play(self, game, ctx, u, loc):
-        ok = game.limited_play(_player(game, ctx, self.player), u, ctx, ignore=self.ignore, alt_cost=self.alt_cost, loc=loc)
+        alt = self.alt_cost(game, ctx) if callable(self.alt_cost) else self.alt_cost
+        ok = game.limited_play(_player(game, ctx, self.player), u, ctx, ignore=self.ignore, alt_cost=alt, loc=loc)
         ctx.vars[self.out] = u if ok else None
         return None
 

@@ -112,7 +112,7 @@ def _equip_cost_text(defn):
     return m.group(1) if m else ""
 
 
-COST_TOKEN = re.compile(r"\[(\d+|A|C|T|Fury|Calm|Mind|Body|Chaos|Order)\]")
+COST_TOKEN = re.compile(r"\[(\d+|A|C|T|Fury|Calm|Mind|Body|Chaos|Order)\]", re.I)   # callers may pass .upper()/.lower() text
 
 
 def temporary_blocked(g, s, ev=None):
@@ -150,11 +150,11 @@ def parse_cost(text):
     for tok in COST_TOKEN.findall(text or ""):
         if tok.isdigit():
             cost["energy"] += int(tok)
-        elif tok == "T":
+        elif tok.upper() == "T":
             cost["exhaust"] = True
-        elif tok == "A":
+        elif tok.upper() == "A":
             cost["power"].append("any")
-        elif tok == "C":
+        elif tok.upper() == "C":
             cost["power"].append("C")
         else:
             cost["power"].append(tok.lower())

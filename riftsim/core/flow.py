@@ -482,16 +482,18 @@ class FlowMixin:
             if o.zone == "board":
                 o.damage = 0
                 o.stunned = False
-        self.expire_mods("turn")
         for o in self.objects.values():
-            # temporary control changes
+            # temporary control changes ("this turn"); before expire_mods drops the marker mods
             keep = []
             for m in o.mods:
-                if m.kind == "control":
+                if m.kind == "control" and m.duration == "turn":
                     o.controller = m.value
+                    if o.zone == "board" and o.location is not None and o.location[0] == "base":
+                        o.location = ("base", o.controller)
                 else:
                     keep.append(m)
             o.mods = keep
+        self.expire_mods("turn")
         self.empty_pools()
         self.bump()
         self._cleanup()
@@ -548,6 +550,7 @@ class FlowMixin:
                     self.set_bf_controller(bf.idx, None)
                     self.dirty = True
         self._check_static_might_reductions()
+        self._end_control_durations()
         # 5. recalls
         for u, o in list(self.objects.items()):
             if o.zone != "board" or o.location is None:
@@ -1014,7 +1017,7 @@ class FlowMixin:
             self.players[it.controller].played_this_turn.append(it.uid)
             o = self.objects[it.uid]
             self.emit("play", uid=it.uid, player=it.controller, card_type=it.kind, loc=ctx.target_bf or ctx.vars.get("__loc"),
-                      from_zone=ctx.played_from, item=it.id, energy=self._energy_spent(it), ctx=ctx)
+                      from_zone=ctx.played_from, item=it.id, energy=self._energy_spent(it), paid=dict(ctx.paid), ctx=ctx)
         elif it.kind == "ability":
             self.emit("activate", uid=it.uid, player=it.controller, energy=(it.cost or {}).get("energy", 0), item=it.id, ctx=ctx)
         self.priority = it.controller

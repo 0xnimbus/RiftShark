@@ -772,3 +772,102 @@ def test_sivir_ambitious_deals_the_excess_after_conquering(db, decks):
     bonus = sum(v for _, v in g.rules("bonus_damage", player=0)) + \
         sum(v for src, v in g.rules("bonus_damage_here") if g.objects[src].place == ("bf", 1))   # battlefield bonus
     assert [e["amount"] for e in g.events if e["kind"] == "damage" and e.get("uid") == foe] == [5 + bonus]
+
+
+def test_azir_ascendant_swaps_with_a_unit_and_takes_its_equipment(db, decks):
+    g = main_phase(db, decks)
+    az = put(g, db, 0, "Azir, Ascendant", ("base", 0))
+    friend = put(g, db, 0, "Rell, Magnetic", ("bf", 0), exclude=(az,))
+    eq = put(g, db, 0, "Doran's Blade", ("bf", 0), exclude=(az, friend))
+    g.do_attach(eq, friend)
+    d = g.run()
+    act = next(o for o in d.options if o[0] == "activate" and o[1] == az)
+    g.choose(act)
+    for _ in range(40):
+        d = g.run()
+        if d.kind in ("pick", "pick_many") and any(eq == o or (eq,) == o for o in d.options):
+            g.choose(next(o for o in d.options if o == eq or o == (eq,))); continue
+        if d.kind == "choose" and friend in d.options:
+            g.choose(friend); continue
+        if d.kind == "action" and not g.chain:
+            break
+        g.choose(("pass",) if ("pass",) in d.options else d.options[0])
+    assert g.objects[az].location == ("bf", 0) and g.objects[friend].location == ("base", 0)
+    assert g.objects[eq].attached_to == az
+    assert not any(o[0] == "activate" and o[1] == az for o in g.run().options)    # once per turn
+
+
+def test_rumble_recycles_a_unit_to_replay_a_mech_cheaper(db, decks):
+    g = main_phase(db, decks)
+    bf = ("bf", 0)
+    rum = put(g, db, 0, "Rumble, Hotheaded", bf)
+    friend = put(g, db, 0, "Ahri, Confident", bf, exclude=(rum,))
+    mech = _card_in(g, db, 0, "Adaptatron", "trash")
+    g.add_mod(friend, "might", -2, "turn")
+    fm = g.chars(friend).might
+    assert 0 < g.objects[mech].defn.energy - fm
+    n = len(g.events)
+    g.emit("conquer", player=0, loc=bf, bf=0, units=(rum,))
+    for _ in range(40):
+        d = g.run()
+        if d.kind == "choose" and friend in d.options:
+            g.choose(friend); continue
+        if d.kind in ("pick", "pick_many") and any(mech == o or (mech,) == o for o in d.options):
+            g.choose(next(o for o in d.options if o == mech or o == (mech,))); continue
+        if d.kind == "yesno":
+            g.choose(True); continue
+        if d.kind == "action" and not g.chain:
+            break
+        g.choose(("pass",) if ("pass",) in d.options else d.options[0])
+    assert g.objects[friend].zone == "deck"
+    assert g.objects[mech].zone == "board"
+    pays = [e for e in g.events[n:] if e["kind"] == "pay" and e.get("energy")]
+    assert pays and pays[-1]["energy"] == max(0, g.objects[mech].defn.energy - fm)
+
+
+def test_akshan_steals_an_enemy_gear_until_he_leaves(db, decks):
+    from riftsim.core.vm import Context
+    g = main_phase(db, decks)
+    ak = put(g, db, 0, "Akshan, Mischievous", ("base", 0))
+    blade = put(g, db, 1, "Doran's Blade", ("base", 1))
+    ctx = Context(0, ak)
+    g.emit("play", uid=ak, player=0, card_type="unit", paid={}, ctx=ctx)       # additional cost not paid
+    settle(g)
+    assert g.objects[blade].controller == 1
+    g.emit("play", uid=ak, player=0, card_type="unit", paid={"add": True}, ctx=ctx)
+    settle(g, picks=[blade])
+    assert g.objects[blade].controller == 0 and g.objects[blade].attached_to == ak
+    g.do_kill([ak])
+    settle(g)
+    assert g.objects[blade].controller == 1 and g.objects[blade].location == ("base", 1)
+
+
+def test_temporary_control_returns_at_end_of_turn(db, decks):
+    g = main_phase(db, decks)
+    foe = put(g, db, 1, "Rell, Magnetic", ("base", 1))
+    from riftsim.core.vm import Context
+    g.take_control(foe, 0, Context(0, None), duration="turn")
+    assert g.objects[foe].controller == 0
+    g._expiration()
+    assert g.objects[foe].controller == 1 and g.objects[foe].location == ("base", 1)
+
+
+def test_nami_headstrong_paid_additional_cost_triggers_the_stun(db, decks):
+    # end to end: the play event carries the paid additional costs to "if you paid the additional cost" triggers
+    from test_targeting import give
+    g = main_phase(db, decks)
+    foe = put(g, db, 1, "Rell, Magnetic", ("bf", 0))
+    nami = give(g, 0, "Nami, Headstrong", db)
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == nami and (len(o) < 3 or o[2] == ("base", 0))))
+    for _ in range(60):
+        d = g.run()
+        if d.kind == "additional_cost":
+            g.choose(True); continue
+        if d.kind == "choose" and foe in d.options:
+            g.choose(foe); continue
+        if d.kind == "action" and not g.chain:
+            break
+        g.choose(("pass",) if ("pass",) in d.options else d.options[0])
+    assert g.objects[nami].zone == "board"
+    assert g.objects[foe].stunned

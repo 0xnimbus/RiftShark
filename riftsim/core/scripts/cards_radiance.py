@@ -219,7 +219,7 @@ def gust_monk(defn):
         O.Choose(Sel("card", zone="trash"), out="__b", targeted=True),
         O.Choose(Sel("unit"), out="t"),
         O.If(O.has_var("__b"), [O.Banish(Ref("__b")), O.GiveKeyword(Ref("t"), "assault", 2)]),
-    ], filt=lambda g, s, ev: bool(getattr(ev.get("ctx"), "paid", {}).get("add")),
+    ], filt=lambda g, s, ev: bool((ev.get("paid") or {}).get("add")),
         label="Gust Monk: Assault 2", source_text=defn.text)])
 
 
