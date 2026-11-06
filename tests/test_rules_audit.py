@@ -245,3 +245,52 @@ def test_hidden_spell_without_target_at_its_battlefield_cannot_be_played(db, dec
     g = main_phase(db, decks)
     assert g._could_target_at_bf(Sel("unit", side="enemy"))
     assert not g._could_target_at_bf(Sel("unit", where="base"))
+
+
+def _swap_hidden_hand(g, p):
+    """Same public information, different hidden hand for player p (hand cards swapped with deck cards)."""
+    ps = g.players[p]
+    k = min(len(ps.hand), len(ps.deck))
+    new_hand, new_deck = ps.deck[:k] + ps.hand[k:], ps.hand[:k] + ps.deck[k:]
+    for u in new_hand:
+        g.objects[u].zone = "hand"
+    for u in new_deck:
+        g.objects[u].zone = "deck"
+    ps.hand, ps.deck = new_hand, new_deck
+    g.bump()
+
+
+@pytest.mark.parametrize("spec", ["advanced", "expert", "mcts:30"])
+def test_ai_decisions_do_not_depend_on_the_opponents_hidden_hand(db, decks, spec):
+    from riftsim.core.policies import make_policy
+    g = main_phase(db, decks)
+    put(g, db, 1, "Shipyard Skulker", ("bf", 0))
+    g.pending = None
+    d = g.run()
+    assert d.player == 0 and len(d.options) > 2
+    h = g.clone()
+    _swap_hidden_hand(h, 1)
+    assert sorted(g.players[1].hand) != sorted(h.players[1].hand)
+    pa, pb = make_policy(spec, seed=5), make_policy(spec, seed=5)
+    if spec.startswith("mcts"):
+        ra, rb = pa.search(g, g.pending), pb.search(h, h.pending)
+        va = sorted((str(c.option), c.visits, round(c.value, 6)) for c in ra.children)
+        vb = sorted((str(c.option), c.visits, round(c.value, 6)) for c in rb.children)
+    else:
+        va, vb = pa.evaluate(g, g.pending, list(g.pending.options)), pb.evaluate(h, h.pending, list(h.pending.options))
+    assert va == vb
+
+
+def test_determinize_keeps_public_and_known_cards(db, decks):
+    import random
+    from riftsim.core.policies import determinize
+    g = main_phase(db, decks)
+    opp = g.players[1]
+    trash = list(opp.trash)
+    seen = g.determinize_check = None
+    known = opp.hand[0]
+    g.known.setdefault(0, {})[known] = g.objects[known].entered_stamp
+    for s in range(5):
+        x = determinize(g, 0, random.Random(s))
+        assert known in x.players[1].hand and x.players[1].trash == trash
+        assert len(x.players[1].hand) == len(opp.hand) and x.players[1].champion == opp.champion

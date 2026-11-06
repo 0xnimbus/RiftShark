@@ -9,7 +9,7 @@ import random
 
 import math
 
-from .policies import MCTSPolicy, GreedyPolicy, _advance_default, heuristic, ai_options
+from .policies import MCTSPolicy, GreedyPolicy, _advance_default, heuristic, ai_options, determinize
 
 GRADES = [(1.0, "best"), (3.0, "good"), (7.0, "inaccuracy"), (15.0, "mistake"), (1e9, "blunder")]
 
@@ -47,10 +47,13 @@ def analyze(game, d, iterations=300, seed=0, max_branch=40):
         if o in stats:
             visits, v = stats[o]
         else:
-            g = game.clone()
-            g.choose(o)
-            _advance_default(g, d.player, rollout_rng=rng)
-            visits, v = 0, math.tanh(heuristic(g, d.player) / 150.0)
+            g = determinize(game, d.player, rng)      # the coach does not see the opponent's hand either
+            if g.pending is None or o not in g.pending.options:
+                g = None
+            else:
+                g.choose(o)
+                _advance_default(g, d.player, rollout_rng=rng)
+            visits, v = 0, (math.tanh(heuristic(g, d.player) / 150.0) if g is not None else 0.0)
         # standard error of the estimate in win-% points (values are in [-1, 1]); one-ply guesses count as very uncertain
         se = 50.0 / math.sqrt(visits) if visits else 25.0
         out.append({"index": i, "label": d.labels[i], "option": o, "win_pct": round(50.0 * (v + 1.0), 1), "visits": visits,

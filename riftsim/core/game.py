@@ -8,6 +8,8 @@ import random
 from .abilities import Static, Triggered, Activated, Replacement, PlayPermission, DelayedAbility, TRIGGERS
 from .cards import CardDB, DOMAINS
 from .objects import Mod, Chars, GameObject, PlayerState, BattlefieldState, ChainItem
+
+_OBJ_PLAIN_SLOTS = tuple(k for k in GameObject.__slots__ if k not in ("mods", "attachments", "counters", "temp", "chars_cache"))
 from .selectors import Sel
 from . import payment
 from .vm import Context, Decision, Frame, compile_effect, _copy_containers
@@ -1723,17 +1725,13 @@ class Game(flow.FlowMixin):
 
     def _clone_obj(self, o):
         c = GameObject.__new__(GameObject)
-        for k in GameObject.__slots__:
-            v = getattr(o, k)
-            if k == "mods":
-                v = [Mod(m.kind, m.value, m.duration, m.source, m.stamp, m.loc) for m in v]
-            elif k in ("attachments",):
-                v = list(v)
-            elif k in ("counters", "temp"):
-                v = _copy_containers(v)
-            elif k == "chars_cache":
-                v = None
-            setattr(c, k, v)
+        for k in _OBJ_PLAIN_SLOTS:
+            setattr(c, k, getattr(o, k))
+        c.mods = [Mod(m.kind, m.value, m.duration, m.source, m.stamp, m.loc) for m in o.mods] if o.mods else []
+        c.attachments = list(o.attachments) if o.attachments else []
+        c.counters = _copy_containers(o.counters) if o.counters else {}
+        c.temp = _copy_containers(o.temp) if o.temp else {}
+        c.chars_cache = None
         return c
 
     def _clone_player(self, p):

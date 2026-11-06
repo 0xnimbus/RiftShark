@@ -154,9 +154,12 @@ class GreedyPolicy(Policy):
         for o in opts:
             v = 0.0
             for k in range(self.samples):
-                g = determinize(game, d.player, self.rng) if self.samples > 1 else game.clone()
-                if o not in (g.pending.options if g.pending is not None else d.options):
-                    g = game.clone()
+                # never look ahead on the real game: the opponent's hand, facedown cards and both deck orders are
+                # resampled from what this player cannot see (a real simulation, Derrick 2026-11-06)
+                g = determinize(game, d.player, self.rng)
+                if g.pending is None or o not in g.pending.options:
+                    v += heuristic(g, d.player)      # option depends on hidden cards: judge the position as it is
+                    continue
                 g.choose(o)
                 _advance_default(g, d.player, rollout_rng=random.Random(self.rng.random()))
                 v += heuristic(g, d.player)
@@ -208,8 +211,11 @@ def determinize(game, player, rng):
     rune decks) on a clone and return it. Cards revealed to `player` (Scuttle Crab, reveals) are kept."""
     g = game.clone()
     for q, ps in enumerate(g.players):
+        # hidden orders/contents are sorted before shuffling, so the result depends only on what `player` knows
         if q == player:
+            ps.deck = sorted(ps.deck, key=str)
             rng.shuffle(ps.deck)
+            ps.rune_deck = sorted(ps.rune_deck, key=str)
             rng.shuffle(ps.rune_deck)
             continue
         # cards `player` knows stay where they are: revealed hand cards, facedown cards they may look at
@@ -217,11 +223,16 @@ def determinize(game, player, rng):
         hidden_hand = [u for u in ps.hand if u not in known_hand]
         fd_slots = [(bf, k, u) for bf in g.battlefields for k, u in bf.facedown.items()
                     if g.objects[u].controller == q and not g.knows(player, u)]
-        pool = hidden_hand + list(ps.deck) + [u for _, _, u in fd_slots]
+        pool = sorted(hidden_hand + list(ps.deck) + [u for _, _, u in fd_slots], key=str)
         rng.shuffle(pool)
+        # a facedown card is known to have [Hidden] (it was hidden with the keyword): fill those slots first
+        hid = [u for u in pool if g.objects[u].base_defn().keywords.get("hidden")]
+        new_fd = hid[:len(fd_slots)]
+        if len(new_fd) < len(fd_slots):           # hidden by another effect: any card
+            new_fd += [u for u in pool if u not in new_fd][:len(fd_slots) - len(new_fd)]
+        rest = [u for u in pool if u not in set(new_fd)]
         nh = len(hidden_hand)
-        new_hand, rest = pool[:nh], pool[nh:]
-        new_fd, new_deck = rest[:len(fd_slots)], rest[len(fd_slots):]
+        new_hand, new_deck = rest[:nh], rest[nh:]
         olds = {u: (g.objects[u].location, g.objects[u].entered_stamp, getattr(g.objects[u], "hidden_at", None),
                     getattr(g.objects[u], "facedown_turn", None)) for _, _, u in fd_slots}
         for (bf, k, old), u in zip(fd_slots, new_fd):
@@ -234,7 +245,9 @@ def determinize(game, player, rng):
             g.objects[u].zone, g.objects[u].location = "hand", None
         for u in ps.deck:
             g.objects[u].zone, g.objects[u].location = "deck", None
+        ps.rune_deck = sorted(ps.rune_deck, key=str)
         rng.shuffle(ps.rune_deck)
+    g.rng = random.Random(rng.random())      # future random events are unknown too
     g.bump()
     return g
 
