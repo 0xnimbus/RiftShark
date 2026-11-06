@@ -21,6 +21,7 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
 | 2026-11-06 13:30 | 9% used, resets 12:50 PM | 24% used, resets Mon 10:00 AM | +7% in 21 min; Rek'Sai deck, 15 legends, coach fix, UI PR merged |
 | 2026-11-06 13:53 | 12% used, resets 12:50 PM | 24% used, resets Mon 10:00 AM | +3% in 23 min; 5 hard legends + 11 champions scripted, 6 engine fixes |
 | 2026-11-06 14:19 | 15% used, resets 12:50 PM | 25% used, resets Mon 10:00 AM | +3% in 26 min; ~70 champions scripted (none 314, partial 32); 20-per-pair round-robin running (out/rr20); browser coach depth 100 |
+| 2026-11-06 14:43 | 18% used, resets 12:50 PM | 25% used, resets Mon 10:00 AM | +3% in 24 min; Repeat fix (CR 820), rr20 restarted 14:34 (180/900) |
 
 ## Where things stand
 
