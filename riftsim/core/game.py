@@ -997,6 +997,8 @@ class Game(flow.FlowMixin):
             if ev["card_type"] == "unit":
                 key = ("units_died", ev["player"])           # "if an enemy unit has died this turn"
                 self.turn_memo[key] = self.turn_memo.get(key, 0) + 1
+            key = ("perms_died", ev["player"])               # "if a friendly unit or gear died this turn"
+            self.turn_memo[key] = self.turn_memo.get(key, 0) + 1
             self.emit("die", ctx=ctx, **{k: v for k, v in ev.items() if k != "kind"})
             self._to_zone(o, "trash")
             self.emit("leave", uid=u, player=ev["player"], loc=ev["loc"], card_type=ev["card_type"], ctx=ctx)
@@ -1303,6 +1305,10 @@ class Game(flow.FlowMixin):
     def do_counter(self, item_id, ctx=None):
         for it in self.chain:
             if it.id == item_id and not it.removed:
+                if it.uid is not None and it.kind == "spell" and any(isinstance(ab, PlayPermission) and ab.perm == "uncounterable"
+                                                                    for ab in self._abilities_of(it.uid, self.objects[it.uid])):
+                    self.log("counter_refused", item=item_id, label=it.label)     # "This can't be countered."
+                    return False
                 if it.kind not in ("unit", "gear") and self.rules("my_spells_abilities_uncounterable", player=it.controller):
                     self.log("counter_refused", item=item_id, label=it.label)     # Mel, Newly Awakened
                     return False

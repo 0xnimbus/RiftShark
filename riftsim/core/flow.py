@@ -1044,6 +1044,9 @@ class FlowMixin:
             self.turn_memo[("spell_spent_4", it.controller)] = True      # Jhin, Meticulous Killer
         if it.kind in ("spell", "unit", "gear"):
             self.players[it.controller].played_this_turn.append(it.uid)
+            pl = ctx.target_bf or ctx.vars.get("__loc")
+            if it.kind in ("unit", "gear") and pl is not None and pl[0] == "bf":
+                self.turn_memo[("played_to_bf", it.controller)] = True      # Hold 'Em
             o = self.objects[it.uid]
             self.emit("play", uid=it.uid, player=it.controller, card_type=it.kind, loc=ctx.target_bf or ctx.vars.get("__loc"),
                       from_zone=ctx.played_from, item=it.id, energy=self._energy_spent(it), paid=dict(ctx.paid), ctx=ctx)
@@ -1070,6 +1073,9 @@ class FlowMixin:
 
     def _deflect_total(self, it, ctx):
         total = 0
+        if it.uid is not None and it.uid in self.objects and any(
+                isinstance(ab, PlayPermission) and ab.perm == "ignore_deflect" for ab in self._abilities_of(it.uid, self.objects[it.uid])):
+            return 0                 # Decree of Insight: "Ignore [Deflect] while paying this spell's cost"
         for u in self._target_uids(ctx):
             o = self.objects.get(u)
             if o is None or o.zone != "board" or self.is_friendly(o.controller, ctx.controller):

@@ -302,3 +302,60 @@ def test_guttural_roar_empowered(db, decks):
     g.objects[u].empowered = 1; g.bump()
     _run_spell(g, db, "Guttural Roar", picks=[u])
     assert g.chars(u).might == b + 6
+
+
+def test_decree_of_rage_cannot_be_countered(db, decks):
+    from riftsim.core.objects import ChainItem
+    g = main_phase(db, decks)
+    sp = _card_in(g, db, 0, "Decree of Rage", "hand")
+    g._to_zone(g.objects[sp], "chain"); g.bump()
+    it = ChainItem(901, "spell", 0, uid=sp, label="Decree of Rage")
+    g.chain.append(it)
+    assert g.do_counter(901) is False and it in g.chain
+
+
+def test_spiderlings_count_each_other_and_ignore_the_copy_limit(db, decks):
+    from riftsim.core.deck import Deck
+    g = main_phase(db, decks)
+    a = put(g, db, 0, "Spiderling", ("bf", 0))
+    b = put(g, db, 0, "Spiderling", ("bf", 0), exclude=(a,))
+    c = put(g, db, 0, "Spiderling", ("bf", 1), exclude=(a, b))
+    assert g.chars(a).might == 2 and g.chars(c).might == 1
+    d0 = Deck.from_dict(decks[0].to_dict())
+    d0.main[:5] = ["Spiderling"] * 5
+    assert not any("Spiderling" in e and "copies" in e for e in (d0.validate(db) or []))
+
+
+def test_cataclysmic_duel_each_player_keeps_one(db, decks):
+    g = main_phase(db, decks)
+    a = put(g, db, 0, "Rell, Magnetic", ("bf", 0))
+    b = put(g, db, 0, "Spiderling", ("bf", 0), exclude=(a,))
+    x = put(g, db, 1, "Rell, Magnetic", ("bf", 1))
+    y = put(g, db, 1, "Spiderling", ("bf", 1), exclude=(x,))
+    _run_spell(g, db, "Cataclysmic Duel", picks=[b, x])
+    assert g.objects[b].zone == "board" and g.objects[x].zone == "board"
+    assert g.objects[a].zone == "trash" and g.objects[y].zone == "trash"
+
+
+def test_wind_and_ghosts_banishes_small_returns_big(db, decks):
+    g = main_phase(db, decks)
+    small = put(g, db, 1, "Spiderling", ("bf", 0))
+    big = put(g, db, 1, "Rell, Magnetic", ("bf", 0), exclude=(small,))
+    _run_spell(g, db, "Wind and Ghosts", picks=[small])
+    _run_spell(g, db, "Wind and Ghosts", picks=[big])
+    assert g.objects[small].zone == "banish" and g.objects[big].zone == "hand"
+
+
+def test_lingering_animus_and_hold_em_turn_memory(db, decks):
+    g = main_phase(db, decks)
+    he = _card_in(g, db, 0, "Hold 'Em", "hand")
+    e0 = g.card_cost(0, he, "hand")[0]
+    g.turn_memo[("played_to_bf", 0)] = True
+    assert g.card_cost(0, he, "hand")[0] == max(0, e0 - 2)
+    la = put(g, db, 0, "Lingering Animus", ("base", 0))
+    ev = g.replace_event({"kind": "enter_ready", "uid": la, "player": 0, "ready": False, "loc": ("base", 0)})
+    assert not ev["ready"]
+    gear = put(g, db, 0, "Doran's Blade", ("base", 0), exclude=(la,))
+    g.do_kill([gear])
+    ev = g.replace_event({"kind": "enter_ready", "uid": la, "player": 0, "ready": False, "loc": ("base", 0)})
+    assert ev["ready"]

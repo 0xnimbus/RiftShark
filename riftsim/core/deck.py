@@ -90,6 +90,8 @@ class Deck:
         for n, k in counts.items():
             cd = db.card(n)
             limit = 1 if cd.keywords.get("unique") else 3
+            if "your deck can have any number of cards named" in (cd.text or "").lower():
+                limit = 10 ** 6                          # Spiderling
             if k > limit:
                 errs.append(f"{n}: {k} copies (max {limit})")
         # Neeko, Blending In (errata): choose up to 3 different legends in addition to your starting legend

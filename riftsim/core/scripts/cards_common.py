@@ -924,3 +924,336 @@ def death_from_below(defn):
                       [O.If(lambda g, c: g.objects[c.source].zone == "trash" and c.event.get("may_replay"),
                             [O.May([O.PlayCard(Ref("self"), alt_cost=(0, ["any"]))], label="play this from your trash for [A]")])],
                       zone="trash", label="replay from trash", source_text=defn.text)]
+
+
+def _named_in_trash(g, u, name):
+    return sum(1 for x in g.players[g.objects[u].owner].trash if g.objects[x].base_defn().name == name)
+
+
+def _has_domain(g, u, dom):
+    return dom in (g.chars(u).domains or ())
+
+
+@script("Shadow Order Disciple")
+def shadow_order_disciple(defn):
+    # When I move, you may [Burn 1] to give me +1 [M] this turn.
+    return [Triggered("move_self", [O.May([O.Burn(1), O.GiveMight(Ref("self"), 1)], label="burn 1 for +1 [M]")],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Shadowblade Lurker")
+def shadowblade_lurker(defn):
+    # I cost [2] less for each card with my name in your trash.
+    return [PlayPermission("cost", cost_mod=lambda g, u, e, p: (max(0, e - 2 * _named_in_trash(g, u, defn.name)), p),
+                           label="[2] less per copy in your trash", source_text=defn.text)]
+
+
+@script("Spiderling")
+def spiderling(defn):
+    # [Hidden]  I have +1 [M] for each other unit you control here with my name.
+    # Your deck can have any number of cards named Spiderling.   (Deck.validate)
+    def n(g, s, u):
+        o = g.objects[s]
+        return sum(1 for x in g.units_at(o.location, o.controller) if x != s and g.objects[x].defn.name == defn.name) \
+            if o.location is not None else 0
+    return [Static("self", "might", n, label="+1 [M] per other Spiderling here", source_text=defn.text)]
+
+
+@script("Disciple of Shen")
+def disciple_of_shen(defn):
+    # [Hidden]  I have [Shield 3] while I'm at a battlefield with exactly one other unit you control.
+    def one_other(g, s):
+        o = g.objects[s]
+        return o.location is not None and o.location[0] == "bf" and \
+            len([x for x in g.units_at(o.location, o.controller) if x != s]) == 1
+    defn.keywords.pop("shield", None)
+    return [Static("self", "keyword", ("shield", 3), cond=one_other, label="[Shield 3] with exactly one other unit",
+                   source_text=defn.text)]
+
+
+@script("Keeper of Law")
+def keeper_of_law(defn):
+    # I cost [2][Order] less if you control a battlefield with exactly two units there.
+    def ok(g, u):
+        me = _ctrl(g, u)
+        return any(bf.controller == me and len(g.units_at(("bf", bf.idx))) == 2 for bf in g.battlefields)
+
+    def reduce(g, u, e, p):
+        if not ok(g, u):
+            return e, p
+        p = list(p)
+        if "order" in p:
+            p.remove("order")
+        return max(0, e - 2), p
+    return [PlayPermission("cost", cost_mod=reduce, label="[2][Order] less", source_text=defn.text)]
+
+
+@script("Consuming Curse")
+def consuming_curse(defn):
+    # [Action]  Deal 2 to a unit at a battlefield. This deals 1 Bonus Damage for each card with this name in your trash.
+    return [SpellEffect([O.Choose(Sel("unit", where="battlefield"), out="t"),
+                         O.Deal(lambda g, c: 2 + sum(1 for x in g.players[c.controller].trash
+                                                     if g.objects[x].base_defn().name == defn.name), Ref("t"))],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Perfect Execution")
+def perfect_execution(defn):
+    # Ready a unit and give it [Assault 3] this turn.  [Flow] [3][Fury]   (keyword)
+    return [SpellEffect([O.Choose(Sel("unit"), out="t"), O.Ready(Ref("t")), O.GiveKeyword(Ref("t"), "assault", 3)],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Shadow Assassin")
+def shadow_assassin(defn):
+    # I enter ready if you have a card with my name in your trash.
+    return [_enter_ready_if(defn, lambda g, s: _named_in_trash(g, s, defn.name) > 0, "enter ready with a copy in your trash")]
+
+
+@script("Pakaa Protector")
+def pakaa_protector(defn):
+    # When I move, reveal the top card of your Main Deck. If it's a unit, draw it. Otherwise, put it in your trash and
+    # give me +2 [M] this turn.
+    top = lambda g, c: (c.vars.get("looked") or [None])[0]
+    is_unit = lambda g, c: g.objects[top(g, c)].base_defn().is_unit
+    return [Triggered("move_self", [O.Look(1, out="looked", reveal=True),
+                                    O.If(lambda g, c: top(g, c) is not None and g.objects[top(g, c)].zone == "deck",
+                                         [O.If(is_unit, [O.ToHand(top)], [O.ToTrash(top), O.GiveMight(Ref("self"), 2)])])],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Raving Witness")
+def raving_witness(defn):
+    # When I move, reveal the top card of your Main Deck. If it's [Mighty], draw it. Otherwise, recycle it.
+    top = lambda g, c: (c.vars.get("looked") or [None])[0]
+    mighty = lambda g, c: (g.objects[top(g, c)].base_defn().might or 0) >= 5
+    return [Triggered("move_self", [O.Look(1, out="looked", reveal=True),
+                                    O.If(lambda g, c: top(g, c) is not None and g.objects[top(g, c)].zone == "deck",
+                                         [O.If(mighty, [O.ToHand(top)], [O.Recycle(top)])])],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Resonating Strike")
+def resonating_strike(defn):
+    # [Hidden] [Reaction]  Choose a battlefield you control and a unit you control at a different location. Move that
+    # unit to that battlefield and give it +2 [M] this turn.
+    mine = lambda g, c, l: g.battlefields[l[1]].controller == c.controller
+    elsewhere = Sel("unit", side="friendly", pred=lambda g, c, u: g.objects[u].location != c.vars.get("loc"))
+    return [SpellEffect([O.ChooseLocation(out="loc", pred=mine), O.Choose(elsewhere, out="t"),
+                         O.Move(Ref("t"), Ref("loc")), O.GiveMight(Ref("t"), 2)], label=defn.name, source_text=defn.text)]
+
+
+@script("Shock Blast")
+def shock_blast(defn):
+    # [Action]  This costs [2] less if you control something that's [Empowered].  Deal 4 to a unit at a battlefield.
+    emp = lambda g, u: any(o.zone == "board" and o.controller == _ctrl(g, u) and o.empowered for o in g.objects.values())
+    return [PlayPermission("cost", cost_mod=lambda g, u, e, p: (max(0, e - 2), p) if emp(g, u) else (e, p),
+                           label="[2] less with something Empowered", source_text=defn.text),
+            SpellEffect([O.Choose(Sel("unit", where="battlefield"), out="t"), O.Deal(4, Ref("t"))], label=defn.name,
+                        source_text=defn.text)]
+
+
+@script("Noxian Demolitionist")
+def noxian_demolitionist(defn):
+    # When I conquer, you may kill a gear with Energy cost no more than my Might.
+    gear = Sel("gear", pred=lambda g, c, u: (g.objects[u].base_defn().energy or 0) <= (g.chars(c.source).might or 0)
+               if c.source in g.objects else False)
+    return [Triggered("conquer_self", [O.May([O.Choose(gear, out="t"), O.Kill(Ref("t"))], label="kill a gear")],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Shadows of the Past")
+def shadows_of_the_past(defn):
+    # Return up to 2 units from trashes to their owners' hands.
+    units = lambda g, c: [u for q in g.players for u in q.trash if g.objects[u].base_defn().is_unit]
+    return [SpellEffect([O.ChooseFromList(units, out="__sp", n=2, up_to=True, label="return up to 2 units"),
+                         O.ToHand(lambda g, c: list(c.vars.get("__sp") or ()))], label=defn.name, source_text=defn.text)]
+
+
+@script("Twilight Step")
+def twilight_step(defn):
+    # Move a unit with 3 [M] or less.  [Flow] [4][Chaos]   (keyword)
+    from .auto_grammar import parse_sentence
+    code = parse_sentence("move a unit", {"tcount": 0})
+    code[0].sel = Sel("unit", pred=lambda g, c, u: (g.chars(u).might or 0) <= 3)
+    return [SpellEffect(code, label=defn.name, source_text=defn.text)]
+
+
+@script("Wind and Ghosts")
+def wind_and_ghosts(defn):
+    # [Action]  Choose a unit at a battlefield. If it has 3 [M] or less, banish it. Otherwise, return it to its owner's hand.
+    small = lambda g, c: c.vars.get("t") in g.objects and (g.chars(c.vars["t"]).might or 0) <= 3
+    return [SpellEffect([O.Choose(Sel("unit", where="battlefield"), out="t"),
+                         O.If(small, [O.Banish(Ref("t"))], [O.ToHand(Ref("t"))])], label=defn.name, source_text=defn.text)]
+
+
+@script("Decree of Rage")
+def decree_of_rage(defn):
+    # [Action]  This can't be countered.  Deal 4 to an enemy Calm unit.
+    return [PlayPermission("uncounterable", label="can't be countered", source_text=defn.text),
+            SpellEffect([O.Choose(Sel("unit", side="enemy", pred=lambda g, c, u: _has_domain(g, u, "calm")), out="t"),
+                         O.Deal(4, Ref("t"))], label=defn.name, source_text=defn.text)]
+
+
+@script("Decree of Insight")
+def decree_of_insight(defn):
+    # [Reaction]  Ignore [Deflect] while paying this spell's cost.  Give an enemy Body unit -5 [M] this turn.
+    return [PlayPermission("ignore_deflect", label="ignore Deflect", source_text=defn.text),
+            SpellEffect([O.Choose(Sel("unit", side="enemy", pred=lambda g, c, u: _has_domain(g, u, "body")), out="t"),
+                         O.GiveMight(Ref("t"), -5)], label=defn.name, source_text=defn.text)]
+
+
+@script("Decree of Strength")
+def decree_of_strength(defn):
+    # Choose an opponent. They reveal their hand and you choose a Mind card from it. They recycle that card.
+    def reveal(g, c):
+        p = c.vars.get("__opp")
+        if p is not None:
+            g.emit("reveal", player=p, cards=list(g.players[p].hand), ctx=c)
+    mind = lambda g, c: [u for u in g.players[c.vars["__opp"]].hand if "mind" in (g.objects[u].base_defn().domains or ())]
+    return [SpellEffect([O.ChoosePlayer(out="__opp", opponent=True), O.Do(reveal, label="reveal hand"),
+                         O.ChooseFromList(mind, out="__dm", label="choose a Mind card"), O.Recycle(Ref("__dm"))],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Decree of Focus")
+def decree_of_focus(defn):
+    # [Reaction]  Choose a friendly unit that's in combat with an enemy Fury unit or that's being chosen by an enemy Fury
+    # spell. Give it +4 [M] this turn.
+    def ok(g, c, u):
+        o = g.objects[u]
+        if g.combat is not None and o.location == ("bf", g.combat["bf"]) and any(
+                _enemy(g, c, x) and _has_domain(g, x, "fury") for x in g.units_at(o.location)):
+            return True
+        for it in g.chain:
+            if it.kind == "spell" and it.controller != c.controller and it.uid in g.objects \
+                    and "fury" in (g.objects[it.uid].base_defn().domains or ()) and u in g._target_uids(it.ctx):
+                return True
+        return False
+    return [SpellEffect([O.Choose(Sel("unit", side="friendly", pred=ok), out="t"), O.GiveMight(Ref("t"), 4)],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Cataclysmic Duel")
+def cataclysmic_duel(defn):
+    # Each player chooses a unit they control. Kill the rest.
+    def ask(q):
+        # chosen as the spell resolves (a callable list keeps the choice out of the finalize step)
+        return O.Choose(lambda g, c, q=q: [u for u, o in g.objects.items() if o.zone == "board" and o.controller == q
+                                           and "unit" in g.chars(u).types], out=f"__keep{q}", targeted=False, player=q)
+
+    def kill_rest(g, c):
+        keep = {c.vars.get(f"__keep{q}") for q in range(len(g.players))}
+        g.do_kill([u for u, o in g.objects.items() if o.zone == "board" and "unit" in g.chars(u).types and u not in keep], c)
+    return [SpellEffect([ask(0), ask(1), O.Do(kill_rest, label="kill the rest")], label=defn.name, source_text=defn.text)]
+
+
+@script("Lingering Animus")
+def lingering_animus(defn):
+    # I enter ready if a friendly unit or gear died this turn.
+    return [_enter_ready_if(defn, lambda g, s: bool(g.turn_memo.get(("perms_died", g.objects[s].controller if
+                                                                       g.objects[s].controller is not None else g.objects[s].owner))),
+                            "enter ready if a friendly unit or gear died this turn")]
+
+
+@script("Iridescent Avian")
+def iridescent_avian(defn):
+    # [T]: [Buff] a unit. If it's already buffed, give it +2 [M] this turn instead.
+    from ..abilities import Activated
+    buffed = lambda g, c: c.vars.get("t") in g.objects and g.objects[c.vars["t"]].buffs > 0
+    return [Activated({"energy": 0, "power": [], "exhaust": True},
+                      [O.If(buffed, [O.GiveMight(Ref("t"), 2)], [O.Buff(Ref("t"))])],
+                      targets=[O.Choose(Sel("unit"), out="t")], label="buff a unit", source_text=defn.text)]
+
+
+@script("Ki Burst")
+def ki_burst(defn):
+    # [Action]  As an additional cost to play this, exhaust a friendly unit.  [Stun] a unit.
+    ready = Sel("unit", side="friendly", pred=lambda g, c, u: not g.objects[u].exhausted)
+    return [PlayPermission("additional_cost", value=(ready, [O.Choose(ready, out="__kb", targeted=False), O.Exhaust(Ref("__kb"))], True),
+                           label="exhaust a friendly unit", source_text=defn.text),
+            SpellEffect([O.Choose(Sel("unit"), out="t"), O.Stun(Ref("t"))], label=defn.name, source_text=defn.text)]
+
+
+@script("Parallel Convergence")
+def parallel_convergence(defn):
+    # As an additional cost to play this, return a friendly unit to its owner's hand.  Deal 5 to a unit at a battlefield.
+    fr = Sel("unit", side="friendly")
+    return [PlayPermission("additional_cost", value=(fr, [O.Choose(fr, out="__pc", targeted=False), O.ToHand(Ref("__pc"))], True),
+                           label="return a friendly unit to hand", source_text=defn.text),
+            SpellEffect([O.Choose(Sel("unit", where="battlefield"), out="t"), O.Deal(5, Ref("t"))], label=defn.name,
+                        source_text=defn.text)]
+
+
+@script("Fanfare")
+def fanfare(defn):
+    # The next three times you play a unit this turn, draw 1.
+    played = lambda g, s, ev: ev.get("kind") == "play" and ev.get("card_type") == "unit"
+    mine = lambda g, c, ev: ev.get("player") == c.controller
+    return [SpellEffect([O.Delayed(played, [O.Draw(1)], filt=mine, expires="turn", once=True, label="Fanfare: draw 1")
+                         for _ in range(3)], label=defn.name, source_text=defn.text)]
+
+
+@script("Hold 'Em")
+def hold_em(defn):
+    # [Action]  This costs [2] less if you've played a unit or gear to a battlefield this turn.  Give a unit +3 [M].
+    def to_bf(g, u):
+        me = _ctrl(g, u)
+        return bool(g.turn_memo.get(("played_to_bf", me)))
+    return [PlayPermission("cost", cost_mod=lambda g, u, e, p: (max(0, e - 2), p) if to_bf(g, u) else (e, p),
+                           label="[2] less after playing to a battlefield", source_text=defn.text),
+            SpellEffect([O.Choose(Sel("unit"), out="t"), O.GiveMight(Ref("t"), 3)], label=defn.name, source_text=defn.text)]
+
+
+@script("Disposal Expert")
+def disposal_expert(defn):
+    # I enter ready if you control no other units.  [Disarm 2]
+    alone = lambda g, s: not any(u != s and o.zone == "board" and o.controller == _ctrl(g, s) and "unit" in g.chars(u).types
+                                 for u, o in g.objects.items())
+    return [_enter_ready_if(defn, alone, "enter ready with no other units")]
+
+
+@script("Acceleration Gate")
+def acceleration_gate(defn):
+    # Ready up to 4 units, gear, and/or runes.
+    things = lambda g, c: [u for u, o in g.objects.items() if o.zone == "board" and o.exhausted and
+                           ({"unit", "gear", "rune"} & g.chars(u).types)]
+    return [SpellEffect([O.ChooseFromList(things, out="__ag", n=4, up_to=True, label="ready up to 4"),
+                         O.Ready(lambda g, c: list(c.vars.get("__ag") or ()))], label=defn.name, source_text=defn.text)]
+
+
+@script("Up from the Deep")
+def up_from_the_deep(defn):
+    # Play two 1 [M] Tentacle unit tokens from Bilgewater.  [Flow] [3]
+    return [SpellEffect([O.PlayToken("Tentacle", loc="choose", count=2)], label=defn.name, source_text=defn.text)]
+
+
+@script("Lightning Rush")
+def lightning_rush(defn):
+    # Look at the top 3 cards of your Main Deck. You may choose a card from among them and draw it. Put the rest into
+    # your trash.  [Flow] [2][A]
+    return [SpellEffect([O.Look(3, out="looked"),
+                         O.ChooseFromList(lambda g, c: list(c.vars.get("looked", [])), out="__lr", up_to=True, label="draw one"),
+                         O.Do(_unwrap("__lr")), O.If(Ref("__lr"), [O.ToHand(Ref("__lr"))]),
+                         O.ToTrash(lambda g, c: [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck"])],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Minah Swiftfoot")
+def minah_swiftfoot(defn):
+    # When I move to a battlefield, choose one — Each player discards 1. / Each player draws 1.
+    to_bf = lambda g, s, ev: ev.get("kind") == "move" and ev.get("uid") == s and (ev.get("to") or ("",))[0] == "bf"
+    each = lambda f: O.Do(lambda g, c: [f(g, c, q) for q in range(len(g.players))])
+    return [Triggered(to_bf, [O.ChooseMode([
+        ("each player discards 1", [O.Discard(1, player=0), O.Discard(1, player=1)]),
+        ("each player draws 1", [each(lambda g, c, q: g.do_draw(q, 1, c))])])], label=defn.name, source_text=defn.text)]
+
+
+@script("Dominus")
+def dominus(defn):
+    # [Action]  This turn, double a unit's Might and give it "[A][A]: Ready me."
+    from ..abilities import Activated
+    ready_me = Activated({"energy": 0, "power": ["any", "any"]}, [O.Ready(Ref("self"))], label="[A][A]: Ready me.",
+                         source_text="[A][A]: Ready me.")
+    return [SpellEffect([O.Choose(Sel("unit"), out="t"), O.DoubleMight(Ref("t")), O.GiveAbility(Ref("t"), ready_me)],
+                        label=defn.name, source_text=defn.text)]
