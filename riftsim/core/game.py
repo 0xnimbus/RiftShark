@@ -1265,6 +1265,9 @@ class Game(flow.FlowMixin):
             origin[u] = o.location
             if not self.valid_destination(u, dest):
                 continue
+            if ctx is not None and not standard and ctx.controller is not None \
+                    and not self.is_friendly(ctx.controller, o.controller) and self.has_keyword(u, "unmovable_by_enemies"):
+                continue          # Jagged Cutlass: "I can't be moved by enemy spells and abilities."
             ev = self.replace_event({"kind": "move", "uid": u, "player": o.controller, "from": o.location, "to": dest, "standard": standard})
             if ev is None:
                 continue

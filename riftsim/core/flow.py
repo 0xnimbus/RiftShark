@@ -739,6 +739,8 @@ class FlowMixin:
         units = tuple(self.units_at(loc, p))
         if how == "conquer":
             self.turn_memo.setdefault(("conquered_bfs", p), set()).add(i)     # "each battlefield you've conquered this turn"
+            for u in units:
+                self.objects[u].temp[("conquered", self.turn)] = True        # "if I didn't conquer this turn"
         if how == "conquer" and ps.points >= v - 1:
             if all((p, b.idx) in self.scored for b in self.battlefields):
                 self.gain_points(p, 1, "conquer")

@@ -2566,3 +2566,27 @@ def fae_porter(defn):
                               O.If(Ref("__fp"), [O.ChooseFromList(others, out="__fpu", label="move a unit you control here"),
                                                  O.Move(Ref("__fpu"), lambda g, c: g.objects[c.source].location)])],
                       label=defn.name, source_text=defn.text)]
+
+
+# ---------------------------------------------------------------- batch 2026-11-06 17:30 (equipment effect text)
+@script("Jagged Cutlass")
+def jagged_cutlass(defn):
+    # [Equip] [Body]   effect: I can't be moved by enemy spells and abilities.   (+2 [M] from the card's Might bonus)
+    return {"abilities": [], "effect_abilities": [Static("attached", "keyword", ("unmovable_by_enemies", True),
+                                                         label="can't be moved by enemy spells and abilities")],
+            "replace": False}
+
+
+@script("Blighted Battleaxe")
+def blighted_battleaxe(defn):
+    # [Equip] [1][Fury]   effect: At the end of your turn, if I didn't conquer this turn, unattach this and deal 4 to me.
+    def run(g, c):
+        gear = c.source
+        u = g.objects[gear].attached_to
+        if u is None or g.objects[u].zone != "board" or g.objects[u].temp.get(("conquered", g.turn)):
+            return
+        g.do_detach(gear, c)
+        g.do_deal([u], 4, c, source_uid=gear)
+    return {"abilities": [], "effect_abilities": [Triggered("end_turn", [O.Do(run, label="unattach and deal 4 unless it conquered")],
+                                                            label=defn.name, source_text=defn.effect_text)],
+            "replace": False}

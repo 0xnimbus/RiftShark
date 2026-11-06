@@ -988,3 +988,24 @@ def test_flurry_of_feathers_birds_and_rippers_bay(db, decks):
     n = len(g.players[0].runes)
     g.put_in_hand(u); settle(g, yes=True)
     assert len(g.players[0].runes) == n + 1
+
+
+def test_jagged_cutlass_unit_cant_be_moved_by_enemies(db, decks):
+    from riftsim.core.vm import Context
+    g = main_phase(db, decks)
+    u = put(g, db, 0, "Shipyard Skulker", ("bf", 0))
+    gear = put(g, db, 0, "Jagged Cutlass", ("base", 0), exclude=(u,))
+    g.do_attach(gear, u); g.bump()
+    assert not g.do_move([u], ("base", 0), Context(1, None))      # an enemy effect
+    assert g.objects[u].location == ("bf", 0)
+    assert g.do_move([u], ("base", 0), Context(0, None))          # its controller's own effect still moves it
+
+
+def test_blighted_battleaxe_hurts_a_unit_that_did_not_conquer(db, decks):
+    g = main_phase(db, decks)
+    u = put(g, db, 0, "Mega-Mech", ("base", 0))
+    gear = put(g, db, 0, "Blighted Battleaxe", ("base", 0), exclude=(u,))
+    g.do_attach(gear, u); g.bump()
+    g.emit("ending_phase", player=0)
+    settle(g)
+    assert g.objects[gear].attached_to is None and g.objects[u].damage == 4
