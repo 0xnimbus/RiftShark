@@ -1542,5 +1542,6 @@ def _temporary_ability():
         from .abilities import Triggered
         from . import ops as O
         from .vm import Ref
-        _TEMPORARY.append(Triggered("start_beginning", [O.Kill(Ref("self"))], label="Temporary", keyword="temporary"))
+        from .scripts import temporary_ability
+        _TEMPORARY.append(temporary_ability())
     return _TEMPORARY[0]

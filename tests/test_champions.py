@@ -416,3 +416,33 @@ def test_ezreal_prodigy_reduces_optional_costs(db, decks):
     put(g, db, 0, "Ezreal, Prodigy", ("base", 0))
     assert g.reduce_optional_cost(0, 1, ["fury"]) == (1, [])
     assert g.reduce_optional_cost(0, 2, []) == (1, [])
+
+
+def test_akali_brash_second_move_lets_you_play_the_banished_card(db, decks):
+    g = main_phase(db, decks)
+    ak = put(g, db, 0, "Akali, Brash", ("base", 0))
+    cheap = next(c for c in db if c.is_unit and not c.is_champion and (c.energy or 0) <= 1 and not c.domains)
+    top = g.players[0].deck[0]
+    g.objects[top].defn = cheap
+    g.do_move([ak], ("bf", 0)); settle(g)
+    g.do_move([ak], ("base", 0)); settle(g)
+    assert g.objects[top].zone == "banish"
+    d = g.run()
+    assert any(o[0] == "play" and o[1] == top for o in d.options)
+
+
+def test_jhin_meticulous_costs_mind_after_a_4_energy_spell(db, decks):
+    g = main_phase(db, decks)
+    j = _card_in(g, db, 0, "Jhin, Meticulous Killer", "hand")
+    assert g.card_cost(0, j, "hand") != (0, ["mind"])
+    g.turn_memo[("spell_spent_4", 0)] = True
+    assert g.card_cost(0, j, "hand") == (0, ["mind"])
+
+
+def test_leblanc_everywhere_stops_temporary_at_her_battlefield(db, decks):
+    g = main_phase(db, decks)
+    s1 = g.play_token(0, "Sprite", ("bf", 0), ready=True)
+    s2 = g.play_token(0, "Sprite", ("bf", 1), ready=True)
+    put(g, db, 0, "LeBlanc, Everywhere at Once", ("bf", 0))
+    from riftsim.core.scripts import temporary_blocked
+    assert temporary_blocked(g, s1) and not temporary_blocked(g, s2)

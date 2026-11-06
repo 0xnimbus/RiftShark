@@ -950,6 +950,8 @@ class FlowMixin:
             if enemy and (it.kind == "spell" or by_unit_ability):      # Ezreal: "chosen enemy units and/or gear"
                 k = ("chose_enemy", it.controller)
                 self.turn_memo[k] = self.turn_memo.get(k, 0) + 1
+        if it.kind == "spell" and self._energy_spent(it) >= 4:
+            self.turn_memo[("spell_spent_4", it.controller)] = True      # Jhin, Meticulous Killer
         if it.kind in ("spell", "unit", "gear"):
             self.players[it.controller].played_this_turn.append(it.uid)
             o = self.objects[it.uid]
@@ -1342,6 +1344,11 @@ class FlowMixin:
         for u in ps.trash:
             if self.objects[u].defn.keywords.get("flow_cost"):
                 sources.append((u, "trash"))
+        for t in self.turn_effects:          # "until ..., you may play that card" (Akali, Brash; Kennen's granted Flow)
+            if t["kind"] == "may_play" and t["player"] == p and self.turn <= t["data"]["until_turn"]:
+                u = t["data"]["uid"]
+                if u in self.objects and self.objects[u].zone == t["data"]["zone"] and (u, t["data"]["zone"]) not in sources:
+                    sources.append((u, t["data"]["zone"]))
         for u, z in sources:
             ambush_only = False
             if not self._play_timing_ok(p, u, z):

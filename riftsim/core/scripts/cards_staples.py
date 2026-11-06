@@ -1104,3 +1104,62 @@ def nami_headstrong(defn):
 def ezreal_prodigy(defn):
     # (line 1 auto-scripted) Optional additional costs you pay cost [1] or [A] less.
     return {"abilities": [Static("self", "rule", ("optional_cost_reduce",), label=defn.name, source_text=defn.text)], "replace": False}
+
+
+def _grant_may_play(g, c, uid, zone, until_your_next_ending=False):
+    """Let the controller play `uid` from `zone` (paying its costs) this turn, or until their next Ending Phase."""
+    if uid is None or uid not in g.objects:
+        return
+    p = c.controller
+    until = g.turn
+    if until_your_next_ending and g.turn_player != p:
+        until = g.turn + 1
+    g.add_turn_effect(c, "may_play", {"uid": uid, "zone": zone, "until_turn": until}, expires=None)
+
+
+@script("Akali, Brash")
+def akali_brash(defn):
+    # The first time I move each turn, [Add] [1][A].
+    # The second time I move each turn, banish the top card of your Main Deck. Until your next Ending Phase, you may
+    # play that card. (You still pay its costs.)
+    def banish_top(g, c):
+        deck = g.players[c.controller].deck
+        if not deck:
+            return
+        u = deck[0]
+        g.do_banish([u], c)
+        _grant_may_play(g, c, u, "banish", until_your_next_ending=True)
+    return {"abilities": [Triggered("move_self", [O.Add(1, ["any"])], filt=lambda g, s, ev: _moves_this_turn(g, s) == 1,
+                                    label=defn.name, source_text=defn.text),
+                          Triggered("move_self", [O.Do(banish_top)], filt=lambda g, s, ev: _moves_this_turn(g, s) == 2,
+                                    label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Kennen, Storm of Shuriken")
+def kennen_storm(defn):
+    # (line 1 auto-scripted) When I conquer, give a spell in your trash [Flow] equal to its cost this turn.
+    spells = lambda g, c: [u for u in g.players[c.controller].trash if g.objects[u].base_defn().type == "spell"]
+    return {"abilities": [Triggered("conquer_self", [
+        O.ChooseFromList(spells, out="__kn", label="give a spell in your trash [Flow]"),
+        O.Do(lambda g, c: _grant_may_play(g, c, c.vars.get("__kn"), "trash"))], label=defn.name, source_text=defn.text)],
+        "replace": False}
+
+
+@script("Jhin, Meticulous Killer")
+def jhin_meticulous(defn):
+    # [Vision]   (keyword)
+    # If you've spent [4] or more to play a spell this turn, you may play me for [Mind].
+    def mod(g, u, e, p):
+        o = g.objects[u]
+        q = o.controller if o.controller is not None else o.owner
+        if g.turn_memo.get(("spell_spent_4", q)):
+            return 0, ["mind"]
+        return e, p
+    return {"abilities": [PlayPermission("cost", cost_mod=mod, label="play me for [Mind]", zone="any")], "replace": True}
+
+
+@script("LeBlanc, Everywhere at Once")
+def leblanc_everywhere(defn):
+    # [Backline]   (keyword)
+    # Your [Temporary] effects at my battlefield don't trigger.
+    return {"abilities": [Static("self", "rule", ("no_temporary_here",), label=defn.name, source_text=defn.text)], "replace": True}

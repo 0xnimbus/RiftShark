@@ -56,7 +56,7 @@ def keyword_abilities(defn):
     if kws.get("deathknell") and defn.is_permanent:
         pass  # the effect text itself is scripted by auto/manual; the trigger is "die_self"
     if kws.get("temporary"):
-        out.append(Triggered("start_beginning", [O.Kill(Ref("self"))], label="Temporary", keyword="temporary"))
+        out.append(temporary_ability())
     if kws.get("vision"):
         out.append(Triggered("enter_self", [O.Predict(1)], label="Vision", keyword="vision"))
     if kws.get("hunt"):
@@ -113,6 +113,20 @@ def _equip_cost_text(defn):
 
 
 COST_TOKEN = re.compile(r"\[(\d+|A|C|T|Fury|Calm|Mind|Body|Chaos|Order)\]")
+
+
+def temporary_blocked(g, s, ev=None):
+    """LeBlanc, Everywhere at Once: "Your [Temporary] effects at my battlefield don't trigger." """
+    o = g.objects.get(s)
+    if o is None or o.location is None or o.location[0] != "bf":
+        return False
+    return any(g.objects[src].location == o.location and g.objects[src].controller == o.controller
+               for src, _ in g.rules("no_temporary_here"))
+
+
+def temporary_ability():
+    return Triggered("start_beginning", [O.Kill(Ref("self"))], filt=lambda g, s, ev: not temporary_blocked(g, s),
+                     label="Temporary", keyword="temporary")
 
 
 def empower_costs(defn):
