@@ -569,3 +569,31 @@ def test_aphelios_modes_once_each_per_turn(db, decks):
                 break
             g.choose(("pass",) if ("pass",) in d.options else d.options[0])
     assert len(labels) == 2 and len(labels[1]) == len(labels[0]) - 1
+
+
+def test_teemo_strategist_deals_1_per_hidden_card_revealed(db, decks):
+    g = main_phase(db, decks)
+    t = put(g, db, 0, "Teemo, Strategist", ("bf", 0))
+    foe = put(g, db, 1, "Sett, Kingpin", ("bf", 0))
+    hidden = next(c for c in db if c.keywords.get("hidden") and c.type == "spell")
+    plain = next(c for c in db if c.type == "spell" and not c.keywords.get("hidden"))
+    deck = g.players[0].deck
+    for i, d in enumerate([hidden, plain, hidden, plain, plain]):
+        g.objects[deck[i]].defn = d
+    top5 = deck[:5]
+    _fire(g, t, "Teemo, Strategist")
+    settle(g)
+    assert g.objects[foe].damage == 2 or g.objects[foe].zone == "trash"
+    assert all(u in g.players[0].deck[-5:] for u in top5)
+
+
+def test_reksai_swarm_queen_plays_a_revealed_unit_here(db, decks):
+    g = main_phase(db, decks)
+    rq = put(g, db, 0, "Rek'Sai, Swarm Queen", ("bf", 0))
+    have = {g.objects[r].defn.domains[0] for r in g.players[0].runes if g.objects[r].defn.domains}
+    unit = next(c for c in db if c.is_unit and not c.is_champion and (c.energy or 0) <= 2 and set(c.domains) <= have and not c.text)
+    top = g.players[0].deck[0]
+    g.objects[top].defn = unit
+    _fire(g, rq, "Rek'Sai, Swarm Queen", here=("bf", 0))
+    settle(g, yes=True, picks=[(top,), ("bf", 0)])
+    assert g.objects[top].zone == "board" and g.objects[top].location == ("bf", 0)

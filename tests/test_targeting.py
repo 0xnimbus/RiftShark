@@ -129,3 +129,27 @@ def test_bellows_breath_hits_up_to_three_units_at_the_same_location(db, decks):
     hit = [g.objects[u].damage >= 1 or g.objects[u].zone != "board" for u in (a, b)]
     assert all(hit)                                       # (Void Gate there may add 1 bonus damage)
     assert g.objects[c].damage == 0
+
+
+def test_repeat_executes_the_spell_again_with_its_own_choices(db, decks):
+    # CR 820: Bellows Breath with Repeat paid: the second execution has its own targets (here: the same two units)
+    g = main_phase(db, decks)
+    bf = ("bf", 0)
+    a = unit_at(g, 1, bf)
+    b = unit_at(g, 1, bf, exclude=(a,))
+    s = give(g, 0, "Bellows Breath", db)
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == s))
+    picks = 0
+    for _ in range(40):
+        d = g.run()
+        if d.kind == "choose_many":
+            g.choose(next(o for o in d.options if set(o) == {a, b})); picks += 1; continue
+        if d.kind == "additional_cost":
+            g.choose(True); continue
+        if d.kind == "action" and not g.chain:
+            break
+        g.choose(("pass",) if ("pass",) in d.options else d.options[0])
+    assert picks == 2
+    hits = [e for e in g.events if e["kind"] == "damage" and e.get("uid") in (a, b)]
+    assert len(hits) == 4 or all(g.objects[u].zone != "board" for u in (a, b))

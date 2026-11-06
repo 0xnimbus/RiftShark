@@ -1285,3 +1285,40 @@ def ivern_friend(defn):
     return {"abilities": [PlayPermission("as_play", value=choose_tag, label="choose Bird, Cat, Dog, or Poro"),
                           Triggered("conquer_self", list(score), label=defn.name, source_text=defn.text),
                           Triggered("hold_self", list(score), label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Teemo, Strategist")
+def teemo_strategist(defn):
+    # [Hidden]   (keyword)
+    # When I defend or I'm played from [Hidden], reveal the top 5 cards of your Main Deck. Deal 1 to an enemy unit here
+    # for each card with [Hidden], then recycle them.
+    eff = [O.Look(5, out="looked", reveal=True),
+           O.Times(lambda g, c: sum(1 for u in c.vars.get("looked", []) if g.objects[u].base_defn().keywords.get("hidden")),
+                   [O.Choose(Sel("unit", side="enemy", where="here"), out="t"), O.Deal(1, Ref("t"))]),
+           O.Recycle(lambda g, c: [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck"])]
+    return {"abilities": [Triggered("defend_self", list(eff), label=defn.name, source_text=defn.text),
+                          Triggered("play_self", list(eff), filt=lambda g, s, ev: ev.get("from_zone") == "facedown",
+                                    label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Rek'Sai, Swarm Queen")
+def reksai_swarm_queen(defn):
+    # When I attack, you may reveal the top 2 cards of your Main Deck. You may play one. Then recycle the rest.
+    # If the played card is a unit, you may play it here.
+    def pick(g, c):
+        return list(c.vars.get("looked", []))
+
+    def is_unit(g, c):
+        u = c.vars.get("__rq")
+        return u in g.objects and g.objects[u].base_defn().is_unit
+    here_or_usual = lambda g, c, l: l == c.here or l in O._unit_play_locations(g, c.controller)
+    body = [O.Look(2, out="looked", reveal=True),
+            O.ChooseFromList(pick, out="__rq", up_to=True, label="play one of the revealed cards"),
+            O.Do(_unwrap("__rq")),
+            O.If(Ref("__rq"), [
+                O.If(is_unit, [O.ChooseLocation(out="__rql", include_bases=True, pred=here_or_usual, label="Play it where?"),
+                               O.PlayCard(Ref("__rq"), loc=Ref("__rql"))],
+                     [O.PlayCard(Ref("__rq"))])]),
+            O.Recycle(lambda g, c: [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck"])]
+    return {"abilities": [Triggered("attack_self", [O.May(body, label="reveal the top 2 cards")], label=defn.name,
+                                    source_text=defn.text)], "replace": True}

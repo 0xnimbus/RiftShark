@@ -10,7 +10,7 @@ import itertools
 
 from .abilities import Activated, PlayPermission, Static
 from .objects import ChainItem
-from .vm import Context, Decision, Frame, Instr, Ref, compile_effect, run_vm, resume_vm, val
+from .vm import Context, Decision, Frame, Instr, Ref, compile_effect, relocate, run_vm, resume_vm, val
 from .ops import Choose, May, SetVar, Do, PayResources
 from . import payment
 
@@ -95,6 +95,39 @@ class _ShowOff(Instr):
             game.emit("reveal", player=ctx.controller, cards=[choice], ctx=ctx)
         game.emit("showoff", player=ctx.controller, uid=it.uid, shown=choice, ctx=ctx)
         game.log("showoff", player=ctx.controller, item=it.id, shown=o.defn.name)
+        return None
+
+
+class _SnapChoices(Instr):
+    """Remember the choices made for execution k (Repeat, CR 820.2)."""
+
+    def __init__(self, k):
+        self.k = k
+
+    def run(self, game, ctx):
+        snaps = ctx.vars.setdefault("__rep_choices", {})
+        from .vm import _copy_containers
+        snaps[self.k] = _copy_containers({n: v for n, v in ctx.vars.items() if not n.startswith("__rep") and n not in ("__costs", "__ask")})
+        return None
+
+
+class _SkipUnlessRepeat(Instr):
+    def __init__(self, target):
+        self.target = target
+
+    def run(self, game, ctx):
+        return None if ctx.repeat else self.target
+
+
+class _RestoreChoices(Instr):
+    def __init__(self, k):
+        self.k = k
+
+    def run(self, game, ctx):
+        snap = (ctx.vars.get("__rep_choices") or {}).get(self.k)
+        if snap:
+            from .vm import _copy_containers
+            ctx.vars.update(_copy_containers(snap))
         return None
 
 
@@ -890,7 +923,7 @@ class FlowMixin:
         if it.kind in ("spell", "unit", "gear"):
             for ab in self._abilities_of(it.uid, self.objects[it.uid]):
                 if isinstance(ab, PlayPermission) and ab.perm == "as_play":
-                    show = show + list(compile_effect(ab.value))
+                    show = show + relocate(compile_effect(ab.value), len(show))
                 if isinstance(ab, PlayPermission) and ab.perm == "additional_cost":
                     req, ins, mandatory = ab.value
                     if mandatory:
@@ -902,7 +935,13 @@ class FlowMixin:
                                        label="pay the additional cost", out="__addq"))
         if it.kind == "spell":
             pre += self._exhaust_reducer_code(it)
-        code = show + compile_effect(pre) + list(it.target_code or []) + [_FinalizeCosts(it.id)]
+        code = show + relocate(compile_effect(pre), len(show))      # compiled pieces: shift their jump targets
+        tcode = list(it.target_code or [])
+        code = code + relocate(tcode, len(code)) + [_FinalizeCosts(it.id)]
+        if tcode and self._optional_costs_include_repeat(it):
+            # CR 820.2: each additional execution gets its own choices (they may differ from the first)
+            code = code + [_SnapChoices(0), _SkipUnlessRepeat(len(code) + 3 + len(tcode))]
+            code = code + relocate(tcode, len(code)) + [_SnapChoices(1)]
         self.vm_frames.append(Frame(code, ctx, tag=("finalize", it.id)))
 
     def _exhaust_reducers(self, p):
@@ -1024,6 +1063,12 @@ class FlowMixin:
                 energy -= 1
         return energy, power
 
+    def _optional_costs_include_repeat(self, it):
+        rc = getattr(it.ability, "repeat_cost", None) if it.ability is not None else None
+        if it.kind == "spell":
+            rc = self.defn_of(it.uid).keywords.get("repeat_cost")
+        return bool(rc)
+
     def _fizzle_item(self, it, why):
         it.removed = True
         if it in self.chain:
@@ -1053,6 +1098,20 @@ class FlowMixin:
         self.log("resolve", item=it.id, label=it.label, controller=it.controller)
         if it.kind in ("unit", "gear"):
             self._enter_board(it)
+        reps = ctx.repeat if it.kind in ("spell", "ability", "trigger", "reflexive") else 0
+        snaps = ctx.vars.get("__rep_choices") or {}
+        if reps:
+            # CR 820.1.d: execute the instructions one additional time per Repeat paid, in order; the last run closes the item
+            self.vm_frames.append(Frame(it.code or [], ctx, tag=("resolve", it.id)))
+            for k in range(reps, 0, -1):
+                if k in snaps:
+                    self.vm_frames.append(Frame([_RestoreChoices(k)], ctx))
+                if k > 1:
+                    self.vm_frames.append(Frame(it.code or [], ctx))
+            self.vm_frames.append(Frame(it.code or [], ctx))
+            if 0 in snaps:
+                self.vm_frames.append(Frame([_RestoreChoices(0)], ctx))
+            return
         self.vm_frames.append(Frame(it.code or [], ctx, tag=("resolve", it.id)))
 
     def _still_valid(self, sel, ctx, u):

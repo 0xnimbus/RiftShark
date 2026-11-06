@@ -151,9 +151,24 @@ def compile_effect(tree):
         else:
             code.append(instr)
     for instr in code:
-        if isinstance(instr, (Jump, JumpIf)) and isinstance(instr.target, str):
-            instr.target = positions[instr.target]
+        # Jump, JumpIf and loop steps (ops._LoopNext) carry a label name until here
+        t = getattr(instr, "target", None)
+        if isinstance(t, str) and t in positions and (isinstance(instr, (Jump, JumpIf)) or type(instr).__name__ == "_LoopNext"):
+            instr.target = positions[t]
     return code
+
+
+def relocate(code, offset):
+    """Copy compiled code so it can be placed `offset` instructions later (jump targets shifted)."""
+    import copy as _copy
+    out = []
+    for instr in code:
+        t = getattr(instr, "target", None)
+        if isinstance(t, int) and (isinstance(instr, (Jump, JumpIf)) or type(instr).__name__ == "_LoopNext"):
+            instr = _copy.copy(instr)
+            instr.target = t + offset
+        out.append(instr)
+    return out
 
 
 def new_label(counter, hint="L"):
