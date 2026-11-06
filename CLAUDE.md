@@ -33,6 +33,7 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
 | 2026-11-06 18:04 | 2% used, resets 5:50 PM | 30% used, resets Mon 10:00 AM | new 5h window; Derrick (17:44): scripting stopped, round-robin redone (out/rr_1745, adaptive max 20, expert; container restart killed the first try, runner now resumes from partial.jsonl); UI asks went to the UI thread |
 | 2026-11-06 18:25 | 2% used, resets 5:50 PM | 30% used, resets Mon 10:00 AM | round-robin 871 games, 44/45 matchups settled |
 | 2026-11-06 19:09 | 4% used, resets 5:50 PM | 30% used, resets Mon 10:00 AM | 18:30 round-robin written up; Derrick (18:41) asked for a Riven rules check: tools/deck_audit.py found Switcheroo + Not So Fast never castable and Heron counting tokens (fixed 9783ead); round-robin re-run in out/rr_1900 |
+| 2026-11-06 19:31 | 6% used, resets 5:50 PM | 30% used, resets Mon 10:00 AM | round-robin re-run on the fixed engine (900 games): Vex 72%, Rek'Sai 66%, Riven 65%; Riven beats Kai'Sa 14-6 |
 
 ## Where things stand
 
@@ -126,6 +127,8 @@ Bugs Derrick reported 2026-11-06 03:35 (do first next session, before item 2):
   docs/results/round_robin_2026-11-06.md (Vex 75%, Riven 65%, Kai'Sa 62% ... Azir 25%).
   Latest (18:30, post-audit engine, expert, 880 games): docs/results/round_robin_2026-11-06_1830.md (Riven 71%, Vex 68%,
   Rek'Sai 64%, Kai'Sa 57% ... Azir 21%; Kai'Sa vs Riven 8-12). Card scripting paused by Derrick at 17:44.
+  19:30 re-run after the Riven audit fixes: docs/results/round_robin_2026-11-06_1930.md (Vex 72%, Rek'Sai 66%, Riven 65%,
+  Kai'Sa 56%; Riven 14-6 vs Kai'Sa). `tools/deck_audit.py GAMES.json KEY` replays one deck's games and counts every card use.
 
 ## Next steps
 
