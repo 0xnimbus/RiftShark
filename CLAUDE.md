@@ -32,6 +32,7 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
 | 2026-11-06 17:42 | 50% used, resets 12:50 PM | 29% used, resets Mon 10:00 AM | +3% in 21 min; 14 cards scripted (none 85 -> 71): Hard Bargain, Kraken Hunter, Commander Ledros, Mageseeker Warden, Temporal Portal... |
 | 2026-11-06 18:04 | 2% used, resets 5:50 PM | 30% used, resets Mon 10:00 AM | new 5h window; Derrick (17:44): scripting stopped, round-robin redone (out/rr_1745, adaptive max 20, expert; container restart killed the first try, runner now resumes from partial.jsonl); UI asks went to the UI thread |
 | 2026-11-06 18:25 | 2% used, resets 5:50 PM | 30% used, resets Mon 10:00 AM | round-robin 871 games, 44/45 matchups settled |
+| 2026-11-06 19:09 | 4% used, resets 5:50 PM | 30% used, resets Mon 10:00 AM | 18:30 round-robin written up; Derrick (18:41) asked for a Riven rules check: tools/deck_audit.py found Switcheroo + Not So Fast never castable and Heron counting tokens (fixed 9783ead); round-robin re-run in out/rr_1900 |
 
 ## Where things stand
 
