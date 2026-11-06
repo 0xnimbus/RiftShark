@@ -222,15 +222,31 @@ def parse_sel(phrase, allow_self=True):
         else:
             kw["min_might"] = int(m.group(1))
         rest = m.group(3).strip()
-    m = re.match(r"with \[(\w[\w\- ]*)\]( \d+)?\b(.*)", rest)
-    if m:
+    m = re.match(r"with \[?(\w[\w\- ]*?)\]?(?: (\d+))?(?:\s+(.*))?$", rest)
+    if m and m.group(1).lower().replace(" ", "_").replace("-", "_") in KEYWORD_NAMES:
         kw["keyword"] = m.group(1).lower().replace(" ", "_").replace("-", "_")
-        rest = m.group(3).strip()
-    m = re.match(r"without \[(\w[\w\- ]*)\]( \d+)?\b(.*)", rest)
+        rest = (m.group(3) or "").strip()
+    m = re.match(r"with less might than (me|it)$", rest)
+    if m:
+        ref = "self" if m.group(1) == "me" else "t"
+        kw["pred"] = (lambda r: lambda g, c, u: (g.chars(u).might or 0) < (g.chars(c.source if r == "self" else c.vars.get("t")).might or 0))(ref)
+        rest = ""
+    m = re.match(r"with energy cost (?:no more than \[(\d+)\]|\[(\d+)\] or less)(?: and (?:with )?power cost no more than \[a\])?$", rest)
+    if m:
+        n = int(m.group(1) or m.group(2))
+        kw["pred"] = (lambda n: lambda g, c, u: (g.objects[u].base_defn().energy or 0) <= n)(n)
+        rest = ""
+    if rest.startswith("at battlefields"):
+        where = "battlefield"
+        rest = rest[len("at battlefields"):].strip()
+    if rest.startswith("in bases"):
+        where = "base"
+        rest = rest[len("in bases"):].strip()
+    m = re.match(r"without \[?(\w[\w\- ]*?)\]?(?: (\d+))?(?:\s+(.*))?$", rest)
     if m:
         k2 = m.group(1).lower().replace(" ", "_").replace("-", "_")
         kw["pred"] = (lambda k: lambda g, c, u: not g.chars(u).keywords.get(k))(k2)
-        rest = m.group(3).strip()
+        rest = (m.group(3) or "").strip()
     m = re.match(r"from your trash\b(.*)", rest)
     if m:
         zone = "trash"
@@ -371,10 +387,17 @@ def count_phrase(p):
 
 
 # ---------------------------------------------------------------------------- effect sentences
+KEYWORD_NAMES = {"accelerate", "assault", "deathknell", "deflect", "ganking", "hidden", "legion", "shield", "tank", "temporary",
+                 "vision", "equip", "quick_draw", "repeat", "weaponmaster", "ambush", "hunt", "level", "unique", "backline",
+                 "empower", "empowered", "flow", "deploy", "disarm", "mighty", "reaction", "action"}
+
+
 def _loc_phrase(p):
     p = p.strip().rstrip(".").lower()
-    if p in ("here", "to here", "this battlefield"):
+    if p in ("here", "to here", "this battlefield", "to this battlefield", "to my battlefield", "to my location"):
         return "here"
+    if p in ("to that battlefield", "to the chosen battlefield"):
+        return Ref("__bl")
     if p in ("to your base", "your base", "to base", "to its base", "to their base", "to its controller's base", "to base.", "base"):
         return "base"
     if p in ("to a battlefield", "a battlefield"):
@@ -1079,6 +1102,19 @@ def parse_condition(c):
         return O.is_my_turn
     if c in ("it's not your turn", "it isn't your turn"):
         return O.not_(O.is_my_turn)
+    m = re.match(r"you control (\d+) or fewer runes$", c)
+    if m:
+        return lambda g, cx, n=int(m.group(1)): len(g.players[cx.controller].runes) <= n
+    m = re.match(r"(?:it's|it is) (?:\[?empowered\]?)$", c)
+    if m:
+        return lambda g, cx: cx.vars.get("t") in g.objects and bool(g.objects[cx.vars["t"]].empowered)
+    m = re.match(r"(?:it's|it is) an? (spell|unit|gear|equipment)$", c)
+    if m:
+        w = m.group(1)
+        return lambda g, cx, w=w: cx.vars.get("t") in g.objects and (w in g.objects[cx.vars["t"]].base_defn().types or w.capitalize() in g.objects[cx.vars["t"]].base_defn().tags)
+    m = re.match(r"you spent \[(\d+)\] or more$", c)
+    if m:
+        return lambda g, cx, n=int(m.group(1)): bool(cx.event) and (cx.event.get("energy") or 0) >= n
     m = re.match(r"you control (\d+) or more (\w+)$", c)
     if m:
         n = int(m.group(1))
