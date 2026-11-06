@@ -1,0 +1,8 @@
+{
+  "buildCommand": "python3 tools/build_web_engine.py",
+  "outputDirectory": "web",
+  "framework": null,
+  "headers": [
+    { "source": "/engine/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=300" }] }
+  ]
+}

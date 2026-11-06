@@ -29,7 +29,7 @@ under the rules as modelled here. Anything listed under *Simplifications* is whe
   cards whose text is not fully scripted: such cards play with whatever part of their text was understood (keywords
   always work).
 
-## Simplifications (results can differ from paper play)
+## Simplifications (results can differ from paper play) — every item here is a bug to fix (owner rule: no simplifications)
 
 - Rune payment is automatic (greedy heuristic: pay energy from the pool, then exhaust ready runes; pay power by
   recycling, exhausting ready runes first). Players never choose which runes to spend.

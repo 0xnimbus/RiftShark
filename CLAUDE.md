@@ -11,6 +11,7 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
 | 2026-11-06 02:03 | 56% used, resets Fri 12:40 AM | 15% used, resets Mon 10:00 AM | ~16%/20 min; session likely exhausted around 03:00 UTC |
 | 2026-11-06 02:24 | 62% used, resets Fri 12:40 AM | 16% used, resets Mon 10:00 AM | +6% in 21 min (batch runs are cheap); continuing |
 | 2026-11-06 02:45 | 72% used, resets Fri 12:40 AM | 17% used, resets Mon 10:00 AM | +10% in 21 min; one more block, then likely stop near 03:05 |
+| 2026-11-06 03:08 | 85% used, resets Fri 12:40 AM | 19% used, resets Mon 10:00 AM | last block: Vercel setup + handoff, then stop until the session resets |
 
 ## Where things stand
 
@@ -39,16 +40,25 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   (gitignored, built by the Pages workflow) and `web/engine_worker.js` runs it with Pyodide 0.27 from jsdelivr when
   `/api/decks` does not answer. Measured in headless Chromium: ~6 s to start, 5-11 s per move at mcts:60/analysis 60.
   Derrick's PC has only Python 3.10 and Claude's auto-mode there refused to run the cloned server; the browser build is the
-  way for him to play until GitHub Pages is enabled (repo private: needs Pro plan or public repo).
+  way for him to play. Hosting: Vercel (`vercel.json`: build `python3 tools/build_web_engine.py`, output `web/`),
+  imported from the GitHub repo through Derrick's Vercel account in Chrome on 2026-11-06. GitHub Pages stays as a fallback.
 - Main deck = 39 cards + chosen champion (CR 103.3). `When you play me` triggers fire from the chain.
 - `riftsim/` top level still holds the v1 simplified engine (engine.py, policies.py, replay.py, runner.py, cli.py).
   It will be replaced by v2 equivalents.
 
-## Known simplifications (must stay documented in RULES.md)
+## HARD RULE (Derrick, 2026-11-06 03:07): no simplified cards or rules. Everything must run exactly as in the real game.
 
-Rune payment is automatic (greedy heuristic), simultaneous triggers are ordered automatically (turn player
-first), optional replacement effects are auto-applied, mulligan is skipped, "Add" restrictions (spend only on X)
-are not enforced, `[Show Off]` is not implemented.
+Every entry in the RULES.md "Simplifications" list is a bug to fix, in this order (each affects every game first):
+1. Rune payment as a player decision (which runes to exhaust for energy / recycle for power) instead of the greedy
+   plan in `game._power_plan`/`game.pay`; MCTS/greedy policies then choose it like any other Decision.
+2. Simultaneous triggers ordered by their controller (CR 383) via a Decision, not automatically.
+3. Mulligan at game start (CR 1v1 setup); optional replacement effects as a Decision; enforce "Add" restrictions.
+4. `[Show Off]`, Baron Pit token, Blade of the Exile alternative Equip cost, Scuttle Crab reveal; remove the 60-turn cap
+   once games are proven to end (or make it a loud error, never a silent draw).
+5. Script every card (`python -m riftsim.core coverage`: 425 none / 67 partial / 55 keywords-only on 2026-11-06), and
+   make `Deck.validate` refuse (or the batch/coach warn loudly about) any card whose script_status is not auto/manual/
+   vanilla, so nothing is simplified silently. Add per-card tests against printed text for the tournament decks first.
+Until this is done, treat the published win rates and coach grades as provisional and say so in the UI.
 
 ## Next steps
 
