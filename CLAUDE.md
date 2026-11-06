@@ -23,6 +23,7 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
 | 2026-11-06 14:19 | 15% used, resets 12:50 PM | 25% used, resets Mon 10:00 AM | +3% in 26 min; ~70 champions scripted (none 314, partial 32); 20-per-pair round-robin running (out/rr20); browser coach depth 100 |
 | 2026-11-06 14:43 | 18% used, resets 12:50 PM | 25% used, resets Mon 10:00 AM | +3% in 24 min; Repeat fix (CR 820), rr20 restarted 14:34 (180/900) |
 | 2026-11-06 15:03 | 22% used, resets 12:50 PM | 26% used, resets Mon 10:00 AM | +4% in 20 min; 12 champions scripted, paid-additional-cost and [Calm]-cost fixes; rr20 restarted 14:58 |
+| 2026-11-06 15:24 | 25% used, resets 12:50 PM | 26% used, resets Mon 10:00 AM | +3% in 21 min; 85 common cards scripted (none 306 -> 222), cards_common.py; rr20 at ~560/900 |
 
 ## Where things stand
 
@@ -35,7 +36,8 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   `flow.py` (turns, HOT FEPR chain, cleanups per CR 323, showdowns, combat per CR 466-468, scoring);
   `deck.py`; `scripts/` (keywords → auto-grammar → manual overrides).
 - `tools/smoke_core.py N SEED`: random-play games; last run 40/40 games without crash, ~0.1 s per game.
-- Script coverage (2026-11-06 15:03): auto 625, manual 190, keywords-only 28, partial 24, none 306, vanilla 23.
+- Script coverage (2026-11-06 15:24): auto 625, manual 275, keywords-only 27, partial 24, none 222, vanilla 23.
+  Common cards are hand-scripted in `riftsim/core/scripts/cards_common.py` (tests: tests/test_common_cards.py).
   Hand scripts for staples/legends/champions live in `riftsim/core/scripts/cards_staples.py` (tests: tests/test_legends.py, tests/test_champions.py).
 - `data/decks/tournament/`: 10 decks (Rek'Sai added 2026-11-06 13:15; specs in tools/deckspecs/radiance_2026-11.json). Top Radiance lists (Riven 1st CoolStuffCon Orlando $25k; Kai'Sa 3rd Convergence IV) from
   riftdecks.com qualifying events (3 relevance stars, 256+ players). Derrick wants these refreshed daily and every
