@@ -64,6 +64,12 @@
         logLines.push({ cls: "turn", html: e.turn ? `Turn ${e.turn}` : "Before the game" });
       }
       if (e.kind === "decision") {
+        if (e.dkind === "action" && e.choice === "pass") {   // passing Focus / priority is what moves a showdown or chain along
+          const st = cur && cur.state, sd = st && st.showdown;
+          logLines.push({ cls: (e.player === human ? "me" : "op") + " pass",
+                          html: `${e.player === human ? "You pass" : "Opponent passes"}${chainOpen.size ? " (chain)" : sd ? " Focus" : ""}.` });
+          continue;
+        }
         if (e.dkind === "action" || (e.dkind === "mulligan" && e.player !== human)) continue;  // shown by their own entries
         logLines.push({ cls: e.player === human ? "me" : "op", html: `${e.player === human ? "You choose" : "Opponent chooses"}: ${B.say(e.choice)}` });
         continue;
@@ -105,6 +111,10 @@
 
   function optionButton(d, i) {
     const h = hints && hints[i] != null ? `<span class="hintpct">${hints[i]}%</span>` : "";
+    if (d.kind === "assign_damage") {
+      const plan = B.damagePlan(d.labels[i]);
+      if (plan) return `<button class="opt dmg" data-i="${i}">${plan}${h}</button>`;
+    }
     return `<button class="opt" data-i="${i}">${B.thumbs(d.labels[i])}<span class="ol">${B.say(d.labels[i])}</span>${h}</button>`;
   }
   function drawDecision(j) {
@@ -247,36 +257,41 @@
     return last;
   }
 
+  /* One request at a time: a click while the coach is still grading waits for that grade, then plays. */
+  let gradeP = null;
+  async function runGrade() {
+    status("coach is grading your move…");
+    try {
+      const g = await api("/api/grade", {});
+      drawReview(g.review); drawSummary(g.summary);
+      status("");
+    } catch (e) { status("error: " + e.message); }
+    finally { gradeP = null; }
+  }
   async function choose(i) {
     if (inFlight || !cur || !cur.decision) return;
     const d = cur.decision, label = d.labels[i];
     inFlight = true; filterUid = null; hints = null;
     banner = { me: true, html: `<span class="who-me">You</span> ${B.say(label)}` };
     drawBoard(cur); drawDecision(cur);
-    $("#review").innerHTML = `${B.say(label)}<div class="alt"><span class="dots"><span></span><span></span><span></span></span> the coach will grade this once the opponent has moved…</div>`;
-    let graded = false;
     try {
+      if (gradeP) await gradeP;
+      $("#review").innerHTML = `${B.say(label)}<div class="alt"><span class="dots"><span></span><span></span><span></span></span> the coach will grade this once the opponent has moved…</div>`;
       const r = await api("/api/apply", { index: i });
       show(r);
       const last = await playOut(r);
       inFlight = false; banner = null;
       show(last);
-      if (r.grading || last.grading) {
-        status("coach is grading your move…");
-        const g = await api("/api/grade", {});
-        graded = true;
-        drawReview(g.review); drawSummary(g.summary);
-      } else {
-        drawReview({ grade: "only move", label, win_pct: null });
-      }
+      if (r.grading || last.grading) gradeP = runGrade();
+      else drawReview({ grade: "only move", label, win_pct: null });
     } catch (e) {
       status("error: " + e.message);
     } finally {
       inFlight = false; banner = null;
       if (cur) { drawBoard(cur); drawDecision(cur); }
-      if (graded || !$("#status").textContent.startsWith("error")) status("");
     }
   }
+
 
   // ------------------------------------------------------------------ controls
   async function loadDecks() {
@@ -307,6 +322,7 @@
   $("#btn-hint").addEventListener("click", async () => {
     if (inFlight) return;
     $("#btn-hint").disabled = true;
+    if (gradeP) await gradeP;
     status("the coach is looking at every option…");
     try {
       const j = await api("/api/hint");

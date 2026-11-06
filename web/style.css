@@ -266,6 +266,31 @@ button.opt img.th { width: 26px; border-radius: 3px; }
 button.opt.primary { justify-content: center; font-weight: 700; }
 .fd-known { display: inline-flex; align-items: center; gap: 4px; }
 .fd-known .card { opacity: .85; border-style: dashed; }
+/* showdown focus and combat */
+.fight { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 5px 8px; margin: 2px 0; border-radius: 8px; background: #000b; border: 1px solid #ff6b6b66; }
+.focus { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; }
+.focus .orb { width: 12px; height: 12px; border-radius: 50%; box-shadow: 0 0 10px currentColor; background: currentColor; animation: pulse 1.2s infinite; }
+.focus.me { color: var(--me); } .focus.op { color: var(--op); }
+.focus .muted { color: var(--muted); }
+.clash { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; }
+.clash .me { color: var(--me); } .clash .op { color: var(--op); }
+.clash .vs { color: var(--muted); font-weight: 700; }
+.focusflag { font-size: 10px; font-weight: 700; color: var(--accent); border: 1px solid var(--accent); padding: 0 5px; border-radius: 4px; vertical-align: middle; animation: pulse 1.2s infinite; }
+.card .role { position: absolute; top: 2px; right: 2px; font-size: 8px; font-weight: 800; padding: 1px 3px; border-radius: 3px; }
+.card .role.atk { background: #c62828ee; color: #fff; } .card .role.def { background: #1565c0ee; color: #fff; }
+.card .pend { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); font-size: 13px; font-weight: 900; color: #fff; background: #b71c1cee; padding: 0 5px; border-radius: 5px; box-shadow: 0 0 10px #f00a; }
+.card.exhausted .role, .card.exhausted .pend { transform: rotate(-90deg); }
+button.opt.dmg { display: block; }
+.dmg-plan { display: flex; flex-direction: column; gap: 3px; width: 100%; }
+.dp { display: grid; grid-template-columns: minmax(0, 1fr) 70px auto; align-items: center; gap: 6px; font-size: 12px; }
+.dp-n { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dp-bar { height: 7px; background: var(--panel3); border-radius: 4px; overflow: hidden; }
+.dp-bar i { display: block; height: 100%; background: #e53935; }
+.dp-a { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.kill { color: #ff8a80; }
+.log .ln.pass { color: var(--muted); font-style: italic; }
+.log b.me { color: var(--me); } .log b.op { color: var(--op); }
+.ch-rule { cursor: help; }
 [hidden] { display: none !important; }
 
 .src-text { margin-top: 6px; padding: 6px 8px; border-left: 3px solid var(--accent, #c89b3c); font-size: 0.9em; opacity: 0.9; }
