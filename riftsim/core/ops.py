@@ -550,7 +550,11 @@ class Move(Instr):
         d = val(game, ctx, self.dest)
         if d is None:
             return None
-        game.do_move(us, d, ctx)
+        if d == "base":                      # each unit goes to its controller's base
+            for u in us:
+                game.do_move([u], ("base", game.objects[u].controller), ctx)
+        else:
+            game.do_move(us, d, ctx)
         if self.ready:
             for u in us:
                 game.do_ready(u, ctx)
@@ -1158,7 +1162,7 @@ def controller_of(ref):
 
 
 def loc_of(ref):
-    return lambda g, c: g.objects[val(g, c, ref)].location if val(g, c, ref) in g.objects else None
+    return lambda g, c: g.objects[val(g, c, ref)].place if val(g, c, ref) in g.objects else None
 
 
 def opponent(g, c):

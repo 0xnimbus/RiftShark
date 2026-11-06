@@ -19,7 +19,7 @@ from .. import ops as O
 from ..vm import Ref
 
 REGISTRY = {}        # card name (lower) -> callable(defn) -> list of abilities, or dict
-_SCRIPTED = set()
+_SCRIPTED = {}
 
 
 def script(*names):
@@ -127,9 +127,9 @@ def parse_cost(text):
 
 # ----------------------------------------------------------------------------- attach
 def attach_scripts(db, defn):
-    if id(defn) in _SCRIPTED:
+    if _SCRIPTED.get(id(defn)) is defn:     # identity check: ids of freed CardDefs get reused
         return defn
-    _SCRIPTED.add(id(defn))
+    _SCRIPTED[id(defn)] = defn
     defn.abilities = []
     defn.effect_abilities = []
     status = "none"

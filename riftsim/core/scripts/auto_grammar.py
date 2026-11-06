@@ -1215,7 +1215,7 @@ TRIGGER_PATTERNS = [
     (r"when you play me from face ?down on your turn", lambda g, s, ev: ev.get("kind") == "play" and ev.get("uid") == s and ev.get("from_zone") == "facedown" and g.turn_player == ev.get("player")),
     (r"when a unit you control becomes mighty", "unit_becomes_mighty"),
     (r"when a showdown begins here", "showdown_start_here"),
-    (r"when you win a combat here", lambda g, s, ev: ev.get("kind") == "combat_result" and ev.get("winner") == g.objects[s].controller and ev.get("loc") == g.objects[s].location),
+    (r"when you win a combat here", lambda g, s, ev: ev.get("kind") == "combat_result" and ev.get("winner") == g.objects[s].controller and ev.get("loc") == g.objects[s].place),
     (r"when i move from a location", "move_self"),
     (r"at the start of your main phase", "start_main"),
     (r"when you conquer or hold", "you_score"),
@@ -1223,8 +1223,8 @@ TRIGGER_PATTERNS = [
     (r"when an opponent scores", lambda g, s, ev: ev.get("kind") == "score" and ev.get("player") != g.objects[s].controller),
     (r"when you banish a card you own", lambda g, s, ev: ev.get("kind") == "banish" and ev.get("player") == g.objects[s].controller),
     (r"when you move an enemy unit", lambda g, s, ev: ev.get("kind") == "move" and ev.get("player") != g.objects[s].controller and not ev.get("standard")),
-    (r"when a stunned enemy unit here dies", lambda g, s, ev: ev.get("kind") == "die" and ev.get("player") != g.objects[s].controller and ev.get("stunned") and ev.get("loc") == g.objects[s].location),
-    (r"when you hide a card here", lambda g, s, ev: ev.get("kind") == "hide" and ev.get("player") == g.objects[s].controller and ev.get("loc") == g.objects[s].location),
+    (r"when a stunned enemy unit here dies", lambda g, s, ev: ev.get("kind") == "die" and ev.get("player") != g.objects[s].controller and ev.get("stunned") and ev.get("loc") == g.objects[s].place),
+    (r"when you hide a card here", lambda g, s, ev: ev.get("kind") == "hide" and ev.get("player") == g.objects[s].controller and ev.get("loc") == g.objects[s].place),
     (r"when you kill a unit with a spell", lambda g, s, ev: ev.get("kind") == "die" and ev.get("killer") == g.objects[s].controller and ev.get("by") == "spell"),
     (r"the first time i win a combat each turn", "win_combat_self"),
     (r"when a friendly unit attacks or defends alone", lambda g, s, ev: ev.get("kind") in ("attack", "defend") and ev.get("player") == g.objects[s].controller and len(g.units_at(ev["loc"], ev["player"])) == 1),
@@ -1254,12 +1254,12 @@ TRIGGER_PATTERNS = [
     (r"when you stun an enemy unit at a battlefield", lambda g, s, ev: ev.get("kind") == "stun" and ev.get("by") == g.objects[s].controller and ev.get("loc", (None,))[0] == "bf"),
     (r"when you stun (?:a|an|one or more) (?:enemy )?units?", lambda g, s, ev: ev.get("kind") == "stun" and ev.get("by") == g.objects[s].controller),
     (r"when i move from a battlefield", lambda g, s, ev: ev.get("kind") == "move" and ev.get("uid") == s and ev.get("from") is not None and ev["from"][0] == "bf"),
-    (r"when a friendly unit moves from my location", lambda g, s, ev: ev.get("kind") == "leave_loc" and ev.get("player") == g.objects[s].controller and ev.get("from") == g.objects[s].location and ev.get("uid") != s),
-    (r"when a unit moves from here", lambda g, s, ev: ev.get("kind") == "leave_loc" and ev.get("from") == g.objects[s].location and ev.get("uid") != s),
+    (r"when a friendly unit moves from my location", lambda g, s, ev: ev.get("kind") == "leave_loc" and ev.get("player") == g.objects[s].controller and ev.get("from") == g.objects[s].place and ev.get("uid") != s),
+    (r"when a unit moves from here", lambda g, s, ev: ev.get("kind") == "leave_loc" and ev.get("from") == g.objects[s].place and ev.get("uid") != s),
     (r"when another friendly unit becomes exhausted", lambda g, s, ev: ev.get("kind") == "exhaust" and ev.get("player") == g.objects[s].controller and ev.get("uid") != s),
     (r"when i conquer after an attack", lambda g, s, ev: ev.get("kind") == "conquer" and s in ev.get("units", ()) and g.combat is not None),
     (r"when i conquer an open battlefield", "conquer_self"),
-    (r"when you conquer here with one or more mighty units", lambda g, s, ev: ev.get("kind") == "conquer" and ev.get("player") == g.objects[s].controller and ev.get("loc") == g.objects[s].location and any(g.chars(u).mighty for u in ev.get("units", ()))),
+    (r"when you conquer here with one or more mighty units", lambda g, s, ev: ev.get("kind") == "conquer" and ev.get("player") == g.objects[s].controller and ev.get("loc") == g.objects[s].place and any(g.chars(u).mighty for u in ev.get("units", ()))),
     (r"when you defend at a battlefield", "you_defend"),
     (r"when i'?m dealt damage", "damaged_self"),
     (r"when you choose me with a spell", "targeted_self"),
@@ -1305,8 +1305,8 @@ TRIGGER_PATTERNS = [
     (r"when you score here", "you_score_here"),
     (r"when you hold or conquer here", "you_score_here"),
     (r"when you conquer or hold here", "you_score_here"),
-    (r"when you defend here", lambda g, s, ev: ev.get("kind") == "combat_start" and ev.get("defender") == g.objects[s].controller and ev.get("loc") == g.objects[s].location),
-    (r"when you attack here", lambda g, s, ev: ev.get("kind") == "combat_start" and ev.get("attacker") == g.objects[s].controller and ev.get("loc") == g.objects[s].location),
+    (r"when you defend here", lambda g, s, ev: ev.get("kind") == "combat_start" and ev.get("defender") == g.objects[s].controller and ev.get("loc") == g.objects[s].place),
+    (r"when you attack here", lambda g, s, ev: ev.get("kind") == "combat_start" and ev.get("attacker") == g.objects[s].controller and ev.get("loc") == g.objects[s].place),
     (r"when you hold", "you_hold"),
     (r"when you conquer", "you_conquer"),
     (r"when you score", "you_score"),
@@ -1437,7 +1437,7 @@ def match_trigger(prefix):
         try:
             sel, _, _, _ = parse_sel("a " + m.group(1))
             here = bool(m.group(2))
-            return (lambda g, s, ev, sel=sel, here=here: ev.get("kind") == "play" and _card_matches(g, ev["uid"], sel) and (not here or ev.get("loc") == g.objects[s].location)), once, None
+            return (lambda g, s, ev, sel=sel, here=here: ev.get("kind") == "play" and _card_matches(g, ev["uid"], sel) and (not here or ev.get("loc") == g.objects[s].place)), once, None
         except ParseError:
             pass
     # compound: "when you play me or when i hold"
@@ -1600,9 +1600,9 @@ def _cnt(g, src, cnt):
 def parse_static_condition(c):
     c = c.strip().lower()
     if c in ("i'm at a battlefield", "i am at a battlefield", "i'm in combat"):
-        return lambda g, src: g.objects[src].location is not None and g.objects[src].location[0] == "bf"
+        return lambda g, src: g.objects[src].place is not None and g.objects[src].place[0] == "bf"
     if c in ("i'm in your base", "i'm in base", "i'm at your base"):
-        return lambda g, src: g.objects[src].location is not None and g.objects[src].location[0] == "base"
+        return lambda g, src: g.objects[src].place is not None and g.objects[src].place[0] == "base"
     if c in ("i'm buffed",):
         return lambda g, src: g.objects[src].buffs > 0
     if c in ("i'm exhausted",):
@@ -1618,13 +1618,13 @@ def parse_static_condition(c):
     if c in ("i'm a defender", "i'm defending"):
         return lambda g, src: g.objects[src].designation == "defender"
     if c in ("i'm in a showdown", "i'm in a showdown or combat"):
-        return lambda g, src: g.showdown is not None and g.objects[src].location == ("bf", g.showdown["bf"])
+        return lambda g, src: g.showdown is not None and g.objects[src].place == ("bf", g.showdown["bf"])
     if c in ("it's your turn",):
         return lambda g, src: g.turn_player == g.objects[src].controller
     if c in ("it's not your turn", "it isn't your turn"):
         return lambda g, src: g.turn_player != g.objects[src].controller
     if c in ("you control this battlefield", "you or an ally control this battlefield"):
-        return lambda g, src: g.objects[src].location is not None and g.objects[src].location[0] == "bf" and g.battlefields[g.objects[src].location[1]].controller == g.objects[src].controller
+        return lambda g, src: g.objects[src].place is not None and g.objects[src].place[0] == "bf" and g.battlefields[g.objects[src].place[1]].controller == g.objects[src].controller
     m = re.match(r"you control (\d+) or more (\w+)$", c)
     if m:
         n = int(m.group(1))
@@ -1637,7 +1637,7 @@ def parse_static_condition(c):
     if m:
         sel, _, _, _ = parse_sel("friendly " + m.group(1))
         from ..vm import Context
-        return lambda g, src, s=sel: bool(s.candidates(g, Context(g.objects[src].controller, src, here=g.objects[src].location)))
+        return lambda g, src, s=sel: bool(s.candidates(g, Context(g.objects[src].controller, src, here=g.objects[src].place)))
     m = re.match(r"you have (\w+) or fewer cards in (?:your )?hand$", c)
     if m:
         return lambda g, src, n=_num(m.group(1)): len(g.players[g.objects[src].controller].hand) <= n
@@ -1648,7 +1648,7 @@ def parse_static_condition(c):
     if m:
         sel, _, _, _ = parse_sel(m.group(1) + " here")
         from ..vm import Context
-        return lambda g, src, s=sel: bool(s.candidates(g, Context(g.objects[src].controller, src, here=g.objects[src].location)))
+        return lambda g, src, s=sel: bool(s.candidates(g, Context(g.objects[src].controller, src, here=g.objects[src].place)))
     raise ParseError(f"static condition {c!r}")
 
 
@@ -1908,7 +1908,7 @@ def script_line(defn, line):
     if m:
         n, mn = int(m.group(1)), int(m.group(2) or 0)
         return [Static("self", "rule", ("cost_reduce", lambda g, src, uid, e, p, n=n, mn=mn: (max(mn, e - n), p) if g.objects[uid].base_defn().type == "spell" and g.objects[uid].owner == g.objects[src].controller else (e, p)),
-                       cond=lambda g, src: g.objects[src].location is not None and g.objects[src].location[0] == "bf", label=line, source_text=line)]
+                       cond=lambda g, src: g.objects[src].place is not None and g.objects[src].place[0] == "bf", label=line, source_text=line)]
     m = re.match(r"my might is increased by your points\.?$", bl)
     if m:
         return [Static("self", "might", lambda g, src, u: g.players[g.objects[src].controller].points, label=line, source_text=line)]

@@ -11,7 +11,7 @@ from ..vm import Ref
 
 # ----------------------------------------------------------------------------- helpers
 def _loc_of(g, s):
-    return g.objects[s].location
+    return g.objects[s].place
 
 
 def _play_here_first_each_turn(g, s, ev, non_token=False, kinds=("unit", "gear")):

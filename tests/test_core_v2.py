@@ -194,3 +194,25 @@ def test_runes_are_a_choice_when_domains_differ(db, decks):
     ps.energy, ps.power, ps.pool_r = 0, [], []
     plans = g.payment_plans(p, 1, [], {"kind": "play", "types": {"unit"}})
     assert len(plans) == len({g.objects[u].domain for u in ps.runes}) >= 2
+
+
+def test_play_session_seat_decides_who_goes_first(db):
+    """Derrick's report: as first player he must start turn 1 with 2 runes; second player gets 3 on turn 2."""
+    from riftsim.core.playsession import PlaySession
+    d0 = json.load(open(ROOT / "data/decks/tournament/kaisa_void.json"))
+    d1 = json.load(open(ROOT / "data/decks/tournament/riven_exile.json"))
+    for human in (0, 1):
+        s = PlaySession(db)
+        s.new(d0, d1, human=human, ai="greedy", analysis=20)
+        g = s.game
+        me = g.players[human]
+        assert g.objects[me.legend].defn.name.startswith("Kai'Sa")       # the human always plays deck0
+        assert g.first_player == 0
+        if human == 0:
+            assert g.turn == 1 and g.turn_player == 0 and len(me.runes) == 2
+        else:
+            assert len(me.runes) in (0, 3)       # AI's turn 1 already played out, or human's turn 2 started
+    s1, s2 = PlaySession(db), PlaySession(db)
+    s1.new(d0, d1, ai="greedy", analysis=20)
+    s2.new(d0, d1, ai="greedy", analysis=20)
+    assert s1.seed != s2.seed                      # every game is a fresh shuffle
