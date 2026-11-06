@@ -123,6 +123,8 @@ Bugs Derrick reported 2026-11-06 03:35 (do first next session, before item 2):
 - AI levels (2026-11-06, 20 games each): random 7-13 novice, novice 8-12 intermediate, intermediate 6-14 advanced,
   advanced 7-13 expert, advanced 2-10 elite (mcts:120, ~5 min per game). Round-robin of the 9 tournament decks:
   docs/results/round_robin_2026-11-06.md (Vex 75%, Riven 65%, Kai'Sa 62% ... Azir 25%).
+  Latest (18:30, post-audit engine, expert, 880 games): docs/results/round_robin_2026-11-06_1830.md (Riven 71%, Vex 68%,
+  Rek'Sai 64%, Kai'Sa 57% ... Azir 21%; Kai'Sa vs Riven 8-12). Card scripting paused by Derrick at 17:44.
 
 ## Next steps
 
