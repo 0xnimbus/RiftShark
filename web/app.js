@@ -72,7 +72,8 @@
 
   // ------------------------------------------------------------ replays
   let rep = null, frame = 0, timer = null;
-  fetch(DATA + "cards.json").then(r => r.json()).then(j => { RiftBoard.setCards(j); }).catch(() => {});
+  fetch(DATA + "cards.json").then(r => r.json()).then(j => { RiftBoard.setCards(j); if (rep) render(); }).catch(() => {});
+  RiftBoard.bindTooltips();
   async function loadReplayList() {
     let idx;
     try {
@@ -95,26 +96,38 @@
                                  : await (await fetch(DATA + "replays/" + name + ".json")).json();
     frame = 0;
     $("#viewer-empty").hidden = true;
-    $("#board").hidden = false;
+    $("#viewer-main").hidden = false;
+    $("#replay-side").hidden = false;
     $("#frame-slider").max = Math.max(0, rep.frames.length - 1);
     render();
   }
   function render() {
     if (!rep) return;
     const f = rep.frames[frame];
-    RiftBoard.renderState(f.state);
     const d = f.decision;
-    $("#decision").innerHTML = `<b class="p${d.player}c">P${d.player}</b> ${d.kind}: <b>${d.label}</b>
-      <div class="opts">${d.n_options} options: ${d.options.slice(0, 12).join(" · ")}${d.n_options > 12 ? " …" : ""}</div>`;
-    $("#frame-label").textContent = `${frame + 1} / ${rep.frames.length}`;
+    RiftBoard.render($("#board"), f.state, { me: 0, victory: 8, neutral: true });
+    const B = RiftBoard;
+    const who = d.player === 0 ? '<span class="p0c">P0</span>' : '<span class="p1c">P1</span>';
+    const [title, text] = B.explain(Object.assign({ prompt: "" }, d, { showdown: !!f.state.showdown && d.kind === "action", chain: f.state.chain.length > 0 && d.kind === "action" }), f.state);
+    const opts = d.options.slice(0, 14).map(o => `<div class="${o === d.label ? "chosen" : ""}">${o === d.label ? "▶ " : "· "}${B.say(o)}</div>`).join("");
+    $("#decision").innerHTML = `<h3>Decision ${frame + 1}: ${who} · ${title.replace(/^Your /, "")}</h3><p class="muted">${text.replace(/\byour\b/gi, "their").replace(/\bYou\b/g, "They").replace(/\byou\b/g, "they")}</p>
+      <p>${who} chose: <b>${B.say(d.label)}</b></p>
+      <div class="opts">${d.n_options} option${d.n_options === 1 ? "" : "s"}:${opts}${d.n_options > 14 ? "<div>…</div>" : ""}</div>`;
+    $("#frame-label").textContent = `${frame + 1} / ${rep.frames.length} · turn ${f.state.turn}`;
     $("#frame-slider").value = frame;
-    // events between this decision and the next
+    // what happened between this decision and the next, in plain words
     const next = rep.frames[frame + 1] ? rep.frames[frame + 1].event_index : rep.events.length;
-    const evs = rep.events.slice(f.event_index, next).filter(e => !e.kind.startsWith("event:") && e.kind !== "pay");
-    $("#events").innerHTML = evs.map(e => `<div class="ev ${e.kind === "decision" ? "hl" : ""}">${fmtEvent(e)}</div>`).join("");
-    RiftBoard.bindTooltips();
+    const open = new Set();
+    rep.events.slice(0, f.event_index).forEach(e => B.chainStep(e, open));  // chain state when this decision was made
+    const lines = rep.events.slice(f.event_index, next).map(e => {
+      if (e.kind === "decision") return null;
+      const cs = B.chainStep(e, open);
+      const h = B.describe(e);
+      const cls = (e.player === 0 ? "me" : e.player === 1 ? "op" : "") + (open.size || cs.depth ? " chain" : "");
+      return h ? `<div class="ln ${cls}"${cs.depth ? ` style="margin-left:${Math.min(4, cs.depth) * 14}px"` : ""}>${h}${cs.note}</div>` : null;
+    }).filter(Boolean);
+    $("#events").innerHTML = lines.join("") || '<span class="muted">nothing visible</span>';
   }
-  const fmtEvent = RiftBoard.fmtEvent;
   function go(n) { if (!rep) return; frame = Math.max(0, Math.min(rep.frames.length - 1, n)); render(); }
   $("#btn-first").onclick = () => go(0);
   $("#btn-prev").onclick = () => go(frame - 1);

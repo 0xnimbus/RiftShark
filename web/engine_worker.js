@@ -19,6 +19,9 @@ def call(cmd, args_json):
         r = S.new(d0, d1, human=a.get("human", 0), seed=a.get("seed"), ai=a.get("ai", "mcts:60"), analysis=a.get("analysis", 60))
     elif cmd == "state": r = S.payload()
     elif cmd == "choose": r = S.choose(a["index"])
+    elif cmd == "apply": r = S.apply(a["index"])
+    elif cmd == "ai_step": r = S.ai_step()
+    elif cmd == "grade": r = S.grade()
     elif cmd == "hint": r = S.hint()
     elif cmd == "decks":
         ds = [dict(d, data=json.load(open("/app/" + d["path"], encoding="utf-8"))) for d in a["decks"]]

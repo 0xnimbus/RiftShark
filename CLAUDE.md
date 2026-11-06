@@ -50,6 +50,19 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   imported from the GitHub repo through Derrick's Vercel account in Chrome on 2026-11-06; live at https://riftshark.vercel.app/play.html
   (auto-deploys on push to main; verified in Derrick's Chrome). The deck lists on the page only show decks that pass
   Deck.validate (fully scripted). GitHub Pages stays as a fallback.
+- UI redesign (2026-11-06 03:30, branch claude/project-thread-awnl3n): playmat board in `web/board.js` (turn/phase bar, score pips,
+  legend/champion/rune zones, battlefields with art, exhausted = rotated + dimmed + label, card preview tooltip with text and
+  status help, "why can't I play this"), plain-language log and decision explanations (`RiftBoard.say/describe/explain`, already
+  covers pay/order_triggers/mulligan), click a glowing hand card to play it. Play page no longer greys out: `PlaySession.apply` →
+  `ai_step` (one AI decision per call, shown from a display queue while the opponent hand shows "thinking") → `grade`.
+  2026-11-06 06:00: cards slide between zones (FLIP in `RiftBoard.render`, opponent cards fly out of their hand), phone layout
+  (<=760px: smaller cards, decision panel fixed at the bottom), rune float options grouped as "Use runes now".
+  Chain lane (06:10): the chain shows in the middle of the board, oldest left, "resolves next" right, with kind, controller,
+  targets (PlaySession reads chosen uids from each item's ctx.vars) and trigger cause; who has priority; log lines indent by
+  chain depth (`RiftBoard.chainStep`). The page sends a fresh random seed per game unless one is typed in, and shows it.
+  Mulligan (06:50): hand view, click up to two cards then confirm (`decision.option_uids` from PlaySession); order_triggers
+  explained one pick at a time. 07:00: Difficulty picker (novice..elite, default advanced), show_off decisions, any number of
+  battlefields, facedown cards the human knows drawn face up (`facedown_known`), cards only slide when they change zone.
 - Main deck = 39 cards + chosen champion (CR 103.3). `When you play me` triggers fire from the chain.
 - `riftsim/` top level still holds the v1 simplified engine (engine.py, policies.py, replay.py, runner.py, cli.py).
   It will be replaced by v2 equivalents.
