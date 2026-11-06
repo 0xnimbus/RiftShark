@@ -235,3 +235,70 @@ def test_empower_dash_costs_parse(db):
     assert emp("VEN-054")[0].get("exhaust") and emp("VEN-054")[0]["energy"] == 0             # [T]
     assert emp("VEN-001")[0]["energy"] == 5                                                   # [5]. This ability...
     assert emp("VEN-163") == []                                                               # Risen Altar: not the keyword
+
+
+def test_songstress_exhausts_herself_and_three_units_to_reduce_a_spell_by_2(db, decks):
+    g = main_phase(db, decks)
+    lg = legend(g, db, "RAD-151")
+    units = [unit_at(g, 0, ("base", 0))]
+    units.append(unit_at(g, 0, ("base", 0), exclude=units))
+    units.append(unit_at(g, 0, ("base", 0), exclude=units))
+    assert g._exhaust_reducers(0)
+    sp = next(u for u in g.players[0].deck if g.objects[u].defn.type == "spell" and g.objects[u].defn.energy >= 2
+              and not g.objects[u].defn.text.lower().startswith("choose"))
+    g._to_zone(g.objects[sp], "hand"); g.bump()
+    it = g._play(0, sp, None)
+    g.pending = None
+    asked = False
+    for _ in range(30):
+        d = g.run()
+        if d.kind == "yesno" and "Songstress" in d.labels[0]:
+            asked = True
+            g.choose(True); continue
+        if d.kind == "choose_many" and asked:
+            g.choose(next(o for o in d.options if set(o) == set(units))); continue
+        if d.kind == "action":
+            break
+        g.choose(d.options[0])
+    assert asked
+    assert g.objects[lg].exhausted and all(g.objects[u].exhausted for u in units)
+    assert it.cost["paid"][0] == max(0, g.objects[sp].defn.energy - 2)
+
+
+def _resolve_spell(g, sp, energy):
+    """Play spell `sp` from P0's hand and let it resolve; treat it as if `energy` was spent on it."""
+    g._energy_spent = lambda it: energy
+    if g.objects[sp].zone != "hand":
+        g._to_zone(g.objects[sp], "hand")
+    it = g._play(0, sp, None)
+    it.cost = {"energy": 0, "power": []}
+    g.pending = None
+    for _ in range(60):
+        d = g.run()
+        if d.kind == "yesno" and "Virtuoso" in d.labels[0]:
+            g.choose(True); continue
+        if d.kind == "action" and not g.chain:
+            return it
+        g.choose(("pass",) if ("pass",) in d.options else d.options[0])
+    raise AssertionError("chain did not settle")
+
+
+def test_virtuoso_banishes_4_energy_spells_and_pays_off_at_four(db, decks):
+    g = main_phase(db, decks)
+    legend(g, db, "UNL-181")
+    cheap = next(c for c in db if c.name == "Progress Day")                      # "Draw 4."
+    spells = []
+    for i in range(5):
+        u = g.players[0].deck[-1 - i]
+        g.objects[u].defn = cheap
+        spells.append(u)
+    _resolve_spell(g, spells[0], 3)
+    assert g.objects[spells[0]].zone == "trash"            # spent only [3]: no trigger
+    for u in spells[1:4]:
+        _resolve_spell(g, u, 4)
+        assert g.objects[u].zone == "banish"
+    runes0, hand0, deck0 = len(g.players[0].runes), len(g.players[0].hand), len(g.players[0].rune_deck)
+    _resolve_spell(g, spells[4], 5)
+    assert all(g.objects[u].zone == "trash" for u in spells[1:])     # put each in its trash
+    assert len(g.players[0].runes) == runes0 + min(4, deck0)                  # channel 4 runes
+    assert len(g.players[0].hand) == hand0 + 4 + 1                     # the spell draws 4, Virtuoso draws 1

@@ -10,7 +10,7 @@ import itertools
 
 from .abilities import Activated, PlayPermission, Static
 from .objects import ChainItem
-from .vm import Context, Decision, Frame, Instr, compile_effect, run_vm, resume_vm, val
+from .vm import Context, Decision, Frame, Instr, Ref, compile_effect, run_vm, resume_vm, val
 from .ops import Choose, May, SetVar, Do, PayResources
 from . import payment
 
@@ -154,7 +154,7 @@ class _FinalizeCosts(Instr):
         return self.run(game, ctx)
 
     def _finish(self, game, ctx, it):
-        e = it.cost["energy"] + sum(x for (x, _) in ctx.vars["__costs"].values())
+        e = max(0, it.cost["energy"] - ctx.vars.get("__cost_reduce", 0)) + sum(x for (x, _) in ctx.vars["__costs"].values())
         p = list(it.cost["power"]) + [d for (_, ps) in ctx.vars["__costs"].values() for d in ps]
         p += ["any"] * game._deflect_total(it, ctx)
         if it.cost.get("exhaust"):
@@ -889,8 +889,45 @@ class FlowMixin:
                         outs = [i.out for i in ins if isinstance(i, PayResources)]
                         pre.append(May(list(ins) + [Do(lambda g, c, outs=tuple(outs): c.paid.__setitem__("add", all(c.vars.get(o) for o in outs)))],
                                        label="pay the additional cost", out="__addq"))
+        if it.kind == "spell":
+            pre += self._exhaust_reducer_code(it)
         code = show + compile_effect(pre) + list(it.target_code or []) + [_FinalizeCosts(it.id)]
         self.vm_frames.append(Frame(code, ctx, tag=("finalize", it.id)))
+
+    def _exhaust_reducers(self, p):
+        """Starry-Eyed Songstress: ready sources with rule 'spell_reduce_exhaust_units' (n units, energy) that p can use now."""
+        out = []
+        for src, v in self.rules("spell_reduce_exhaust_units", player=p):
+            n, _ = v
+            o = self.objects[src]
+            ready_units = [u for u, x in self.objects.items() if x.zone == "board" and x.controller == p and not x.exhausted
+                           and u != src and "unit" in self.chars(u).types]
+            if not o.exhausted and len(ready_units) >= n:
+                out.append((src, v))
+        return out
+
+    def _exhaust_reducer_code(self, it):
+        """The optional cost is offered as a yes/no; when the spell was only affordable with it, it is paid without asking
+        (declining would make the play illegal, CR 357)."""
+        from .ops import Exhaust
+        from .selectors import Sel
+        p = it.controller
+        code = []
+        e, pw = it.cost["energy"], it.cost["power"]
+        must = not self.can_pay(p, e, pw, purpose=self.item_purpose(it))
+        for src, (n, energy) in self._exhaust_reducers(p):
+            sel = Sel("unit", side="friendly", pred=lambda g, c, u, src=src: u != src and not g.objects[u].exhausted)
+            body = [Choose(sel, out=f"__exr{src}", n=n, targeted=False),
+                    Do(lambda g, c, src=src: g.do_exhaust(src, c)),
+                    Exhaust(Ref(f"__exr{src}")),
+                    Do(lambda g, c, energy=energy: c.vars.__setitem__("__cost_reduce", c.vars.get("__cost_reduce", 0) + energy))]
+            if must:
+                code += body
+                must = False
+            else:
+                code.append(May(body, out=f"__exq{src}",
+                                label=f"exhaust {self.objects[src].defn.name} and {n} friendly units to reduce the cost by [{energy}]"))
+        return code
 
     def _finalized(self, item_id):
         it = next((x for x in self.chain if x.id == item_id), None)
@@ -915,7 +952,7 @@ class FlowMixin:
             self.players[it.controller].played_this_turn.append(it.uid)
             o = self.objects[it.uid]
             self.emit("play", uid=it.uid, player=it.controller, card_type=it.kind, loc=ctx.target_bf or ctx.vars.get("__loc"),
-                      from_zone=ctx.played_from, item=it.id, ctx=ctx)
+                      from_zone=ctx.played_from, item=it.id, energy=self._energy_spent(it), ctx=ctx)
         elif it.kind == "ability":
             self.emit("activate", uid=it.uid, player=it.controller, energy=(it.cost or {}).get("energy", 0), item=it.id, ctx=ctx)
         self.priority = it.controller
@@ -1002,6 +1039,11 @@ class FlowMixin:
         except (KeyError, AttributeError):
             return False
 
+    def _energy_spent(self, it):
+        """Energy actually paid for an item (base cost + additional costs), for "if you spent [N] or more"."""
+        paid = (it.cost or {}).get("paid")
+        return paid[0] if paid else 0
+
     def _resolved(self, item_id):
         it = next((x for x in self.chain if x.id == item_id), None)
         if it is None:
@@ -1015,7 +1057,7 @@ class FlowMixin:
                     self._to_zone(o, "banish")
                 else:
                     self._to_zone(o, "trash")
-            self.emit("resolve", uid=it.uid, player=it.controller, card_type="spell", item=it.id)
+            self.emit("resolve", uid=it.uid, player=it.controller, card_type="spell", item=it.id, energy=self._energy_spent(it))
         if it.kind == "trigger" and it.ability is not None and getattr(it.ability, "keyword", None) == "deathknell":
             pass
         self.dirty = True
@@ -1301,7 +1343,8 @@ class FlowMixin:
             for loc in locs:
                 e, pw = self.card_cost(p, u, z, loc)
                 if not self.can_pay(p, e, pw, purpose=purpose):
-                    continue
+                    if not (loc is None and self._exhaust_reducers(p) and self.can_pay(p, max(0, e - 2), pw, purpose=purpose)):
+                        continue
                 if loc is None:
                     if not self._spell_has_targets(p, u, z):
                         continue

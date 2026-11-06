@@ -328,3 +328,46 @@ def boy_who_shattered_time(defn):
                                      "custom": [O.Disempower(Ref("self"))]}, [reduce], timing="main",
                                     label="next unit costs [2][A] less and dies at end of turn", source_text=defn.text)],
             "replace": True}
+
+
+@script("Starry-Eyed Songstress")
+def starry_eyed_songstress(defn):
+    # As an additional cost to play a spell, you may exhaust me and three friendly units to reduce the cost of
+    # that spell by [2].   (flow._exhaust_reducer_code offers it while the spell is finalized)
+    return {"abilities": [Static("self", "rule", ("spell_reduce_exhaust_units", (3, 2)), label=defn.name, source_text=defn.text)],
+            "replace": True}
+
+
+@script("Virtuoso", "Jhin, Virtuoso")
+def virtuoso(defn):
+    # When you play a spell, if you spent [4] or more, you may banish it. Then, if there are four spells banished
+    # with me, put each in its trash, channel 4 runes, and draw 1.
+    # Rulings (RiftJudge 8769, 9779): the trigger happens once the spell has finished resolving (Time Warp has
+    # already banished itself); a countered spell was never played (CR 426.1.b), so it does not trigger.
+    def spent4(g, s, ev):
+        return ev.get("kind") == "resolve" and ev.get("card_type") == "spell" and \
+            ev.get("player") == g.objects[s].controller and (ev.get("energy") or 0) >= 4
+
+    def banish_it(g, c):
+        u = c.event.get("uid")
+        o = g.objects.get(u)
+        if o is not None and o.zone == "trash":
+            g.do_banish([u], c)
+            g.objects[c.source].temp.setdefault("banished_with", []).append(u)
+
+    def payoff(g, c):
+        src = g.objects[c.source]
+        mine = [u for u in src.temp.get("banished_with", []) if g.objects[u].zone == "banish"]
+        src.temp["banished_with"] = mine
+        if len(mine) < 4:
+            return
+        for u in mine:
+            g._to_zone(g.objects[u], "trash")
+        src.temp["banished_with"] = []
+        g.bump()
+        c.vars["__virt"] = True
+
+    return {"abilities": [Triggered(spent4, [O.May([O.Do(banish_it)], label="banish the spell with Virtuoso"),
+                                             O.Do(payoff),
+                                             O.If(lambda g, c: c.vars.get("__virt"), [O.Channel(4), O.Draw(1)])],
+                                    label=defn.name, source_text=defn.text)], "replace": True}
