@@ -157,10 +157,19 @@ class MCTSPolicy(Policy):
         opts = list(d.options)
         if len(opts) == 1:
             return opts[0]
+        root = self.search(game, d)
+        if not root.children:
+            return self.rng.choice(opts)
+        best = max(root.children, key=lambda ch: ch.visits)
+        return best.option
+
+    def search(self, game, d, iterations=None):
+        """Run the search and return the root node (children carry visits and summed value for each option)."""
+        opts = list(d.options)
         root = _Node(player=d.player)
         root.untried = list(opts) if len(opts) <= self.max_branch else self.rng.sample(opts, self.max_branch)
         me = d.player
-        for _ in range(self.iterations):
+        for _ in range(iterations or self.iterations):
             g = determinize(game, me, self.rng)
             node = root
             # selection / expansion
@@ -215,10 +224,7 @@ class MCTSPolicy(Policy):
                 node.visits += 1
                 node.value += v
                 node = node.parent
-        if not root.children:
-            return self.rng.choice(opts)
-        best = max(root.children, key=lambda ch: ch.visits)
-        return best.option
+        return root
 
 
 def make_policy(spec, seed=0):
