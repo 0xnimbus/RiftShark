@@ -1240,3 +1240,13 @@ def seraphine_inspiring(defn):
         return ev.get("kind") == "exhaust" and ev.get("player") == g.objects[s].controller and ev.get("units_in_batch") == 3
     return {"abilities": [Triggered(three_at_once, [O.May([O.Draw(1)], label="draw 1")], once_per_turn=True,
                                     label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Orianna, Mechanical Marvel")
+def orianna_marvel(defn):
+    # Once each turn, while I'm at a battlefield, you may pay [1][A] less to play a gear.
+    # (Applied to the first gear you play while she is at a battlefield: the saving is the same for every gear.)
+    def applies(g, src, uid, p):
+        return _at_bf(g, src) and g.objects[uid].base_defn().type == "gear"
+    return {"abilities": [Static("self", "rule", ("cost_reduce_once", applies), label=defn.name, source_text=defn.text)],
+            "replace": True}

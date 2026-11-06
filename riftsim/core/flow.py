@@ -1261,6 +1261,10 @@ class FlowMixin:
                     energy = max(0, energy - t["data"].get("energy", 0))
                     if t["data"].get("power"):
                         power = power[t["data"]["power"]:]
+        for src, v in self.rules("cost_reduce_once", player=p):   # Orianna: once each turn, a reduction for one card
+            if not self.turn_memo.get(("once_reduce", src)) and v(self, src, uid, p):
+                energy = max(0, energy - 1)
+                power = power[1:]
         for src, v in self.rules("cost_mod_all"):            # Vex, Cheerless: affects every player's spells
             energy, power = v(self, src, uid, energy, power, p)
         if loc is not None:
@@ -1642,6 +1646,9 @@ class FlowMixin:
 
     def _use_play_effects(self, p, uid):
         """'The next <card> you play this turn costs less / gets X': playing a matching card uses the effect up."""
+        for src, v in self.rules("cost_reduce_once", player=p):
+            if not self.turn_memo.get(("once_reduce", src)) and v(self, src, uid, p):
+                self.turn_memo[("once_reduce", src)] = True
         for t in list(self.turn_effects):
             if t["kind"] != "cost_reduce" or t["player"] != p or t["uses"] is None:
                 continue

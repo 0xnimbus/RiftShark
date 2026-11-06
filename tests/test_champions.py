@@ -521,3 +521,16 @@ def test_seraphine_draws_when_three_units_exhaust_together(db, decks):
         g.do_exhaust(u, batch=b)
     settle(g)
     assert len(g.players[0].hand) == hand + 1
+
+
+def test_orianna_first_gear_each_turn_costs_1_any_less(db, decks):
+    g = main_phase(db, decks)
+    ori = put(g, db, 0, "Orianna, Mechanical Marvel", ("base", 0))
+    gear = next(c for c in db if c.type == "gear" and not c.is_token and (c.energy or 0) >= 2)
+    a = _card_in(g, db, 0, gear.name, "hand")
+    e0, p0 = g.card_cost(0, a, "hand", ("base", 0))
+    g.do_move([ori], ("bf", 0)); settle(g)
+    e1, p1 = g.card_cost(0, a, "hand", ("base", 0))
+    assert e1 == e0 - 1 and len(p1) == max(0, len(p0) - 1)
+    g._use_play_effects(0, a)
+    assert g.card_cost(0, a, "hand", ("base", 0)) == (e0, p0)
