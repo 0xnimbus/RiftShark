@@ -1878,3 +1878,121 @@ def void_rush(defn):
                          O.ChooseFromList(cards, out="__vr", up_to=True, label="play one, [2] less"), O.Do(_unwrap("__vr")),
                          O.If(Ref("__vr"), [O.PlayCard(Ref("__vr"), alt_cost=cheaper)]),
                          O.Do(draw_rest, label="draw the rest")], label=defn.name, source_text=defn.text)]
+
+
+# ---------------------------------------------------------------- batch 2026-11-06 16:10
+@script("Deadly Flourish")
+def deadly_flourish(defn):
+    # Deal 3 to an enemy unit. When it dies this turn, play a Gold gear token exhausted.
+    dies = lambda g, s, ev: ev.get("kind") == "die"
+    it = lambda g, c, ev: ev.get("uid") == c.vars.get("t")
+    return [SpellEffect([O.Choose(Sel("unit", side="enemy"), out="t"),
+                         O.Delayed(dies, [O.PlayToken("Gold", loc="base", exhausted=True)], filt=it, expires="turn", once=True,
+                                   label="Deadly Flourish: Gold"),
+                         O.Deal(3, Ref("t"))], label=defn.name, source_text=defn.text)]
+
+
+@script("Call to Battle")
+def call_to_battle(defn):
+    # Move a unit you control to a battlefield you control. Then, choose an opponent. They move a unit they control to
+    # the same battlefield.
+    mine = lambda g, c, l: g.battlefields[l[1]].controller == c.controller
+    theirs = lambda g, c: [u for u, o in g.objects.items() if o.zone == "board" and o.controller == c.vars.get("__opp")
+                           and "unit" in g.chars(u).types and o.location != c.vars["loc"] and g.valid_destination(u, c.vars["loc"])]
+    return [SpellEffect([O.Choose(Sel("unit", side="friendly", pred=lambda g, c, u: g.objects[u].controller == c.controller), out="t"),
+                         O.ChooseLocation(out="loc", pred=mine, label="a battlefield you control"),
+                         O.Move(Ref("t"), Ref("loc")),
+                         O.ChoosePlayer(out="__opp", opponent=True),
+                         O.ChooseFromList(theirs, out="__ct", player=Ref("__opp"), label="move a unit you control there"),
+                         O.Move(Ref("__ct"), Ref("loc"))], label=defn.name, source_text=defn.text)]
+
+
+@script("Disposal Order")
+def disposal_order(defn):
+    # [Reaction]  Choose one — Choose up to 3 cards from opponents' trashes. Their owners recycle them. / Draw 1.
+    opp_trash = lambda g, c: [u for q in g.opponents(c.controller) for u in g.players[q].trash]
+    return [SpellEffect([O.ChooseMode([
+        ("recycle up to 3 cards from opponents' trashes",
+         _pick_up_to(opp_trash, 3, "__dor", "choose a card from an opponent's trash (up to 3)") +
+         [O.Recycle(lambda g, c: list(c.vars.get("__dor") or ()))]),
+        ("draw 1", [O.Draw(1)])])], label=defn.name, source_text=defn.text)]
+
+
+@script("Abandon")
+def abandon(defn):
+    # [Reaction]  Counter a spell. Return it to its owner's hand instead of putting it in their trash.  [Predict].
+    spell = Sel("card", zone="chain", pred=lambda g, c, u: any(it.uid == u and it.kind == "spell" for it in g.chain))
+    def counter(g, c):
+        u = c.vars.get("__sp")
+        it = next((x for x in g.chain if x.uid == u and x.kind == "spell"), None)
+        if it is not None and g.do_counter(it.id, c) and g.objects[u].zone == "trash":
+            g._to_zone(g.objects[u], "hand"); g.bump()
+    return [SpellEffect([O.Choose(spell, out="__sp"), O.Do(counter, label="counter it, to its owner's hand"), O.Predict(1)],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Insightful Investigator")
+def insightful_investigator(defn):
+    # When you play me, choose an opponent. They reveal their hand. You may pay 2 XP to choose a card from their hand. If
+    # you do, they discard that card and draw 1.
+    def reveal(g, c):
+        q = c.vars["__opp"]
+        if g.players[q].hand:
+            g.emit("reveal", cards=tuple(g.players[q].hand), player=q, ctx=c)
+    can = lambda g, c: g.players[c.controller].xp >= 2 and bool(g.players[c.vars["__opp"]].hand)
+    def pay_xp(g, c):
+        g.players[c.controller].xp -= 2; g.bump()
+    hand = lambda g, c: list(g.players[c.vars["__opp"]].hand)
+    def discard(g, c):
+        q, u = c.vars["__opp"], c.vars.get("__ii")
+        if u is not None:
+            g.do_discard(q, [u], c); g.do_draw(q, 1, c)
+    return [Triggered("play_self", [O.ChoosePlayer(out="__opp", opponent=True), O.Do(reveal, label="they reveal their hand"),
+                                    O.If(can, [O.May([O.Do(pay_xp, label="pay 2 XP"),
+                                                      O.ChooseFromList(hand, out="__ii", label="they discard it and draw 1"),
+                                                      O.Do(discard, label="discard, draw 1")], label="pay 2 XP to choose a card")])],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Suave Negotiator")
+def suave_negotiator(defn):
+    # When you play me, choose an opponent. You and that player each draw 1.
+    return [Triggered("play_self", [O.ChoosePlayer(out="__opp", opponent=True), O.Draw(1), O.Draw(1, player=Ref("__opp"))],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Siren's Song")
+def sirens_song(defn):
+    # [Reaction]  Move an enemy unit that moved this turn.
+    moved = Sel("unit", side="enemy", pred=lambda g, c, u: g.objects[u].temp.get(("moved", g.turn)))
+    dests = lambda g, c, l: l != g.objects[c.vars["t"]].location and g.valid_destination(c.vars["t"], l)
+    return [SpellEffect([O.Choose(moved, out="t"), O.ChooseLocation(out="loc", pred=dests, include_bases=True, label="move it where?"),
+                         O.Move(Ref("t"), Ref("loc"))], label=defn.name, source_text=defn.text)]
+
+
+@script("Explosimian")
+def explosimian(defn):
+    # When I hold, play three Bomb gear tokens to a single battlefield.
+    return [Triggered("hold_self",
+                      [O.ChooseLocation(out="loc"), O.PlayToken("Bomb", loc=Ref("loc"), count=3)],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Elder Dragon")
+def elder_dragon(defn):
+    # Any amount of your damage is enough to kill enemy units.  When you play me, choose up to one enemy unit at each
+    # location. Deal 1 to them.
+    def pick_code():
+        return [O.Do(lambda g, c: c.vars.__setitem__("__ed", []), label="choose up to one enemy unit at each location")]
+    def locs(g, c):
+        return sorted({g.objects[u].location for u, o in g.objects.items() if o.zone == "board" and "unit" in g.chars(u).types
+                       and _enemy(g, c, u)}, key=str)
+    code = pick_code()
+    for i in range(8):        # at most one pick per location (bases and battlefields)
+        at = lambda g, c, i=i: [u for u in g.objects if g.objects[u].zone == "board" and "unit" in g.chars(u).types and _enemy(g, c, u)
+                                and g.objects[u].location == (locs(g, c)[i] if i < len(locs(g, c)) else None)]
+        code += [O.ChooseFromList(at, out=f"__ed{i}", up_to=True, label="deal 1 to an enemy unit here"),
+                 O.Do(lambda g, c, i=i: c.vars["__ed"].extend(c.vars.get(f"__ed{i}") or ()), label="")]
+    code += [O.Deal(1, lambda g, c: list(c.vars["__ed"]))]
+    return [Static("self", "rule", ("any_damage_kills_enemies",), source_text=defn.text),
+            Triggered("play_self", code, label=defn.name, source_text=defn.text)]

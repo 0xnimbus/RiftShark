@@ -901,6 +901,7 @@ class Game(flow.FlowMixin):
         if o is None or o.damage == 0:
             return
         o.damage = 0
+        o.temp = {k: v for k, v in o.temp.items() if not (isinstance(k, tuple) and k[0] == "damaged_by")}
         self.bump()
 
     def do_deal(self, uids, amount, ctx, source_uid=None, combat=False):
@@ -947,6 +948,8 @@ class Game(flow.FlowMixin):
             o.damage += amt
             o.temp["dmg_item"] = ctx.item if ctx is not None else None
             o.temp[("dealt_damage", self.turn)] = True          # "if I haven't been dealt damage this turn"
+            if by is not None:
+                o.temp[("damaged_by", by)] = True                # Elder Dragon: "any amount of your damage"
             self.bump()
             self.log("damage", uid=u, amount=amt, source=src, combat=combat)
             self.emit("damage", uid=u, amount=amt, source=src, player=o.controller, loc=o.location, by=by, combat=combat, ctx=ctx)
@@ -973,7 +976,13 @@ class Game(flow.FlowMixin):
     def lethal_damage(self, uid):
         o = self.objects[uid]
         c = self.chars(uid)
-        return c.might is not None and o.damage > 0 and o.damage >= c.might
+        if c.might is None or o.damage <= 0:
+            return False
+        if o.damage >= c.might:
+            return True
+        # Elder Dragon: "Any amount of your damage is enough to kill enemy units."
+        return any(o.temp.get(("damaged_by", self.objects[src].controller)) and not self.is_friendly(self.objects[src].controller, o.controller)
+                   for src, _ in self.rules("any_damage_kills_enemies"))
 
     def do_kill(self, uids, ctx=None, by=None, in_combat=False):
         """Kill permanents (CR 429): they are sent to their owner's trash; deathknell triggers first."""
@@ -1170,6 +1179,7 @@ class Game(flow.FlowMixin):
         batch = self.tick()          # units moved together by one action/effect share a batch ("when an opponent moves")
         for i, u in enumerate(moved):
             o = self.objects[u]
+            o.temp[("moved", self.turn)] = True                 # "a unit that moved this turn" (Siren's Song)
             self.emit("move", uid=u, player=o.controller, **{"from": origin.get(u)}, to=o.location, loc=o.location, standard=standard,
                       batch=batch, batch_index=i, ctx=ctx)
             self.emit("arrive", uid=u, player=o.controller, loc=o.location, ctx=ctx)
@@ -1197,6 +1207,7 @@ class Game(flow.FlowMixin):
         self._on_change_location(o)
         if heal:
             o.damage = 0
+            o.temp = {k: v for k, v in o.temp.items() if not (isinstance(k, tuple) and k[0] == "damaged_by")}
         if exhaust:
             o.exhausted = True
         o.designation = None

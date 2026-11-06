@@ -486,6 +486,7 @@ class FlowMixin:
         for o in self.objects.values():
             if o.zone == "board":
                 o.damage = 0
+                o.temp = {k: v for k, v in o.temp.items() if not (isinstance(k, tuple) and k[0] == "damaged_by")}
                 o.stunned = False
         for o in self.objects.values():
             # temporary control changes ("this turn"); before expire_mods drops the marker mods
@@ -844,6 +845,7 @@ class FlowMixin:
         for o in self.objects.values():
             if o.zone == "board":
                 o.damage = 0
+                o.temp = {k: v for k, v in o.temp.items() if not (isinstance(k, tuple) and k[0] == "damaged_by")}
         self.bump()
         dfn = self.units_at(loc, c["defender"])
         att = self.units_at(loc, c["attacker"])

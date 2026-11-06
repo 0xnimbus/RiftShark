@@ -655,5 +655,11 @@
    "Bilgewater"
   ],
   "data_incomplete": false
+ },
+ "VEN-073": {
+  "text": "[Equip] [Body] ([Body]: Attach this to a unit you control.)",
+  "keywords": {
+   "equip": true
+  }
  }
 }

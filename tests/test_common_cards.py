@@ -706,3 +706,67 @@ def test_zenith_blade_stuns_and_may_move(db, decks):
     me = put(g, db, 0, "Hunting Dog", ("base", 0), exclude=(foe,))
     _run_spell(g, db, "Zenith Blade, Leona", picks=[(me,)])
     assert any(e["kind"] == "move" and e.get("uid") == me and e.get("to") == ("bf", 0) for e in g.events)   # then a showdown there
+
+
+def test_deadly_flourish_gold_when_it_dies(db, decks):
+    g = main_phase(db, decks)
+    foe = put(g, db, 1, "Hunting Dog", ("bf", 0))
+    _run_spell(g, db, "Deadly Flourish", picks=[foe])
+    settle(g)
+    golds = [o for o in g.objects.values() if o.zone == "board" and o.defn.name == "Gold" and o.controller == 0]
+    assert g.objects[foe].zone == "trash" and len(golds) == 1
+
+
+def test_abandon_returns_the_spell_to_hand(db, decks):
+    from riftsim.core.objects import ChainItem
+    g = main_phase(db, decks)
+    sp = _card_in(g, db, 1, "Get Excited!", "hand")
+    g._to_zone(g.objects[sp], "chain"); g.bump()
+    g.chain.append(ChainItem(900, "spell", 1, uid=sp, label="Get Excited!"))
+    _run_spell(g, db, "Abandon", picks=[sp])
+    assert g.objects[sp].zone == "hand" and sp in g.players[1].hand
+
+
+def test_suave_negotiator_and_disposal_order(db, decks):
+    g = main_phase(db, decks)
+    h0, h1 = len(g.players[0].hand), len(g.players[1].hand)
+    s = put(g, db, 0, "Suave Negotiator", ("base", 0))
+    _fire(g, s, "Suave Negotiator"); settle(g)
+    assert len(g.players[0].hand) == h0 + 1 and len(g.players[1].hand) == h1 + 1
+    t = [g.players[1].deck[i] for i in range(4)]
+    for u in t:
+        g._to_zone(g.objects[u], "trash")
+    g.bump()
+    _run_spell(g, db, "Disposal Order", picks=[0, (t[0],), (t[1],), (t[2],)])
+    assert [g.objects[u].zone for u in t] == ["deck", "deck", "deck", "trash"]
+
+
+def test_sirens_song_moves_a_unit_that_moved(db, decks):
+    g = main_phase(db, decks)
+    a = put(g, db, 1, "Hunting Dog", ("bf", 0))
+    b = put(g, db, 1, "Hunting Dog", ("bf", 0), exclude=(a,))
+    g.do_move([a], ("bf", 1), None) if hasattr(g, "do_move") else None
+    assert g.objects[a].location == ("bf", 1)
+    _run_spell(g, db, "Siren's Song", picks=[("base", 1)])
+    assert g.objects[a].location == ("base", 1) and g.objects[b].location == ("bf", 0)
+
+
+def test_elder_dragon_any_damage_kills(db, decks):
+    from riftsim.core.vm import Context
+    g = main_phase(db, decks)
+    put(g, db, 0, "Elder Dragon", ("base", 0))
+    foe = put(g, db, 1, "Elnuk Herd", ("bf", 0))
+    mine = put(g, db, 0, "Elnuk Herd", ("bf", 1), exclude=(foe,))
+    g.do_deal([foe], 1, Context(0, None)); g.do_deal([mine], 1, Context(0, None))
+    settle(g)
+    assert g.objects[foe].zone == "trash" and g.objects[mine].zone == "board"
+
+
+def test_insightful_investigator_pays_xp(db, decks):
+    g = main_phase(db, decks)
+    g.players[0].xp = 2
+    target = g.players[1].hand[0]
+    ii = put(g, db, 0, "Insightful Investigator", ("base", 0))
+    h1 = len(g.players[1].hand)
+    _fire(g, ii, "Insightful Investigator"); settle(g, picks=[target])
+    assert g.players[0].xp == 0 and g.objects[target].zone == "trash" and len(g.players[1].hand) == h1

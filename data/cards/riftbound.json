@@ -5252,8 +5252,10 @@
    "tags": [
     "Equipment"
    ],
-   "keywords": {},
-   "text": "Equip [Body] ([Body]: Attach this to a unit you control.)",
+   "keywords": {
+    "equip": true
+   },
+   "text": "[Equip] [Body] ([Body]: Attach this to a unit you control.)",
    "effect_text": "I can't be moved by enemy spells and abilities.",
    "text_raw": "<p>Equip :rb_rune_body: (:rb_rune_body:: Attach this to a unit you control.)</p>",
    "set": "VEN",
