@@ -27,6 +27,8 @@ from . import model as M
 def _resolve(ref):
     if not ref:
         return M.best_path()
+    if ref == "heuristic":
+        return ref
     if os.path.sep in ref or ref.endswith(".json"):
         return ref
     return os.path.join(M.MODELS_DIR, ref + ".json")
@@ -91,7 +93,7 @@ def make_learned(kind, arg, seed=0):
     if kind == "learned":
         path = _resolve(arg)
         pol = LearnedGreedy(M.load(path), seed=seed)
-        pol.name = "learned:" + os.path.basename(path)[:-5]
+        pol.name = "learned:" + (path if path == "heuristic" else os.path.basename(path)[:-5])
         return pol
     it, _, ref = arg.partition(":")
     path = _resolve(ref)

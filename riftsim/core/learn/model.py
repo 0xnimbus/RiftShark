@@ -51,6 +51,18 @@ class ValueNet:
         return self.predict_x(encode(g, p))
 
 
+class HeuristicNet:
+    """Baseline with the same interface: the hand-written score squashed to a probability. `learned:heuristic` uses
+    it, so the gain from the value net can be separated from the gain from judging options at the turn boundary."""
+    meta = {"baseline": True}
+
+    def predict(self, g, p):
+        if g.over:
+            return 0.5 if g.winner is None else (1.0 if g.winner == p else 0.0)
+        from ..policies import heuristic
+        return 1.0 / (1.0 + math.exp(-max(-30.0, min(30.0, heuristic(g, p) / 150.0))))
+
+
 _CACHE = {}
 
 
@@ -61,6 +73,8 @@ def best_path():
 
 
 def load(path=None):
+    if path == "heuristic":
+        return HeuristicNet()
     path = path or best_path()
     if path not in _CACHE:
         _CACHE[path] = ValueNet.load(path)

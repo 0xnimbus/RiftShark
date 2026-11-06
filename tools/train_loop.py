@@ -372,7 +372,7 @@ def write_ladder(hist):
     lines = ["# Learned AI generations", "",
              "Each generation trains the value net on self-play of the best AI so far, then plays it head to head "
              "(same decks and shuffles, seats swapped). It replaces the best AI only with a score of 55% or more.",
-             "Written by tools/train_loop.py; the play page and `learned` policy use the generation in best.json.", "",
+             "Written by tools/train_loop.py; the `learned` policy and the play page's Learned difficulty use the generation in best.json.", "",
              "| gen | date | self-play by | positions | val loss (constant) | val acc | vs best: score (95% interval) | games | promoted |",
              "|---|---|---|---|---|---|---|---|---|"]
     for h in hist:
