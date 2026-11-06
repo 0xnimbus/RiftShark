@@ -294,3 +294,6 @@ button.opt.dmg { display: block; }
 [hidden] { display: none !important; }
 
 .src-text { margin-top: 6px; padding: 6px 8px; border-left: 3px solid var(--accent, #c89b3c); font-size: 0.9em; opacity: 0.9; }
+
+details.og.runes > summary { cursor: pointer; list-style: revert; }
+details.og.runes:not([open]) { opacity: .75; }

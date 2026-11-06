@@ -230,13 +230,16 @@ def test_mulligan_sets_aside_draws_and_recycles(db):
     g = Game(db, [d0, d1], seed=3, first_player=1)
     d = g.run()
     assert d.kind == "mulligan" and d.player == 1 and d.options[0] == ()
-    assert len(d.options) == 1 + 4 + 6 and max(len(o) for o in d.options) == 2
+    # every distinct outcome once: copies of the same card are interchangeable
+    from itertools import combinations
     ps = g.players[1]
+    want = {tuple(sorted(g.objects[u].defn.id for u in c)) for k in range(3) for c in combinations(ps.hand, k)}
+    assert len(d.options) == len(want) and max(len(o) for o in d.options) == 2
+    hand0 = list(ps.hand)
     aside = d.options[-1]
     top2 = ps.deck[:2]
     g.choose(aside)
-    assert sorted(ps.hand) == sorted([u for u in d.options[1] + d.options[2] + d.options[3] + d.options[4]
-                                      if u not in aside] + top2)
+    assert sorted(ps.hand) == sorted([u for u in hand0 if u not in aside] + top2)
     assert set(ps.deck[-2:]) == set(aside) and len(ps.hand) == 4
     d = g.run()
     assert d.kind == "mulligan" and d.player == 0

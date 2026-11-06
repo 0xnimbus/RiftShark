@@ -151,7 +151,14 @@
       for (const [k, t] of groups) {
         const g = idx.filter(i => k.test(d.labels[i]));
         g.forEach(i => used.add(i));
-        if (g.length) html += `<div class="og"><div class="ogt">${t}</div>${g.map(i => optionButton(d, i)).join("")}</div>`;
+        if (!g.length) continue;
+        if (/rune/.test(t)) {
+          // optional: legal at any time, only useful right before paying (the payment step offers runes too)
+          html += `<details class="og runes"><summary class="ogt">Optional: use runes early (${g.length})</summary>` +
+                  `${g.map(i => optionButton(d, i)).join("")}</details>`;
+        } else {
+          html += `<div class="og"><div class="ogt">${t}</div>${g.map(i => optionButton(d, i)).join("")}</div>`;
+        }
       }
       const rest = idx.filter(i => !used.has(i));
       if (rest.length) html += `<div class="og end">${rest.map(i => optionButton(d, i)).join("")}</div>`;
@@ -175,8 +182,20 @@
     const cards = me.hand.map(c => `<button class="mull-card${mullSel.includes(c.uid) ? " sel" : ""}" data-uid="${c.uid}">
         <img src="${esc(c.image || "")}" alt=""><span>${esc(c.name)}</span>${mullSel.includes(c.uid) ? '<i class="mull-tag">SET ASIDE</i>' : ""}</button>`).join("");
     const n = mullSel.length;
+    // coach recommendations: best options first, click one to select those cards
+    let coach = "";
+    if (hints && Object.keys(hints).length) {
+      const ranked = Object.keys(hints).map(Number).filter(i => hints[i] != null).sort((x, y) => hints[y] - hints[x]).slice(0, 6);
+      coach = `<div class="og"><div class="ogt">Coach: best mulligans (win chance)</div>` +
+        ranked.map(i => `<button class="opt mull-hint" data-i="${i}"><span class="ol">${B.say(d.labels[i])}</span>` +
+          `<span class="hintpct">${hints[i]}%</span></button>`).join("") + `</div>`;
+    }
     $("#options").innerHTML = `<div class="mull">${cards}</div>
-      <button class="opt primary" id="mull-go">${n ? `Mulligan ${n} card${n === 1 ? "" : "s"} (draw ${n} new)` : "Keep this hand"}</button>`;
+      <button class="opt primary" id="mull-go">${n ? `Mulligan ${n} card${n === 1 ? "" : "s"} (draw ${n} new)` : "Keep this hand"}</button>${coach}`;
+    $("#options").querySelectorAll(".mull-hint").forEach(b => b.addEventListener("click", () => {
+      mullSel = (d.option_uids[+b.dataset.i] || []).slice();
+      drawMulligan(cur, cur.decision);
+    }));
     $("#options").querySelectorAll(".mull-card").forEach(b => b.addEventListener("click", () => {
       const u = +b.dataset.uid;
       if (mullSel.includes(u)) mullSel = mullSel.filter(x => x !== u);

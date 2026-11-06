@@ -328,7 +328,12 @@ class FlowMixin:
         """CR 117.1: choose up to two cards in hand. Options are every subset of size 0-2 (keep first)."""
         from itertools import combinations
         hand = list(self.players[p].hand)
-        opts = [()] + [(u,) for u in hand] + list(combinations(hand, 2))
+        opts, seen = [], set()
+        for o in [()] + [(u,) for u in hand] + list(combinations(hand, 2)):
+            key = tuple(sorted(self.objects[u].defn.id for u in o))     # copies of a card give the same outcome
+            if key not in seen:
+                seen.add(key)
+                opts.append(o)
         labels = ["Keep hand"] + ["Mulligan " + ", ".join(self.objects[u].defn.name for u in o) for o in opts[1:]]
         return self.ask(p, "mulligan", opts, labels, "_on_mulligan", label="Mulligan: set aside up to two cards")
 
