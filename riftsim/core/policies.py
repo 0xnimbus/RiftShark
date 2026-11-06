@@ -149,6 +149,10 @@ class GreedyPolicy(Policy):
         self.miss_reactions = miss_reactions    # chance to let an opponent's chain item resolve without looking
         self.samples = samples                  # determinised evaluations per option (hidden information)
 
+    def value(self, g, p):
+        """Position value for p (hand-written heuristic; LearnedPolicy uses the trained value net)."""
+        return heuristic(g, p)
+
     def evaluate(self, game, d, opts):
         vals = []
         for o in opts:
@@ -158,11 +162,11 @@ class GreedyPolicy(Policy):
                 # resampled from what this player cannot see (a real simulation, Derrick 2026-11-06)
                 g = determinize(game, d.player, self.rng)
                 if g.pending is None or o not in g.pending.options:
-                    v += heuristic(g, d.player)      # option depends on hidden cards: judge the position as it is
+                    v += self.value(g, d.player)     # option depends on hidden cards: judge the position as it is
                     continue
                 g.choose(o)
                 _advance_default(g, d.player, rollout_rng=random.Random(self.rng.random()))
-                v += heuristic(g, d.player)
+                v += self.value(g, d.player)
             v /= self.samples
             v += self.rng.random() * self.noise
             if d.kind == "action" and o[0] == "end_turn":
@@ -262,6 +266,10 @@ class MCTSPolicy(Policy):
         self.rng = random.Random(seed)
         self.max_branch = max_branch
 
+    def leaf(self, g, me):
+        """Leaf value in [-1, 1] for `me`."""
+        return math.tanh(heuristic(g, me) / 150.0)
+
     def choose(self, game, d):
         opts = ai_options(d, game)
         if d.kind == "mulligan":
@@ -329,8 +337,7 @@ class MCTSPolicy(Policy):
                 g.choose(o)
                 g.run()
                 steps += 1
-            v = heuristic(g, me)
-            v = math.tanh(v / 150.0)
+            v = self.leaf(g, me)
             # backprop
             while node is not None:
                 node.visits += 1
@@ -386,6 +393,9 @@ def make_policy(spec, seed=0):
         pol.name = spec
         return pol
     name, _, arg = spec.partition(":")
+    if name in ("learned", "learned-mcts"):
+        from .learn.policy import make_learned
+        return make_learned(name, arg, seed)
     if name == "random":
         return RandomPolicy(seed)
     if name == "greedy":

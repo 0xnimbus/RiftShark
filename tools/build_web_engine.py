@@ -26,6 +26,9 @@ def main():
                 files.append(rel)
     files.append("riftsim/__init__.py")
     files.append("data/cards/riftbound.json")
+    best = os.path.join(ROOT, "models", "best.json")
+    if os.path.exists(best):        # the promoted learned generation: the play page's "Learned" difficulty
+        files += ["models/best.json"] + (["models/" + json.load(open(best))["model"]] if json.load(open(best)).get("model") else [])
     for d in ("data/decks/tournament", "data/decks"):
         p = os.path.join(ROOT, d)
         if not os.path.isdir(p):
