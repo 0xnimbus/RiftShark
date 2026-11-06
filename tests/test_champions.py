@@ -597,3 +597,13 @@ def test_reksai_swarm_queen_plays_a_revealed_unit_here(db, decks):
     _fire(g, rq, "Rek'Sai, Swarm Queen", here=("bf", 0))
     settle(g, yes=True, picks=[(top,), ("bf", 0)])
     assert g.objects[top].zone == "board" and g.objects[top].location == ("bf", 0)
+
+
+def test_karthus_makes_deathknell_trigger_twice(db, decks):
+    g = main_phase(db, decks)
+    put(g, db, 0, "Karthus, Eternal", ("base", 0))
+    lb = put(g, db, 0, "LeBlanc, Fragmented", ("base", 0))
+    hand = len(g.players[0].hand)
+    g.do_kill([lb])
+    settle(g)
+    assert len(g.players[0].hand) == hand + 2

@@ -1322,3 +1322,9 @@ def reksai_swarm_queen(defn):
             O.Recycle(lambda g, c: [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck"])]
     return {"abilities": [Triggered("attack_self", [O.May(body, label="reveal the top 2 cards")], label=defn.name,
                                     source_text=defn.text)], "replace": True}
+
+
+@script("Karthus, Eternal")
+def karthus_eternal(defn):
+    # Your [Deathknell] effects trigger an additional time.
+    return {"abilities": [Static("self", "rule", ("deathknell_twice",), label=defn.name, source_text=defn.text)], "replace": True}

@@ -531,6 +531,10 @@ class Game(flow.FlowMixin):
                     ok = False
                 if ok:
                     pend.append((uid, ab, None))
+                    if getattr(ab, "keyword", None) == "deathknell":
+                        who = o.controller if o.controller is not None else o.owner
+                        for _ in self.rules("deathknell_twice", player=who):      # Karthus, Eternal
+                            pend.append((uid, ab, None))
             # equipment effect triggers (active while attached)
             if o.zone == "board" and o.attached_to is not None:
                 for ab in o.defn.effect_abilities:
