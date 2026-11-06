@@ -423,7 +423,7 @@ def test_radiance_type_fixes(db):
 
 def test_equipment_grants_its_keywords_to_the_unit(db, decks):
     g = main_phase(db, decks)
-    u = put(g, db, 0, "Stalwart Goatherd", ("base", 0))
+    u = put(g, db, 0, "Shipyard Skulker", ("base", 0))
     n = put(g, db, 0, "Nazuman Ntofo", ("base", 0), exclude=(u,))
     p = put(g, db, 0, "Protector's Shield", ("base", 0), exclude=(u, n))
     assert not g.chars(u).kw("shield")

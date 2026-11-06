@@ -1147,9 +1147,9 @@ class Mill(Instr):
         p = _player(game, ctx, self.player)
         for _ in range(val(game, ctx, self.n)):
             ps = game.players[p]
-            if not ps.deck:
+            if not game._burn_out_until_cards(p):     # CR 432.1.b
                 break
-            u = ps.deck.pop(0) if isinstance(ps.deck, list) else game._draw_raw(p)
+            u = ps.deck.pop(0)
             game.put_in_trash(u, ctx)
         return None
 

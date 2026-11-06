@@ -124,3 +124,78 @@ def test_victory_is_checked_before_trigger_ordering(db, decks):
     g.pending = None
     g.run()
     assert g.over and g.winner == 1
+
+
+def test_burn_out_recycles_then_opponent_scores_then_draws(db, decks):
+    # CR 432.2 example: empty deck at a draw -> recycle trash, opponent gains 1, then draw 1
+    g = main_phase(db, decks)
+    ps = g.players[0]
+    for u in list(ps.deck):
+        g._to_zone(g.objects[u], "trash")
+    before = g.players[1].points
+    hand = len(ps.hand)
+    g.do_draw(0, 1)
+    assert g.players[1].points == before + 1 and len(ps.hand) == hand + 1 and not ps.trash
+
+
+def test_burn_out_repeats_while_deck_and_trash_are_empty(db, decks):
+    # CR 432.3: the attempt burns out again and again until an opponent wins
+    g = main_phase(db, decks)
+    ps = g.players[0]
+    for u in list(ps.deck) + list(ps.trash):
+        g._to_zone(g.objects[u], "banished")
+    g.do_draw(0, 1)
+    assert g.players[1].points >= g.victory_score() and g.players[1].points > g.players[0].points
+    g.dirty = True; g.pending = None
+    g.run()
+    assert g.over and g.winner == 1
+
+
+def test_putting_cards_from_an_empty_deck_into_trash_burns_out(db, decks):
+    # CR 432.1.b
+    g = main_phase(db, decks)
+    ps = g.players[0]
+    for u in list(ps.deck)[:-1]:
+        g._to_zone(g.objects[u], "trash")
+    before = g.players[1].points
+    g.do_burn(0, 2)
+    assert g.players[1].points == before + 1
+
+
+@pytest.mark.parametrize("name,kw", [
+    ("Master Yi, Tempered", "ganking"), ("Master Yi, Tempered", "deflect"),   # only at [Level 6]
+    ("Seal of Discord", "reaction"),        # "[T]: [Reaction] — [Add]" is the ability's timing, not the gear's
+    ("Dragonsoul Sage", "reaction"), ("Shadow", "action"),
+    ("Ember Monk", "hidden"),               # "When you play a card from [Hidden]"
+    ("Carrion Dredger", "deflect"),         # its Bird token has Deflect
+    ("Sprite Mother", "temporary"),         # its Sprite token is Temporary
+    ("Bilgewater Bully", "ganking"),        # only while buffed
+    ("Breakneck Mech", "deflect"),          # granted to Mechs by a static
+])
+def test_keywords_mentioned_in_text_are_not_the_cards_own(db, name, kw):
+    assert not next(c for c in db if c.name == name).keywords.get(kw)
+
+
+@pytest.mark.parametrize("name,kw", [
+    ("Ekko, Revolutionary", "assault"), ("Block", "hidden"), ("Block", "action"), ("Petricite Monument", "temporary"),
+    ("Unsung Hero", "deathknell"), ("Kai'Sa, Rebel", "disarm"), ("Sprite Call", "hidden"),
+])
+def test_printed_keywords_are_kept(db, name, kw):
+    assert next(c for c in db if c.name == name).keywords.get(kw)
+
+
+def test_bilgewater_bully_has_ganking_only_while_buffed(db, decks):
+    g = main_phase(db, decks)
+    u = put(g, db, 0, "Bilgewater Bully", ("base", 0))
+    assert not g.chars(u).keywords.get("ganking")
+    g.do_buff(u)
+    g.bump()
+    assert g.chars(u).keywords.get("ganking")
+
+
+@pytest.mark.parametrize("name,kw,val", [
+    ("Chemtech Enforcer", "assault", 2), ("Needlessly Large Yordle", "shield", 5), ("Sivir, Ambitious", "deflect", 2),
+    ("Armored Tusker", "shield", 3), ("Garen, Rugged", "shield", 2), ("Voracious Gromp", "hunt", 3),
+])
+def test_numbered_keywords_carry_their_number(db, name, kw, val):
+    assert next(c for c in db if c.name == name).keywords.get(kw) == val

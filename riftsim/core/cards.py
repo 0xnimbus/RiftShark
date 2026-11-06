@@ -2,10 +2,44 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 DOMAINS = ("fury", "calm", "mind", "body", "chaos", "order")
 DEFAULT_DB = Path(__file__).resolve().parent.parent.parent / "data" / "cards" / "riftbound.json"
+
+
+_KW_TOKEN = re.compile(r"\s*(\[[^\]]*\]\s*,?\s*)*")
+
+
+def _card_level_keyword(k, text):
+    """Is keyword k printed as the card's own keyword: at the start of a line or sentence, possibly after other
+    keywords, and not the timing of an activated ability ("[Reaction][>]", "[T]: [Action] —")? Keywords the
+    text never names are kept (tokens and data without text)."""
+    pat = re.compile(r"\[" + k.replace("_", "[- ]?") + r"(?=[\] ])", re.I)
+    hits = list(pat.finditer(text))
+    if not hits:
+        return True
+    for m in hits:
+        sent = re.split(r"[.\n)/]", text[:m.start()])[-1]
+        if not _KW_TOKEN.fullmatch(sent):
+            continue
+        if k in ("action", "reaction") and re.match(r"\[[^\]]*\]\s*\[>\]", text[m.start():]):
+            continue
+        return True
+    return False
+
+
+def _printed_numeric_keywords(text):
+    """Card-level numbered keywords ("[Assault 2]", "[Shield 3]", "[Deflect 2]", "[Disarm 2]", "[Hunt 3]")."""
+    out = {}
+    for k in ("assault", "shield", "deflect", "disarm", "hunt"):
+        for m in re.finditer(r"\[" + k + r"(?: (\d+))?\]", text, re.I):
+            sent = re.split(r"[.\n)/]", text[:m.start()])[-1]
+            if _KW_TOKEN.fullmatch(sent):
+                out[k] = int(m.group(1)) if m.group(1) else out.get(k, True)
+                break
+    return out
 
 
 class CardDef:
@@ -28,6 +62,12 @@ class CardDef:
         self.tags = tuple(kw.get("tags") or ())
         self.keywords = dict(kw.get("keywords") or {})
         self.text = kw.get("text") or ""
+        for k, v in _printed_numeric_keywords(self.text).items():
+            self.keywords[k] = v          # "[Shield 3]", "[Assault 2]": the gallery data drops or flattens the number
+        for k in [k for k in self.keywords if not k.startswith("_") and not _card_level_keyword(k, self.text)]:
+            # the gallery lists every keyword the text mentions ("Your Mechs have [Shield]", "[T]: [Reaction] —",
+            # "While I'm buffed, I have [Ganking]"); only keywords printed as the card's own count
+            del self.keywords[k]
         self.effect_text = kw.get("effect_text") or ""
         self.set = kw.get("set", "")
         self.image = kw.get("image", "")

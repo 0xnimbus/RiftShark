@@ -772,29 +772,38 @@ class Game(flow.FlowMixin):
                 p2 = ev["player"]
                 self.do_draw(p2, 1, ctx)
                 continue
-            if not ps.deck:
-                self.do_burn_out(p)
-                if not ps.deck:
-                    continue
+            if not self._burn_out_until_cards(p):
+                return
             u = self._draw_raw(p)
             self.turn_memo[("draws", p)] = self.turn_memo.get(("draws", p), 0) + 1
             self.log("draw", player=p, uid=u)
             self.emit("draw", player=p, uid=u, ctx=ctx, batch=batch)
 
+    def _burn_out_until_cards(self, p):
+        """CR 432.1-432.3: moving a card out of an empty Main Deck burns out first; if the deck is still empty
+        the attempt burns out again, until an opponent has won. True when there is a card to move."""
+        ps = self.players[p]
+        v = self.victory_score()
+        while not ps.deck:
+            self.do_burn_out(p)
+            if not ps.deck and any(q.points >= v and all(q.points > r.points for r in self.players if r is not q)
+                                   for q in self.players):
+                return False         # the cleanup that follows ends the game (CR 432.3.a)
+        return True
+
     def do_burn_out(self, p):
-        """CR 432: deck empty -> opponent(s) gain a point? No: the player recycles trash into deck and each
-        opponent gains 1 point (burn out)."""
+        """CR 432.2: recycle the trash into the Main Deck (randomized), then an opponent gains 1 point."""
         ps = self.players[p]
         if ps.deck:
             return
         self.log("burn_out", player=p)
         ps.burned_out = True
-        for q in self.opponents(p):
-            self.gain_points(q, 1, "burn_out", None)
         cards = [u for u in ps.trash if not self.objects[u].defn.is_token]
         for u in cards:
             self._to_zone(self.objects[u], "deck")
         self.rng.shuffle(ps.deck)
+        for q in self.opponents(p)[:1]:          # 432.2.c: "chooses an opponent" (1v1: the only one)
+            self.gain_points(q, 1, "burn_out", None)
         self.emit("burn_out", player=p)
 
     def do_exhaust(self, uid, ctx=None, batch=None):
@@ -1115,8 +1124,8 @@ class Game(flow.FlowMixin):
         """Burn (CR 441): put the top n cards of the deck into the trash."""
         ps = self.players[p]
         for _ in range(n):
-            if not ps.deck:
-                break
+            if not self._burn_out_until_cards(p):      # CR 432.1.b: moving cards out of an empty deck burns out
+                return
             u = ps.deck[0]
             self._to_zone(self.objects[u], "trash")
             self.emit("burn", uid=u, player=p, ctx=ctx)

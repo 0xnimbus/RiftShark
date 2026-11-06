@@ -1116,11 +1116,11 @@ class FlowMixin:
         self.priority = it.controller
         self.passes = 0
         self.dirty = True
+        if it.kind in ("spell", "unit", "gear") and self.showdown is not None:
+            self.showdown["acted"] = True      # CR 347.1.b / 340.2.a: playing any card passes Focus when the chain closes
         if it.resolves_now:
-            self._resolve_item(it)
+            self._resolve_item(it)            # CR 337.2: units, gear and Add abilities resolve on finalizing
             return
-        if it.kind == "spell" and self.showdown is not None:
-            self.showdown["acted"] = True
 
     def _target_uids(self, ctx):
         out = []
