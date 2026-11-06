@@ -1193,3 +1193,10 @@ def jax_unmatched(defn):
                           Triggered(granted_quick_draw_play, [O.Attach(lambda g, c: c.event.get("uid"), Ref("t"))],
                                     targets=[O.Choose(Sel("unit", side="friendly"), out="t", targeted=True)],
                                     label="Quick-Draw (Jax)", source_text=defn.text)], "replace": True}
+
+
+@script("Ziggs, Short-Fused")
+def ziggs(defn):
+    # (line 1 auto-scripted) Abilities of friendly gear deal 1 Bonus Damage.
+    return {"abilities": [Static("self", "rule", ("bonus_damage_gear_abilities", 1), label=defn.name, source_text=defn.text)],
+            "replace": False}

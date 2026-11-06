@@ -461,3 +461,13 @@ def test_kayle_empowers_three_times(db, decks):
     assert g.objects[k].empowered == 3
     c = g.chars(k)
     assert c.might == m + 6 and c.kw("deflect") >= 3 and c.keywords.get("ganking")
+
+
+def test_ziggs_gear_abilities_deal_bonus_damage(db, decks):
+    g = main_phase(db, decks)
+    put(g, db, 0, "Ziggs, Short-Fused", ("base", 0))
+    gear = put(g, db, 0, next(c.name for c in db if c.type == "gear" and not c.is_token), ("base", 0))
+    foe = put(g, db, 1, "Sett, Kingpin", ("bf", 0))
+    from riftsim.core.vm import Context
+    g.do_deal([foe], 1, Context(0, gear))
+    assert g.objects[foe].damage == 2
