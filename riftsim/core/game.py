@@ -1256,6 +1256,12 @@ class Game(flow.FlowMixin):
         o.zone = "board"
         o.location = loc if loc is not None else ("base", p)
         o.controller = p
+        if defn.is_unit:
+            if self.consume_turn_effects("enter_ready", player=p):     # "friendly units enter ready this turn"
+                ready = True
+            ev = self.replace_event({"kind": "enter_ready", "uid": o.uid, "player": p, "ready": ready, "loc": o.location})
+            if ev is not None:
+                ready = bool(ev.get("ready"))
         o.exhausted = (not ready) if defn.is_unit else bool(exhausted_gear)
         o.entered_stamp = self.tick()
         o.token_source = ctx.source if ctx else None

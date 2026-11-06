@@ -2339,3 +2339,80 @@ def forgotten_relic(defn):
     body = [O.Do(burn, label="[Burn 1]"), O.If(lambda g, c: c.vars.get("__fr") is not None, [O.Reflexive(pump, label="burned a unit")])]
     return [Triggered("play_self", body, label=defn.name, source_text=defn.text),
             Triggered("start_beginning", list(body), label=defn.name + " (Beginning Phase)", source_text=defn.text)]
+
+
+# ---------------------------------------------------------------- batch 2026-11-06 16:50 (Origins / Spiritforged)
+@script("Bushwhack")
+def bushwhack(defn):
+    # [Hidden]  Friendly units enter ready this turn. Play a Gold gear token exhausted.
+    return [SpellEffect([O.DelayedPassive("enter_ready", {}), O.PlayToken("Gold", loc="base", exhausted=True)],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Flame Chompers")
+def flame_chompers(defn):
+    # When you discard me, you may pay [Fury] to play me.
+    return [Triggered("discard_self", [O.May([O.PlayCard(Ref("self"), alt_cost=(0, ["fury"]))], label="pay [Fury] to play me")],
+                      zone="trash", label=defn.name, source_text=defn.text)]
+
+
+def _units_on_board(g):
+    return [u for u, o in g.objects.items() if o.zone == "board" and "unit" in g.chars(u).types]
+
+
+@script("Whirlwind")
+def whirlwind(defn):
+    # Starting with the next player, each player may return a unit to its owner's hand.
+    def one(who):
+        return [O.ChooseFromList(lambda g, c: _units_on_board(g), out=f"__ww{who}", up_to=True, player=lambda g, c: (c.controller + who) % len(g.players),
+                                 label="you may return a unit to its owner's hand"),
+                O.Do(_unwrap(f"__ww{who}")),
+                O.If(Ref(f"__ww{who}"), [O.Do(lambda g, c, who=who: g.put_in_hand(c.vars[f"__ww{who}"], c), label="return it")])]
+    return [SpellEffect(one(1) + one(0), label=defn.name, source_text=defn.text)]
+
+
+@script("Party Favors")
+def party_favors(defn):
+    # Each other player chooses Cards or Runes. For each player that chooses Cards, you and that player each draw 1. For
+    # each player that chooses Runes, you and that player each channel 1 rune exhausted.
+    opp = lambda g, c: g.opponent(c.controller)
+    return [SpellEffect([O.ChooseMode([("Cards", [O.Draw(1), O.Draw(1, player=opp)]),
+                                       ("Runes", [O.Channel(1, exhausted=True), O.Channel(1, exhausted=True, player=opp)])],
+                                      player=opp)], label=defn.name, source_text=defn.text)]
+
+
+@script("King's Edict")
+def kings_edict(defn):
+    # Starting with the next player, each other player chooses a unit you don't control that hasn't been chosen for this
+    # spell. Kill those units.
+    pool = lambda g, c: [u for u in _units_on_board(g) if g.objects[u].controller != c.controller]
+    return [SpellEffect([O.ChooseFromList(pool, out="__ke", player=lambda g, c: g.opponent(c.controller),
+                                          label="choose a unit the caster doesn't control"),
+                         O.Kill(Ref("__ke"))], label=defn.name, source_text=defn.text)]
+
+
+@script("Blind Fury")
+def blind_fury(defn):
+    # [Action]  Each opponent reveals the top card of their Main Deck. Choose one and banish it, then play it, ignoring
+    # its cost. Then recycle the rest.
+    def reveal(g, c):
+        tops = [g.players[q].deck[0] for q in g.opponents(c.controller) if g.players[q].deck]
+        for u in tops:
+            g.emit("reveal", cards=(u,), player=g.objects[u].owner, ctx=c)
+        c.vars["__bf"] = tops
+    rest = lambda g, c: [u for u in c.vars.get("__bf", []) if u != c.vars.get("__bfp") and g.objects[u].zone == "deck"]
+    return [SpellEffect([O.Do(reveal, label="opponents reveal their top card"),
+                         O.ChooseFromList(lambda g, c: c.vars.get("__bf", []), out="__bfp", label="banish it, then play it"),
+                         O.If(Ref("__bfp"), [O.Banish(Ref("__bfp")), O.PlayCard(Ref("__bfp"), ignore="all")]),
+                         O.Recycle(rest)], label=defn.name, source_text=defn.text)]
+
+
+@script("Fox-Fire, Ahri")
+def fox_fire(defn):
+    # [Hidden]  [Action]  Kill any number of units at a battlefield with total Might 4 or less.
+    def opts(g, c):
+        loc = c.vars.get("loc")
+        used = sum(g.chars(u).might or 0 for u in c.vars.get("__ff", []))
+        return [u for u in g.units_at(loc) if (g.chars(u).might or 0) + used <= 4] if loc else []
+    return [SpellEffect([O.ChooseLocation(out="loc")] + _pick_up_to(opts, 8, "__ff", "kill a unit there (total Might 4 or less)") +
+                        [O.Kill(lambda g, c: list(c.vars.get("__ff") or ()))], label=defn.name, source_text=defn.text)]

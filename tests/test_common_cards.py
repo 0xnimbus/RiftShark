@@ -890,3 +890,48 @@ def test_transpositionist_and_bottled_constellation(db, decks):
     order = [u for u in g.objects if u in us]
     settle(g, picks=[(order[0],), (order[1],), (order[2],)])
     assert all(g.objects[u].zone == "trash" for u in us) and g.players[0].points == pts + 1
+
+
+def test_bushwhack_units_enter_ready(db, decks):
+    g = main_phase(db, decks)
+    _run_spell(g, db, "Bushwhack")
+    u = g.play_token(0, "Recruit", ("base", 0))
+    assert not g.objects[u].exhausted
+
+
+def test_flame_chompers_from_discard(db, decks):
+    g = main_phase(db, decks)
+    fc = _card_in(g, db, 0, "Flame Chompers", "hand")
+    r = g.players[0].runes[0]
+    g.objects[r].defn = next(c for c in db if c.name == "Fury Rune"); g.objects[r].domain = "fury"; g.bump()
+    g.do_discard(0, [fc]); settle(g)
+    assert g.objects[fc].zone == "board"
+
+
+def test_party_favors_and_kings_edict(db, decks):
+    g = main_phase(db, decks)
+    h0, h1 = len(g.players[0].hand), len(g.players[1].hand)
+    _run_spell(g, db, "Party Favors", picks=[0])
+    assert len(g.players[0].hand) == h0 + 1 and len(g.players[1].hand) == h1 + 1
+    a = put(g, db, 1, "Hunting Dog", ("bf", 0)); b = put(g, db, 1, "Elnuk Herd", ("bf", 0), exclude=(a,))
+    _run_spell(g, db, "King's Edict", picks=[a])
+    assert g.objects[a].zone == "trash" and g.objects[b].zone == "board"
+
+
+def test_fox_fire_total_might_four(db, decks):
+    g = main_phase(db, decks)
+    a = put(g, db, 1, "Hunting Dog", ("bf", 0)); b = put(g, db, 1, "Hunting Dog", ("bf", 0), exclude=(a,))
+    c = put(g, db, 1, "Elnuk Herd", ("bf", 0), exclude=(a, b))
+    ma, mb = g.chars(a).might, g.chars(b).might
+    _run_spell(g, db, "Fox-Fire, Ahri", picks=[("bf", 0), (a,), (b,), ()])
+    killed = [u for u in (a, b, c) if g.objects[u].zone == "trash"]
+    assert sum(g.chars(u).might or 0 for u in killed) <= 4 + 0 and c not in killed and a in killed
+    assert (b in killed) == (ma + mb <= 4)
+
+
+def test_blind_fury_plays_the_opponents_top_card(db, decks):
+    g = main_phase(db, decks)
+    top = g.players[1].deck[0]
+    g.objects[top].defn = next(c for c in db if c.name == "Hunting Dog"); g.bump()
+    _run_spell(g, db, "Blind Fury")
+    assert g.objects[top].zone == "board" and g.objects[top].controller == 0
