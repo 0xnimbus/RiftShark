@@ -1177,3 +1177,19 @@ def kayle_justified(defn):
                           Static("self", "keyword", ("deflect", 3), cond=three, label="[Deflect 3] at three", source_text=defn.text),
                           Static("self", "keyword", ("ganking", True), cond=three, label="[Ganking] at three", source_text=defn.text)],
             "replace": True}
+
+
+@script("Jax, Unmatched")
+def jax_unmatched(defn):
+    # [Deflect]   (keyword)
+    # Each Equipment in your hand has [Quick-Draw]. (CR 819.1.d: [Reaction] and "When you play this, attach it to a
+    # unit you control.")
+    def granted_quick_draw_play(g, s, ev):
+        if ev.get("kind") != "play" or ev.get("player") != g.objects[s].controller or ev.get("from_zone") != "hand":
+            return False
+        d = g.objects[ev["uid"]].base_defn()
+        return d.is_equipment and not d.keywords.get("quick_draw")
+    return {"abilities": [Static("self", "rule", ("hand_equipment_quick_draw",), label=defn.name, source_text=defn.text),
+                          Triggered(granted_quick_draw_play, [O.Attach(lambda g, c: c.event.get("uid"), Ref("t"))],
+                                    targets=[O.Choose(Sel("unit", side="friendly"), out="t", targeted=True)],
+                                    label="Quick-Draw (Jax)", source_text=defn.text)], "replace": True}

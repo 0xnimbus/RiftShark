@@ -1265,6 +1265,8 @@ class FlowMixin:
         kws = c.keywords
         reaction = bool(kws.get("reaction")) or (from_zone == "facedown" and o.facedown_turn is not None and self.turn > o.facedown_turn) \
             or bool(kws.get("quick_draw"))
+        if from_zone == "hand" and c.is_equipment and self.rules("hand_equipment_quick_draw", player=p):
+            reaction = True                       # Jax, Unmatched: "Each Equipment in your hand has [Quick-Draw]."
         action = bool(kws.get("action"))
         for ab in self._abilities_of(uid, o):
             if isinstance(ab, PlayPermission) and (ab.cond is None or ab.cond(self, uid)):
