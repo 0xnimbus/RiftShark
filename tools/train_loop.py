@@ -112,7 +112,8 @@ def _selfplay_game(args):
         d = g.run()
         if d is None:
             break
-        if d.kind == "action":
+        if d.kind != "mulligan":
+            # every kind of decision point, both seats: greedy and MCTS evaluate positions at all of them
             n += 1
             if n % every == 0:
                 for s in (0, 1):
@@ -129,7 +130,7 @@ def _selfplay_game(args):
             "secs": time.time() - t}
 
 
-def selfplay(games, spec, out, workers, seed, every=3, epsilon=0.03):
+def selfplay(games, spec, out, workers, seed, every=4, epsilon=0.03):
     import numpy as np
     rng = random.Random(seed)
     jobs = []
@@ -139,26 +140,38 @@ def selfplay(games, spec, out, workers, seed, every=3, epsilon=0.03):
         jobs.append((pair[::-1], seed + 2 * i + 1, spec, every, epsilon))
     X, Y, G = [], [], []
     timeouts = []
+    part = out + ".partial.npz"          # container restarts kill runs: resume from the last checkpoint
+    start = 0
+    if os.path.exists(part):
+        d = np.load(part, allow_pickle=True)
+        X, Y, G = d["x"].tolist(), d["y"].tolist(), d["game"].tolist()
+        start, timeouts = int(d["done"]), json.loads(str(d["timeouts"]))
+        print(f"resuming self-play at game {start}", file=sys.stderr)
     t = time.time()
     with ProcessPoolExecutor(max_workers=workers) as ex:
-        for k, r in enumerate(ex.map(_selfplay_timed, jobs)):
+        for k, r in enumerate(ex.map(_selfplay_timed, jobs[start:]), start):
             if r.get("timeout"):
                 timeouts.append(r["args"])
                 print(f"self-play game {r['args']} ran out of time, dropped", file=sys.stderr)
-                continue
-            X += r["x"]
-            Y += r["y"]
-            G += [k] * len(r["y"])
+            else:
+                X += r["x"]
+                Y += r["y"]
+                G += [k] * len(r["y"])
             if (k + 1) % 20 == 0:
                 print(f"self-play {k + 1}/{len(jobs)} games, {len(Y)} positions ({time.time() - t:.0f}s)", file=sys.stderr)
+            if (k + 1) % 50 == 0:
+                np.savez(part, x=np.array(X, dtype=np.float32), y=np.array(Y, dtype=np.float32),
+                         game=np.array(G, dtype=np.int32), done=k + 1, timeouts=json.dumps(timeouts))
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     np.savez_compressed(out, x=np.array(X, dtype=np.float32), y=np.array(Y, dtype=np.float32),
                         game=np.array(G, dtype=np.int32))
+    if os.path.exists(part):
+        os.remove(part)
     return len(jobs), len(Y), timeouts
 
 
 # ------------------------------------------------------------------------------------------------ training
-def train(files, out, hidden=64, epochs=40, lr=2e-3, l2=1e-4, seed=0, warm=None, meta=None):
+def train(files, out, hidden=48, epochs=40, lr=2e-3, l2=1e-3, seed=0, warm=None, meta=None):
     import numpy as np
     xs, ys, gs = [], [], []
     off = 0
@@ -379,7 +392,7 @@ def main():
     t = sub.add_parser("train")
     t.add_argument("files", nargs="+")
     t.add_argument("--out", required=True)
-    t.add_argument("--hidden", type=int, default=64)
+    t.add_argument("--hidden", type=int, default=48)
     q = sub.add_parser("gate")
     q.add_argument("candidate")
     q.add_argument("best")

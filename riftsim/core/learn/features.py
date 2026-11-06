@@ -6,10 +6,15 @@ so the same function is safe inside search and on the real game. Pure Python: it
 """
 from __future__ import annotations
 
+import math
 import zlib
 
 LEGEND_BUCKETS = 16
 MAX_BF = 3
+# turn structure: the same board is worth different amounts before and after the turn player's Awaken/Channel/Draw,
+# so the net must know where in the turn it is (without this, gen 1 rated "end my turn" above every attack because
+# the next own decision came in the opponent's Beginning phase with their runes and units still exhausted)
+PHASES = ("beginning", "main", "ending", "other")
 
 
 def _bucket(name):
@@ -76,8 +81,12 @@ def encode(g, p):
     out = [me.points / win, opp.points / win, (me.points - opp.points) / win,
            1.0 if win - me.points <= 2 else 0.0, 1.0 if win - opp.points <= 2 else 0.0,
            min(g.turn, 30) / 20, 1.0 if g.turn_player == p else 0.0,
-           1.0 if g.phase == "main" else 0.0, min(len(g.chain), 5) / 5,
-           1.0 if g.chain and g.chain[-1].controller == p else 0.0]
+           min(len(g.chain), 5) / 5, 1.0 if g.chain and g.chain[-1].controller == p else 0.0,
+           1.0 if g.combat is not None else 0.0, 1.0 if getattr(g, "showdown", None) is not None else 0.0]
+    ph = g.phase if g.phase in PHASES else "other"
+    out += [1.0 if ph == x else 0.0 for x in PHASES]
+    from ..policies import heuristic        # hand-written score as one input (reads public info and own hand only)
+    out.append(math.tanh(heuristic(g, p) / 150.0))
     _side(g, p, out)
     _side(g, q, out)
     _hand(g, p, out)
@@ -106,4 +115,4 @@ def encode(g, p):
 
 
 def size():
-    return 10 + 2 * 19 + 5 + 5 * MAX_BF + 2 * LEGEND_BUCKETS
+    return 11 + len(PHASES) + 1 + 2 * 19 + 5 + 5 * MAX_BF + 2 * LEGEND_BUCKETS
