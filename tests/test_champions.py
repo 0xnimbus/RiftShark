@@ -607,3 +607,83 @@ def test_karthus_makes_deathknell_trigger_twice(db, decks):
     g.do_kill([lb])
     settle(g)
     assert len(g.players[0].hand) == hand + 2
+
+
+def _spell_ctx(g, p, picked):
+    from riftsim.core.vm import Context
+    ctx = Context(p, None)
+    ctx.vars["__picked"] = tuple(picked)
+    return ctx
+
+
+def test_gangplank_naval_empowered_turns_chosen_stun_minus_might_and_bounce_into_plus_3(db, decks):
+    g = main_phase(db, decks)
+    gp = put(g, db, 1, "Gangplank, Naval", ("bf", 0))
+    base = g.chars(gp).might
+    ctx = _spell_ctx(g, 0, [gp])
+    g.do_stun(gp, ctx)                       # not Empowered: stunned as usual
+    assert g.objects[gp].stunned
+    g.objects[gp].stunned = False
+    g.objects[gp].empowered = 1
+    g.bump()
+    g.do_stun(gp, ctx)
+    assert not g.objects[gp].stunned and g.chars(gp).might == base + 3
+    g.give_might(gp, -2, "turn", ctx)
+    assert g.chars(gp).might == base + 6
+    g.put_in_hand(gp, ctx)
+    assert g.objects[gp].zone == "board" and g.chars(gp).might == base + 9
+    # an effect that doesn't choose him (e.g. "all units") is not replaced
+    g.give_might(gp, -2, "turn", _spell_ctx(g, 0, []))
+    assert g.chars(gp).might == base + 7
+
+
+def test_mel_empowered_extra_minus_might_and_uncounterable(db, decks):
+    g = main_phase(db, decks)
+    mel = put(g, db, 0, "Mel, Newly Awakened", ("base", 0))
+    foe = put(g, db, 1, "Gangplank, Naval", ("bf", 0))
+    base = g.chars(foe).might
+    g.give_might(foe, -1, "turn", _spell_ctx(g, 0, [foe]))
+    assert g.chars(foe).might == base - 1
+    g.objects[mel].empowered = 1
+    g.bump()
+    g.give_might(foe, -1, "turn", _spell_ctx(g, 0, [foe]))
+    assert g.chars(foe).might == base - 3
+    g.give_might(foe, -1, "turn", _spell_ctx(g, 1, [foe]))     # the opponent's effects get no bonus
+    assert g.chars(foe).might == base - 4
+    from riftsim.core.objects import ChainItem
+    it = ChainItem(999, "spell", 0, label="test spell")
+    g.chain.append(it)
+    assert g.do_counter(999) is False and it in g.chain
+    g.chain.remove(it)
+
+
+def test_ahri_confident_grows_when_you_reduce_an_enemy_here(db, decks):
+    g = main_phase(db, decks)
+    bf = ("bf", 0)
+    ahri = put(g, db, 0, "Ahri, Confident", bf)
+    foe = put(g, db, 1, "Gangplank, Naval", bf)
+    far = put(g, db, 1, "Mel, Newly Awakened", ("bf", 1), exclude=(foe,))
+    base = g.chars(ahri).might
+    g.give_might(far, -1, "turn", _spell_ctx(g, 0, [far]))     # not here
+    settle(g)
+    assert g.chars(ahri).might == base
+    g.give_might(foe, -1, "turn", _spell_ctx(g, 0, [foe]))
+    settle(g)
+    assert g.chars(ahri).might == base + 1
+    g.give_might(foe, -1, "turn", _spell_ctx(g, 1, [foe]))     # the opponent reduced it
+    settle(g)
+    assert g.chars(ahri).might == base + 1
+
+
+def test_ahri_counts_a_static_minus_might_that_starts_applying(db, decks):
+    # ruling: a stunned enemy at the battlefield of your Leona, Zealot receives -[M] from her passive
+    g = main_phase(db, decks)
+    bf = ("bf", 0)
+    ahri = put(g, db, 0, "Ahri, Confident", bf)
+    leona = put(g, db, 0, "Leona, Zealot", bf, exclude=(ahri,))
+    foe = put(g, db, 1, "Gangplank, Naval", bf)
+    settle(g)
+    base = g.chars(ahri).might
+    g.do_stun(foe, None)
+    settle(g)
+    assert g.chars(ahri).might == base + 1

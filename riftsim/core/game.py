@@ -310,6 +310,31 @@ class Game(flow.FlowMixin):
                 c.might = 0
         return c
 
+    def _check_static_might_reductions(self):
+        """Ahri, Confident counts a static -[M] that starts applying (ruling, Radiance patch notes): compare each
+        unit's negative static might per source controller with the last check and emit 'might_reduced'."""
+        if not self.rules("watch_might_reductions"):
+            return
+        for uid, o in self.objects.items():
+            if o.zone != "board" or "unit" not in self.chars(uid).types:
+                continue
+            neg = {}
+            for src, so in self.objects.items():
+                if so.zone != "board":
+                    continue
+                for ab in self.abilities(src):
+                    if isinstance(ab, Static) and ab.mod_kind == "might" and ab.active(self, src) and ab.applies_to(self, src, uid):
+                        v = ab.value(self, src, uid) if callable(ab.value) else ab.value
+                        if v and v < 0:
+                            neg[so.controller] = neg.get(so.controller, 0) - v
+            prev = o.temp.get("neg_static", {})
+            if neg != prev:
+                o.temp["neg_static"] = neg
+                for p, n in neg.items():
+                    if n > prev.get(p, 0):
+                        self.emit("might_reduced", uid=uid, player=o.controller, by=p, loc=o.location,
+                                  amount=n - prev.get(p, 0), ctx=None)
+
     def _apply_static(self, c, ab, src, uid):
         v = ab.value
         if callable(v):
@@ -783,9 +808,47 @@ class Game(flow.FlowMixin):
         self.dirty = True
         return True
 
+    def chose(self, ctx, uid):
+        """True if the spell/ability running with `ctx` chose `uid` (targeted or not)."""
+        if ctx is None or uid is None:
+            return False
+        if uid in (ctx.vars.get("__picked") or ()):
+            return True
+        return uid in self._target_uids(ctx)
+
+    def _chosen_harm_redirect(self, uid, ctx):
+        """Gangplank, Naval (errata 2026-10-27): if a spell or ability that chooses me would stun me, give me -[M],
+        or return me to hand, give me +3 [M] this turn instead."""
+        if ctx is None or not self.chose(ctx, uid):
+            return False
+        hits = [v for src, v in self.rules("chosen_harm_to_might") if src == uid]
+        if not hits:
+            return False
+        self.log("replace", source=uid, event="chosen_harm", label="+%d [M] this turn instead" % hits[0])
+        self.add_mod(uid, "might", hits[0], duration="turn", source=uid)
+        return True
+
+    def give_might(self, uid, amt, duration="turn", ctx=None):
+        """Give +/-N [M]. -[M] from a spell/ability goes through Gangplank's and Mel's replacements and emits
+        'might_reduced' (Ahri, Confident: an ability of an object you control gives a unit non-zero -[M])."""
+        o = self.objects.get(uid)
+        if o is None:
+            return
+        if amt < 0 and ctx is not None and o.zone == "board":
+            if self._chosen_harm_redirect(uid, ctx):
+                return
+            if self.chose(ctx, uid):
+                amt -= sum(v for _, v in self.rules("chosen_minus_might_extra", player=ctx.controller))   # Mel
+        self.add_mod(uid, "might", amt, duration=duration, source=ctx.source if ctx else None)
+        if amt < 0 and o.zone == "board":
+            self.emit("might_reduced", uid=uid, player=o.controller, by=ctx.controller if ctx else None,
+                      loc=o.location, amount=-amt, ctx=ctx)
+
     def do_stun(self, uid, ctx=None):
         o = self.objects.get(uid)
         if o is None or o.zone != "board":
+            return
+        if self._chosen_harm_redirect(uid, ctx):
             return
         ev = self.replace_event({"kind": "stun", "uid": uid, "player": o.controller, "loc": o.location})
         if ev is None:
@@ -1228,6 +1291,9 @@ class Game(flow.FlowMixin):
     def do_counter(self, item_id, ctx=None):
         for it in self.chain:
             if it.id == item_id and not it.removed:
+                if it.kind not in ("unit", "gear") and self.rules("my_spells_abilities_uncounterable", player=it.controller):
+                    self.log("counter_refused", item=item_id, label=it.label)     # Mel, Newly Awakened
+                    return False
                 it.countered = True
                 it.removed = True
                 self.chain.remove(it)
@@ -1280,6 +1346,8 @@ class Game(flow.FlowMixin):
         if o is None or o.zone in (None, "gone"):
             return
         was, loc = o.zone, o.location
+        if was == "board" and self._chosen_harm_redirect(uid, ctx):
+            return
         self._to_zone(o, "hand")
         if was == "board":
             self.emit("leave", uid=uid, player=o.owner, loc=loc, ctx=ctx)

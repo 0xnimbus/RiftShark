@@ -819,7 +819,7 @@ class GiveMight(Instr):
             if self.min_value is not None and a < 0:
                 cur = game.chars(u).might or 0
                 a = -min(-a, max(cur - self.min_value, 0))
-            game.add_mod(u, "might", a, duration=self.duration, source=ctx.source)
+            game.give_might(u, a, duration=self.duration, ctx=ctx)
         return None
 
 

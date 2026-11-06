@@ -547,6 +547,7 @@ class FlowMixin:
                     self.log("lose_control", bf=bf.idx, player=bf.controller)
                     self.set_bf_controller(bf.idx, None)
                     self.dirty = True
+        self._check_static_might_reductions()
         # 5. recalls
         for u, o in list(self.objects.items()):
             if o.zone != "board" or o.location is None:

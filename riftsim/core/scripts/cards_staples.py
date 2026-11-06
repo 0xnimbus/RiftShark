@@ -1328,3 +1328,43 @@ def reksai_swarm_queen(defn):
 def karthus_eternal(defn):
     # Your [Deathknell] effects trigger an additional time.
     return {"abilities": [Static("self", "rule", ("deathknell_twice",), label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Gangplank, Naval")
+def gangplank_naval(defn):
+    # [Empower] [Body][Body]   (keyword)
+    # [Empowered][>] If a spell or ability that chooses me would stun me, give me -[M], or return me to hand,
+    # give me +3 [M] this turn instead.   (errata 2026-10-27; engine: Game._chosen_harm_redirect)
+    emp = lambda g, s: bool(g.objects[s].empowered)
+    return {"abilities": [Static("self", "rule", ("chosen_harm_to_might", 3), cond=emp,
+                                 label="Empowered: +3 [M] instead of stun / -[M] / return to hand", source_text=defn.text)],
+            "replace": True}
+
+
+@script("Mel, Newly Awakened")
+def mel_newly_awakened(defn):
+    # When you play me, draw 1.   [Empower] [3]   (auto-scripted, kept: replace=False)
+    # [Empowered][>] Your spells and abilities can't be countered. If a spell or ability you control would give -[M]
+    # to a unit it chooses, it gives an additional -1 [M].
+    emp = lambda g, s: bool(g.objects[s].empowered)
+    return {"abilities": [Static("self", "rule", ("my_spells_abilities_uncounterable",), cond=emp,
+                                 label="Empowered: your spells and abilities can't be countered", source_text=defn.text),
+                          Static("self", "rule", ("chosen_minus_might_extra", 1), cond=emp,
+                                 label="Empowered: -[M] to a chosen unit is 1 more", source_text=defn.text)],
+            "replace": False}
+
+
+@script("Ahri, Confident")
+def ahri_confident(defn):
+    # [Disarm]   (keyword)
+    # When you reduce the Might of an enemy unit here by 1 or more, give me +1 [M] this turn.
+    # Ruling (Radiance patch notes): any non-zero -[M] applied by an object you control counts, including a static
+    # -[M] that starts applying (Game._check_static_might_reductions).
+    def reduced_here(g, s, ev):
+        me = g.objects[s]
+        return (ev.get("kind") == "might_reduced" and ev.get("by") == me.controller and ev.get("amount", 0) >= 1
+                and ev.get("player") is not None and not g.is_friendly(ev["player"], me.controller)
+                and ev.get("loc") == me.location)
+    return {"abilities": [Static("self", "rule", ("watch_might_reductions",), label="watches -[M]"),
+                          Triggered(reduced_here, [O.GiveMight(Ref("self"), 1)], label=defn.name, source_text=defn.text)],
+            "replace": True}
