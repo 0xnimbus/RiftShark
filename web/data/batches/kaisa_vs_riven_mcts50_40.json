@@ -1,0 +1,2363 @@
+{
+ "summary": {
+  "games": 40,
+  "draws": 0,
+  "avg_turns": 15.8,
+  "decks": {
+   "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)": {
+    "games": 40,
+    "wins": 30,
+    "first_games": 19,
+    "first_wins": 14,
+    "points": 299,
+    "win_rate": 0.75,
+    "first_win_rate": 0.737,
+    "avg_points": 7.47
+   },
+   "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)": {
+    "games": 40,
+    "wins": 10,
+    "first_games": 21,
+    "first_wins": 5,
+    "points": 235,
+    "win_rate": 0.25,
+    "first_win_rate": 0.238,
+    "avg_points": 5.88
+   }
+  },
+  "cards": [
+   {
+    "deck": "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "card": "Kai'Sa, Survivor",
+    "played": 69,
+    "games": 39,
+    "win_rate_when_played": 0.744
+   },
+   {
+    "deck": "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "card": "Riven, Broken Blade",
+    "played": 44,
+    "games": 39,
+    "win_rate_when_played": 0.256
+   },
+   {
+    "deck": "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "card": "Stupefy",
+    "played": 49,
+    "games": 33,
+    "win_rate_when_played": 0.758
+   },
+   {
+    "deck": "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "card": "Temporal Breach",
+    "played": 42,
+    "games": 33,
+    "win_rate_when_played": 0.788
+   },
+   {
+    "deck": "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "card": "Tideturner",
+    "played": 50,
+    "games": 32,
+    "win_rate_when_played": 0.281
+   },
+   {
+    "deck": "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "card": "Zhonya's Hourglass",
+    "played": 42,
+    "games": 32,
+    "win_rate_when_played": 0.25
+   },
+   {
+    "deck": "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "card": "Bilgewater Tracker",
+    "played": 50,
+    "games": 31,
+    "win_rate_when_played": 0.71
+   },
+   {
+    "deck": "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "card": "Reckless Innovator",
+    "played": 40,
+    "games": 30,
+    "win_rate_when_played": 0.233
+   },
+   {
+    "deck": "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "card": "Noxus Hopeful",
+    "played": 44,
+    "games": 26,
+    "win_rate_when_played": 0.769
+   },
+   {
+    "deck": "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "card": "Thousand-Tailed Watcher",
+    "played": 40,
+    "games": 26,
+    "win_rate_when_played": 0.769
+   },
+   {
+    "deck": "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "card": "Brynhir Thundersong",
+    "played": 37,
+    "games": 25,
+    "win_rate_when_played": 0.76
+   },
+   {
+    "deck": "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "card": "Gust",
+    "played": 32,
+    "games": 25,
+    "win_rate_when_played": 0.2
+   },
+   {
+    "deck": "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "card": "Bedeviling Stranger",
+    "played": 31,
+    "games": 24,
+    "win_rate_when_played": 0.042
+   },
+   {
+    "deck": "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "card": "Blade of the Exile",
+    "played": 38,
+    "games": 24,
+    "win_rate_when_played": 0.292
+   },
+   {
+    "deck": "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "card": "Discipline",
+    "played": 30,
+    "games": 24,
+    "win_rate_when_played": 0.167
+   },
+   {
+    "deck": "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "card": "Falling Star",
+    "played": 33,
+    "games": 24,
+    "win_rate_when_played": 0.75
+   },
+   {
+    "deck": "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "card": "Forecaster",
+    "played": 37,
+    "games": 24,
+    "win_rate_when_played": 0.75
+   },
+   {
+    "deck": "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "card": "Hextech Ray",
+    "played": 29,
+    "games": 21,
+    "win_rate_when_played": 0.762
+   },
+   {
+    "deck": "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "card": "Rebuke",
+    "played": 28,
+    "games": 21,
+    "win_rate_when_played": 0.238
+   },
+   {
+    "deck": "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "card": "Scuttle Crab",
+    "played": 30,
+    "games": 21,
+    "win_rate_when_played": 0.238
+   },
+   {
+    "deck": "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "card": "Smoke Screen",
+    "played": 23,
+    "games": 19,
+    "win_rate_when_played": 0.737
+   },
+   {
+    "deck": "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "card": "Stellacorn Herder",
+    "played": 32,
+    "games": 19,
+    "win_rate_when_played": 0.211
+   },
+   {
+    "deck": "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "card": "Blitzcrank, Impassive",
+    "played": 34,
+    "games": 18,
+    "win_rate_when_played": 0.278
+   },
+   {
+    "deck": "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "card": "Defy",
+    "played": 22,
+    "games": 18,
+    "win_rate_when_played": 0.167
+   },
+   {
+    "deck": "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "card": "Switcheroo",
+    "played": 18,
+    "games": 18,
+    "win_rate_when_played": 0.167
+   },
+   {
+    "deck": "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "card": "The Empyrean",
+    "played": 23,
+    "games": 18,
+    "win_rate_when_played": 0.722
+   },
+   {
+    "deck": "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "card": "Astral Heron",
+    "played": 21,
+    "games": 16,
+    "win_rate_when_played": 0.438
+   },
+   {
+    "deck": "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "card": "Battle Preparations",
+    "played": 16,
+    "games": 16,
+    "win_rate_when_played": 0.5
+   },
+   {
+    "deck": "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "card": "Lost to the Sands",
+    "played": 16,
+    "games": 16,
+    "win_rate_when_played": 0.625
+   },
+   {
+    "deck": "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "card": "Not So Fast",
+    "played": 15,
+    "games": 15,
+    "win_rate_when_played": 0.267
+   },
+   {
+    "deck": "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "card": "Orb of Regret",
+    "played": 14,
+    "games": 14,
+    "win_rate_when_played": 0.714
+   },
+   {
+    "deck": "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "card": "Star-Crossed",
+    "played": 14,
+    "games": 14,
+    "win_rate_when_played": 0.286
+   },
+   {
+    "deck": "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "card": "Time Warp",
+    "played": 15,
+    "games": 14,
+    "win_rate_when_played": 0.714
+   },
+   {
+    "deck": "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "card": "Bellows Breath",
+    "played": 13,
+    "games": 13,
+    "win_rate_when_played": 0.615
+   },
+   {
+    "deck": "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "card": "Watchful Sentry",
+    "played": 14,
+    "games": 12,
+    "win_rate_when_played": 0.75
+   },
+   {
+    "deck": "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "card": "Lecturing Yordle",
+    "played": 18,
+    "games": 11,
+    "win_rate_when_played": 0.818
+   },
+   {
+    "deck": "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "card": "Baron Nashor",
+    "played": 3,
+    "games": 3,
+    "win_rate_when_played": 0.333
+   }
+  ],
+  "avg_secs": 216.022
+ },
+ "games": [
+  {
+   "seed": 0,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 14,
+   "points": [
+    8,
+    4
+   ],
+   "first": 1,
+   "decisions": 95,
+   "secs": 171.536,
+   "replay": "out/kr_mcts/replays/game_0.json.gz",
+   "played": [
+    [
+     "Noxus Hopeful",
+     "Stupefy",
+     "Kai'Sa, Survivor",
+     "Brynhir Thundersong",
+     "Temporal Breach",
+     "Noxus Hopeful",
+     "Brynhir Thundersong",
+     "Lost to the Sands",
+     "The Empyrean",
+     "Lecturing Yordle"
+    ],
+    [
+     "Gust",
+     "Riven, Broken Blade",
+     "Bedeviling Stranger",
+     "Stellacorn Herder",
+     "Blade of the Exile",
+     "Tideturner",
+     "Bedeviling Stranger",
+     "Defy",
+     "Astral Heron",
+     "Rebuke",
+     "Blade of the Exile",
+     "Tideturner",
+     "Stellacorn Herder"
+    ]
+   ],
+   "decks": [
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)"
+   ]
+  },
+  {
+   "seed": 1,
+   "winner": 1,
+   "reason": "victory",
+   "turns": 17,
+   "points": [
+    5,
+    8
+   ],
+   "first": 1,
+   "decisions": 125,
+   "secs": 224.972,
+   "replay": "out/kr_mcts/replays/game_1.json.gz",
+   "played": [
+    [
+     "Reckless Innovator",
+     "Stellacorn Herder",
+     "Bedeviling Stranger",
+     "Rebuke",
+     "Bedeviling Stranger",
+     "Defy",
+     "Switcheroo",
+     "Riven, Broken Blade",
+     "Tideturner",
+     "Astral Heron",
+     "Discipline",
+     "Blade of the Exile",
+     "Astral Heron",
+     "Zhonya's Hourglass",
+     "Zhonya's Hourglass"
+    ],
+    [
+     "Forecaster",
+     "Falling Star",
+     "Stupefy",
+     "Hextech Ray",
+     "Forecaster",
+     "Bilgewater Tracker",
+     "Hextech Ray",
+     "Bilgewater Tracker",
+     "Kai'Sa, Survivor",
+     "Lecturing Yordle",
+     "The Empyrean",
+     "Watchful Sentry",
+     "Noxus Hopeful",
+     "The Empyrean"
+    ]
+   ],
+   "decks": [
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)"
+   ]
+  },
+  {
+   "seed": 2,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 16,
+   "points": [
+    8,
+    6
+   ],
+   "first": 0,
+   "decisions": 121,
+   "secs": 224.739,
+   "replay": "out/kr_mcts/replays/game_2.json.gz",
+   "played": [
+    [
+     "Temporal Breach",
+     "Kai'Sa, Survivor",
+     "Brynhir Thundersong",
+     "Forecaster",
+     "Falling Star",
+     "Stupefy",
+     "Hextech Ray",
+     "Brynhir Thundersong",
+     "Stupefy",
+     "Temporal Breach",
+     "Forecaster",
+     "Bilgewater Tracker",
+     "Bilgewater Tracker",
+     "Lecturing Yordle",
+     "Time Warp",
+     "Stupefy",
+     "Bellows Breath"
+    ],
+    [
+     "Bedeviling Stranger",
+     "Riven, Broken Blade",
+     "Bedeviling Stranger",
+     "Battle Preparations",
+     "Tideturner",
+     "Rebuke",
+     "Scuttle Crab",
+     "Stellacorn Herder",
+     "Defy",
+     "Scuttle Crab",
+     "Bedeviling Stranger",
+     "Zhonya's Hourglass",
+     "Stellacorn Herder",
+     "Reckless Innovator"
+    ]
+   ],
+   "decks": [
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)"
+   ]
+  },
+  {
+   "seed": 3,
+   "winner": 1,
+   "reason": "victory",
+   "turns": 13,
+   "points": [
+    5,
+    8
+   ],
+   "first": 0,
+   "decisions": 80,
+   "secs": 131.853,
+   "replay": "out/kr_mcts/replays/game_3.json.gz",
+   "played": [
+    [
+     "Tideturner",
+     "Riven, Broken Blade",
+     "Reckless Innovator",
+     "Reckless Innovator",
+     "Bedeviling Stranger",
+     "Astral Heron",
+     "Baron Nashor"
+    ],
+    [
+     "Forecaster",
+     "Kai'Sa, Survivor",
+     "Hextech Ray",
+     "Brynhir Thundersong",
+     "Temporal Breach",
+     "Kai'Sa, Survivor",
+     "Stupefy",
+     "Brynhir Thundersong",
+     "The Empyrean",
+     "Time Warp"
+    ]
+   ],
+   "decks": [
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)"
+   ]
+  },
+  {
+   "seed": 4,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 14,
+   "points": [
+    8,
+    0
+   ],
+   "first": 1,
+   "decisions": 85,
+   "secs": 169.831,
+   "replay": "out/kr_mcts/replays/game_4.json.gz",
+   "played": [
+    [
+     "Stupefy",
+     "Stupefy",
+     "Kai'Sa, Survivor",
+     "Kai'Sa, Survivor",
+     "Bellows Breath",
+     "Hextech Ray",
+     "Brynhir Thundersong",
+     "Forecaster",
+     "Thousand-Tailed Watcher",
+     "Smoke Screen",
+     "Temporal Breach",
+     "Thousand-Tailed Watcher",
+     "Orb of Regret",
+     "Falling Star"
+    ],
+    [
+     "Gust",
+     "Not So Fast",
+     "Star-Crossed",
+     "Switcheroo",
+     "Battle Preparations",
+     "Blade of the Exile",
+     "Blade of the Exile",
+     "Discipline",
+     "Stellacorn Herder",
+     "Zhonya's Hourglass"
+    ]
+   ],
+   "decks": [
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)"
+   ]
+  },
+  {
+   "seed": 5,
+   "winner": 1,
+   "reason": "victory",
+   "turns": 20,
+   "points": [
+    7,
+    8
+   ],
+   "first": 1,
+   "decisions": 156,
+   "secs": 257.855,
+   "replay": "out/kr_mcts/replays/game_5.json.gz",
+   "played": [
+    [
+     "Star-Crossed",
+     "Riven, Broken Blade",
+     "Zhonya's Hourglass",
+     "Blade of the Exile",
+     "Not So Fast",
+     "Discipline",
+     "Riven, Broken Blade",
+     "Blitzcrank, Impassive",
+     "Reckless Innovator",
+     "Zhonya's Hourglass",
+     "Scuttle Crab",
+     "Gust",
+     "Switcheroo",
+     "Bedeviling Stranger",
+     "Rebuke",
+     "Tideturner"
+    ],
+    [
+     "Noxus Hopeful",
+     "Kai'Sa, Survivor",
+     "Brynhir Thundersong",
+     "Forecaster",
+     "Noxus Hopeful",
+     "Bilgewater Tracker",
+     "Lecturing Yordle",
+     "Watchful Sentry",
+     "Temporal Breach",
+     "Stupefy",
+     "Hextech Ray",
+     "Thousand-Tailed Watcher",
+     "Falling Star",
+     "The Empyrean",
+     "Falling Star",
+     "Lecturing Yordle",
+     "Time Warp",
+     "Stupefy"
+    ]
+   ],
+   "decks": [
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)"
+   ]
+  },
+  {
+   "seed": 6,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 12,
+   "points": [
+    8,
+    3
+   ],
+   "first": 1,
+   "decisions": 91,
+   "secs": 160.376,
+   "replay": "out/kr_mcts/replays/game_6.json.gz",
+   "played": [
+    [
+     "Lecturing Yordle",
+     "Stupefy",
+     "Kai'Sa, Survivor",
+     "Stupefy",
+     "Bellows Breath",
+     "Temporal Breach",
+     "Lecturing Yordle",
+     "Bilgewater Tracker",
+     "Forecaster",
+     "Smoke Screen",
+     "Thousand-Tailed Watcher",
+     "Stupefy",
+     "Lecturing Yordle",
+     "Brynhir Thundersong"
+    ],
+    [
+     "Not So Fast",
+     "Gust",
+     "Bedeviling Stranger",
+     "Stellacorn Herder",
+     "Battle Preparations",
+     "Defy",
+     "Riven, Broken Blade",
+     "Rebuke",
+     "Zhonya's Hourglass",
+     "Discipline",
+     "Reckless Innovator"
+    ]
+   ],
+   "decks": [
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)"
+   ]
+  },
+  {
+   "seed": 7,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 14,
+   "points": [
+    8,
+    5
+   ],
+   "first": 1,
+   "decisions": 112,
+   "secs": 221.536,
+   "replay": "out/kr_mcts/replays/game_7.json.gz",
+   "played": [
+    [
+     "Tideturner",
+     "Reckless Innovator",
+     "Not So Fast",
+     "Battle Preparations",
+     "Riven, Broken Blade",
+     "Blitzcrank, Impassive",
+     "Zhonya's Hourglass",
+     "Stellacorn Herder",
+     "Reckless Innovator",
+     "Star-Crossed",
+     "Stellacorn Herder",
+     "Bedeviling Stranger",
+     "Reckless Innovator",
+     "Gust"
+    ],
+    [
+     "Bilgewater Tracker",
+     "Stupefy",
+     "Forecaster",
+     "Kai'Sa, Survivor",
+     "Noxus Hopeful",
+     "Lost to the Sands",
+     "Watchful Sentry",
+     "The Empyrean",
+     "Thousand-Tailed Watcher",
+     "Lecturing Yordle"
+    ]
+   ],
+   "decks": [
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)"
+   ]
+  },
+  {
+   "seed": 8,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 16,
+   "points": [
+    9,
+    7
+   ],
+   "first": 1,
+   "decisions": 113,
+   "secs": 184.787,
+   "replay": "out/kr_mcts/replays/game_8.json.gz",
+   "played": [
+    [
+     "Forecaster",
+     "Kai'Sa, Survivor",
+     "Noxus Hopeful",
+     "Noxus Hopeful",
+     "The Empyrean",
+     "Thousand-Tailed Watcher",
+     "Smoke Screen",
+     "Orb of Regret",
+     "Kai'Sa, Survivor",
+     "Bilgewater Tracker"
+    ],
+    [
+     "Bedeviling Stranger",
+     "Riven, Broken Blade",
+     "Tideturner",
+     "Discipline",
+     "Blade of the Exile",
+     "Bedeviling Stranger",
+     "Blade of the Exile",
+     "Zhonya's Hourglass",
+     "Defy",
+     "Rebuke",
+     "Reckless Innovator"
+    ]
+   ],
+   "decks": [
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)"
+   ]
+  },
+  {
+   "seed": 9,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 15,
+   "points": [
+    8,
+    6
+   ],
+   "first": 0,
+   "decisions": 117,
+   "secs": 238.617,
+   "replay": "out/kr_mcts/replays/game_9.json.gz",
+   "played": [
+    [
+     "Discipline",
+     "Riven, Broken Blade",
+     "Not So Fast",
+     "Scuttle Crab",
+     "Astral Heron",
+     "Tideturner",
+     "Scuttle Crab",
+     "Defy",
+     "Defy",
+     "Blade of the Exile",
+     "Blade of the Exile",
+     "Zhonya's Hourglass",
+     "Reckless Innovator",
+     "Rebuke",
+     "Battle Preparations"
+    ],
+    [
+     "Noxus Hopeful",
+     "Kai'Sa, Survivor",
+     "Orb of Regret",
+     "Bilgewater Tracker",
+     "Noxus Hopeful",
+     "Bellows Breath",
+     "The Empyrean",
+     "Time Warp",
+     "Kai'Sa, Survivor",
+     "Time Warp",
+     "Stupefy",
+     "The Empyrean"
+    ]
+   ],
+   "decks": [
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)"
+   ]
+  },
+  {
+   "seed": 10,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 14,
+   "points": [
+    9,
+    7
+   ],
+   "first": 1,
+   "decisions": 115,
+   "secs": 167.883,
+   "replay": "out/kr_mcts/replays/game_10.json.gz",
+   "played": [
+    [
+     "Watchful Sentry",
+     "Kai'Sa, Survivor",
+     "Temporal Breach",
+     "Watchful Sentry",
+     "Smoke Screen",
+     "Kai'Sa, Survivor",
+     "Temporal Breach",
+     "Kai'Sa, Survivor",
+     "Hextech Ray",
+     "Orb of Regret",
+     "Noxus Hopeful",
+     "Thousand-Tailed Watcher",
+     "Bellows Breath",
+     "Thousand-Tailed Watcher"
+    ],
+    [
+     "Tideturner",
+     "Bedeviling Stranger",
+     "Discipline",
+     "Tideturner",
+     "Scuttle Crab",
+     "Reckless Innovator",
+     "Switcheroo",
+     "Rebuke",
+     "Riven, Broken Blade",
+     "Blade of the Exile",
+     "Blade of the Exile",
+     "Zhonya's Hourglass",
+     "Astral Heron"
+    ]
+   ],
+   "decks": [
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)"
+   ]
+  },
+  {
+   "seed": 11,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 17,
+   "points": [
+    8,
+    6
+   ],
+   "first": 1,
+   "decisions": 120,
+   "secs": 177.865,
+   "replay": "out/kr_mcts/replays/game_11.json.gz",
+   "played": [
+    [
+     "Blade of the Exile",
+     "Riven, Broken Blade",
+     "Tideturner",
+     "Zhonya's Hourglass",
+     "Zhonya's Hourglass",
+     "Reckless Innovator",
+     "Riven, Broken Blade",
+     "Tideturner",
+     "Astral Heron",
+     "Defy",
+     "Not So Fast"
+    ],
+    [
+     "Noxus Hopeful",
+     "Bellows Breath",
+     "Lecturing Yordle",
+     "Kai'Sa, Survivor",
+     "Stupefy",
+     "Lost to the Sands",
+     "Lecturing Yordle",
+     "Temporal Breach",
+     "Falling Star",
+     "Bilgewater Tracker",
+     "Noxus Hopeful",
+     "Time Warp",
+     "Falling Star",
+     "The Empyrean"
+    ]
+   ],
+   "decks": [
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)"
+   ]
+  },
+  {
+   "seed": 12,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 22,
+   "points": [
+    8,
+    7
+   ],
+   "first": 0,
+   "decisions": 150,
+   "secs": 254.033,
+   "replay": "out/kr_mcts/replays/game_12.json.gz",
+   "played": [
+    [
+     "Forecaster",
+     "Falling Star",
+     "Noxus Hopeful",
+     "Kai'Sa, Survivor",
+     "Smoke Screen",
+     "Stupefy",
+     "Bilgewater Tracker",
+     "Brynhir Thundersong",
+     "Temporal Breach",
+     "Bilgewater Tracker",
+     "Orb of Regret",
+     "Time Warp",
+     "Falling Star",
+     "Thousand-Tailed Watcher",
+     "Watchful Sentry",
+     "Thousand-Tailed Watcher",
+     "Noxus Hopeful",
+     "Bilgewater Tracker",
+     "Noxus Hopeful",
+     "Forecaster",
+     "Watchful Sentry"
+    ],
+    [
+     "Tideturner",
+     "Blitzcrank, Impassive",
+     "Scuttle Crab",
+     "Riven, Broken Blade",
+     "Bedeviling Stranger",
+     "Blade of the Exile",
+     "Defy",
+     "Discipline",
+     "Switcheroo",
+     "Gust",
+     "Not So Fast",
+     "Blitzcrank, Impassive",
+     "Blitzcrank, Impassive",
+     "Star-Crossed",
+     "Blitzcrank, Impassive",
+     "Stellacorn Herder",
+     "Zhonya's Hourglass"
+    ]
+   ],
+   "decks": [
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)"
+   ]
+  },
+  {
+   "seed": 13,
+   "winner": 1,
+   "reason": "victory",
+   "turns": 15,
+   "points": [
+    7,
+    8
+   ],
+   "first": 0,
+   "decisions": 115,
+   "secs": 218.13,
+   "replay": "out/kr_mcts/replays/game_13.json.gz",
+   "played": [
+    [
+     "Bedeviling Stranger",
+     "Stellacorn Herder",
+     "Blitzcrank, Impassive",
+     "Zhonya's Hourglass",
+     "Tideturner",
+     "Discipline",
+     "Gust",
+     "Star-Crossed",
+     "Reckless Innovator",
+     "Gust",
+     "Tideturner",
+     "Riven, Broken Blade",
+     "Discipline",
+     "Blitzcrank, Impassive",
+     "Switcheroo",
+     "Defy"
+    ],
+    [
+     "Stupefy",
+     "Watchful Sentry",
+     "Bilgewater Tracker",
+     "Hextech Ray",
+     "Kai'Sa, Survivor",
+     "Hextech Ray",
+     "Bilgewater Tracker",
+     "Kai'Sa, Survivor",
+     "Brynhir Thundersong",
+     "The Empyrean",
+     "Orb of Regret",
+     "Noxus Hopeful",
+     "Time Warp"
+    ]
+   ],
+   "decks": [
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)"
+   ]
+  },
+  {
+   "seed": 14,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 16,
+   "points": [
+    8,
+    7
+   ],
+   "first": 1,
+   "decisions": 138,
+   "secs": 229.0,
+   "replay": "out/kr_mcts/replays/game_14.json.gz",
+   "played": [
+    [
+     "Bilgewater Tracker",
+     "Falling Star",
+     "Hextech Ray",
+     "Smoke Screen",
+     "Bilgewater Tracker",
+     "Kai'Sa, Survivor",
+     "Brynhir Thundersong",
+     "Forecaster",
+     "Temporal Breach",
+     "Brynhir Thundersong",
+     "Lost to the Sands",
+     "Falling Star",
+     "The Empyrean"
+    ],
+    [
+     "Bedeviling Stranger",
+     "Riven, Broken Blade",
+     "Zhonya's Hourglass",
+     "Rebuke",
+     "Zhonya's Hourglass",
+     "Blitzcrank, Impassive",
+     "Stellacorn Herder",
+     "Scuttle Crab",
+     "Switcheroo",
+     "Blitzcrank, Impassive",
+     "Blitzcrank, Impassive",
+     "Reckless Innovator",
+     "Tideturner",
+     "Tideturner"
+    ]
+   ],
+   "decks": [
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)"
+   ]
+  },
+  {
+   "seed": 15,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 20,
+   "points": [
+    8,
+    6
+   ],
+   "first": 1,
+   "decisions": 153,
+   "secs": 265.804,
+   "replay": "out/kr_mcts/replays/game_15.json.gz",
+   "played": [
+    [
+     "Reckless Innovator",
+     "Defy",
+     "Riven, Broken Blade",
+     "Switcheroo",
+     "Discipline",
+     "Tideturner",
+     "Defy",
+     "Rebuke",
+     "Astral Heron",
+     "Rebuke",
+     "Astral Heron",
+     "Tideturner",
+     "Astral Heron",
+     "Star-Crossed",
+     "Battle Preparations"
+    ],
+    [
+     "Forecaster",
+     "Bellows Breath",
+     "Lost to the Sands",
+     "Orb of Regret",
+     "Brynhir Thundersong",
+     "The Empyrean",
+     "Brynhir Thundersong",
+     "Smoke Screen",
+     "Hextech Ray",
+     "The Empyrean",
+     "The Empyrean",
+     "Kai'Sa, Survivor",
+     "Falling Star",
+     "Stupefy",
+     "Hextech Ray",
+     "Brynhir Thundersong",
+     "Brynhir Thundersong",
+     "Temporal Breach",
+     "Brynhir Thundersong",
+     "Bilgewater Tracker"
+    ]
+   ],
+   "decks": [
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)"
+   ]
+  },
+  {
+   "seed": 16,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 16,
+   "points": [
+    8,
+    7
+   ],
+   "first": 1,
+   "decisions": 160,
+   "secs": 278.276,
+   "replay": "out/kr_mcts/replays/game_16.json.gz",
+   "played": [
+    [
+     "Bilgewater Tracker",
+     "Forecaster",
+     "Noxus Hopeful",
+     "Lost to the Sands",
+     "Kai'Sa, Survivor",
+     "Temporal Breach",
+     "Watchful Sentry",
+     "The Empyrean",
+     "Brynhir Thundersong",
+     "Bilgewater Tracker",
+     "Temporal Breach",
+     "Brynhir Thundersong",
+     "Bilgewater Tracker",
+     "Noxus Hopeful",
+     "Forecaster"
+    ],
+    [
+     "Scuttle Crab",
+     "Riven, Broken Blade",
+     "Tideturner",
+     "Reckless Innovator",
+     "Star-Crossed",
+     "Riven, Broken Blade",
+     "Stellacorn Herder",
+     "Gust",
+     "Scuttle Crab",
+     "Gust",
+     "Bedeviling Stranger",
+     "Stellacorn Herder",
+     "Tideturner",
+     "Astral Heron",
+     "Blade of the Exile",
+     "Zhonya's Hourglass",
+     "Stellacorn Herder",
+     "Blade of the Exile",
+     "Scuttle Crab",
+     "Zhonya's Hourglass",
+     "Stellacorn Herder"
+    ]
+   ],
+   "decks": [
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)"
+   ]
+  },
+  {
+   "seed": 17,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 16,
+   "points": [
+    8,
+    6
+   ],
+   "first": 1,
+   "decisions": 111,
+   "secs": 250.303,
+   "replay": "out/kr_mcts/replays/game_17.json.gz",
+   "played": [
+    [
+     "Star-Crossed",
+     "Riven, Broken Blade",
+     "Reckless Innovator",
+     "Gust",
+     "Reckless Innovator",
+     "Blitzcrank, Impassive",
+     "Zhonya's Hourglass",
+     "Tideturner",
+     "Battle Preparations",
+     "Tideturner",
+     "Blitzcrank, Impassive",
+     "Blitzcrank, Impassive",
+     "Blade of the Exile",
+     "Zhonya's Hourglass"
+    ],
+    [
+     "Stupefy",
+     "Kai'Sa, Survivor",
+     "Smoke Screen",
+     "Kai'Sa, Survivor",
+     "Temporal Breach",
+     "Falling Star",
+     "Brynhir Thundersong",
+     "Hextech Ray",
+     "Noxus Hopeful",
+     "The Empyrean",
+     "Smoke Screen",
+     "Brynhir Thundersong",
+     "Brynhir Thundersong",
+     "Bilgewater Tracker"
+    ]
+   ],
+   "decks": [
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)"
+   ]
+  },
+  {
+   "seed": 18,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 16,
+   "points": [
+    8,
+    5
+   ],
+   "first": 1,
+   "decisions": 132,
+   "secs": 246.946,
+   "replay": "out/kr_mcts/replays/game_18.json.gz",
+   "played": [
+    [
+     "Forecaster",
+     "Stupefy",
+     "Forecaster",
+     "Forecaster",
+     "Temporal Breach",
+     "Forecaster",
+     "Falling Star",
+     "Hextech Ray",
+     "Kai'Sa, Survivor",
+     "Brynhir Thundersong",
+     "Hextech Ray",
+     "Thousand-Tailed Watcher",
+     "Forecaster",
+     "Lost to the Sands",
+     "Thousand-Tailed Watcher"
+    ],
+    [
+     "Defy",
+     "Bedeviling Stranger",
+     "Not So Fast",
+     "Tideturner",
+     "Gust",
+     "Riven, Broken Blade",
+     "Astral Heron",
+     "Stellacorn Herder",
+     "Blitzcrank, Impassive",
+     "Blade of the Exile",
+     "Discipline",
+     "Blade of the Exile",
+     "Bedeviling Stranger"
+    ]
+   ],
+   "decks": [
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)"
+   ]
+  },
+  {
+   "seed": 19,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 21,
+   "points": [
+    8,
+    7
+   ],
+   "first": 1,
+   "decisions": 157,
+   "secs": 327.997,
+   "replay": "out/kr_mcts/replays/game_19.json.gz",
+   "played": [
+    [
+     "Tideturner",
+     "Gust",
+     "Gust",
+     "Riven, Broken Blade",
+     "Blade of the Exile",
+     "Zhonya's Hourglass",
+     "Battle Preparations",
+     "Not So Fast",
+     "Astral Heron",
+     "Zhonya's Hourglass",
+     "Stellacorn Herder",
+     "Blitzcrank, Impassive",
+     "Blitzcrank, Impassive",
+     "Rebuke",
+     "Rebuke",
+     "Astral Heron"
+    ],
+    [
+     "Bellows Breath",
+     "Hextech Ray",
+     "Stupefy",
+     "Kai'Sa, Survivor",
+     "Hextech Ray",
+     "Lost to the Sands",
+     "Falling Star",
+     "Orb of Regret",
+     "Noxus Hopeful",
+     "Kai'Sa, Survivor",
+     "Forecaster",
+     "Brynhir Thundersong",
+     "Bilgewater Tracker",
+     "Temporal Breach",
+     "Brynhir Thundersong",
+     "Time Warp",
+     "Thousand-Tailed Watcher",
+     "Noxus Hopeful",
+     "Forecaster",
+     "Kai'Sa, Survivor"
+    ]
+   ],
+   "decks": [
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)"
+   ]
+  },
+  {
+   "seed": 20,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 14,
+   "points": [
+    8,
+    2
+   ],
+   "first": 0,
+   "decisions": 91,
+   "secs": 198.064,
+   "replay": "out/kr_mcts/replays/game_20.json.gz",
+   "played": [
+    [
+     "Lecturing Yordle",
+     "Hextech Ray",
+     "Noxus Hopeful",
+     "Kai'Sa, Survivor",
+     "Bilgewater Tracker",
+     "Stupefy",
+     "Falling Star",
+     "Lecturing Yordle",
+     "Falling Star",
+     "Noxus Hopeful",
+     "Kai'Sa, Survivor",
+     "Temporal Breach",
+     "Kai'Sa, Survivor",
+     "Lecturing Yordle",
+     "Time Warp",
+     "Orb of Regret"
+    ],
+    [
+     "Discipline",
+     "Rebuke",
+     "Star-Crossed",
+     "Reckless Innovator",
+     "Riven, Broken Blade",
+     "Gust",
+     "Rebuke",
+     "Blitzcrank, Impassive",
+     "Zhonya's Hourglass",
+     "Bedeviling Stranger",
+     "Discipline",
+     "Not So Fast"
+    ]
+   ],
+   "decks": [
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)"
+   ]
+  },
+  {
+   "seed": 21,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 15,
+   "points": [
+    8,
+    5
+   ],
+   "first": 0,
+   "decisions": 110,
+   "secs": 200.424,
+   "replay": "out/kr_mcts/replays/game_21.json.gz",
+   "played": [
+    [
+     "Tideturner",
+     "Zhonya's Hourglass",
+     "Zhonya's Hourglass",
+     "Riven, Broken Blade",
+     "Scuttle Crab",
+     "Astral Heron",
+     "Stellacorn Herder",
+     "Star-Crossed",
+     "Blade of the Exile",
+     "Tideturner"
+    ],
+    [
+     "Stupefy",
+     "Stupefy",
+     "Hextech Ray",
+     "Bilgewater Tracker",
+     "Watchful Sentry",
+     "Bilgewater Tracker",
+     "Thousand-Tailed Watcher",
+     "Forecaster",
+     "Thousand-Tailed Watcher",
+     "Bellows Breath",
+     "Kai'Sa, Survivor"
+    ]
+   ],
+   "decks": [
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)"
+   ]
+  },
+  {
+   "seed": 22,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 18,
+   "points": [
+    8,
+    6
+   ],
+   "first": 0,
+   "decisions": 145,
+   "secs": 268.948,
+   "replay": "out/kr_mcts/replays/game_22.json.gz",
+   "played": [
+    [
+     "Stupefy",
+     "Bilgewater Tracker",
+     "Noxus Hopeful",
+     "Bilgewater Tracker",
+     "Stupefy",
+     "Stupefy",
+     "Hextech Ray",
+     "Temporal Breach",
+     "Noxus Hopeful",
+     "Brynhir Thundersong",
+     "Falling Star",
+     "Bilgewater Tracker",
+     "Kai'Sa, Survivor",
+     "Thousand-Tailed Watcher",
+     "Hextech Ray",
+     "Forecaster",
+     "Watchful Sentry",
+     "Time Warp"
+    ],
+    [
+     "Scuttle Crab",
+     "Blitzcrank, Impassive",
+     "Scuttle Crab",
+     "Gust",
+     "Battle Preparations",
+     "Zhonya's Hourglass",
+     "Discipline",
+     "Blitzcrank, Impassive",
+     "Blitzcrank, Impassive",
+     "Tideturner",
+     "Switcheroo",
+     "Tideturner",
+     "Reckless Innovator",
+     "Reckless Innovator",
+     "Riven, Broken Blade",
+     "Blitzcrank, Impassive"
+    ]
+   ],
+   "decks": [
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)"
+   ]
+  },
+  {
+   "seed": 23,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 17,
+   "points": [
+    8,
+    7
+   ],
+   "first": 0,
+   "decisions": 131,
+   "secs": 238.413,
+   "replay": "out/kr_mcts/replays/game_23.json.gz",
+   "played": [
+    [
+     "Gust",
+     "Gust",
+     "Reckless Innovator",
+     "Rebuke",
+     "Riven, Broken Blade",
+     "Blade of the Exile",
+     "Zhonya's Hourglass",
+     "Battle Preparations",
+     "Reckless Innovator",
+     "Stellacorn Herder",
+     "Discipline",
+     "Scuttle Crab",
+     "Switcheroo",
+     "Stellacorn Herder"
+    ],
+    [
+     "Forecaster",
+     "Hextech Ray",
+     "Kai'Sa, Survivor",
+     "Thousand-Tailed Watcher",
+     "Temporal Breach",
+     "Kai'Sa, Survivor",
+     "Forecaster",
+     "Smoke Screen",
+     "Smoke Screen",
+     "Hextech Ray",
+     "Brynhir Thundersong",
+     "Orb of Regret",
+     "Falling Star",
+     "Forecaster",
+     "Falling Star",
+     "Bilgewater Tracker"
+    ]
+   ],
+   "decks": [
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)"
+   ]
+  },
+  {
+   "seed": 24,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 11,
+   "points": [
+    8,
+    4
+   ],
+   "first": 0,
+   "decisions": 88,
+   "secs": 142.293,
+   "replay": "out/kr_mcts/replays/game_24.json.gz",
+   "played": [
+    [
+     "Forecaster",
+     "Bilgewater Tracker",
+     "Kai'Sa, Survivor",
+     "Thousand-Tailed Watcher",
+     "Temporal Breach",
+     "Thousand-Tailed Watcher",
+     "The Empyrean",
+     "Falling Star",
+     "Orb of Regret"
+    ],
+    [
+     "Bedeviling Stranger",
+     "Stellacorn Herder",
+     "Zhonya's Hourglass",
+     "Battle Preparations",
+     "Riven, Broken Blade",
+     "Switcheroo",
+     "Defy",
+     "Rebuke",
+     "Stellacorn Herder",
+     "Blitzcrank, Impassive"
+    ]
+   ],
+   "decks": [
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)"
+   ]
+  },
+  {
+   "seed": 25,
+   "winner": 1,
+   "reason": "victory",
+   "turns": 15,
+   "points": [
+    7,
+    8
+   ],
+   "first": 1,
+   "decisions": 123,
+   "secs": 224.776,
+   "replay": "out/kr_mcts/replays/game_25.json.gz",
+   "played": [
+    [
+     "Tideturner",
+     "Riven, Broken Blade",
+     "Switcheroo",
+     "Blade of the Exile",
+     "Discipline",
+     "Zhonya's Hourglass",
+     "Blade of the Exile",
+     "Scuttle Crab",
+     "Gust"
+    ],
+    [
+     "Stupefy",
+     "Bilgewater Tracker",
+     "Lecturing Yordle",
+     "Bellows Breath",
+     "Noxus Hopeful",
+     "Kai'Sa, Survivor",
+     "Bilgewater Tracker",
+     "Thousand-Tailed Watcher",
+     "Temporal Breach",
+     "Thousand-Tailed Watcher",
+     "The Empyrean",
+     "Forecaster",
+     "Thousand-Tailed Watcher"
+    ]
+   ],
+   "decks": [
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)"
+   ]
+  },
+  {
+   "seed": 26,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 16,
+   "points": [
+    8,
+    7
+   ],
+   "first": 1,
+   "decisions": 116,
+   "secs": 206.02,
+   "replay": "out/kr_mcts/replays/game_26.json.gz",
+   "played": [
+    [
+     "Noxus Hopeful",
+     "Kai'Sa, Survivor",
+     "Noxus Hopeful",
+     "Smoke Screen",
+     "Falling Star",
+     "Forecaster",
+     "Stupefy",
+     "Temporal Breach",
+     "Kai'Sa, Survivor",
+     "Stupefy",
+     "Lost to the Sands",
+     "Brynhir Thundersong",
+     "Thousand-Tailed Watcher"
+    ],
+    [
+     "Tideturner",
+     "Gust",
+     "Switcheroo",
+     "Riven, Broken Blade",
+     "Blitzcrank, Impassive",
+     "Astral Heron",
+     "Zhonya's Hourglass",
+     "Discipline",
+     "Blitzcrank, Impassive",
+     "Tideturner",
+     "Blade of the Exile",
+     "Reckless Innovator",
+     "Bedeviling Stranger",
+     "Blitzcrank, Impassive"
+    ]
+   ],
+   "decks": [
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)"
+   ]
+  },
+  {
+   "seed": 27,
+   "winner": 1,
+   "reason": "victory",
+   "turns": 15,
+   "points": [
+    6,
+    8
+   ],
+   "first": 1,
+   "decisions": 130,
+   "secs": 243.932,
+   "replay": "out/kr_mcts/replays/game_27.json.gz",
+   "played": [
+    [
+     "Gust",
+     "Scuttle Crab",
+     "Zhonya's Hourglass",
+     "Defy",
+     "Tideturner",
+     "Star-Crossed",
+     "Reckless Innovator",
+     "Discipline",
+     "Discipline",
+     "Riven, Broken Blade",
+     "Blitzcrank, Impassive",
+     "Blade of the Exile",
+     "Scuttle Crab",
+     "Blade of the Exile",
+     "Reckless Innovator"
+    ],
+    [
+     "Noxus Hopeful",
+     "Kai'Sa, Survivor",
+     "Temporal Breach",
+     "Noxus Hopeful",
+     "Smoke Screen",
+     "Stupefy",
+     "Bilgewater Tracker",
+     "Kai'Sa, Survivor",
+     "Orb of Regret",
+     "The Empyrean",
+     "Temporal Breach",
+     "Kai'Sa, Survivor",
+     "Brynhir Thundersong",
+     "Falling Star",
+     "Smoke Screen"
+    ]
+   ],
+   "decks": [
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)"
+   ]
+  },
+  {
+   "seed": 28,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 16,
+   "points": [
+    8,
+    5
+   ],
+   "first": 1,
+   "decisions": 114,
+   "secs": 234.135,
+   "replay": "out/kr_mcts/replays/game_28.json.gz",
+   "played": [
+    [
+     "Forecaster",
+     "Lost to the Sands",
+     "Smoke Screen",
+     "Kai'Sa, Survivor",
+     "Bellows Breath",
+     "Stupefy",
+     "Temporal Breach",
+     "Forecaster",
+     "Brynhir Thundersong",
+     "Stupefy",
+     "Temporal Breach",
+     "Thousand-Tailed Watcher",
+     "Thousand-Tailed Watcher",
+     "Kai'Sa, Survivor"
+    ],
+    [
+     "Discipline",
+     "Gust",
+     "Gust",
+     "Zhonya's Hourglass",
+     "Riven, Broken Blade",
+     "Rebuke",
+     "Switcheroo",
+     "Bedeviling Stranger",
+     "Riven, Broken Blade",
+     "Zhonya's Hourglass",
+     "Stellacorn Herder",
+     "Rebuke",
+     "Stellacorn Herder",
+     "Not So Fast",
+     "Blitzcrank, Impassive"
+    ]
+   ],
+   "decks": [
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)"
+   ]
+  },
+  {
+   "seed": 29,
+   "winner": 1,
+   "reason": "victory",
+   "turns": 16,
+   "points": [
+    5,
+    8
+   ],
+   "first": 0,
+   "decisions": 125,
+   "secs": 262.293,
+   "replay": "out/kr_mcts/replays/game_29.json.gz",
+   "played": [
+    [
+     "Zhonya's Hourglass",
+     "Riven, Broken Blade",
+     "Gust",
+     "Not So Fast",
+     "Gust",
+     "Star-Crossed",
+     "Switcheroo",
+     "Blade of the Exile",
+     "Blade of the Exile",
+     "Reckless Innovator",
+     "Discipline",
+     "Riven, Broken Blade",
+     "Reckless Innovator",
+     "Discipline"
+    ],
+    [
+     "Bilgewater Tracker",
+     "Kai'Sa, Survivor",
+     "Brynhir Thundersong",
+     "Lecturing Yordle",
+     "Smoke Screen",
+     "Forecaster",
+     "Bellows Breath",
+     "Stupefy",
+     "Hextech Ray",
+     "Lost to the Sands",
+     "Noxus Hopeful",
+     "Stupefy",
+     "Thousand-Tailed Watcher",
+     "Watchful Sentry",
+     "Noxus Hopeful"
+    ]
+   ],
+   "decks": [
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)"
+   ]
+  },
+  {
+   "seed": 30,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 19,
+   "points": [
+    8,
+    5
+   ],
+   "first": 0,
+   "decisions": 131,
+   "secs": 198.237,
+   "replay": "out/kr_mcts/replays/game_30.json.gz",
+   "played": [
+    [
+     "Stupefy",
+     "Kai'Sa, Survivor",
+     "Kai'Sa, Survivor",
+     "Falling Star",
+     "Thousand-Tailed Watcher",
+     "Kai'Sa, Survivor",
+     "Smoke Screen",
+     "Orb of Regret",
+     "Temporal Breach",
+     "Kai'Sa, Survivor",
+     "Lost to the Sands",
+     "Falling Star",
+     "Bilgewater Tracker",
+     "Noxus Hopeful",
+     "Hextech Ray"
+    ],
+    [
+     "Tideturner",
+     "Tideturner",
+     "Star-Crossed",
+     "Tideturner",
+     "Riven, Broken Blade",
+     "Rebuke",
+     "Blade of the Exile",
+     "Not So Fast",
+     "Stellacorn Herder",
+     "Switcheroo",
+     "Zhonya's Hourglass",
+     "Stellacorn Herder",
+     "Rebuke",
+     "Defy",
+     "Reckless Innovator",
+     "Blade of the Exile"
+    ]
+   ],
+   "decks": [
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)"
+   ]
+  },
+  {
+   "seed": 31,
+   "winner": 1,
+   "reason": "victory",
+   "turns": 17,
+   "points": [
+    7,
+    8
+   ],
+   "first": 0,
+   "decisions": 134,
+   "secs": 264.574,
+   "replay": "out/kr_mcts/replays/game_31.json.gz",
+   "played": [
+    [
+     "Discipline",
+     "Reckless Innovator",
+     "Discipline",
+     "Stellacorn Herder",
+     "Tideturner",
+     "Star-Crossed",
+     "Riven, Broken Blade",
+     "Astral Heron",
+     "Baron Nashor",
+     "Not So Fast",
+     "Zhonya's Hourglass",
+     "Gust",
+     "Scuttle Crab",
+     "Stellacorn Herder",
+     "Tideturner",
+     "Blitzcrank, Impassive",
+     "Stellacorn Herder",
+     "Tideturner"
+    ],
+    [
+     "Stupefy",
+     "Temporal Breach",
+     "Kai'Sa, Survivor",
+     "Forecaster",
+     "Smoke Screen",
+     "Lost to the Sands",
+     "Bellows Breath",
+     "Kai'Sa, Survivor",
+     "Forecaster",
+     "Thousand-Tailed Watcher",
+     "Watchful Sentry",
+     "Brynhir Thundersong",
+     "Falling Star",
+     "Thousand-Tailed Watcher",
+     "Time Warp"
+    ]
+   ],
+   "decks": [
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)"
+   ]
+  },
+  {
+   "seed": 32,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 13,
+   "points": [
+    8,
+    4
+   ],
+   "first": 0,
+   "decisions": 90,
+   "secs": 162.405,
+   "replay": "out/kr_mcts/replays/game_32.json.gz",
+   "played": [
+    [
+     "Stupefy",
+     "Hextech Ray",
+     "Kai'Sa, Survivor",
+     "Stupefy",
+     "Temporal Breach",
+     "Kai'Sa, Survivor",
+     "Bilgewater Tracker",
+     "Thousand-Tailed Watcher",
+     "Falling Star",
+     "Brynhir Thundersong",
+     "Bilgewater Tracker",
+     "Lost to the Sands",
+     "Noxus Hopeful"
+    ],
+    [
+     "Defy",
+     "Tideturner",
+     "Riven, Broken Blade",
+     "Blade of the Exile",
+     "Blade of the Exile",
+     "Bedeviling Stranger",
+     "Scuttle Crab",
+     "Scuttle Crab",
+     "Gust",
+     "Reckless Innovator"
+    ]
+   ],
+   "decks": [
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)"
+   ]
+  },
+  {
+   "seed": 33,
+   "winner": 1,
+   "reason": "victory",
+   "turns": 22,
+   "points": [
+    4,
+    8
+   ],
+   "first": 1,
+   "decisions": 145,
+   "secs": 275.346,
+   "replay": "out/kr_mcts/replays/game_33.json.gz",
+   "played": [
+    [
+     "Discipline",
+     "Riven, Broken Blade",
+     "Stellacorn Herder",
+     "Tideturner",
+     "Astral Heron",
+     "Switcheroo",
+     "Reckless Innovator",
+     "Scuttle Crab",
+     "Tideturner",
+     "Defy",
+     "Zhonya's Hourglass",
+     "Tideturner",
+     "Rebuke",
+     "Scuttle Crab",
+     "Bedeviling Stranger",
+     "Defy",
+     "Blade of the Exile",
+     "Gust",
+     "Blade of the Exile",
+     "Stellacorn Herder"
+    ],
+    [
+     "Stupefy",
+     "Bilgewater Tracker",
+     "Smoke Screen",
+     "Temporal Breach",
+     "Bilgewater Tracker",
+     "Falling Star",
+     "Thousand-Tailed Watcher",
+     "Thousand-Tailed Watcher",
+     "Stupefy",
+     "Temporal Breach",
+     "Thousand-Tailed Watcher",
+     "Falling Star",
+     "Smoke Screen",
+     "Thousand-Tailed Watcher",
+     "The Empyrean",
+     "The Empyrean",
+     "Time Warp",
+     "Falling Star"
+    ]
+   ],
+   "decks": [
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)"
+   ]
+  },
+  {
+   "seed": 34,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 17,
+   "points": [
+    8,
+    6
+   ],
+   "first": 1,
+   "decisions": 131,
+   "secs": 265.322,
+   "replay": "out/kr_mcts/replays/game_34.json.gz",
+   "played": [
+    [
+     "Lecturing Yordle",
+     "Falling Star",
+     "Smoke Screen",
+     "Kai'Sa, Survivor",
+     "Brynhir Thundersong",
+     "Lecturing Yordle",
+     "Thousand-Tailed Watcher",
+     "Temporal Breach",
+     "Kai'Sa, Survivor",
+     "Orb of Regret",
+     "Stupefy",
+     "Noxus Hopeful",
+     "Bilgewater Tracker",
+     "Kai'Sa, Survivor",
+     "Time Warp",
+     "Temporal Breach",
+     "Noxus Hopeful"
+    ],
+    [
+     "Bedeviling Stranger",
+     "Zhonya's Hourglass",
+     "Tideturner",
+     "Discipline",
+     "Gust",
+     "Zhonya's Hourglass",
+     "Riven, Broken Blade",
+     "Battle Preparations",
+     "Rebuke",
+     "Reckless Innovator",
+     "Discipline",
+     "Bedeviling Stranger",
+     "Rebuke",
+     "Scuttle Crab",
+     "Blade of the Exile"
+    ]
+   ],
+   "decks": [
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)"
+   ]
+  },
+  {
+   "seed": 35,
+   "winner": 1,
+   "reason": "victory",
+   "turns": 11,
+   "points": [
+    3,
+    8
+   ],
+   "first": 1,
+   "decisions": 84,
+   "secs": 157.252,
+   "replay": "out/kr_mcts/replays/game_35.json.gz",
+   "played": [
+    [
+     "Not So Fast",
+     "Riven, Broken Blade",
+     "Defy",
+     "Gust",
+     "Scuttle Crab",
+     "Tideturner",
+     "Bedeviling Stranger",
+     "Reckless Innovator",
+     "Blitzcrank, Impassive"
+    ],
+    [
+     "Noxus Hopeful",
+     "Stupefy",
+     "Bilgewater Tracker",
+     "Temporal Breach",
+     "Bilgewater Tracker",
+     "Bilgewater Tracker",
+     "Hextech Ray",
+     "Kai'Sa, Survivor",
+     "Thousand-Tailed Watcher",
+     "Stupefy"
+    ]
+   ],
+   "decks": [
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)"
+   ]
+  },
+  {
+   "seed": 36,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 13,
+   "points": [
+    8,
+    4
+   ],
+   "first": 0,
+   "decisions": 92,
+   "secs": 169.78,
+   "replay": "out/kr_mcts/replays/game_36.json.gz",
+   "played": [
+    [
+     "Noxus Hopeful",
+     "Kai'Sa, Survivor",
+     "Noxus Hopeful",
+     "Bilgewater Tracker",
+     "Stupefy",
+     "Temporal Breach",
+     "Kai'Sa, Survivor",
+     "Falling Star",
+     "Kai'Sa, Survivor",
+     "Temporal Breach",
+     "Kai'Sa, Survivor",
+     "Thousand-Tailed Watcher",
+     "The Empyrean"
+    ],
+    [
+     "Rebuke",
+     "Reckless Innovator",
+     "Riven, Broken Blade",
+     "Battle Preparations",
+     "Discipline",
+     "Scuttle Crab",
+     "Scuttle Crab",
+     "Bedeviling Stranger",
+     "Reckless Innovator"
+    ]
+   ],
+   "decks": [
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)"
+   ]
+  },
+  {
+   "seed": 37,
+   "winner": 1,
+   "reason": "victory",
+   "turns": 12,
+   "points": [
+    3,
+    8
+   ],
+   "first": 0,
+   "decisions": 90,
+   "secs": 150.548,
+   "replay": "out/kr_mcts/replays/game_37.json.gz",
+   "played": [
+    [
+     "Battle Preparations",
+     "Riven, Broken Blade",
+     "Rebuke",
+     "Zhonya's Hourglass",
+     "Tideturner",
+     "Defy",
+     "Bedeviling Stranger",
+     "Reckless Innovator",
+     "Scuttle Crab",
+     "Defy",
+     "Reckless Innovator"
+    ],
+    [
+     "Noxus Hopeful",
+     "Stupefy",
+     "Kai'Sa, Survivor",
+     "Stupefy",
+     "Kai'Sa, Survivor",
+     "Noxus Hopeful",
+     "Hextech Ray",
+     "Temporal Breach",
+     "Kai'Sa, Survivor",
+     "Bilgewater Tracker",
+     "Noxus Hopeful",
+     "Hextech Ray"
+    ]
+   ],
+   "decks": [
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)"
+   ]
+  },
+  {
+   "seed": 38,
+   "winner": 1,
+   "reason": "victory",
+   "turns": 16,
+   "points": [
+    3,
+    8
+   ],
+   "first": 1,
+   "decisions": 109,
+   "secs": 209.824,
+   "replay": "out/kr_mcts/replays/game_38.json.gz",
+   "played": [
+    [
+     "Temporal Breach",
+     "Smoke Screen",
+     "Falling Star",
+     "Kai'Sa, Survivor",
+     "Brynhir Thundersong",
+     "Thousand-Tailed Watcher",
+     "Watchful Sentry",
+     "Forecaster",
+     "Time Warp",
+     "Lost to the Sands"
+    ],
+    [
+     "Tideturner",
+     "Tideturner",
+     "Riven, Broken Blade",
+     "Reckless Innovator",
+     "Astral Heron",
+     "Scuttle Crab",
+     "Blitzcrank, Impassive",
+     "Blitzcrank, Impassive",
+     "Blade of the Exile",
+     "Battle Preparations",
+     "Baron Nashor",
+     "Blitzcrank, Impassive",
+     "Blade of the Exile",
+     "Zhonya's Hourglass"
+    ]
+   ],
+   "decks": [
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)"
+   ]
+  },
+  {
+   "seed": 39,
+   "winner": 0,
+   "reason": "victory",
+   "turns": 15,
+   "points": [
+    8,
+    6
+   ],
+   "first": 0,
+   "decisions": 110,
+   "secs": 165.958,
+   "replay": "out/kr_mcts/replays/game_39.json.gz",
+   "played": [
+    [
+     "Tideturner",
+     "Battle Preparations",
+     "Riven, Broken Blade",
+     "Rebuke",
+     "Blitzcrank, Impassive",
+     "Gust",
+     "Astral Heron",
+     "Gust",
+     "Astral Heron",
+     "Scuttle Crab",
+     "Discipline",
+     "Rebuke",
+     "Switcheroo"
+    ],
+    [
+     "Stupefy",
+     "Bilgewater Tracker",
+     "Temporal Breach",
+     "Bilgewater Tracker",
+     "Smoke Screen",
+     "Kai'Sa, Survivor",
+     "Temporal Breach",
+     "Kai'Sa, Survivor",
+     "Brynhir Thundersong",
+     "Lost to the Sands",
+     "Bilgewater Tracker",
+     "Bilgewater Tracker",
+     "Thousand-Tailed Watcher",
+     "Noxus Hopeful",
+     "Thousand-Tailed Watcher"
+    ]
+   ],
+   "decks": [
+    "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+    "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)"
+   ]
+  }
+ ],
+ "policies": [
+  "mcts:50",
+  "mcts:50"
+ ]
+}
