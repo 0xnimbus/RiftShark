@@ -59,13 +59,26 @@ def _is_payment_source(game, o):
     return bool(getattr(ab, "is_add", False)) and ab.timing == "reaction"
 
 
+def _is_repeat_equip(game, o):
+    """Equipping a gear that was already attached this turn: shuffling equipment back and forth only spends resources."""
+    if game is None or o[0] != "activate":
+        return False
+    try:
+        ab = game.abilities(o[1])[o[2]]
+    except (KeyError, IndexError):
+        return False
+    at = game.objects[o[1]].temp.get("attached_turn")
+    return bool(getattr(ab, "is_equip", False)) and at is not None and at[0] == game.turn
+
+
 def ai_options(dec, game=None):
     """Options the built-in AIs consider. Floating resources with rune actions (CR 164.2) is legal at any
     Reaction window, but on its own it never improves the static evaluation and it hides the horizon from a
     one-ply search, so the AIs only spend runes through payment plans. This is an AI choice, not a rules
     restriction: the options stay legal for human players and the coach still grades them."""
     if dec.kind == "action":
-        return [o for o in dec.options if o[0] != "rune" and not _is_payment_source(game, o)] or list(dec.options)
+        return [o for o in dec.options if o[0] != "rune" and not _is_payment_source(game, o)
+                and not _is_repeat_equip(game, o)] or list(dec.options)
     return list(dec.options)
 
 
