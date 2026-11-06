@@ -1083,14 +1083,16 @@ class Game(flow.FlowMixin):
     def do_channel(self, p, n, exhausted=False, ctx=None):
         ps = self.players[p]
         made = []
-        for k in range(n):
+        extra = len(self.rules("channel_plus_one", player=p)) if n > 0 else 0     # Seraphic Wyvern: "+1 exhausted rune"
+        plan = [bool(exhausted)] * n + [True] * extra
+        for k, exh in enumerate(plan):
             if not ps.rune_deck:
-                self.log("channel_short", player=p, missing=n - k)     # rune deck empty: nothing to channel
+                self.log("channel_short", player=p, missing=len(plan) - k)     # rune deck empty: nothing to channel
                 break
             u = ps.rune_deck[0]
             o = self.objects[u]
             self._to_zone(o, "board")
-            o.exhausted = bool(exhausted)
+            o.exhausted = exh
             made.append(u)
             self.emit("channel", uid=u, player=p, ctx=ctx)
         return made

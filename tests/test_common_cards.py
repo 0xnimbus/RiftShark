@@ -848,3 +848,45 @@ def test_mechanical_bandit_draws_the_lowest(db, decks):
     g.objects[t1].defn = next(c for c in db if c.name == "Elnuk Herd")
     _fire(g, mb, "Mechanical Bandit"); settle(g)
     assert g.objects[t0].zone == "hand" and g.objects[t1].zone == "deck" and g.players[1].deck[-1] == t1
+
+
+def test_seraphic_wyvern_channels_one_more_exhausted(db, decks):
+    g = main_phase(db, decks)
+    put(g, db, 0, "Seraphic Wyvern", ("base", 0))
+    n = len(g.players[0].runes)
+    made = g.do_channel(0, 1)
+    assert len(made) == 2 and not g.objects[made[0]].exhausted and g.objects[made[1]].exhausted
+    assert len(g.players[0].runes) == n + 2
+
+
+def test_waters_wage_and_piltovan_guidebot(db, decks):
+    g = main_phase(db, decks)
+    _run_spell(g, db, "The Waters' Wage")
+    golds = [o for o in g.objects.values() if o.zone == "board" and o.defn.name == "Gold"]
+    assert len(golds) == 1 and golds[0].exhausted
+    gb = put(g, db, 0, "Piltovan Guidebot", ("base", 0))
+    big = _card_in(g, db, 0, "Supernova", "hand")
+    g.emit("play", uid=big, player=0, card_type="spell"); settle(g)
+    assert g.chars(gb).might == 9
+
+
+def test_transpositionist_and_bottled_constellation(db, decks):
+    g = main_phase(db, decks)
+    t = put(g, db, 0, "Transpositionist", ("base", 0))
+    r = g.players[0].runes[0]
+    g.objects[r].defn = next(c for c in db if c.name == "Chaos Rune"); g.objects[r].domain = "chaos"; g.bump()
+    big = put(g, db, 0, "Elnuk Herd", ("bf", 0), exclude=(t,))
+    small = _card_in(g, db, 0, "Hunting Dog", "hand")
+    _fire(g, t, "Transpositionist", ctx_vars={})
+    settle(g, picks=[big, (small,)])
+    assert g.objects[big].zone == "hand" and g.objects[small].zone == "board"
+    g = main_phase(db, decks)
+    bc = put(g, db, 0, "Bottled Constellation", ("base", 0))
+    us = []
+    for _ in range(3):
+        us.append(put(g, db, 0, "Hunting Dog", ("base", 0), exclude=tuple(us) + (bc,)))
+    pts = g.players[0].points
+    _fire(g, bc, "Bottled Constellation")
+    order = [u for u in g.objects if u in us]
+    settle(g, picks=[(order[0],), (order[1],), (order[2],)])
+    assert all(g.objects[u].zone == "trash" for u in us) and g.players[0].points == pts + 1

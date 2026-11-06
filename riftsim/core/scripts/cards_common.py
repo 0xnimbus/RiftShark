@@ -2224,3 +2224,118 @@ def mechanical_bandit(defn):
                 rest.append(tops[me])
         g.do_recycle(rest, c)
     return [Triggered("start_beginning", [O.Do(run, label="reveal top cards")], label=defn.name, source_text=defn.text)]
+
+
+# ---------------------------------------------------------------- batch 2026-11-06 16:40
+@script("Seraphic Wyvern")
+def seraphic_wyvern(defn):
+    # If you would channel runes, channel that many runes plus 1 exhausted rune instead.
+    return [Static("self", "rule", ("channel_plus_one",), source_text=defn.text)]
+
+
+@script("The Waters' Wage")
+def the_waters_wage(defn):
+    # [Hidden]  Play a Gold gear token exhausted. If it's your turn and you played this from face down, play three ready
+    # Gold gear tokens instead.
+    big = lambda g, c: g.turn_player == c.controller and getattr(c, "played_from", None) == "facedown"
+    return [SpellEffect([O.If(big, [O.PlayToken("Gold", loc="base", count=3)], [O.PlayToken("Gold", loc="base", exhausted=True)])],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Piltovan Guidebot")
+def piltovan_guidebot(defn):
+    # When you play a card, you may have my base Might become equal to that card's Energy cost this turn.
+    def setm(g, c):
+        o = g.objects.get(c.event.get("uid"))
+        if o is not None:
+            g.add_mod(c.source, "base_might", o.base_defn().energy or 0, duration="turn", source=c.source)
+    return [Triggered("you_play_card", [O.May([O.Do(setm, label="base Might = its Energy cost")],
+                                              label="make my base Might equal that card's Energy cost this turn")],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Demon Shade")
+def demon_shade(defn):
+    # [Hidden]  Choose a friendly unit, then choose one — Move it to an open battlefield. / Give it [Ganking] this turn
+    # if there are no open battlefields.
+    def opens(g, c):
+        return [("bf", b.idx) for b in g.battlefields if b.controller is None and not g.units_at(("bf", b.idx))]
+    no_open = lambda g, c: not opens(g, c)
+    return [SpellEffect([O.Choose(Sel("unit", side="friendly"), out="t"),
+                         O.ChooseMode([("move it to an open battlefield",
+                                        [O.ChooseLocation(out="loc", pred=lambda g, c, l: l in opens(g, c) and g.valid_destination(c.vars["t"], l)),
+                                         O.Move(Ref("t"), Ref("loc"))]),
+                                       ("give it [Ganking] this turn if there are no open battlefields",
+                                        [O.If(no_open, [O.Do(lambda g, c: g.add_mod(c.vars["t"], "keyword", ("ganking", True), duration="turn",
+                                                                                    source=c.source), label="[Ganking] this turn")])])])],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Hexplosive Minefield")
+def hexplosive_minefield(defn):
+    # [Action]  Kill any number of friendly Bomb tokens. At end of turn, play that many Bomb tokens to a single battlefield.
+    bombs = lambda g, c: [u for u, o in g.objects.items() if o.zone == "board" and g.is_friendly(o.controller, c.controller)
+                          and o.defn.is_token and o.defn.name == "Bomb"]
+    def kill(g, c):
+        us = list(c.vars.get("__hb") or ())
+        c.vars["__hbn"] = len(us)
+        if us:
+            g.do_kill(us, c)
+    end = lambda g, s, ev: ev.get("kind") == "ending_phase"
+    return [SpellEffect(_pick_up_to(bombs, 12, "__hb", "kill a friendly Bomb token (any number)") +
+                        [O.Do(kill, label="kill them"),
+                         O.If(lambda g, c: c.vars.get("__hbn"), [
+                             O.Delayed(end, [O.ChooseLocation(out="loc"), O.PlayToken("Bomb", loc=Ref("loc"), count=Ref("__hbn"))],
+                                       expires="turn", once=True, label="Hexplosive Minefield: Bombs")])],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Transpositionist")
+def transpositionist(defn):
+    # [Chaos], [T]: Return a friendly unit to its owner's hand. You may play a unit with less Might than that unit had,
+    # ignoring its cost.
+    from ..abilities import Activated
+    def ret(g, c):
+        u = c.vars.get("t")
+        if u is None:
+            return
+        c.vars["__tm"] = g.chars(u).might or 0
+        g.put_in_hand(u, c) if hasattr(g, "put_in_hand") else g._to_zone(g.objects[u], "hand")
+    smaller = lambda g, c: [u for u in g.players[c.controller].hand if g.objects[u].base_defn().is_unit
+                            and (g.objects[u].base_defn().might or 0) < c.vars.get("__tm", 0) and u != c.vars.get("t")]
+    return [Activated({"energy": 0, "power": ["chaos"], "exhaust": True},
+                      [O.Choose(Sel("unit", side="friendly"), out="t"), O.Do(ret, label="return it to its owner's hand"),
+                       O.ChooseFromList(smaller, out="__tp", up_to=True, label="play a unit with less Might, ignoring its cost"),
+                       O.Do(_unwrap("__tp")), O.If(Ref("__tp"), [O.PlayCard(Ref("__tp"), ignore="all")])],
+                      timing="main", label=defn.name, source_text=defn.text)]
+
+
+@script("Bottled Constellation")
+def bottled_constellation(defn):
+    # At the start of your Main Phase, you may kill 3 other friendly units and/or gear to score 1 point.
+    others = lambda g, c: [u for u, o in g.objects.items() if u != c.source and o.zone == "board" and o.controller == c.controller
+                           and o.defn.type != "rune" and ("unit" in g.chars(u).types or "gear" in g.chars(u).types)]
+    def pay(g, c):
+        us = list(c.vars.get("__bc") or ())
+        if len(us) == 3:
+            g.do_kill(us, c)
+            g.gain_points(c.controller, 1, "effect", c)
+    return [Triggered("start_main", [O.If(lambda g, c: len(others(g, c)) >= 3, [
+        O.May(_pick_up_to(others, 3, "__bc", "kill 3 other friendly units and/or gear") + [O.Do(pay, label="kill 3, score 1")],
+              label="kill 3 other friendly units and/or gear to score 1 point")])], label=defn.name, source_text=defn.text)]
+
+
+@script("Forgotten Relic")
+def forgotten_relic(defn):
+    # When you play this or at the start of your Beginning Phase, [Burn 1]. When you burn a unit this way, do this: Give a
+    # friendly unit +[M] equal to the burned card's Might this turn.
+    def burn(g, c):
+        ps = g.players[c.controller]
+        top = ps.deck[0] if ps.deck else None
+        g.do_burn(c.controller, 1, c)
+        c.vars["__fr"] = (g.objects[top].base_defn().might or 0) if top is not None and g.objects[top].base_defn().is_unit \
+            and g.objects[top].zone == "trash" else None
+    pump = [O.Choose(Sel("unit", side="friendly"), out="t"), O.GiveMight(Ref("t"), Ref("__fr"))]
+    body = [O.Do(burn, label="[Burn 1]"), O.If(lambda g, c: c.vars.get("__fr") is not None, [O.Reflexive(pump, label="burned a unit")])]
+    return [Triggered("play_self", body, label=defn.name, source_text=defn.text),
+            Triggered("start_beginning", list(body), label=defn.name + " (Beginning Phase)", source_text=defn.text)]
