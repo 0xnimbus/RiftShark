@@ -994,6 +994,9 @@ class Game(flow.FlowMixin):
                 continue
             # CR 808.1.d.2: death triggers are added before the card moves (they see the board state)
             self.log("die", uid=u, name=o.defn.name, loc=o.location)
+            if ev["card_type"] == "unit":
+                key = ("units_died", ev["player"])           # "if an enemy unit has died this turn"
+                self.turn_memo[key] = self.turn_memo.get(key, 0) + 1
             self.emit("die", ctx=ctx, **{k: v for k, v in ev.items() if k != "kind"})
             self._to_zone(o, "trash")
             self.emit("leave", uid=u, player=ev["player"], loc=ev["loc"], card_type=ev["card_type"], ctx=ctx)

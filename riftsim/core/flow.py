@@ -150,6 +150,8 @@ class _FinalizeCosts(Instr):
             return None
         if it.cost is None:
             it.cost = {"energy": 0, "power": []}
+        if ctx.vars.get("__ignore_cost"):          # "If you do, ignore this spell's cost" (Call to Glory, Wallop)
+            it.cost = {"energy": 0, "power": []}
         ctx.vars.setdefault("__costs", {})
         if it.kind == "spell" and not ctx.vars.get("__chosen_reduce_done"):
             ctx.vars["__chosen_reduce_done"] = True
@@ -943,10 +945,22 @@ class FlowMixin:
                     if mandatory:
                         pre += list(ins) + [SetVar("__add", True), Do(lambda g, c: c.paid.__setitem__("add", True))]
                     else:
+                        # non-resource costs (exhaust a unit, spend a buff) set __addok False when they could not be done
                         outs = [i.out for i in ins if isinstance(i, PayResources)]
                         pre.append(May([SetVar("__optional_cost", True)] + list(ins) + [SetVar("__optional_cost", False),
-                                        Do(lambda g, c, outs=tuple(outs): c.paid.__setitem__("add", all(c.vars.get(o) for o in outs)))],
+                                        Do(lambda g, c, outs=tuple(outs): c.paid.__setitem__(
+                                            "add", all(c.vars.get(o) for o in outs) and c.vars.get("__addok", True)))],
                                        label="pay the additional cost", out="__addq"))
+                if isinstance(ab, PlayPermission) and ab.perm == "free_with_cost":
+                    # "As you play this, you may <cost> as an additional cost. If you do, ignore this spell's cost."
+                    can, ins = ab.value
+                    if can(self, it.controller, it.uid):
+                        body = list(ins) + [SetVar("__ignore_cost", True), Do(lambda g, c: c.paid.__setitem__("add", True))]
+                        e0, pw0 = (it.cost or {}).get("energy", 0), (it.cost or {}).get("power", [])
+                        if not self.can_pay(it.controller, e0, pw0, purpose=self.item_purpose(it)):
+                            pre += body           # only playable this way (CR 357: the play must be legal)
+                        else:
+                            pre.append(May(body, label=ab.label or "pay the alternative cost", out="__freeq"))
         if it.kind == "spell":
             pre += self._exhaust_reducer_code(it)
         code = show + relocate(compile_effect(pre), len(show))      # compiled pieces: shift their jump targets
@@ -957,6 +971,12 @@ class FlowMixin:
             code = code + [_SnapChoices(0), _SkipUnlessRepeat(len(code) + 3 + len(tcode))]
             code = code + relocate(tcode, len(code)) + [_SnapChoices(1)]
         self.vm_frames.append(Frame(code, ctx, tag=("finalize", it.id)))
+
+    def _free_with_cost(self, p, uid):
+        for ab in self._abilities_of(uid, self.objects[uid]):
+            if isinstance(ab, PlayPermission) and ab.perm == "free_with_cost" and ab.value[0](self, p, uid):
+                return True
+        return False
 
     def _exhaust_reducers(self, p):
         """Starry-Eyed Songstress: ready sources with rule 'spell_reduce_exhaust_units' (n units, energy) that p can use now."""
@@ -1462,7 +1482,8 @@ class FlowMixin:
             for loc in locs:
                 e, pw = self.card_cost(p, u, z, loc)
                 if not self.can_pay(p, e, pw, purpose=purpose):
-                    if not (loc is None and self._exhaust_reducers(p) and self.can_pay(p, max(0, e - 2), pw, purpose=purpose)):
+                    if not (loc is None and self._exhaust_reducers(p) and self.can_pay(p, max(0, e - 2), pw, purpose=purpose)) \
+                            and not self._free_with_cost(p, u):
                         continue
                 if loc is None:
                     if not self._spell_has_targets(p, u, z):
