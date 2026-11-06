@@ -41,5 +41,6 @@ under the rules as modelled here. Anything listed under *Simplifications* is whe
 - Baron Nashor's Baron Pit battlefield token is not modelled: Baron plays like a normal unit (its other abilities work).
 - Scuttle Crab's "look at their facedown cards" is a no-op (the AI already sees the full state).
 - Card text the grammar could not parse is skipped for that card (see coverage); the long tail is being hand-scripted,
-  competitive staples first.
+  competitive staples first. Since 2026-11-06 a deck containing such a card is illegal (`Deck.validate` rejects it when
+  scripts are attached), so no simulated or coached game can use a simplified card without a loud error.
 - A safety cap of 60 turns per game counts as a draw.

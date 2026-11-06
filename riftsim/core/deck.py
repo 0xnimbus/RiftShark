@@ -105,6 +105,17 @@ class Deck:
                     errs.append(f"{b} is not a battlefield")
             except KeyError:
                 errs.append(f"unknown battlefield {b}")
+        # No silent simplifications: once card scripts are attached, every card in the deck must be fully scripted
+        # ('auto', 'manual' or 'vanilla'); a card the engine would only partly run makes the deck illegal here.
+        if getattr(db, "scripted", False):
+            for c in [self.legend, self.champion] + list(self.main) + list(self.battlefields):
+                try:
+                    cd = db.card(c)
+                except KeyError:
+                    continue
+                st = getattr(cd, "script_status", "none")
+                if st not in ("auto", "manual", "vanilla"):
+                    errs.append(f"{cd.name} is not fully scripted ({st}); the engine would simplify it")
         if errs and raise_on_error and strict:
             raise DeckError("; ".join(errs))
         return errs

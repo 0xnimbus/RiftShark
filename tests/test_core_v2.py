@@ -70,3 +70,19 @@ def test_coverage_floor(db):
     import collections
     c = collections.Counter(x.script_status for x in db)
     assert c["auto"] + c["manual"] >= 600
+
+
+def test_unscripted_card_makes_deck_illegal(db, decks):
+    """Owner rule: no silent simplifications. A deck with a card the engine cannot fully run is rejected."""
+    from riftsim.core.deck import Deck, DeckError
+    d = decks[0]
+    bad = next(c for c in db if c.script_status == "none" and c.type in ("unit", "spell", "gear")
+               and c.domains and set(c.domains) <= set(db.card(d.legend).domains))
+    d2 = Deck(d.name, d.legend, d.champion, d.main[:-1] + [bad.id], d.runes, d.battlefields)
+    errs = d2.validate(db)
+    assert any("not fully scripted" in e for e in errs)
+    try:
+        d2.validate(db, raise_on_error=True)
+        assert False, "expected DeckError"
+    except DeckError:
+        pass

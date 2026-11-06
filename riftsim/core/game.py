@@ -22,8 +22,9 @@ class RulesError(Exception):
 
 
 class Game(flow.FlowMixin):
-    def __init__(self, db: CardDB, decks, seed=0, mode="1v1", log=True):
+    def __init__(self, db: CardDB, decks, seed=0, mode="1v1", log=True, strict=True):
         self.db = db
+        self.strict = strict  # False: allow decks with unscripted cards (dev smoke tests only)
         self.mode = mode
         self.cfg = MODES[mode]
         self.rng = random.Random(seed)
@@ -79,7 +80,7 @@ class Game(flow.FlowMixin):
         for i, d in enumerate(decks):
             if not isinstance(d, Deck):
                 d = Deck.from_dict(d, self.db)
-            d.validate(self.db, raise_on_error=True)
+            d.validate(self.db, raise_on_error=True, strict=self.strict)
             p = self.players[i]
             p.deck_name = d.name
             self.deck_names.append(d.name)

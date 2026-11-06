@@ -26,7 +26,7 @@ def play(seed, verbose=False):
     rng = random.Random(seed)
     d1 = make_deck("Blind Monk", "Lee Sin, Meditative" if False else "Lee Sin", seed)
     d2 = make_deck("Hand of Noxus", "Darius", seed + 1)
-    g = Game(db, [d1, d2], seed=seed)
+    g = Game(db, [d1, d2], seed=seed, strict=False)  # random decks contain unscripted cards
     n = 0
     while True:
         d = g.run()

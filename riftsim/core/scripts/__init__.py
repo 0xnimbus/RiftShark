@@ -188,6 +188,7 @@ def script_all(db):
     from . import cards_manual  # noqa: F401  (registers manual scripts)
     for c in db:
         attach_scripts(db, c)
+    db.scripted = True
     return db
 
 
