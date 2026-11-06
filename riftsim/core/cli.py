@@ -45,7 +45,7 @@ def cmd_batch(a):
     results, summary = run_batch(decks, games=a.games, policies=pols, workers=a.workers, replay_dir=a.replays,
                                  seed0=a.seed, max_turns=a.max_turns, snapshots=a.snapshots, progress=prog)
     if a.out:
-        save_results(results, summary, a.out)
+        save_results(results, summary, a.out, policies=pols)
     print(json.dumps({k: v for k, v in summary.items() if k != "cards"}, indent=1))
     print("top cards by games played:")
     for c in summary["cards"][:15]:

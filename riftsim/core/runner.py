@@ -110,6 +110,6 @@ def summarize(results):
             "avg_secs": round(sum(r["secs"] for r in results) / max(1, len(results)), 3)}
 
 
-def save_results(results, summary, path):
+def save_results(results, summary, path, policies=None):
     with open(path, "w") as f:
-        json.dump({"summary": summary, "games": results}, f, indent=1)
+        json.dump({"summary": summary, "games": results, "policies": list(policies or [])}, f, indent=1)
