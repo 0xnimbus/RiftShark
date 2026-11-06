@@ -28,6 +28,7 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
 | 2026-11-06 16:11 | 33% used, resets 12:50 PM | 27% used, resets Mon 10:00 AM | +3% in 26 min; 55 more cards scripted (none 148 -> 93), Elder Dragon/Seraphic Wyvern/enter-ready-token engine support; rr20b at ~560/900 |
 | 2026-11-06 16:39 | 38% used, resets 12:50 PM | 28% used, resets Mon 10:00 AM | +5% in 28 min; round-robins paused by Derrick (16:12) for a full rules audit: keyword data, damage assignment, moves, burn out fixed (report: RULES.md audit section) |
 | 2026-11-06 17:00 | 44% used, resets 12:50 PM | 28% used, resets Mon 10:00 AM | +6% in 21 min; hidden-card targeting fix, AI never sees hidden info (determinize everywhere), engine ~25% faster |
+| 2026-11-06 17:21 | 47% used, resets 12:50 PM | 29% used, resets Mon 10:00 AM | +3% in 21 min; adaptive + sharded round-robin, mulligan coach UI, Emperor's Dais may-pay and Gold payment fixes; PR #2 (focus/damage UI) merged |
 
 ## Where things stand
 
