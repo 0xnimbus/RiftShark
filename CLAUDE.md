@@ -34,6 +34,7 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
 | 2026-11-06 18:25 | 2% used, resets 5:50 PM | 30% used, resets Mon 10:00 AM | round-robin 871 games, 44/45 matchups settled |
 | 2026-11-06 19:09 | 4% used, resets 5:50 PM | 30% used, resets Mon 10:00 AM | 18:30 round-robin written up; Derrick (18:41) asked for a Riven rules check: tools/deck_audit.py found Switcheroo + Not So Fast never castable and Heron counting tokens (fixed 9783ead); round-robin re-run in out/rr_1900 |
 | 2026-11-06 19:31 | 6% used, resets 5:50 PM | 30% used, resets Mon 10:00 AM | round-robin re-run on the fixed engine (900 games): Vex 72%, Rek'Sai 66%, Riven 65%; Riven beats Kai'Sa 14-6 |
+| 2026-11-06 19:51 | 6% used, resets 5:50 PM | 30% used, resets Mon 10:00 AM | Riven audit and re-run reported to Derrick; all asks done; card scripting paused by him, so the thread is idle (no further checkpoints) until his next message |
 
 ## Where things stand
 
