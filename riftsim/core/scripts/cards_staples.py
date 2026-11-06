@@ -195,3 +195,102 @@ def ezreal_legend(defn):
     return {"abilities": [Activated({"exhaust": True}, [O.Draw(1)], timing="reaction",
                                     restriction=lambda g, s: g.turn_memo.get(("chose_enemy", g.objects[s].controller), 0) >= 2,
                                     label="draw 1", source_text=defn.text)], "replace": True}
+
+
+def _may_exhaust_me(body, label):
+    return O.May([O.If(_ready_self, [O.Exhaust(Ref("self"))] + body)], label=label)
+
+
+@script("Battle Mistress", "Sivir, Battle Mistress")
+def sivir_legend(defn):
+    # When you recycle a rune, you may exhaust me to play a Gold gear token exhausted.
+    # When one or more enemy units die, ready me.
+    def you_recycle_rune(g, s, ev):
+        o = g.objects.get(ev.get("uid"))
+        return ev.get("kind") == "recycle" and o is not None and o.defn.type == "rune" and ev.get("player") == g.objects[s].controller
+
+    def enemy_units_die(g, s, ev):
+        if ev.get("kind") != "die" or ev.get("card_type") != "unit" or ev.get("player") is None:
+            return False
+        if g.is_friendly(ev["player"], g.objects[s].controller):
+            return False
+        seen = g.objects[s].temp.setdefault("sivir_batches", set())      # once per group of units dying together
+        if ev.get("batch") in seen:
+            return False
+        seen.add(ev.get("batch"))
+        return True
+    return {"abilities": [
+        Triggered(you_recycle_rune, [_may_exhaust_me([O.PlayToken("Gold", loc="base", exhausted=True)],
+                                                     "exhaust me to play a Gold gear token exhausted")],
+                  label="When you recycle a rune", source_text=defn.text),
+        Triggered(enemy_units_die, [O.Ready(Ref("self"))], label="When one or more enemy units die, ready me",
+                  source_text=defn.text)], "replace": True}
+
+
+@script("Chem-Baroness", "Renata Glasc, Chem-Baroness")
+def renata_legend(defn):
+    # When you or an ally hold, you may exhaust me to play a Gold gear token exhausted.   (1v1: no allies)
+    # While your score is within 3 points of the Victory Score, your Gold [Add] an additional [1].
+    def close_to_win(g, s):
+        p = g.objects[s].controller
+        return g.players[p].points >= g.cfg["victory"] - 3
+    return {"abilities": [
+        Triggered("you_hold", [_may_exhaust_me([O.PlayToken("Gold", loc="base", exhausted=True)],
+                                               "exhaust me to play a Gold gear token exhausted")],
+                  label="When you hold", source_text=defn.text),
+        Static("self", "rule", ("gold_adds_extra", 1), cond=close_to_win, label="your Gold [Add] an additional [1]",
+               source_text=defn.text)], "replace": True}
+
+
+@script("Bashful Bloom")
+def bashful_bloom(defn):
+    # [4], [T]: Play a ready 3 [M] Sprite unit token with [Temporary]. This ability costs [1] less for each friendly
+    # unit with [Temporary].
+    def n_temporary(g, uid):
+        p = g.objects[uid].controller
+        return sum(1 for u in g.board_uids() if g.objects[u].controller == p and "unit" in g.chars(u).types
+                   and g.chars(u).keywords.get("temporary"))
+    return {"abilities": [Activated({"energy": 4, "exhaust": True, "energy_reduction": n_temporary},
+                                    [O.PlayToken("Sprite", loc="choose", ready=True)], timing="main",
+                                    label="play a ready Sprite", source_text=defn.text)], "replace": True}
+
+
+@script("Green Father", "Ivern, Green Father")
+def green_father(defn):
+    # When you conquer or hold, you may exhaust me to replace that battlefield with a Brush battlefield token.
+    def bf_uid(g, c):
+        loc = (c.vars.get("ev") or {}).get("loc")
+        return g.battlefields[loc[1]].uid if loc and loc[0] == "bf" else None
+    body = [_may_exhaust_me([O.ReplaceWithToken(bf_uid, "Brush")], "exhaust me to replace that battlefield with a Brush")]
+    return {"abilities": [Triggered("you_conquer", body, label="When you conquer", source_text=defn.text),
+                          Triggered("you_hold", list(body), label="When you hold", source_text=defn.text)], "replace": True}
+
+
+@script("Voidreaver")
+def voidreaver(defn):
+    # When you win a combat, gain 1 XP. / Spend 1 XP, [T]: [Buff] a unit.   (auto)
+    # Spend 2 XP, [T]: Move an exhausted friendly unit from a battlefield to its base.
+    return _keep([Activated({"xp": 2, "exhaust": True}, [O.Move(Ref("t"), "base")],
+                            targets=[O.Choose(Sel("unit", side="friendly", pred=lambda g, c, u: g.objects[u].exhausted
+                                                  and g.objects[u].location is not None and g.objects[u].location[0] == "bf"),
+                                              out="t", targeted=True)],
+                            timing="main", label="move an exhausted friendly unit to its base",
+                            source_text="Spend 2 XP, [T]: Move an exhausted friendly unit from a battlefield to its base.")])
+
+
+@script("Pride of Nazumah")
+def pride_of_nazumah(defn):
+    # [1], [T]: Give a friendly unit "I have [Assault] equal to my [Shield]" this turn.
+    return {"abilities": [Activated({"energy": 1, "exhaust": True},
+                                    [O.GiveKeyword(Ref("t"), "assault_equals_shield", True, duration="turn")],
+                                    targets=[O.Choose(Sel("unit", side="friendly"), out="t", targeted=True)], timing="main",
+                                    label="give a unit Assault equal to its Shield", source_text=defn.text)], "replace": True}
+
+
+@script("Agony's Embrace")
+def agonys_embrace(defn):
+    # Once each turn, when you play a card from face down, draw 1. Then, if it's not your turn, discard 1.
+    def facedown_play(g, s, ev):
+        return ev.get("kind") == "play" and ev.get("from_zone") == "facedown" and ev.get("player") == g.objects[s].controller
+    return {"abilities": [Triggered(facedown_play, [O.Draw(1), O.If(O.not_(O.is_my_turn), [O.Discard(1)])],
+                                    once_per_turn=True, label=defn.name, source_text=defn.text)], "replace": True}

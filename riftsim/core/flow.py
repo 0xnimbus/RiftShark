@@ -1449,7 +1449,7 @@ class FlowMixin:
                 return False
         if cost.get("kill_self") and o.zone != "board":
             return False
-        e = cost.get("energy", 0)
+        e = self.ability_energy(ab, uid)
         pw = list(cost.get("power", ()))
         pw = [o.base_defn().domains[0] if (d == "C" and o.base_defn().domains) else ("any" if d == "C" else d) for d in pw]
         if not self.can_pay(p, e, pw, purpose={"kind": "ability", "types": set(self.chars(uid).types), "uid": uid}):
@@ -1584,7 +1584,7 @@ class FlowMixin:
         ctx.vars["self"] = uid
         cost = ab.cost
         pw = [o.base_defn().domains[0] if (d == "C" and o.base_defn().domains) else ("any" if d == "C" else d) for d in cost.get("power", ())]
-        c = {"energy": cost.get("energy", 0), "power": pw}
+        c = {"energy": self.ability_energy(ab, uid), "power": pw}
         if cost.get("exhaust"):
             c["exhaust"] = uid
         if cost.get("kill_self"):
@@ -1612,6 +1612,14 @@ class FlowMixin:
         self.passes = 0
         self.priority = p
         self.dirty = True
+
+    def ability_energy(self, ab, uid):
+        """Energy cost of an activated ability, after the ability's own reduction ("costs [1] less for each ...")."""
+        e = ab.cost.get("energy", 0)
+        f = ab.cost.get("energy_reduction")
+        if f is not None:
+            e = max(0, e - f(self, uid))
+        return e
 
     def _cost_choices(self, ab, uid):
         """Costs that need a choice (discard N, sacrifice a unit, recycle N) become choose instructions."""

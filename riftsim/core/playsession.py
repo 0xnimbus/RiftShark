@@ -143,7 +143,8 @@ class PlaySession:
             src = g.vm_frames[-1].ctx.source
         if src is not None and src in g.objects:
             o = g.objects[src]
-            dv["source"] = {"uid": src, "card": o.defn.id, "name": o.defn.name, "image": o.defn.image}
+            dv["source"] = {"uid": src, "card": o.defn.id, "name": o.defn.name, "image": o.defn.image,
+                            "text": o.defn.text}       # shown under the prompt so the player sees why it is asked
         return dv
 
     def new_events(self):

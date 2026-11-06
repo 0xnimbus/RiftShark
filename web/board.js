@@ -63,6 +63,12 @@ window.RiftBoard = (function () {
 
   /* What a decision is asking, in plain words. d = {kind, player, prompt, showdown, chain, source}. */
   function explain(d, st) {
+    const r = explainBase(d, st);
+    if (d.kind !== "action" && d.source && d.source.text)     // quote the card so it is clear why this is asked
+      r[1] += `<div class="src-text"><b>${esc(d.source.name)}</b>: ${chips(String(d.source.text).replace(/\n/g, " / "))}</div>`;
+    return r;
+  }
+  function explainBase(d, st) {
     const src = d.source ? `<b>${esc(d.source.name)}</b>` : "An effect";
     const pr = d.prompt ? chips(d.prompt.replace(/#\d+/g, "")) : "";
     const sd = st && st.showdown ? bfName(st.showdown.bf) : "";

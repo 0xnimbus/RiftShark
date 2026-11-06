@@ -680,6 +680,10 @@ class GainXP(Instr):
         return None
 
 
+def _unit_play_locations(game, p):
+    return [("base", p)] + [("bf", b.idx) for b in game.battlefields if b.controller == p]
+
+
 class PlayToken(Instr):
     """Play a token. loc: 'here' | 'base' | Ref/location | None (controller chooses from valid locations)."""
 
@@ -688,11 +692,24 @@ class PlayToken(Instr):
 
     def run(self, game, ctx):
         loc = self.loc
+        if loc == "choose":
+            # no location given: the usual valid locations for playing a unit, base or a battlefield you control (CR 355.2.a)
+            locs = _unit_play_locations(game, ctx.controller)
+            if len(locs) > 1:
+                return Decision(ctx.controller, "choose_location", locs, out="__tokloc",
+                                labels=[game.loc_name(l) for l in locs], info={"label": f"Play the {self.token} token where?"})
+            loc = locs[0]
+        return self._make(game, ctx, loc)
+
+    def resume(self, game, ctx, choice):
+        return self._make(game, ctx, choice)
+
+    def _make(self, game, ctx, loc):
         if loc == "here":
             loc = ctx.here
         elif loc == "base":
             loc = ("base", ctx.controller)
-        else:
+        elif not (isinstance(loc, tuple) and len(loc) == 2 and isinstance(loc[0], str)):
             loc = val(game, ctx, loc)
         if loc is None:
             return None
@@ -721,6 +738,18 @@ class PlayCard(Instr):
             ctx.vars[self.out] = None
             return None
         loc = val(game, ctx, self.loc) if self.loc is not None else None
+        d = game.objects[u].base_defn()
+        if loc is None and d.is_unit and ctx.target_bf is None:
+            locs = _unit_play_locations(game, _player(game, ctx, self.player))   # CR 355.2.a
+            if len(locs) > 1:
+                return Decision(_player(game, ctx, self.player), "choose_location", locs, out="__playloc",
+                                labels=[game.loc_name(l) for l in locs], info={"label": f"Play {d.name} where?"})
+        return self._play(game, ctx, u, loc)
+
+    def resume(self, game, ctx, choice):
+        return self._play(game, ctx, val(game, ctx, self.card), choice)
+
+    def _play(self, game, ctx, u, loc):
         ok = game.limited_play(_player(game, ctx, self.player), u, ctx, ignore=self.ignore, alt_cost=self.alt_cost, loc=loc)
         ctx.vars[self.out] = u if ok else None
         return None
@@ -733,7 +762,12 @@ class Add(Instr):
         self.energy, self.power, self.restriction = energy, power, restriction
 
     def run(self, game, ctx):
-        game.add_resources(ctx.controller, val(game, ctx, self.energy), [val(game, ctx, p) for p in self.power], restriction=self.restriction)
+        energy = val(game, ctx, self.energy)
+        src = game.objects.get(ctx.source) if ctx.source is not None else None
+        if src is not None and src.defn.is_token and src.defn.name == "Gold":
+            # Renata Glasc: "your Gold [Add] an additional [1]" while within 3 points of the Victory Score
+            energy += sum(int(v) for _, v in game.rules("gold_adds_extra", player=ctx.controller))
+        game.add_resources(ctx.controller, energy, [val(game, ctx, p) for p in self.power], restriction=self.restriction)
         return None
 
 

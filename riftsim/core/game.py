@@ -299,6 +299,8 @@ class Game(flow.FlowMixin):
             # keywords that modify might by designation
             if o.designation == "attacker":
                 c.might += c.kw("assault")
+                if c.keywords.get("assault_equals_shield"):      # Pride of Nazumah: "[Assault] equal to my [Shield]"
+                    c.might += c.kw("shield")
             elif o.designation == "defender":
                 c.might += c.kw("shield")
             if c.might < 0:
@@ -883,6 +885,7 @@ class Game(flow.FlowMixin):
     def do_kill(self, uids, ctx=None, by=None, in_combat=False):
         """Kill permanents (CR 429): they are sent to their owner's trash; deathknell triggers first."""
         alone = {}
+        batch = self.tick()            # one id for everything killed at the same time ("one or more units die")
         for u in list(uids):
             o = self.objects.get(u)
             if o is not None and o.zone == "board" and o.location is not None:
@@ -896,7 +899,8 @@ class Game(flow.FlowMixin):
                                      "in_combat": in_combat or self.combat is not None and o.location == ("bf", self.combat["bf"]),
                                      "card_type": "unit" if "unit" in self.chars(u).types else "gear", "by": by,
                                      "token": o.defn.is_token, "might": self.chars(u).might, "stunned": o.stunned, "buffed": o.buffs > 0,
-                                     "alone": alone.get(u, False), "dmg_item": o.temp.get("dmg_item") if by == "damage" else None})
+                                     "alone": alone.get(u, False), "dmg_item": o.temp.get("dmg_item") if by == "damage" else None,
+                                     "batch": batch})
             if ev is None:
                 continue
             if ev.get("replaced_with") == "recall":

@@ -622,7 +622,8 @@ def parse_sentence(s, state):
         if m.group(5):
             grant = {k.lower().replace(" ", "_").replace("-", "_"): (int(v) if v else True) for k, v in re.findall(r"\[?([a-z][\w\-]+)\]?(?: (\d+))?", m.group(5))}
         locw = (m.group(6) or "").strip()
-        loc = "here" if locw == "here" else (Ref("__tloc") if locw in ("to its location", "there") else "base")
+        loc = "here" if locw == "here" else (Ref("__tloc") if locw in ("to its location", "there") else
+                                            ("base" if locw else "choose"))      # unspecified: CR 355.2.a
         return [O.PlayToken(tok, loc=loc, ready=ready, count=cnt, grant=grant)]
     m = re.match(r"play a bomb gear token to a battlefield$", sl)
     if m:
@@ -980,13 +981,14 @@ def parse_sentence(s, state):
     if m:
         tok = m.group(2).strip().title() if m.group(2).strip().lower() != "sand soldier" else "Sand Soldier"
         rest = (m.group(3) or "").strip()
-        loc = "base"
+        loc = "choose"          # no location in the text: base or a battlefield you control (CR 355.2.a)
         ready = False
         grant = None
         if rest.startswith("here") or rest.startswith("to this battlefield"):
             loc = "here"
             rest = re.sub(r"^(here|to this battlefield)", "", rest).strip()
         elif rest.startswith("to your base") or rest.startswith("to base") or rest.startswith("in your base"):
+            loc = "base"
             rest = re.sub(r"^(to|in) (your )?base", "", rest).strip()
         if rest.startswith("ready"):
             ready = True
@@ -1002,7 +1004,7 @@ def parse_sentence(s, state):
         return [O.PlayToken(tok, loc=loc, ready=ready, grant=grant)]
     m = re.match(r"play (\w+) (\d+) \[m\] (\w+) unit tokens?( here| to your base)?$", sl)
     if m and _num(m.group(1)):
-        loc = "here" if m.group(4) and "here" in m.group(4) else "base"
+        loc = "here" if m.group(4) and "here" in m.group(4) else ("base" if m.group(4) else "choose")
         return [O.PlayToken(m.group(3).title(), loc=loc, count=_num(m.group(1)))]
     m = re.match(r"play a gold gear token( exhausted)?$", sl)
     if m:
