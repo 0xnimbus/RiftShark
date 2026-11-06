@@ -1102,6 +1102,9 @@ def parse_condition(c):
         return O.is_my_turn
     if c in ("it's not your turn", "it isn't your turn"):
         return O.not_(O.is_my_turn)
+    m = re.match(r"you assigned (\d+) or more excess damage(?: to enemy units)?$", c)
+    if m:
+        return lambda g, cx, n=int(m.group(1)): g.turn_memo.get(("excess_damage", cx.controller), 0) >= n
     m = re.match(r"you control (\d+) or fewer runes$", c)
     if m:
         return lambda g, cx, n=int(m.group(1)): len(g.players[cx.controller].runes) <= n
