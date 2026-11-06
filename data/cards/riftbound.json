@@ -2292,9 +2292,9 @@
   {
    "id": "RAD-025",
    "name": "Consult the Heavens",
-   "type": "unit",
+   "type": "spell",
    "types": [
-    "unit"
+    "spell"
    ],
    "supertype": null,
    "domains": [
@@ -10763,9 +10763,9 @@
   {
    "id": "RAD-012",
    "name": "Runeblade Anvil",
-   "type": "unit",
+   "type": "gear",
    "types": [
-    "unit"
+    "gear"
    ],
    "supertype": null,
    "domains": [
@@ -11874,9 +11874,9 @@
   {
    "id": "RAD-035",
    "name": "Invigorating Bloom",
-   "type": "unit",
+   "type": "gear",
    "types": [
-    "unit"
+    "gear"
    ],
    "supertype": null,
    "domains": [
@@ -13020,9 +13020,9 @@
   {
    "id": "RAD-059",
    "name": "Supernova",
-   "type": "unit",
+   "type": "spell",
    "types": [
-    "unit"
+    "spell"
    ],
    "supertype": null,
    "domains": [
@@ -21649,9 +21649,9 @@
   {
    "id": "RAD-039",
    "name": "Ephemeral Ward",
-   "type": "unit",
+   "type": "gear",
    "types": [
-    "unit"
+    "gear"
    ],
    "supertype": null,
    "domains": [
@@ -24081,9 +24081,9 @@
   {
    "id": "RAD-087",
    "name": "Portable Portal",
-   "type": "unit",
+   "type": "gear",
    "types": [
-    "unit"
+    "gear"
    ],
    "supertype": null,
    "domains": [
@@ -24339,9 +24339,9 @@
   {
    "id": "RAD-108",
    "name": "Bushwhack Trap",
-   "type": "unit",
+   "type": "gear",
    "types": [
-    "unit"
+    "gear"
    ],
    "supertype": null,
    "domains": [
@@ -31175,9 +31175,9 @@
   {
    "id": "RAD-044",
    "name": "Hunting Blind",
-   "type": "unit",
+   "type": "gear",
    "types": [
-    "unit"
+    "gear"
    ],
    "supertype": null,
    "domains": [
@@ -33156,9 +33156,9 @@
   {
    "id": "RAD-136",
    "name": "Dockside Lock-Up",
-   "type": "unit",
+   "type": "gear",
    "types": [
-    "unit"
+    "gear"
    ],
    "supertype": null,
    "domains": [

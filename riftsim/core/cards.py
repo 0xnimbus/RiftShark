@@ -115,6 +115,11 @@ class CardDB:
             return self.by_name[k.lower()]
         if k in self.tokens:
             return self.tokens[k]
+        # short champion/legend names: "Lee Sin" -> "Lee Sin, Meditative" (prefer units for champions)
+        cands = [c for n, c in self.by_name.items() if n.startswith(k.lower() + ",")]
+        if cands:
+            cands.sort(key=lambda c: (c.type != "unit", c.name))
+            return cands[0]
         raise KeyError(f"unknown card {key!r}")
 
     def __iter__(self):

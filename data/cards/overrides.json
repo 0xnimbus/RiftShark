@@ -1,0 +1,12 @@
+{
+ "_comment": "Manual corrections applied on top of the gallery data by tools_normalize_cards.py / CardDB.load (card id -> fields).",
+ "RAD-025": {"type": "spell", "types": ["spell"]},
+ "RAD-059": {"type": "spell", "types": ["spell"]},
+ "RAD-012": {"type": "gear", "types": ["gear"]},
+ "RAD-035": {"type": "gear", "types": ["gear"]},
+ "RAD-039": {"type": "gear", "types": ["gear"]},
+ "RAD-087": {"type": "gear", "types": ["gear"]},
+ "RAD-108": {"type": "gear", "types": ["gear"]},
+ "RAD-044": {"type": "gear", "types": ["gear"]},
+ "RAD-136": {"type": "gear", "types": ["gear"]}
+}

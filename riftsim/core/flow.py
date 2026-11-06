@@ -33,6 +33,8 @@ class _FinalizeCosts(Instr):
         it = self._item(game)
         if it is None:
             return None
+        if it.cost is None:
+            it.cost = {"energy": 0, "power": []}
         ctx.vars.setdefault("__costs", {})
         opts = game._optional_costs(it, ctx)
         for name, (energy, power, label) in opts:
@@ -131,7 +133,7 @@ class FlowMixin:
         self.decision_count += 1
         self.history.append(choice)
         handler = d.info.get("handler")
-        self.log("decision", player=d.player, kind=d.kind, choice=d.labels[d.options.index(choice)])
+        self.log("decision", player=d.player, dkind=d.kind, choice=d.labels[d.options.index(choice)])
         if handler:
             self.pending = None
             getattr(self, handler)(choice, d)
@@ -223,7 +225,10 @@ class FlowMixin:
             if self.turn > self.max_turns:
                 self._end_game(None, "turn limit")
                 return
-            self._main_decision()
+            if self.showdown is not None:
+                self._showdown_decision()
+            else:
+                self._main_decision()
         elif ph == "ending":
             self.emit("ending_phase", player=self.turn_player)
             self.phase = "expiration"

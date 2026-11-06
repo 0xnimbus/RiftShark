@@ -110,6 +110,13 @@ def main(gallery_path, codex_path, out_path):
         cards[key] = x; order.append(key); added += 1
         by_name[(norm(x['name']), x['type'])] = key
     out = [cards[k] for k in order]
+    import os
+    ovp = os.path.join(os.path.dirname(out_path), 'overrides.json')
+    if os.path.exists(ovp):
+        ov = json.load(open(ovp))
+        for x in out:
+            if x['id'] in ov:
+                x.update(ov[x['id']])
     seen = collections.Counter(x['id'] for x in out)
     for x in out:
         if seen[x['id']] > 1:
