@@ -75,7 +75,8 @@ def keyword_abilities(defn):
         out.append(Triggered("play_self", [O.Attach(Ref("self"), Ref("t"))], targets=[O.Choose(Sel("unit", side="friendly"), targeted=True)],
                              label="Quick-Draw", keyword="quick_draw"))
     if kws.get("weaponmaster"):
-        out.append(Triggered("play_self", [O.If(lambda g, c: c.vars.get("t") is not None and _pay_equip(g, c), [O.Attach(Ref("t"), Ref("self"))])],
+        out.append(Triggered("play_self", [O.If(lambda g, c: c.vars.get("t") is not None,
+                                                 [O.PayEquip(Ref("t"), out="__eq"), O.If(Ref("__eq"), [O.Attach(Ref("t"), Ref("self"))])])],
                              targets=[O.Choose(Sel("gear", side="friendly", tags=["Equipment"]), up_to=True, targeted=False)],
                              label="Weaponmaster", optional=True, keyword="weaponmaster"))
     if defn.is_equipment and defn.might:
@@ -97,20 +98,6 @@ def keyword_abilities(defn):
         cost = parse_cost(m.group(1)) if m else {"energy": 1}
         out.append(Activated(cost, [O.Empower(Ref("self"))], timing="main", label="Empower", is_empower=True, keyword="empower"))
     return out
-
-
-def _pay_equip(g, c):
-    gear = c.vars.get("t")
-    if gear is None:
-        return False
-    for ab in g.abilities(gear):
-        if isinstance(ab, Activated) and ab.is_equip:
-            e, pw = ab.cost.get("energy", 0), list(ab.cost.get("power", ()))
-            pw = [g.objects[gear].base_defn().domains[0] if d == "C" and g.objects[gear].base_defn().domains else ("any" if d == "C" else d) for d in pw]
-            if g.can_pay(c.controller, e, pw):
-                g.pay(c.controller, e, pw, c)
-                return True
-    return False
 
 
 def _equip_cost_text(defn):

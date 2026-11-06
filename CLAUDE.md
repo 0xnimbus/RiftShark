@@ -12,6 +12,7 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
 | 2026-11-06 02:24 | 62% used, resets Fri 12:40 AM | 16% used, resets Mon 10:00 AM | +6% in 21 min (batch runs are cheap); continuing |
 | 2026-11-06 02:45 | 72% used, resets Fri 12:40 AM | 17% used, resets Mon 10:00 AM | +10% in 21 min; one more block, then likely stop near 03:05 |
 | 2026-11-06 03:08 | 85% used, resets Fri 12:40 AM | 19% used, resets Mon 10:00 AM | last block: Vercel setup + handoff, then stop until the session resets |
+| 2026-11-06 03:30 | (switched to Opus by Derrick at 03:13) | | Derrick asked to stop after this commit: credits running low. Next: items 2-5 below, then re-run Kai'Sa vs Riven batches |
 
 ## Where things stand
 
@@ -51,8 +52,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
 ## HARD RULE (Derrick, 2026-11-06 03:07): no simplified cards or rules. Everything must run exactly as in the real game.
 
 Every entry in the RULES.md "Simplifications" list is a bug to fix, in this order (each affects every game first):
-1. Rune payment as a player decision (which runes to exhaust for energy / recycle for power) instead of the greedy
-   plan in `game._power_plan`/`game.pay`; MCTS/greedy policies then choose it like any other Decision.
+1. DONE 2026-11-06 03:30: rune payment is a `pay` decision over distinct plans (`riftsim/core/payment.py`), rune
+   float actions ("rune", exhaust|recycle, uid), Add restrictions enforced via payment purpose, effect payments always
+   optional. AIs skip floats (`policies.ai_options`) and rollouts use the standard plan; one-ply lookahead pays
+   before evaluating. Old replays no longer verify (new decisions): re-run batches and re-export web/data.
 2. Simultaneous triggers ordered by their controller (CR 383) via a Decision, not automatically.
 3. Mulligan at game start (CR 1v1 setup); optional replacement effects as a Decision; enforce "Add" restrictions.
 4. `[Show Off]`, Baron Pit token, Blade of the Exile alternative Equip cost, Scuttle Crab reveal; remove the 60-turn cap

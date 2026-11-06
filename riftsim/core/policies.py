@@ -41,6 +41,26 @@ def heuristic(g, p):
     return v
 
 
+def _is_payment_source(game, o):
+    if game is None or o[0] != "activate":
+        return False
+    try:
+        ab = game.abilities(o[1])[o[2]]
+    except (KeyError, IndexError):
+        return False
+    return bool(getattr(ab, "is_add", False)) and ab.timing == "reaction"
+
+
+def ai_options(dec, game=None):
+    """Options the built-in AIs consider. Floating resources with rune actions (CR 164.2) is legal at any
+    Reaction window, but on its own it never improves the static evaluation and it hides the horizon from a
+    one-ply search, so the AIs only spend runes through payment plans. This is an AI choice, not a rules
+    restriction: the options stay legal for human players and the coach still grades them."""
+    if dec.kind == "action":
+        return [o for o in dec.options if o[0] != "rune" and not _is_payment_source(game, o)] or list(dec.options)
+    return list(dec.options)
+
+
 class Policy:
     name = "policy"
 
@@ -56,7 +76,7 @@ class RandomPolicy(Policy):
         self.pass_bias = pass_bias
 
     def choose(self, game, d):
-        opts = d.options
+        opts = ai_options(d, game)
         if d.kind == "action" and len(opts) > 1 and self.rng.random() < self.pass_bias:
             opts = [o for o in opts if o[0] not in ("pass", "end_turn")] or opts
         return self.rng.choice(opts)
@@ -71,11 +91,13 @@ def _advance_default(g, p, max_steps=400, rollout_rng=None):
         d = g.run()
         if d is None:
             return None
-        if d.player == p:
+        if d.player == p and d.kind != "pay":
             return d
-        opts = d.options
+        opts = ai_options(d, g)
         if d.kind == "action":
             opts = [o for o in opts if o[0] == "pass"] or opts
+        elif d.kind == "pay":
+            opts = opts[:1]           # standard payment plan
         g.choose(rng.choice(opts))
         steps += 1
     return g.pending
@@ -91,7 +113,7 @@ class GreedyPolicy(Policy):
         self.max_options = max_options
 
     def choose(self, game, d):
-        opts = list(d.options)
+        opts = ai_options(d, game)
         if len(opts) == 1:
             return opts[0]
         if len(opts) > self.max_options:
@@ -154,18 +176,19 @@ class MCTSPolicy(Policy):
         self.max_branch = max_branch
 
     def choose(self, game, d):
-        opts = list(d.options)
+        opts = ai_options(d, game)
         if len(opts) == 1:
             return opts[0]
-        root = self.search(game, d)
+        root = self.search(game, d, all_root_options=False)
         if not root.children:
             return self.rng.choice(opts)
         best = max(root.children, key=lambda ch: ch.visits)
         return best.option
 
-    def search(self, game, d, iterations=None):
-        """Run the search and return the root node (children carry visits and summed value for each option)."""
-        opts = list(d.options)
+    def search(self, game, d, iterations=None, all_root_options=True):
+        """Run the search and return the root node (children carry visits and summed value for each option).
+        all_root_options: evaluate every legal option at the root (the coach grades any move a human makes)."""
+        opts = list(d.options) if all_root_options else ai_options(d, game)
         root = _Node(player=d.player)
         root.untried = list(opts) if len(opts) <= self.max_branch else self.rng.sample(opts, self.max_branch)
         me = d.player
@@ -179,7 +202,8 @@ class MCTSPolicy(Policy):
                 if dec is None or g.over:
                     break
                 if node.untried is None:
-                    node.untried = list(dec.options) if len(dec.options) <= self.max_branch else self.rng.sample(dec.options, self.max_branch)
+                    dopts = ai_options(dec, g)
+                    node.untried = dopts if len(dopts) <= self.max_branch else self.rng.sample(dopts, self.max_branch)
                     node.player = dec.player
                 if node.untried:
                     o = node.untried.pop(self.rng.randrange(len(node.untried)))
@@ -211,9 +235,10 @@ class MCTSPolicy(Policy):
             steps = 0
             while not g.over and g.pending is not None and steps < self.rollout_depth:
                 dec = g.pending
-                o = self.rng.choice(dec.options)
-                if dec.kind == "action" and len(dec.options) > 1 and self.rng.random() < 0.5:
-                    o = self.rng.choice([x for x in dec.options if x[0] not in ("pass", "end_turn")] or dec.options)
+                dopts = ai_options(dec, g)
+                o = dopts[0] if dec.kind == "pay" else self.rng.choice(dopts)
+                if dec.kind == "action" and len(dopts) > 1 and self.rng.random() < 0.5:
+                    o = self.rng.choice([x for x in dopts if x[0] not in ("pass", "end_turn")] or dopts)
                 g.choose(o)
                 g.run()
                 steps += 1

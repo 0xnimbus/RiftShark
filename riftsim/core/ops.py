@@ -808,8 +808,25 @@ class Reflexive(Instr):
         return None
 
 
+def _pay_decision(game, ctx, e, pw, purpose, decline=True, label=""):
+    """Offer every distinct way to pay (CR 445.2: paying Energy/Power is always optional; declining negates
+    the instruction). Returns a Decision, or applies the only possibility and returns None."""
+    from .payment import plan_label
+    p = ctx.controller
+    plans = game.payment_plans(p, e, pw, purpose) if game.can_pay(p, e, pw, purpose=purpose) else []
+    opts = list(plans) + (["decline"] if decline else [])
+    if not plans:
+        return "cannot"
+    if len(opts) == 1:
+        game.apply_payment(p, plans[0], ctx, purpose)
+        return None
+    labels = [plan_label(game, pl) for pl in plans] + (["don't pay" + (f" ({label})" if label else "")] if decline else [])
+    return Decision(p, "pay", opts, labels=labels, info={"energy": e, "power": list(pw), "for": label})
+
+
 class PayResources(Instr):
-    """'You may pay X' (not a cost). Stores True in out if paid. energy int, power list of domains."""
+    """'You may pay X' / 'pay X' (not a cost of playing). Stores True in out if paid. energy int, power list of domains.
+    CR 445.2: a player instructed to pay Energy or Power may always decline, which negates the instruction."""
 
     def __init__(self, energy=0, power=(), out="paid", optional=True):
         self.energy, self.power, self.out, self.optional = energy, power, out, optional
@@ -817,40 +834,97 @@ class PayResources(Instr):
     def run(self, game, ctx):
         e = val(game, ctx, self.energy)
         pw = [val(game, ctx, p) for p in self.power]
-        if not game.can_pay(ctx.controller, e, pw):
+        purpose = {"kind": "effect", "uid": ctx.source}
+        r = _pay_decision(game, ctx, e, pw, purpose, decline=True, label=f"{e} energy {pw}" if pw else f"{e} energy")
+        if r == "cannot":
             ctx.vars[self.out] = False
             return None
-        if not self.optional:
-            game.pay(ctx.controller, e, pw)
+        if r is None:
             ctx.vars[self.out] = True
             return None
-        return Decision(ctx.controller, "yesno", [True, False], out=self.out, labels=[f"pay {e}/{pw}", "don't pay"])
+        return r
 
     def resume(self, game, ctx, choice):
-        if choice:
-            game.pay(ctx.controller, val(game, ctx, self.energy), [val(game, ctx, p) for p in self.power])
+        if choice == "decline":
+            ctx.vars[self.out] = False
+        else:
+            game.apply_payment(ctx.controller, choice, ctx, {"kind": "effect", "uid": ctx.source})
+            ctx.vars[self.out] = True
         return None
 
 
 class PayAnyEnergy(Instr):
-    """'Pay any amount of energy' -> chooses amount into out."""
+    """'Pay any amount of energy' -> chooses amount into out, then how to pay it."""
 
     def __init__(self, out="x", power=False):
         self.out, self.power = out, power
 
+    def _cost(self, n):
+        return (0, ["any"] * n) if self.power else (n, [])
+
     def run(self, game, ctx):
-        mx = game.available_power(ctx.controller) if self.power else game.available_energy(ctx.controller)
-        opts = list(range(mx + 1))
+        purpose = {"kind": "effect", "uid": ctx.source}
+        opts = [n for n in range(0, 40) if game.can_pay(ctx.controller, *self._cost(n), purpose=purpose)]
+        ctx.vars.pop("__payany", None)
         if len(opts) == 1:
             ctx.vars[self.out] = 0
             return None
         return Decision(ctx.controller, "pay_amount", opts, out=self.out, labels=[str(o) for o in opts])
 
     def resume(self, game, ctx, choice):
-        if self.power:
-            game.pay(ctx.controller, 0, ["any"] * choice)
-        else:
-            game.pay(ctx.controller, choice, [])
+        purpose = {"kind": "effect", "uid": ctx.source}
+        if "__payany" in ctx.vars:              # second step: how to pay the chosen amount
+            n = ctx.vars.pop("__payany")
+            ctx.vars[self.out] = n
+            game.apply_payment(ctx.controller, choice, ctx, purpose)
+            return None
+        if not choice:
+            return None
+        r = _pay_decision(game, ctx, *self._cost(choice), purpose, decline=False)
+        if isinstance(r, Decision):
+            ctx.vars["__payany"] = choice
+            r.out = None
+            return r
+        return None
+
+
+class PayEquip(Instr):
+    """Weaponmaster (CR 829): 'you may pay the Equip cost of a gear' -> out True if paid."""
+
+    def __init__(self, gear, out="__eq"):
+        self.gear, self.out = gear, out
+
+    def _cost(self, game, ctx):
+        from .abilities import Activated
+        gear = val(game, ctx, self.gear)
+        if gear is None or gear not in game.objects:
+            return None
+        for ab in game.abilities(gear):
+            if isinstance(ab, Activated) and ab.is_equip:
+                d = game.objects[gear].base_defn()
+                pw = ["any" if x == "C" and not d.domains else (d.domains[0] if x == "C" else x) for x in ab.cost.get("power", ())]
+                return ab.cost.get("energy", 0), pw
+        return None
+
+    def run(self, game, ctx):
+        c = self._cost(game, ctx)
+        if c is None:
+            ctx.vars[self.out] = False
+            return None
+        purpose = {"kind": "ability", "types": {"gear"}, "uid": val(game, ctx, self.gear)}
+        r = _pay_decision(game, ctx, c[0], c[1], purpose, decline=False)
+        if r == "cannot":
+            ctx.vars[self.out] = False
+            return None
+        if r is None:
+            ctx.vars[self.out] = True
+            return None
+        return r
+
+    def resume(self, game, ctx, choice):
+        purpose = {"kind": "ability", "types": {"gear"}, "uid": val(game, ctx, self.gear)}
+        game.apply_payment(ctx.controller, choice, ctx, purpose)
+        ctx.vars[self.out] = True
         return None
 
 

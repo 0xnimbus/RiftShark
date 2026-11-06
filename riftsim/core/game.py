@@ -9,6 +9,7 @@ from .abilities import Static, Triggered, Activated, Replacement, PlayPermission
 from .cards import CardDB, DOMAINS
 from .objects import Mod, Chars, GameObject, PlayerState, BattlefieldState, ChainItem
 from .selectors import Sel
+from . import payment
 from .vm import Context, Decision, Frame, compile_effect
 from . import flow
 
@@ -1210,90 +1211,48 @@ class Game(flow.FlowMixin):
         return len(ps.power) + len(ps.runes)
 
     def add_resources(self, p, energy=0, power=(), restriction=None, ctx=None):
+        """CR 430: put resources into p's Rune Pool. Restricted resources ('Use only to play spells') stay tagged."""
         ps = self.players[p]
-        ps.energy += energy
-        for d in power:
-            ps.power.append(d)
+        if restriction:
+            ps.pool_r.extend([("E", restriction)] * energy)
+            ps.pool_r.extend((d, restriction) for d in power)
+        else:
+            ps.energy += energy
+            ps.power.extend(power)
+        self.bump()
         self.emit("add", player=p, energy=energy, power=list(power), ctx=ctx)
 
-    def _power_plan(self, p, power):
-        """Plan how to pay a list of power requirements (domains or 'any'). Returns list of
-        ('pool', idx) | ('rune', uid) or None if impossible."""
-        ps = self.players[p]
-        pool = list(ps.power)
-        runes = list(ps.runes)
-        plan = []
-        need = sorted(power, key=lambda d: d == "any")   # specific domains first
-        for d in need:
-            # pool first: exact domain, then universal
-            idx = next((i for i, x in enumerate(pool) if x is not None and (x == d or (d == "any" and True))), None)
-            if d != "any":
-                idx = next((i for i, x in enumerate(pool) if x == d), None)
-                if idx is None:
-                    idx = next((i for i, x in enumerate(pool) if x == "any"), None)
-            if idx is not None:
-                pool[idx] = None
-                plan.append(("pool", idx))
-                continue
-            cands = [u for u in runes if d == "any" or self.objects[u].domain == d]
-            if not cands:
-                return None
-            # prefer exhausted runes (energy already extracted), then the domain we have most of
-            cands.sort(key=lambda u: (not self.objects[u].exhausted,
-                                      -sum(1 for v in runes if self.objects[v].domain == self.objects[u].domain)))
-            u = cands[0]
-            runes.remove(u)
-            plan.append(("rune", u))
-        return plan
+    def empty_pools(self):
+        """CR 167: every Rune Pool empties at the start of each Main Phase and the end of each turn."""
+        for ps in self.players:
+            ps.energy, ps.power, ps.pool_r = 0, [], []
 
-    def can_pay(self, p, energy=0, power=(), extra_exhaust=()):
-        plan = self._power_plan(p, list(power))
-        if plan is None:
-            return False
-        ps = self.players[p]
-        used = {u for k, u in plan if k == "rune"}
-        # energy: pool + ready runes (including ready runes about to be recycled: exhaust first for energy)
-        ready = [u for u in ps.runes if not self.objects[u].exhausted and u not in extra_exhaust]
-        return ps.energy + len(ready) >= energy
+    def can_pay(self, p, energy=0, power=(), extra_exhaust=(), purpose=None):
+        return payment.can_pay(self, p, energy, list(power), purpose, extra_exhaust)
 
-    def pay(self, p, energy=0, power=(), ctx=None):
-        ps = self.players[p]
-        plan = self._power_plan(p, list(power))
-        if plan is None:
-            raise RulesError(f"P{p} cannot pay power {power}")
-        # power: recycle planned runes; if a planned rune is ready, exhaust it first for energy (strictly better)
-        recycled = []
-        for k, v in plan:
-            if k == "pool":
-                ps.power[v] = None
-            else:
-                o = self.objects[v]
-                if not o.exhausted:
-                    o.exhausted = True
-                    ps.energy += 1
-                recycled.append(v)
-        ps.power = [x for x in ps.power if x is not None]
-        for u in recycled:
-            self.do_recycle([u], ctx)
-        # energy: pool first, then exhaust ready runes (prefer the most common domain to keep options)
-        need = energy
-        take = min(need, ps.energy)
-        ps.energy -= take
-        need -= take
-        if need > 0:
-            ready = [u for u in ps.runes if not self.objects[u].exhausted]
-            ready.sort(key=lambda u: -sum(1 for v in ps.runes if self.objects[v].domain == self.objects[u].domain and not self.objects[v].exhausted))
-            if len(ready) < need:
-                raise RulesError(f"P{p} cannot pay {energy} energy")
-            for u in ready[:need]:
-                self.objects[u].exhausted = True
-        self.bump()
-        self.log("pay", player=p, energy=energy, power=list(power))
-        if energy or power:
-            self.emit("pay", player=p, energy=energy, power=list(power), ctx=ctx)
+    def payment_plans(self, p, energy=0, power=(), purpose=None):
+        return payment.plans(self, p, energy, list(power), purpose)
 
-    def pay_power_any(self, p, n, ctx=None):
-        self.pay(p, 0, ["any"] * n, ctx)
+    def apply_payment(self, p, plan, ctx=None, purpose=None):
+        payment.apply_plan(self, p, plan, ctx, purpose)
+
+    def item_purpose(self, it):
+        """What a chain item's cost pays for (Add restrictions check this)."""
+        if it is None:
+            return None
+        if it.kind in ("spell", "unit", "gear"):
+            return payment.purpose_of_card(self, it.uid, "play")
+        o = self.objects.get(it.uid)
+        types = set(self.chars(it.uid).types) if (o is not None and o.zone == "board") else (set(o.base_defn().types) if o else set())
+        return {"kind": "ability", "types": types, "uid": it.uid}
+
+    def ctx_purpose(self, ctx):
+        if ctx is None or ctx.item is None:
+            return None
+        for it in self.chain:
+            if it.id == ctx.item:
+                return self.item_purpose(it)
+        return None
 
     # ------------------------------------------------------------------ choices
     def choice_candidates(self, ctx, sel, targeted=True):
@@ -1315,7 +1274,7 @@ class Game(flow.FlowMixin):
                     if self.chars(u).keywords.get("untargetable"):
                         continue
                     d = self.keyword_value(u, "deflect")
-                    if d and not self.can_pay(ctx.controller, 0, ["any"] * (d + paid)):
+                    if d and not self.can_pay(ctx.controller, 0, ["any"] * (d + paid), purpose=self.ctx_purpose(ctx)):
                         continue
                 out.append(u)
             cands = out
@@ -1421,7 +1380,7 @@ class Game(flow.FlowMixin):
                             "xp": p.xp, "hand": [obj(u) for u in p.hand], "hand_size": len(p.hand), "deck_size": len(p.deck),
                             "trash": [obj(u) for u in p.trash], "rune_deck": len(p.rune_deck),
                             "runes": [obj(u) for u in p.runes], "champion": obj(p.champion) if p.champion else None,
-                            "energy": p.energy, "power": list(p.power), "legend_obj": obj(p.legend),
+                            "energy": p.energy, "power": list(p.power), "pool_restricted": [list(x) for x in p.pool_r], "legend_obj": obj(p.legend),
                             "base": [obj(u) for u in self.permanents_at(("base", p.idx))]})
         bfs = []
         for b in self.battlefields:

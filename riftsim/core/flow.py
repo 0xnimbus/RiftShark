@@ -12,6 +12,7 @@ from .abilities import Activated, PlayPermission, Static
 from .objects import ChainItem
 from .vm import Context, Decision, Frame, Instr, compile_effect, run_vm, resume_vm, val
 from .ops import Choose, May, SetVar, Do
+from . import payment
 
 PHASES = ["awaken", "beginning", "scoring", "channel", "draw", "main", "ending", "expiration"]
 
@@ -43,7 +44,7 @@ class _FinalizeCosts(Instr):
             total_e = energy + it.cost["energy"] + sum(e for (e, _) in ctx.vars["__costs"].values())
             total_p = list(power) + list(it.cost["power"]) + [d for (_, ps) in ctx.vars["__costs"].values() for d in ps]
             total_p += ["any"] * game._deflect_total(it, ctx)
-            if not game.can_pay(ctx.controller, total_e, total_p):
+            if not game.can_pay(ctx.controller, total_e, total_p, purpose=game.item_purpose(it)):
                 ctx.vars["__costs"][name] = (0, [])
                 continue
             ctx.vars["__ask"] = name
@@ -53,6 +54,12 @@ class _FinalizeCosts(Instr):
 
     def resume(self, game, ctx, choice):
         it = self._item(game)
+        if ctx.vars.get("__ask") == "__pay__":
+            ctx.vars.pop("__ask")
+            e, p = ctx.vars.pop("__pay_total")
+            game.apply_payment(ctx.controller, choice, ctx, game.item_purpose(it))
+            it.cost["paid"] = (e, p)
+            return None
         name = ctx.vars.pop("__ask")
         opts = dict(game._optional_costs(it, ctx))
         energy, power, _ = opts[name]
@@ -83,13 +90,22 @@ class _FinalizeCosts(Instr):
             game.do_spend_buff(it.cost["spend_buff"], ctx)
         if it.cost.get("xp"):
             game.players[ctx.controller].xp -= it.cost["xp"]
-        if not game.can_pay(ctx.controller, e, p):
+        purpose = game.item_purpose(it)
+        plans = game.payment_plans(ctx.controller, e, p, purpose) if game.can_pay(ctx.controller, e, p, purpose=purpose) else []
+        if not plans:
             # cannot pay after all (e.g. deflect targets): the item leaves the chain (CR 355)
             game._fizzle_item(it, "cannot pay")
             return None
-        game.pay(ctx.controller, e, p, ctx)
-        it.cost["paid"] = (e, p)
-        return None
+        if len(plans) == 1:
+            game.apply_payment(ctx.controller, plans[0], ctx, purpose)
+            it.cost["paid"] = (e, p)
+            return None
+        # CR 357.1.a / 445.2.c: the player chooses which runes and Add abilities pay the cost
+        ctx.vars["__ask"] = "__pay__"
+        ctx.vars["__pay_total"] = (e, list(p))
+        from .payment import plan_label
+        return Decision(ctx.controller, "pay", plans, labels=[plan_label(game, pl) for pl in plans],
+                        info={"item": it.id, "for": it.label, "energy": e, "power": list(p)})
 
 
 class FlowMixin:
@@ -216,8 +232,7 @@ class FlowMixin:
         elif ph == "draw":
             self.do_draw(self.turn_player, 1)
             self.phase = "main"
-            for p in self.players:
-                p.energy, p.power = 0, []
+            self.empty_pools()
             self.emit("main_phase", player=self.turn_player)
             self.priority = self.turn_player
             self.dirty = True
@@ -282,8 +297,7 @@ class FlowMixin:
                 else:
                     keep.append(m)
             o.mods = keep
-        for p in self.players:
-            p.energy, p.power = 0, []
+        self.empty_pools()
         self.bump()
         self._cleanup()
         if self.chain:
@@ -889,6 +903,9 @@ class FlowMixin:
             return f"play {self.label(a[1])}" + (f" to {self.loc_name(loc)}" if loc else "")
         if k == "move":
             return "move " + ", ".join(self.label(u) for u in a[1]) + " to " + self.loc_name(a[2])
+        if k == "rune":
+            d = (self.objects[a[2]].domain or "?").capitalize()
+            return f"exhaust a {d} rune: add 1 energy" if a[1] == "exhaust" else f"recycle a {d} rune: add {d} power"
         if k == "hide":
             return f"hide {self.label(a[1])} at {self.loc_name(('bf', a[2]))}"
         if k == "activate":
@@ -915,8 +932,26 @@ class FlowMixin:
             self.dirty = True
         elif k == "hide":
             p = self.turn_player
-            self.pay(p, 0, ["any"])
-            self.do_hide(p, a[1], ("bf", a[2]), Context(p))
+            plans = self.payment_plans(p, 0, ["any"], {"kind": "hide"})
+            if len(plans) == 1:
+                self._hide_paid(plans[0], None, hide=(a[1], a[2]), player=p)
+            else:
+                from .payment import plan_label
+                self.ask(p, "pay", plans, [plan_label(self, pl) for pl in plans], "_hide_paid", hide=(a[1], a[2]), hider=p,
+                         **{"for": "hide " + self.objects[a[1]].defn.name})
+        elif k == "rune":
+            p = self.priority if self.priority is not None else self.turn_player
+            u = a[2]
+            o = self.objects[u]
+            ctx = Context(p, u)
+            if a[1] == "exhaust":
+                self.do_exhaust(u, ctx)
+                self.add_resources(p, 1, (), ctx=ctx)
+            else:
+                dom = o.domain
+                self.do_recycle([u], ctx)
+                self.add_resources(p, 0, (dom,), ctx=ctx)
+            self.log("rune", player=p, uid=u, how=a[1])
             self.dirty = True
         elif k == "activate":
             self._activate(self.priority if self.priority is not None else self.turn_player, a[1], a[2])
@@ -1053,7 +1088,7 @@ class FlowMixin:
             if not self._play_restrictions_ok(p, u, z):
                 continue
             e, pw = self.card_cost(p, u, z)
-            if not self.can_pay(p, e, pw):
+            if not self.can_pay(p, e, pw, purpose=payment.purpose_of_card(self, u)):
                 continue
             for loc in self._play_locations(p, u, z):
                 if loc is None:
@@ -1069,9 +1104,36 @@ class FlowMixin:
             for i, ab in enumerate(self.abilities(u)):
                 if isinstance(ab, Activated) and self._can_activate(p, u, i, ab):
                     acts.append(("activate", u, i))
+        acts.extend(self._rune_actions(p))
         if main:
             acts.extend(self._move_actions(p))
             acts.extend(self._hide_actions(p))
+        return acts
+
+    def _can_react(self, p):
+        """May p activate a Reaction ability right now (same windows as _can_activate for reactions)?"""
+        if self.closed:
+            return p == self.priority
+        if self.showdown is not None or self.combat is not None:
+            return p == self.focus
+        return p == self.turn_player and self.phase == "main"
+
+    def _rune_actions(self, p):
+        """CR 164.2: every rune has '[Reaction] [E]: Add [1]' and '[Reaction] Recycle this: Add [C]'.
+        Activating them outside a payment adds resources to the pool ('floating'). Runes of the same domain and
+        state are interchangeable, so one action is offered per (domain, state)."""
+        if not self._can_react(p):
+            return []
+        acts, seen = [], set()
+        for u in sorted(self.players[p].runes):
+            o = self.objects[u]
+            key = (o.domain, o.exhausted)
+            if key in seen:
+                continue
+            seen.add(key)
+            if not o.exhausted:
+                acts.append(("rune", "exhaust", u))
+            acts.append(("rune", "recycle", u))
         return acts
 
     def _play_restrictions_ok(self, p, uid, z):
@@ -1154,7 +1216,7 @@ class FlowMixin:
         e = cost.get("energy", 0)
         pw = list(cost.get("power", ()))
         pw = [o.base_defn().domains[0] if (d == "C" and o.base_defn().domains) else ("any" if d == "C" else d) for d in pw]
-        if not self.can_pay(p, e, pw, extra_exhaust=()):
+        if not self.can_pay(p, e, pw, purpose={"kind": "ability", "types": set(self.chars(uid).types), "uid": uid}):
             return False
         if ab.targets:
             ctx = Context(p, uid, here=o.location)
@@ -1191,7 +1253,7 @@ class FlowMixin:
         acts = []
         ps = self.players[p]
         bfs = [b.idx for b in self.battlefields if b.controller == p and p not in b.facedown]
-        if not bfs or not self.can_pay(p, 0, ["any"]):
+        if not bfs or not self.can_pay(p, 0, ["any"], purpose={"kind": "hide"}):
             return acts
         cards = list(ps.hand) + ([ps.champion] if ps.champion else [])
         for u in cards:
@@ -1199,6 +1261,13 @@ class FlowMixin:
                 for b in bfs:
                     acts.append(("hide", u, b))
         return acts
+
+    def _hide_paid(self, plan, d, hide=None, player=None):
+        if d is not None:
+            hide, player = d.info["hide"], d.info["hider"]
+        self.apply_payment(player, plan, Context(player), {"kind": "hide"})
+        self.do_hide(player, hide[0], ("bf", hide[1]), Context(player))
+        self.dirty = True
 
     def _play(self, p, uid, loc):
         o = self.objects[uid]
@@ -1250,7 +1319,7 @@ class FlowMixin:
             pw = []
         if alt_cost is not None:
             e, pw = alt_cost
-        if not self.can_pay(p, e, pw):
+        if not self.can_pay(p, e, pw, purpose=payment.purpose_of_card(self, uid)):
             return False
         kind = "spell" if "spell" in d.types else ("unit" if "unit" in d.types else "gear")
         if loc is None and kind != "spell":

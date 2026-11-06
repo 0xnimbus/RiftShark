@@ -29,13 +29,20 @@ under the rules as modelled here. Anything listed under *Simplifications* is whe
   cards whose text is not fully scripted: such cards play with whatever part of their text was understood (keywords
   always work).
 
+## Rune payment (exact since 2026-11-06)
+
+Paying a cost is a player decision (`pay`): every distinct way to pay is offered, covering which runes to exhaust
+for [1], which to recycle for [C] and in what order, other Reaction Add abilities (Kai'Sa's legend, Seals...) and
+which pool resources to spend (`riftsim/core/payment.py`). Runes' two abilities can also be activated on their own
+at any Reaction window to float resources. Add restrictions ("Use only to play spells", "only during showdowns")
+are enforced. Paying Energy/Power in effects is always optional (CR 445.2). The one choice not offered is
+recycling a ready rune without exhausting it first, which is strictly dominated (the extra [1] can never hurt).
+The built-in AIs do not float resources outside payments; that is an AI limitation, not a rule.
+
 ## Simplifications (results can differ from paper play) — every item here is a bug to fix (owner rule: no simplifications)
 
-- Rune payment is automatic (greedy heuristic: pay energy from the pool, then exhaust ready runes; pay power by
-  recycling, exhausting ready runes first). Players never choose which runes to spend.
 - Simultaneous triggers are ordered automatically (turn player first, then in object order), not by player choice.
 - Optional replacement effects are auto-applied; mulligans are skipped.
-- "Add" spending restrictions ("use only to play spells") are recorded but not enforced.
 - `[Show Off]` is not implemented: "if you showed off" clauses never fire (The Empyrean, Battle Preparations).
 - Blade of the Exile's alternative Equip cost (exhaust a friendly unit) is not offered; only [A] is.
 - Baron Nashor's Baron Pit battlefield token is not modelled: Baron plays like a normal unit (its other abilities work).

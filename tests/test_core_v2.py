@@ -86,3 +86,111 @@ def test_unscripted_card_makes_deck_illegal(db, decks):
         assert False, "expected DeckError"
     except DeckError:
         pass
+
+
+# ---------------------------------------------------------------- payment (CR 162-168, 357, 430, 445)
+def _random_states(db, decks, n_games=3, every=7):
+    from riftsim.core.game import Game
+    from riftsim.core.policies import make_policy
+    for seed in range(n_games):
+        g = Game(db, decks, seed=seed)
+        pols = [make_policy("greedy", seed=seed + 1), make_policy("greedy", seed=seed + 2)]
+        k = 0
+        while True:
+            d = g.run()
+            if d is None or g.turn > 14:
+                break
+            k += 1
+            if k % every == 0:
+                yield g, d
+            g.choose(pols[d.player].choose(g, d))
+
+
+def test_can_pay_matches_payment_plans(db, decks):
+    """The fast affordability check and the full plan enumeration must always agree."""
+    from riftsim.core import payment
+    checked = 0
+    for g, d in _random_states(db, decks):
+        for p in range(2):
+            ps = g.players[p]
+            for u in list(ps.hand) + ([ps.champion] if ps.champion else []):
+                e, pw = g.card_cost(p, u, g.objects[u].zone)
+                purpose = payment.purpose_of_card(g, u)
+                assert g.can_pay(p, e, pw, purpose=purpose) == bool(g.payment_plans(p, e, pw, purpose)), (g.label(u), e, pw)
+                checked += 1
+    assert checked > 50
+
+
+def test_every_payment_plan_pays_exactly_the_cost(db, decks):
+    """Applying any offered plan removes exactly the cost from the resources the player had."""
+    from riftsim.core import payment
+    n = 0
+    for g, d in _random_states(db, decks, every=5):
+        p = d.player
+        ps = g.players[p]
+        for u in list(ps.hand)[:3]:
+            e, pw = g.card_cost(p, u, g.objects[u].zone)
+            purpose = payment.purpose_of_card(g, u)
+            for plan in g.payment_plans(p, e, pw, purpose)[:6]:
+                h = g.clone()
+                hs = h.players[p]
+                before_runes = {x: h.objects[x].exhausted for x in hs.runes}
+                h.apply_payment(p, plan, None, purpose)
+                acts, spend = plan
+                assert sum(n for (r, _), n in spend if r == "E") == e
+                assert sorted(r for (r, _), n in spend for _ in range(n) if r != "E") == sorted(
+                    r for r in [x for (x, _), m in spend for _ in range(m) if x != "E"])
+                assert len([1 for (r, _), m in spend for _ in range(m) if r != "E"]) == len(pw)
+                # recycled runes left the board, exhausted ones are exhausted, nothing else changed
+                for x, was in before_runes.items():
+                    if ("rc", x) in acts:
+                        assert x not in hs.runes and x in hs.rune_deck
+                    elif ("ex", x) in acts:
+                        assert h.objects[x].exhausted and not was
+                    else:
+                        assert h.objects[x].exhausted == was
+                assert hs.energy >= 0
+                n += 1
+    assert n > 20
+
+
+def test_add_restriction_limits_spending(db):
+    """Kai'Sa's legend adds [A] 'Use only to play spells': it can pay for a spell but not for a unit."""
+    from riftsim.core import payment
+    from riftsim.core.deck import Deck
+    from riftsim.core.game import Game
+    deck = Deck.load(str(ROOT / "data/decks/tournament/kaisa_void.json"), db)
+    other = Deck.load(str(ROOT / "data/decks/tournament/riven_exile.json"), db)
+    g = Game(db, [deck, other], seed=3)
+    g.run()
+    p = 0
+    ps = g.players[p]
+    for u in list(ps.runes):
+        g.do_recycle([u])
+    ps.energy, ps.power, ps.pool_r = 0, [], [("any", "spells")]
+    spell = next(c.id for c in db if c.type == "spell")
+    unit = next(c.id for c in db if c.type == "unit")
+    assert payment.restriction_ok(g, "spells", {"kind": "play", "types": {"spell"}})
+    assert not payment.restriction_ok(g, "spells", {"kind": "play", "types": {"unit"}})
+    assert g.can_pay(p, 0, ["any"], purpose={"kind": "play", "types": {"spell"}})
+    assert not g.can_pay(p, 0, ["any"], purpose={"kind": "play", "types": {"unit"}})
+    plans = g.payment_plans(p, 0, ["any"], {"kind": "play", "types": {"spell"}})
+    assert len(plans) == 1
+    g.apply_payment(p, plans[0], None, {"kind": "play", "types": {"spell"}})
+    assert ps.pool_r == []
+
+
+def test_runes_are_a_choice_when_domains_differ(db, decks):
+    """With ready runes of several domains, paying 1 energy offers one plan per domain to exhaust."""
+    from riftsim.core.game import Game
+    g = Game(db, decks, seed=0)
+    g.run()
+    p = 0
+    ps = g.players[p]
+    while len({g.objects[u].domain for u in ps.runes}) < 2 and ps.rune_deck:
+        g.do_channel(p, 1)
+    for u in ps.runes:
+        g.objects[u].exhausted = False
+    ps.energy, ps.power, ps.pool_r = 0, [], []
+    plans = g.payment_plans(p, 1, [], {"kind": "play", "types": {"unit"}})
+    assert len(plans) == len({g.objects[u].domain for u in ps.runes}) >= 2
