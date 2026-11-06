@@ -1996,3 +1996,131 @@ def elder_dragon(defn):
     code += [O.Deal(1, lambda g, c: list(c.vars["__ed"]))]
     return [Static("self", "rule", ("any_damage_kills_enemies",), source_text=defn.text),
             Triggered("play_self", code, label=defn.name, source_text=defn.text)]
+
+
+# ---------------------------------------------------------------- batch 2026-11-06 16:20 (Radiance)
+@script("One-Two Punch")
+def one_two_punch(defn):
+    # [Action]  [Buff] a friendly unit and [Stun] an enemy unit.
+    return [SpellEffect([O.Choose(Sel("unit", side="friendly"), out="t"), O.Choose(Sel("unit", side="enemy"), out="t2"),
+                         O.Buff(Ref("t")), O.Stun(Ref("t2"))], label=defn.name, source_text=defn.text)]
+
+
+@script("Raucous Anthem")
+def raucous_anthem(defn):
+    # Ready your units and give them +3 [M] this turn.
+    mine = lambda g, c: [u for u, o in g.objects.items() if o.zone == "board" and o.controller == c.controller and "unit" in g.chars(u).types]
+    return [SpellEffect([O.Ready(mine), O.GiveMight(mine, 3)], label=defn.name, source_text=defn.text)]
+
+
+@script("Steadfast Outrider")
+def steadfast_outrider(defn):
+    # [Tank]  While there are 2 or more other friendly units and/or gear at my battlefield, I have +2 [M].
+    def cond(g, s):
+        o = g.objects[s]
+        if o.location is None or o.location[0] != "bf":
+            return False
+        n = sum(1 for u, x in g.objects.items() if u != s and x.zone == "board" and x.location == o.location
+                and g.is_friendly(x.controller, o.controller) and x.defn.type != "rune"
+                and ("unit" in x.defn.types or "gear" in x.defn.types))
+        return n >= 2
+    return [Static("self", "might", 2, cond=cond, label="+2 [M] with 2+ other friendly units/gear here", source_text=defn.text)]
+
+
+@script("Cosmic Vista")
+def cosmic_vista(defn):
+    # When you hold here, if your Rune Deck is empty, you score 1 point.
+    empty = lambda g, c: not g.players[c.controller].rune_deck
+    return [Triggered("you_hold_here", [O.If(empty, [O.GainPoints(1)])], controller="event", label=defn.name, source_text=defn.text)]
+
+
+@script("Ntofo Strikes")
+def ntofo_strikes(defn):
+    # [Action]  Give a friendly unit [Shield 2] this turn, then deal damage equal to its [Shield] to an enemy unit.
+    def shield(g, c):
+        g.add_mod(c.vars["t"], "keyword", ("shield", 2), duration="turn", source=c.source)
+    return [SpellEffect([O.Choose(Sel("unit", side="friendly"), out="t"), O.Choose(Sel("unit", side="enemy"), out="t2"),
+                         O.Do(shield, label="[Shield 2] this turn"),
+                         O.Deal(lambda g, c: g.chars(c.vars["t"]).kw("shield") if c.vars.get("t") in g.objects else 0, Ref("t2"))],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Armored Tusker")
+def armored_tusker(defn):
+    # [Shield 3]  [Tank]  When I move, you may deal damage equal to my [Shield] to a unit at a battlefield.
+    return [Triggered("move_self", [O.May([O.ChooseFromList(lambda g, c: [u for u, o in g.objects.items() if o.zone == "board"
+                                                                         and "unit" in g.chars(u).types and o.location and o.location[0] == "bf"],
+                                                            out="__at", label="deal damage equal to my [Shield]"),
+                                           O.Deal(lambda g, c: g.chars(c.source).kw("shield"), Ref("__at"))],
+                                          label="deal damage equal to my [Shield] to a unit at a battlefield")],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Party Crasher")
+def party_crasher(defn):
+    # I cost [1] less for each exhausted unit you control.  [Tank]
+    def reduce(g, u, e, p):
+        q = _ctrl(g, u)
+        n = sum(1 for x, o in g.objects.items() if o.zone == "board" and o.controller == q and o.exhausted and "unit" in g.chars(x).types)
+        return (max(0, e - n), p)
+    return [PlayPermission("cost", cost_mod=reduce, label="[1] less per exhausted unit you control", source_text=defn.text)]
+
+
+@script("Bloodscent Swarm")
+def bloodscent_swarm(defn):
+    # I cost [2] less for each battlefield you've conquered this turn.
+    def reduce(g, u, e, p):
+        n = len(g.turn_memo.get(("conquered_bfs", _ctrl(g, u)), ()))
+        return (max(0, e - 2 * n), p)
+    return [PlayPermission("cost", cost_mod=reduce, label="[2] less per battlefield you conquered this turn", source_text=defn.text)]
+
+
+@script("Titanic Shrine")
+def titanic_shrine(defn):
+    # When you play a unit with Might greater than each other unit on the board, exhaust me to draw 1.
+    def big(g, s, ev):
+        if ev.get("kind") != "play" or ev.get("card_type") != "unit" or ev.get("player") != g.objects[s].controller:
+            return False
+        u = ev.get("uid")
+        if u not in g.objects or g.objects[u].zone != "board" or g.objects[s].exhausted:
+            return False
+        m = g.chars(u).might or 0
+        return all((g.chars(x).might or 0) < m for x, o in g.objects.items() if x != u and o.zone == "board" and "unit" in g.chars(x).types)
+    return [Triggered(big, [O.If(lambda g, c: not g.objects[c.source].exhausted, [O.Exhaust(Ref("self")), O.Draw(1)])],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Forbidden Technique")
+def forbidden_technique(defn):
+    # Ready a unit.  When you play a card with Energy cost [7] or more, you may play this from your trash for
+    # [1][Fury][Fury]. Banish this.
+    def big(g, s, ev):
+        if ev.get("kind") != "play" or ev.get("token") or ev.get("player") != g.objects[s].owner or ev.get("uid") == s:
+            return False
+        o = g.objects.get(ev.get("uid"))
+        return o is not None and (o.base_defn().energy or 0) >= 7
+    # "Banish this." is printed in the trash paragraph: read as "if played from your trash this way, banish it as it
+    # resolves" (otherwise the trash ability could only ever be used after a discard).
+    from_trash = lambda g, c: getattr(c, "played_from", None) == "trash"
+    return [SpellEffect([O.Choose(Sel("unit"), out="t"), O.Ready(Ref("t")), O.If(from_trash, [O.Banish(Ref("self"))])],
+                        label=defn.name, source_text=defn.text),
+            Triggered(big, [O.May([O.PlayCard(Ref("self"), alt_cost=(1, ["fury", "fury"]))], label="play this from your trash for [1][Fury][Fury]")],
+                      zone="trash", label="play from trash", source_text=defn.text)]
+
+
+@script("Remember the Fallen")
+def remember_the_fallen(defn):
+    # Play up to 3 units and/or gear from your trash, each with Energy cost no more than [3] and Power cost no more than
+    # [A], ignoring their costs.
+    def ok(g, c):
+        out = []
+        for u in g.players[c.controller].trash:
+            d = g.objects[u].base_defn()
+            if (d.is_unit or d.is_gear) and (d.energy or 0) <= 3 and (d.power or 0) <= 1:
+                out.append(u)
+        return out
+    code = _pick_up_to(ok, 3, "__rf", "play a unit or gear from your trash (up to 3)")
+    for i in range(3):
+        code.append(O.If(lambda g, c, i=i: len(c.vars.get("__rf") or ()) > i,
+                         [O.PlayCard(lambda g, c, i=i: c.vars["__rf"][i], ignore="all")]))
+    return [SpellEffect(code, label=defn.name, source_text=defn.text)]

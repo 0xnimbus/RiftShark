@@ -770,3 +770,53 @@ def test_insightful_investigator_pays_xp(db, decks):
     h1 = len(g.players[1].hand)
     _fire(g, ii, "Insightful Investigator"); settle(g, picks=[target])
     assert g.players[0].xp == 0 and g.objects[target].zone == "trash" and len(g.players[1].hand) == h1
+
+
+def test_radiance_batch_simple_spells(db, decks):
+    g = main_phase(db, decks)
+    me = put(g, db, 0, "Hunting Dog", ("base", 0))
+    foe = put(g, db, 1, "Elnuk Herd", ("bf", 0), exclude=(me,))
+    _run_spell(g, db, "One-Two Punch", picks=[me, foe])
+    assert g.objects[me].buffs == 1 and g.objects[foe].stunned
+    g.objects[me].exhausted = True
+    base = g.chars(me).might
+    _run_spell(g, db, "Raucous Anthem")
+    assert not g.objects[me].exhausted and g.chars(me).might == base + 3
+
+
+def test_steadfast_outrider_and_party_crasher(db, decks):
+    g = main_phase(db, decks)
+    so = put(g, db, 0, "Steadfast Outrider", ("bf", 0))
+    m = g.chars(so).might
+    a = put(g, db, 0, "Hunting Dog", ("bf", 0), exclude=(so,))
+    assert g.chars(so).might == m
+    put(g, db, 0, "The Good Stuff", ("bf", 0), exclude=(so, a))
+    assert g.chars(so).might == m + 2
+    pc = _card_in(g, db, 0, "Party Crasher", "hand")
+    e0 = g.card_cost(0, pc, "hand")[0]
+    g.objects[a].exhausted = True; g.objects[so].exhausted = True; g.bump()
+    assert g.card_cost(0, pc, "hand")[0] == max(0, e0 - 2)
+
+
+def test_ntofo_strikes_and_cosmic_vista(db, decks):
+    g = main_phase(db, decks)
+    me = put(g, db, 0, "Hunting Dog", ("base", 0))
+    foe = put(g, db, 1, "Elnuk Herd", ("bf", 0), exclude=(me,))
+    _run_spell(g, db, "Ntofo Strikes", picks=[me, foe])
+    assert g.chars(me).kw("shield") == 2 and (g.objects[foe].damage == 2 or g.objects[foe].zone == "trash")
+    _bf_card(g, db, "Cosmic Vista", 1); g.set_bf_controller(1, 0)
+    pts = g.players[0].points
+    g.emit("hold", player=0, loc=("bf", 1), bf=1, units=()); settle(g)
+    assert g.players[0].points == pts
+    g.players[0].rune_deck.clear()
+    g.set_bf_controller(1, 0)                          # (no units there, so control lapsed after the first hold)
+    g.emit("hold", player=0, loc=("bf", 1), bf=1, units=()); settle(g)
+    assert g.players[0].points == pts + 1
+
+
+def test_remember_the_fallen_plays_cheap_cards_from_trash(db, decks):
+    g = main_phase(db, decks)
+    a = _card_in(g, db, 0, "Hunting Dog", "trash")
+    b = _card_in(g, db, 0, "Elnuk Herd", "trash")      # costs 6: not allowed
+    _run_spell(g, db, "Remember the Fallen", picks=[(a,), ()])
+    assert g.objects[a].zone == "board" and g.objects[b].zone == "trash"
