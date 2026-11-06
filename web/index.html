@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RiftShark — Riftbound simulation results</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>RiftShark</h1>
+  <nav>
+    <button data-tab="dashboard" class="active">Dashboard</button>
+    <button data-tab="replays">Replays</button>
+    <button data-tab="about">About</button>
+  </nav>
+</header>
+
+<main>
+  <section id="dashboard" class="tab active">
+    <div id="summary" class="cards"></div>
+    <h2>Deck results</h2>
+    <div id="deck-table"></div>
+    <h2>Card performance</h2>
+    <p class="muted">Win rate of games in which the card was played at least once, by deck. Needs many games to mean anything.</p>
+    <div class="controls">
+      <input id="card-filter" placeholder="filter card or deck">
+      <label><input type="checkbox" id="min-games" checked> hide cards with fewer than 5 games</label>
+    </div>
+    <div id="card-table"></div>
+  </section>
+
+  <section id="replays" class="tab">
+    <div class="replay-layout">
+      <aside id="replay-list"></aside>
+      <div id="viewer">
+        <div id="viewer-empty" class="muted">Pick a replay on the left.</div>
+        <div id="board" hidden>
+          <div class="player-strip" id="p1-strip"></div>
+          <div class="field">
+            <div class="base" id="base-1"></div>
+            <div class="battlefields" id="bfs"></div>
+            <div class="base" id="base-0"></div>
+          </div>
+          <div class="player-strip" id="p0-strip"></div>
+          <div class="chain" id="chain"></div>
+          <div class="controls">
+            <button id="btn-first">⏮</button>
+            <button id="btn-prev">◀</button>
+            <span id="frame-label"></span>
+            <button id="btn-next">▶</button>
+            <button id="btn-last">⏭</button>
+            <button id="btn-play">▶ play</button>
+            <input id="frame-slider" type="range" min="0" value="0">
+          </div>
+          <div id="decision"></div>
+          <div id="events" class="events"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="about" class="tab">
+    <h2>About</h2>
+    <p>RiftShark simulates Riftbound matches with a rules-accurate engine (chain, showdowns, combat, scoring), card scripts for
+    every set including Radiance, and search-based AI players. Every replay shown here was re-simulated from its recorded
+    decisions and verified to contain only moves the engine deems legal.</p>
+    <p>Source: <a href="https://github.com/0xnimbus/RiftShark">github.com/0xnimbus/RiftShark</a>. Card images are the official
+    Riftbound card gallery assets.</p>
+  </section>
+</main>
+<div id="tooltip" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>

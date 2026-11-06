@@ -50,7 +50,8 @@ class Recorder:
         if self.snapshots:
             self.frames.append({"decision": {"player": d.player, "kind": d.kind, "label": d.labels[d.options.index(choice)],
                                              "n_options": len(d.options), "options": d.labels[:60]},
-                                "event_index": len(self.game.events)})
+                                "event_index": len(self.game.events),
+                                "state": _jsonable(self.game.snapshot())})
 
     def to_replay(self, decks, seed, policies=None):
         g = self.game
