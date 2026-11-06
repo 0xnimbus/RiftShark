@@ -1,0 +1,71 @@
+{
+ "name": "Fury Aggro",
+ "legend": "L_FURY_WARLORD",
+ "champion": "F_CHAMP",
+ "main": [
+  {
+   "id": "F_RAIDER",
+   "count": 3
+  },
+  {
+   "id": "F_SCOUT",
+   "count": 3
+  },
+  {
+   "id": "F_BRUTE",
+   "count": 3
+  },
+  {
+   "id": "F_PYROMANCER",
+   "count": 3
+  },
+  {
+   "id": "F_BERSERKER",
+   "count": 3
+  },
+  {
+   "id": "F_WARBAND",
+   "count": 2
+  },
+  {
+   "id": "B_SHIELDBEARER",
+   "count": 3
+  },
+  {
+   "id": "B_HUNTER",
+   "count": 3
+  },
+  {
+   "id": "B_BRAWLER",
+   "count": 3
+  },
+  {
+   "id": "B_COLOSSUS",
+   "count": 2
+  },
+  {
+   "id": "F_FIREBOLT",
+   "count": 3
+  },
+  {
+   "id": "F_IGNITE",
+   "count": 3
+  },
+  {
+   "id": "F_RALLY",
+   "count": 3
+  },
+  {
+   "id": "B_SURGE",
+   "count": 3
+  }
+ ],
+ "runes": {
+  "fury": 8,
+  "body": 4
+ },
+ "battlefields": [
+  "Burning Fields",
+  "Iron Gate"
+ ]
+}

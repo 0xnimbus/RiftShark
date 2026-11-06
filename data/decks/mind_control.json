@@ -1,0 +1,71 @@
+{
+ "name": "Mind Control",
+ "legend": "L_MIND_TACTICIAN",
+ "champion": "M_CHAMP",
+ "main": [
+  {
+   "id": "M_APPRENTICE",
+   "count": 3
+  },
+  {
+   "id": "M_SCRIBE",
+   "count": 3
+  },
+  {
+   "id": "M_PHANTOM",
+   "count": 3
+  },
+  {
+   "id": "M_ILLUSIONIST",
+   "count": 3
+  },
+  {
+   "id": "M_GOLEM",
+   "count": 3
+  },
+  {
+   "id": "C_ACOLYTE",
+   "count": 3
+  },
+  {
+   "id": "C_MONK",
+   "count": 3
+  },
+  {
+   "id": "C_WARDEN",
+   "count": 3
+  },
+  {
+   "id": "C_GUARDIAN",
+   "count": 2
+  },
+  {
+   "id": "M_INSIGHT",
+   "count": 3
+  },
+  {
+   "id": "M_BANISH",
+   "count": 3
+  },
+  {
+   "id": "M_MINDBLAST",
+   "count": 3
+  },
+  {
+   "id": "C_FOCUS",
+   "count": 2
+  },
+  {
+   "id": "C_SERENITY",
+   "count": 3
+  }
+ ],
+ "runes": {
+  "mind": 7,
+  "calm": 5
+ },
+ "battlefields": [
+  "Library of Echoes",
+  "Quiet Shrine"
+ ]
+}

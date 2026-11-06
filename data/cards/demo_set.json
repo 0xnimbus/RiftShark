@@ -1,0 +1,517 @@
+{
+ "_note": "Placeholder cards for testing the engine. Replace with real card data; the engine reads this file so no code changes are needed for new cards that use the supported keywords/effects.",
+ "legends": [
+  {
+   "id": "L_FURY_WARLORD",
+   "name": "Fury Warlord",
+   "domains": [
+    "fury",
+    "body"
+   ],
+   "ability": {
+    "type": "attack_bonus",
+    "domain": "fury",
+    "amount": 1
+   },
+   "text": "Your Fury units get +1 might while attacking."
+  },
+  {
+   "id": "L_MIND_TACTICIAN",
+   "name": "Mind Tactician",
+   "domains": [
+    "mind",
+    "calm"
+   ],
+   "ability": {
+    "type": "conquer_draw"
+   },
+   "text": "Once per turn, when you conquer a battlefield, draw a card."
+  }
+ ],
+ "cards": [
+  {
+   "id": "F_CHAMP",
+   "name": "Blade Champion",
+   "type": "champion",
+   "domains": [
+    "fury"
+   ],
+   "energy": 3,
+   "power": [
+    "fury"
+   ],
+   "might": 4,
+   "keywords": {
+    "assault": 1
+   }
+  },
+  {
+   "id": "F_RAIDER",
+   "name": "Raider",
+   "type": "unit",
+   "domains": [
+    "fury"
+   ],
+   "energy": 1,
+   "power": [
+    "fury"
+   ],
+   "might": 2,
+   "keywords": {
+    "accelerate": true
+   }
+  },
+  {
+   "id": "F_BRUTE",
+   "name": "Brute",
+   "type": "unit",
+   "domains": [
+    "fury"
+   ],
+   "energy": 2,
+   "power": [
+    "fury"
+   ],
+   "might": 3
+  },
+  {
+   "id": "F_BERSERKER",
+   "name": "Berserker",
+   "type": "unit",
+   "domains": [
+    "fury"
+   ],
+   "energy": 3,
+   "power": [
+    "fury"
+   ],
+   "might": 4,
+   "keywords": {
+    "assault": 2
+   }
+  },
+  {
+   "id": "F_WARBAND",
+   "name": "Warband",
+   "type": "unit",
+   "domains": [
+    "fury"
+   ],
+   "energy": 4,
+   "power": [
+    "fury",
+    "fury"
+   ],
+   "might": 6
+  },
+  {
+   "id": "B_SHIELDBEARER",
+   "name": "Shieldbearer",
+   "type": "unit",
+   "domains": [
+    "body"
+   ],
+   "energy": 2,
+   "power": [
+    "body"
+   ],
+   "might": 2,
+   "keywords": {
+    "tank": true,
+    "shield": 2
+   }
+  },
+  {
+   "id": "B_HUNTER",
+   "name": "Hunter",
+   "type": "unit",
+   "domains": [
+    "body"
+   ],
+   "energy": 2,
+   "power": [
+    "body"
+   ],
+   "might": 3,
+   "keywords": {
+    "ganking": true
+   }
+  },
+  {
+   "id": "F_FIREBOLT",
+   "name": "Firebolt",
+   "type": "spell",
+   "domains": [
+    "fury"
+   ],
+   "energy": 1,
+   "power": [
+    "fury"
+   ],
+   "effect": {
+    "type": "damage",
+    "amount": 3,
+    "target": "enemy_unit"
+   }
+  },
+  {
+   "id": "F_RALLY",
+   "name": "Rally",
+   "type": "spell",
+   "domains": [
+    "fury"
+   ],
+   "energy": 1,
+   "power": [],
+   "effect": {
+    "type": "buff",
+    "amount": 2,
+    "target": "friendly_unit"
+   }
+  },
+  {
+   "id": "B_SURGE",
+   "name": "Surge of Strength",
+   "type": "spell",
+   "domains": [
+    "body"
+   ],
+   "energy": 0,
+   "power": [
+    "body"
+   ],
+   "effect": {
+    "type": "ready_runes",
+    "amount": 2
+   }
+  },
+  {
+   "id": "M_CHAMP",
+   "name": "Arch Seer",
+   "type": "champion",
+   "domains": [
+    "mind"
+   ],
+   "energy": 3,
+   "power": [
+    "mind"
+   ],
+   "might": 3,
+   "effect": {
+    "trigger": "play",
+    "type": "draw",
+    "amount": 1
+   }
+  },
+  {
+   "id": "M_APPRENTICE",
+   "name": "Apprentice",
+   "type": "unit",
+   "domains": [
+    "mind"
+   ],
+   "energy": 1,
+   "power": [
+    "mind"
+   ],
+   "might": 1,
+   "effect": {
+    "trigger": "play",
+    "type": "draw",
+    "amount": 1
+   }
+  },
+  {
+   "id": "M_GOLEM",
+   "name": "Rune Golem",
+   "type": "unit",
+   "domains": [
+    "mind"
+   ],
+   "energy": 3,
+   "power": [
+    "mind"
+   ],
+   "might": 4,
+   "keywords": {
+    "tank": true
+   }
+  },
+  {
+   "id": "M_PHANTOM",
+   "name": "Phantom",
+   "type": "unit",
+   "domains": [
+    "mind"
+   ],
+   "energy": 2,
+   "power": [
+    "mind"
+   ],
+   "might": 2,
+   "keywords": {
+    "ganking": true
+   }
+  },
+  {
+   "id": "C_MONK",
+   "name": "Calm Monk",
+   "type": "unit",
+   "domains": [
+    "calm"
+   ],
+   "energy": 2,
+   "power": [
+    "calm"
+   ],
+   "might": 3,
+   "keywords": {
+    "shield": 1
+   }
+  },
+  {
+   "id": "C_GUARDIAN",
+   "name": "Stone Guardian",
+   "type": "unit",
+   "domains": [
+    "calm"
+   ],
+   "energy": 4,
+   "power": [
+    "calm",
+    "calm"
+   ],
+   "might": 5,
+   "keywords": {
+    "tank": true,
+    "shield": 1
+   }
+  },
+  {
+   "id": "M_INSIGHT",
+   "name": "Insight",
+   "type": "spell",
+   "domains": [
+    "mind"
+   ],
+   "energy": 1,
+   "power": [
+    "mind"
+   ],
+   "effect": {
+    "type": "draw",
+    "amount": 2
+   }
+  },
+  {
+   "id": "M_BANISH",
+   "name": "Banish Lesser",
+   "type": "spell",
+   "domains": [
+    "mind"
+   ],
+   "energy": 2,
+   "power": [
+    "mind"
+   ],
+   "effect": {
+    "type": "kill_if_might_le",
+    "amount": 3,
+    "target": "enemy_unit"
+   }
+  },
+  {
+   "id": "C_FOCUS",
+   "name": "Focus",
+   "type": "spell",
+   "domains": [
+    "calm"
+   ],
+   "energy": 0,
+   "power": [
+    "calm"
+   ],
+   "effect": {
+    "type": "ready_runes",
+    "amount": 2
+   }
+  },
+  {
+   "id": "C_SERENITY",
+   "name": "Serenity",
+   "type": "spell",
+   "domains": [
+    "calm"
+   ],
+   "energy": 1,
+   "power": [],
+   "effect": {
+    "type": "buff",
+    "amount": 2,
+    "target": "friendly_unit"
+   }
+  },
+  {
+   "id": "F_SCOUT",
+   "name": "Scout",
+   "type": "unit",
+   "domains": [
+    "fury"
+   ],
+   "energy": 1,
+   "power": [],
+   "might": 1,
+   "keywords": {
+    "ganking": true
+   }
+  },
+  {
+   "id": "F_PYROMANCER",
+   "name": "Pyromancer",
+   "type": "unit",
+   "domains": [
+    "fury"
+   ],
+   "energy": 2,
+   "power": [
+    "fury"
+   ],
+   "might": 2,
+   "effect": {
+    "trigger": "play",
+    "type": "damage",
+    "amount": 1,
+    "target": "enemy_unit"
+   }
+  },
+  {
+   "id": "B_COLOSSUS",
+   "name": "Colossus",
+   "type": "unit",
+   "domains": [
+    "body"
+   ],
+   "energy": 5,
+   "power": [
+    "body",
+    "body"
+   ],
+   "might": 7,
+   "keywords": {
+    "tank": true
+   }
+  },
+  {
+   "id": "B_BRAWLER",
+   "name": "Brawler",
+   "type": "unit",
+   "domains": [
+    "body"
+   ],
+   "energy": 3,
+   "power": [
+    "body"
+   ],
+   "might": 4
+  },
+  {
+   "id": "F_IGNITE",
+   "name": "Ignite",
+   "type": "spell",
+   "domains": [
+    "fury"
+   ],
+   "energy": 2,
+   "power": [
+    "fury"
+   ],
+   "effect": {
+    "type": "damage",
+    "amount": 5,
+    "target": "enemy_unit"
+   }
+  },
+  {
+   "id": "M_SCRIBE",
+   "name": "Scribe",
+   "type": "unit",
+   "domains": [
+    "mind"
+   ],
+   "energy": 2,
+   "power": [
+    "mind"
+   ],
+   "might": 2,
+   "effect": {
+    "trigger": "play",
+    "type": "draw",
+    "amount": 1
+   }
+  },
+  {
+   "id": "M_ILLUSIONIST",
+   "name": "Illusionist",
+   "type": "unit",
+   "domains": [
+    "mind"
+   ],
+   "energy": 3,
+   "power": [
+    "mind"
+   ],
+   "might": 3,
+   "keywords": {
+    "ganking": true,
+    "accelerate": true
+   }
+  },
+  {
+   "id": "C_ACOLYTE",
+   "name": "Acolyte",
+   "type": "unit",
+   "domains": [
+    "calm"
+   ],
+   "energy": 1,
+   "power": [
+    "calm"
+   ],
+   "might": 2
+  },
+  {
+   "id": "C_WARDEN",
+   "name": "Warden",
+   "type": "unit",
+   "domains": [
+    "calm"
+   ],
+   "energy": 3,
+   "power": [
+    "calm"
+   ],
+   "might": 3,
+   "keywords": {
+    "tank": true,
+    "shield": 2
+   }
+  },
+  {
+   "id": "M_MINDBLAST",
+   "name": "Mind Blast",
+   "type": "spell",
+   "domains": [
+    "mind"
+   ],
+   "energy": 2,
+   "power": [
+    "mind"
+   ],
+   "effect": {
+    "type": "damage",
+    "amount": 4,
+    "target": "enemy_unit"
+   }
+  }
+ ]
+}

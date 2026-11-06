@@ -1,0 +1,76 @@
+Radiance Errata Updates
+Updates to the text of cards introduced with the release of Radiance.
+Announcements2026-10-09T16:00:00.000Z
+Hey Riftbounders!
+We’ve got some fresh card errata for you today, covering cards from Radiance. If you’re just starting Riftbound, or new to TCGs, card errata refers to any updates to card text after a card was printed. We do this to make cards more easily understood and to clarify how they work within the rules of the game.
+Radiance Cards
+Elnuk Herd
+[NEW TEXT] 
+[Hidden] (Hide now for [A] to react with later for [0].)
+When you play me, give a friendly unit +3 [M] this turn, then recycle me if I was played from face down.
+▲
+[OLD TEXT]
+[Hidden] (Hide now for [A] to react with later for [0].)
+When you play me, give another friendly unit +3 [M] this turn, then recycle me if I was played from face down.
+Last Caress
+[NEW TEXT] 
+[Reaction] (Play any time, even before spells and abilities resolve.)
+The next unit you play this turn, even from face down, can be played to any battlefield. When you play it, [Buff] it. (Give it a +1 [M] buff if it doesn't have one.)
+▲
+[OLD TEXT]
+[Reaction] (Play any time, even before spells and abilities resolve.)
+The next unit you play this turn (even from face down) can be played to any battlefield. When you play it, [Buff] it. (Give it a +1 [M] buff if it doesn't have one.)
+Forbidden Technique
+[NEW TEXT] 
+Ready a unit.
+When you play a card with Energy cost [7] or more, you may play this from your trash for [1][C][C]. Then banish this.
+▲
+[OLD TEXT]
+Ready a unit.
+When you play a card with Energy cost [7] or more, you may play this from your trash for [1][C][C]. Banish this.
+Neeko, Blending In
+[NEW TEXT] 
+(Neutral cards can go in decks of any Domain.)
+If Neeko is in your deck, choose up to 3 different legends in addition to your starting legend. (Different means none match names.)
+When you play me, choose one of those Legends and add it to your Legend Zone while I'm on the board.
+▲
+[OLD TEXT]
+(Neutral cards can go in decks of any Domain.)
+If Neeko is in your deck, choose 3 different legends in addition to your starting legend. (Different means none match names.)
+When you play me, choose one of those Legends and add it to your Legend Zone while I'm on the board.
+Related Articles
+Announcements
+2026-10-27T16:15:00.000Z
+Riftbound x K/DA: Behind the Scenes with Fortiche
+Here’s how Fortiche designed Evelynn for the Riftbound x K/DA Couture Collection. Drawing live now!
+Announcements
+2026-10-22T16:00:00.000Z
+Riftbound’s 2026 Drawings
+Everything about the K/DA Collection, T1 Player Bundle, 2026 Worlds Bundle, and Gift of the Rift.
+Announcements
+2026-10-21T16:00:00.000Z
+Riftbound x K/DA Couture Collection
+Bring the heat. Enter drawing for the Riftbound x K/DA Couture Collection starting October 27.
+Announcements
+2026-10-21T16:00:00.000Z
+Riftbound x K/DA: Couture Collection Drawing FAQ
+Everything you need to know about the Riftbound x K/DA: Couture Collection drawings.
+Announcements
+2026-10-09T20:00:00.000Z
+A festival of brilliance begins in Radiance!
+Take a look at some of the cards that are lighting up Radiance, dropping October 23.
+Announcements
+2026-10-09T16:00:00.000Z
+October 2026 Tournament Rules Changelog
+Announcements
+2026-10-09T16:00:00.000Z
+Radiance Errata Updates
+Updates to the text of cards introduced with the release of Radiance.
+Announcements
+2026-10-09T16:00:00.000Z
+Core Rules: Radiance Patch Notes (Effective October 16, 2026)
+Read about the latest changes to core rules, along with some fun new interactions.
+Announcements
+2026-09-28T19:00:00.000Z
+The boys are back. Find them in Radiance!
+Heartsteel OVN and OVN signature cards drop October 23rd in Riftound’s 5th Set: Radiance
