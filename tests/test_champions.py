@@ -207,7 +207,9 @@ def _fire(g, uid, label, ctx_vars=None, here=None):
     ctx = Context(g.objects[uid].controller, uid, here=here or g.objects[uid].place)
     ctx.vars["self"] = uid
     ctx.vars.update(ctx_vars or {})
-    g.vm_frames.append(Frame(list(ab.target_code or []) + list(ab.code), ctx))
+    from riftsim.core.vm import relocate
+    tc = list(ab.target_code or [])
+    g.vm_frames.append(Frame(tc + relocate(ab.code, len(tc)), ctx))
     return ctx
 
 

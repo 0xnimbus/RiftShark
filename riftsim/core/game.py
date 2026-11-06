@@ -1209,6 +1209,8 @@ class Game(flow.FlowMixin):
 
     def gain_xp(self, p, n, ctx=None):
         self.players[p].xp += n
+        if n > 0:
+            self.turn_memo[("xp_gained", p)] = self.turn_memo.get(("xp_gained", p), 0) + n
         self.bump()
         self.log("xp", player=p, xp=self.players[p].xp)
         self.emit("xp", player=p, amount=n, ctx=ctx)

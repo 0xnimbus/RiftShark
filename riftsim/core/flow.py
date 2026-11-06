@@ -972,6 +972,14 @@ class FlowMixin:
             code = code + relocate(tcode, len(code)) + [_SnapChoices(1)]
         self.vm_frames.append(Frame(code, ctx, tag=("finalize", it.id)))
 
+    def _trash_play_perm(self, uid):
+        """'You may play me from your trash for COST' (PlayPermission 'from_trash', alt_cost, cond)."""
+        o = self.objects[uid]
+        for ab in self._abilities_of(uid, o):
+            if isinstance(ab, PlayPermission) and ab.perm == "from_trash" and (ab.cond is None or ab.cond(self, uid)):
+                return ab
+        return None
+
     def _free_with_cost(self, p, uid):
         for ab in self._abilities_of(uid, self.objects[uid]):
             if isinstance(ab, PlayPermission) and ab.perm == "free_with_cost" and ab.value[0](self, p, uid):
@@ -1344,6 +1352,9 @@ class FlowMixin:
             fl = d.keywords.get("flow_cost")
             if fl:
                 energy, power = fl[0], list(fl[1])
+            tp = self._trash_play_perm(uid)
+            if tp is not None and tp.alt_cost is not None and not fl:
+                energy, power = tp.alt_cost[0], list(tp.alt_cost[1])
         for ab in self._abilities_of(uid, o):
             if isinstance(ab, PlayPermission) and ab.cost_mod is not None and (ab.cond is None or ab.cond(self, uid)):
                 energy, power = ab.cost_mod(self, uid, energy, power)
@@ -1457,7 +1468,7 @@ class FlowMixin:
             for u in self.facedown_cards(bf.idx, p):
                 sources.append((u, "facedown"))
         for u in ps.trash:
-            if self.objects[u].defn.keywords.get("flow_cost"):
+            if self.objects[u].defn.keywords.get("flow_cost") or self._trash_play_perm(u):
                 sources.append((u, "trash"))
         for t in self.turn_effects:          # "until ..., you may play that card" (Akali, Brash; Kennen's granted Flow)
             if t["kind"] == "may_play" and t["player"] == p and self.turn <= t["data"]["until_turn"]:

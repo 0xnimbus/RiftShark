@@ -577,3 +577,220 @@ def double_trouble(defn):
     # Recycle the rest.
     return [SpellEffect(_look_reveal_draw_recycle(3, lambda d: d.is_unit, "reveal a unit and draw it"),
                         label=defn.name, source_text=defn.text)]
+
+
+def _enemy(g, c, u):
+    o = g.objects[u]
+    return o.controller is not None and not g.is_friendly(o.controller, c.controller)
+
+
+@script("Kinkou Initiate")
+def kinkou_initiate(defn):
+    # When you play me, draw 1 if your other units have total Might 5 or more.
+    def total(g, c):
+        return sum(g.chars(u).might or 0 for u, o in g.objects.items() if u != c.source and o.zone == "board"
+                   and o.controller == c.controller and "unit" in g.chars(u).types)
+    return [Triggered("play_self", [O.If(lambda g, c: total(g, c) >= 5, [O.Draw(1)])], label=defn.name, source_text=defn.text)]
+
+
+@script("Bewitching Spirit")
+def bewitching_spirit(defn):
+    # When you play me, choose a player. They discard 1.
+    return [Triggered("play_self", [O.ChoosePlayer(out="__pl", opponent=False),
+                                    O.Discard(1, player=lambda g, c: c.vars["__pl"])], label=defn.name, source_text=defn.text)]
+
+
+@script("Isolate")
+def isolate(defn):
+    # Move an enemy unit from a battlefield to its base. Then, if there's an enemy unit alone at that battlefield, draw 1.
+    def remember(g, c):
+        t = c.vars.get("t")
+        c.vars["__from"] = g.objects[t].location if t in g.objects else None
+
+    def alone(g, c):
+        loc = c.vars.get("__from")
+        if loc is None:
+            return False
+        foes = {}
+        for u in g.units_at(loc):
+            if _enemy(g, c, u):
+                foes.setdefault(g.objects[u].controller, []).append(u)
+        return any(len(v) == 1 for v in foes.values())
+    return [SpellEffect([O.Choose(Sel("unit", side="enemy", where="battlefield"), out="t"), O.Do(remember),
+                         O.Move(Ref("t"), "base"), O.If(alone, [O.Draw(1)])], label=defn.name, source_text=defn.text)]
+
+
+@script("Walking Roost")
+def walking_roost(defn):
+    # [Deflect]  When you play me, choose an opponent. They play a 1 [M] Bird unit token with [Deflect].
+    def bird(g, c):
+        p = c.vars.get("__opp")
+        if p is not None:
+            g.play_token(p, "Bird", ("base", p), ctx=c)
+    return [Triggered("play_self", [O.ChoosePlayer(out="__opp", opponent=True), O.Do(bird, label="they play a Bird")],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Crimson Pigeons")
+def crimson_pigeons(defn):
+    # I have +2 [M] while I'm attacking with another unit.
+    def with_another(g, s):
+        o = g.objects[s]
+        return o.designation == "attacker" and any(u != s and g.objects[u].designation == "attacker"
+                                                    for u in g.units_at(o.location, o.controller))
+    return [Static("self", "might", 2, cond=with_another, label="+2 [M] attacking with another unit", source_text=defn.text)]
+
+
+@script("Heroic Charge")
+def heroic_charge(defn):
+    # [Action]  Give a friendly unit +1 [M] this turn and [Stun] an enemy unit at its location.
+    there = Sel("unit", side="enemy", pred=lambda g, c, u: c.vars.get("t") in g.objects
+                and g.objects[u].location == g.objects[c.vars["t"]].location)
+    return [SpellEffect([O.Choose(Sel("unit", side="friendly"), out="t"), O.Choose(there, out="s"),
+                         O.GiveMight(Ref("t"), 1), O.Stun(Ref("s"))], label=defn.name, source_text=defn.text)]
+
+
+@script("Loyal Poro")
+def loyal_poro(defn):
+    # [Deathknell][>] If I didn't die alone, draw 1.
+    return [Triggered("die_self", [O.Draw(1)], filt=lambda g, s, ev: not ev.get("alone"),
+                      label="Deathknell", source_text=defn.text, keyword="deathknell")]
+
+
+@script("Scrutinizing Sergeant")
+def scrutinizing_sergeant(defn):
+    # When you play me, gain 1 XP for each friendly unit.
+    n = lambda g, c: sum(1 for u, o in g.objects.items() if o.zone == "board" and o.controller == c.controller
+                         and "unit" in g.chars(u).types)
+    return [Triggered("play_self", [O.GainXP(n)], label=defn.name, source_text=defn.text)]
+
+
+@script("Right of Conquest")
+def right_of_conquest(defn):
+    # Draw 1, then draw 1 for each battlefield you or allies control.
+    n = lambda g, c: sum(1 for bf in g.battlefields if bf.controller is not None and g.is_friendly(bf.controller, c.controller))
+    return [SpellEffect([O.Draw(1), O.Draw(n)], label=defn.name, source_text=defn.text)]
+
+
+@script("Crescent Strike")
+def crescent_strike(defn):
+    # [Action]  Choose a battlefield and an enemy unit there. Deal 4 to that unit and 1 to each other enemy unit there.
+    there = Sel("unit", side="enemy", pred=lambda g, c, u: g.objects[u].location == c.vars.get("loc"))
+    others = lambda g, c: [u for u in g.units_at(c.vars["loc"]) if _enemy(g, c, u) and u != c.vars.get("t")]
+    def deal(g, c):
+        t = c.vars.get("t")
+        rest = others(g, c)
+        if t is not None:
+            g.do_deal([t], 4, c)
+        if rest:
+            g.do_deal(rest, 1, c)
+    return [SpellEffect([O.ChooseLocation(out="loc"), O.Choose(there, out="t"), O.Do(deal, label="deal 4 and 1")],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Petal Pixie")
+def petal_pixie(defn):
+    # I have +1 [M] for each of your units with [Temporary] at my battlefield.
+    def own_temp(g, x):
+        o = g.objects[x]
+        return bool(o.base_defn().keywords.get("temporary")) or any(
+            m.kind == "keyword" and isinstance(m.value, tuple) and m.value[0] == "temporary" for m in o.mods)
+
+    def n(g, s, u):
+        o = g.objects[s]
+        if o.location is None or o.location[0] != "bf":
+            return 0
+        return sum(1 for x in g.units_at(o.location, o.controller)
+                   if (own_temp(g, x) if x == s else g.chars(x).keywords.get("temporary")))
+    return [Static("self", "might", n, label="+1 [M] per Temporary unit here", source_text=defn.text)]
+
+
+@script("Angler Beast")
+def angler_beast(defn):
+    # When you play me, return all units with 2 [M] or less to their owners' hands.
+    small = lambda g, c: [u for u, o in g.objects.items() if o.zone == "board" and "unit" in g.chars(u).types
+                          and (g.chars(u).might or 0) <= 2]
+    return [Triggered("play_self", [O.ToHand(small)], label=defn.name, source_text=defn.text)]
+
+
+@script("Existential Dread")
+def existential_dread(defn):
+    # [Action] [Repeat] [2]  [Stun] an attacking enemy unit. If it's already stunned, return it to its owner's hand instead.
+    attacking = Sel("unit", side="enemy", pred=lambda g, c, u: g.objects[u].designation == "attacker")
+    stunned = lambda g, c: c.vars.get("t") in g.objects and g.objects[c.vars["t"]].stunned
+    return [SpellEffect([O.Choose(attacking, out="t"), O.If(stunned, [O.ToHand(Ref("t"))], [O.Stun(Ref("t"))])],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Starhound")
+def starhound(defn):
+    # When you play me, return a Bird, Cat, Dog, or Poro from your trash to your hand.
+    pets = lambda g, c: [u for u in g.players[c.controller].trash if {"Bird", "Cat", "Dog", "Poro"} & set(g.objects[u].base_defn().tags)]
+    return [Triggered("play_self", [O.ChooseFromList(pets, out="__pet", label="return a Bird, Cat, Dog or Poro"),
+                                    O.ToHand(Ref("__pet"))], label=defn.name, source_text=defn.text)]
+
+
+@script("Wily Newtfish")
+def wily_newtfish(defn):
+    # If you've gained XP this turn, I have +1 [M] and [Ganking].
+    gained = lambda g, s: bool(g.turn_memo.get(("xp_gained", g.objects[s].controller)))
+    defn.keywords.pop("ganking", None)      # the printed [Ganking] is conditional, not a standing keyword
+    return [Static("self", "might", 1, cond=gained, label="+1 [M] after gaining XP", source_text=defn.text),
+            Static("self", "keyword", ("ganking", True), cond=gained, label="[Ganking] after gaining XP", source_text=defn.text)]
+
+
+@script("Friendship")
+def friendship(defn):
+    # [Reaction]  Choose a unit. Give it +1 [M] this turn for each of the following tags among your units — Bird, Cat,
+    # Dog, and Poro.
+    def n(g, c):
+        tags = set()
+        for u, o in g.objects.items():
+            if o.zone == "board" and o.controller == c.controller and "unit" in g.chars(u).types:
+                tags |= {"Bird", "Cat", "Dog", "Poro"} & set(g.chars(u).tags)
+        return len(tags)
+    return [SpellEffect([O.Choose(Sel("unit"), out="t"), O.GiveMight(Ref("t"), n)], label=defn.name, source_text=defn.text)]
+
+
+@script("Fresh Beans")
+def fresh_beans(defn):
+    # When you play a unit during a showdown, you may exhaust this to draw 1.
+    def unit_in_showdown(g, s, ev):
+        return (ev.get("kind") == "play" and ev.get("card_type") == "unit" and ev.get("player") == g.objects[s].controller
+                and g.showdown is not None)
+    ready = lambda g, c: c.source in g.objects and not g.objects[c.source].exhausted
+    return [Triggered(unit_in_showdown, [O.If(ready, [O.May([O.Exhaust(Ref("self")), O.Draw(1)], label="exhaust this to draw 1")])],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Stare Down")
+def stare_down(defn):
+    # Choose a friendly unit and a battlefield. Move all enemy units at that battlefield with less Might than the chosen
+    # unit to their base. Gain 1 XP.
+    def smaller(g, c):
+        t = c.vars.get("t")
+        if t not in g.objects or c.vars.get("loc") is None:
+            return []
+        m = g.chars(t).might or 0
+        return [u for u in g.units_at(c.vars["loc"]) if _enemy(g, c, u) and (g.chars(u).might or 0) < m]
+    return [SpellEffect([O.Choose(Sel("unit", side="friendly"), out="t"), O.ChooseLocation(out="loc"),
+                         O.Move(smaller, "base"), O.GainXP(1)], label=defn.name, source_text=defn.text)]
+
+
+@script("Undying Legion")
+def undying_legion(defn):
+    # [Legion][>] You may play me from your trash for [3][Fury].
+    return [PlayPermission("from_trash", zone="trash", alt_cost=(3, ["fury"]),
+                           cond=lambda g, u: g.legion_active(g.objects[u].owner, u),
+                           label="Legion: play me from your trash for [3][Fury]", source_text=defn.text)]
+
+
+@script("Grim Resolve")
+def grim_resolve(defn):
+    # [Action]  Give a friendly unit +3 [M] this turn. When it wins a combat this turn, gain 2 XP.
+    def wins(g, s, ev):
+        return ev.get("kind") == "combat_result" and ev.get("winner") is not None
+    won = lambda g, c, ev: c.vars.get("t") in (ev.get("winners") or ())
+    return [SpellEffect([O.Choose(Sel("unit", side="friendly"), out="t"), O.GiveMight(Ref("t"), 3),
+                         O.Delayed(wins, [O.GainXP(2)], filt=won, expires="turn", once=True, label="Grim Resolve: 2 XP")],
+                        label=defn.name, source_text=defn.text)]

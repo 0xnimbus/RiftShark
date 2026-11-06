@@ -207,3 +207,40 @@ def test_monch_costs_less_and_enters_ready_with_a_stunned_enemy(db, decks):
     foe = put(g, db, 1, "Rell, Magnetic", ("bf", 0))
     g.objects[foe].stunned = True; g.bump()
     assert g.card_cost(0, m, "hand")[0] == e0 - 2
+
+
+def test_undying_legion_plays_from_trash_only_with_legion(db, decks):
+    g = main_phase(db, decks)
+    ul = _card_in(g, db, 0, "Undying Legion", "trash")
+    fury = next(c for c in db if c.name == "Fury Rune")
+    for r in g.players[0].runes[:2]:
+        g.objects[r].defn, g.objects[r].domain = fury, "fury"
+    g.bump()
+    assert not any(o[0] == "play" and o[1] == ul for o in g.run().options)
+    g.players[0].played_this_turn.append(-1)
+    g.bump(); g.pending = None
+    assert any(o[0] == "play" and o[1] == ul for o in g.run().options)
+    assert g.card_cost(0, ul, "trash") == (3, ["fury"])
+
+
+def test_isolate_draws_if_an_enemy_is_left_alone(db, decks):
+    g = main_phase(db, decks)
+    a = put(g, db, 1, "Rell, Magnetic", ("bf", 0))
+    b = put(g, db, 1, "Rell, Magnetic", ("bf", 0), exclude=(a,))
+    from riftsim.core.vm import Context, Frame
+    s = next(c for c in db if c.name == "Isolate")
+    h = len(g.players[0].hand)
+    ctx = Context(0, None)
+    from riftsim.core.vm import relocate
+    tc = list(s.abilities[-1].target_code or [])
+    g.vm_frames.append(Frame(tc + relocate(s.abilities[-1].code, len(tc)), ctx))     # jump targets shift
+    settle(g, picks=[a])
+    assert g.objects[a].location == ("base", 1) and len(g.players[0].hand) == h + 1
+
+
+def test_wily_newtfish_after_gaining_xp(db, decks):
+    g = main_phase(db, decks)
+    w = put(g, db, 0, "Wily Newtfish", ("base", 0))
+    assert g.chars(w).might == 4 and not g.chars(w).keywords.get("ganking")
+    g.gain_xp(0, 1)
+    assert g.chars(w).might == 5 and g.chars(w).keywords.get("ganking")
