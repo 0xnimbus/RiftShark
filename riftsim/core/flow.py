@@ -888,7 +888,8 @@ class FlowMixin:
                         pre += list(ins) + [SetVar("__add", True), Do(lambda g, c: c.paid.__setitem__("add", True))]
                     else:
                         outs = [i.out for i in ins if isinstance(i, PayResources)]
-                        pre.append(May(list(ins) + [Do(lambda g, c, outs=tuple(outs): c.paid.__setitem__("add", all(c.vars.get(o) for o in outs)))],
+                        pre.append(May([SetVar("__optional_cost", True)] + list(ins) + [SetVar("__optional_cost", False),
+                                        Do(lambda g, c, outs=tuple(outs): c.paid.__setitem__("add", all(c.vars.get(o) for o in outs)))],
                                        label="pay the additional cost", out="__addq"))
         if it.kind == "spell":
             pre += self._exhaust_reducer_code(it)
@@ -999,7 +1000,18 @@ class FlowMixin:
             rc = self.defn_of(it.uid).keywords.get("repeat_cost")
         if rc:
             out.append(("repeat", (rc[0], list(rc[1]), f"Repeat {rc}")))
-        return out
+        return [(n, (*self.reduce_optional_cost(it.controller, e, p), lbl)) for n, (e, p, lbl) in out]
+
+    def reduce_optional_cost(self, p, energy, power):
+        """Ezreal, Prodigy: "Optional additional costs you pay cost [1] or [A] less" (once per such source)."""
+        power = list(power)
+        for _ in self.rules("optional_cost_reduce", player=p):
+            # the reduction is [1] or [A]: power is the scarcer resource, so it takes a power symbol when there is one
+            if power:
+                power.pop()
+            elif energy > 0:
+                energy -= 1
+        return energy, power
 
     def _fizzle_item(self, it, why):
         it.removed = True

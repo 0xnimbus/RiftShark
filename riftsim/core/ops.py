@@ -952,6 +952,8 @@ class PayResources(Instr):
     def run(self, game, ctx):
         e = val(game, ctx, self.energy)
         pw = [val(game, ctx, p) for p in self.power]
+        if ctx.vars.get("__optional_cost"):        # an optional additional cost (Ezreal, Prodigy reduces those)
+            e, pw = game.reduce_optional_cost(ctx.controller, e, pw)
         purpose = {"kind": "effect", "uid": ctx.source}
         r = _pay_decision(game, ctx, e, pw, purpose, decline=True, label=f"{e} energy {pw}" if pw else f"{e} energy")
         if r == "cannot":

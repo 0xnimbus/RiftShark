@@ -1054,3 +1054,53 @@ def riven_deserter(defn):
                           Activated({"energy": 0, "power": [], "exhaust_unit": ready_friendly}, [O.Ready(Ref("t"))],
                                     targets=[O.Choose(Sel("unit"), out="t")], timing="main", once_per_turn=True,
                                     label="exhaust a friendly unit: ready a unit", source_text=defn.text)], "replace": True}
+
+
+@script("Master Yi, Unstoppable")
+def master_yi_unstoppable(defn):
+    # [Level 3][>] I cost [2][Calm] less. [Level 6][>] I cost [4][Calm][Calm] less instead.
+    # [Level 11][>] I cost [6][Calm][Calm][Calm] less instead. [Level 16][>] I can't be chosen by enemy spells and abilities.
+    def xp(g, u):
+        o = g.objects[u]
+        p = o.controller if o.controller is not None else o.owner
+        return g.players[p].xp
+
+    def mod(g, u, e, p):
+        x = xp(g, u)
+        n, k = (6, 3) if x >= 11 else (4, 2) if x >= 6 else (2, 1) if x >= 3 else (0, 0)
+        p = list(p)
+        for _ in range(k):
+            if "calm" in p:
+                p.remove("calm")
+        return max(0, e - n), p
+    return {"abilities": [PlayPermission("cost", cost_mod=mod, label="Level cost reduction", zone="any"),
+                          Static("self", "keyword", ("untargetable", True), cond=lambda g, s: xp(g, s) >= 16,
+                                 label="Level 16: can't be chosen by enemy spells and abilities", source_text=defn.text)],
+            "replace": True}
+
+
+@script("Renata Glasc, Mastermind")
+def renata_mastermind(defn):
+    # [1][Mind]: Draw 1. / [4][Mind][Mind][Mind][Mind], [T]: Score 1 point. / Use my abilities only while I'm at a battlefield.
+    at_bf = lambda g, u: _at_bf(g, u)
+    return {"abilities": [Activated({"energy": 1, "power": ["mind"]}, [O.Draw(1)], timing="main", restriction=at_bf,
+                                    label="draw 1", source_text=defn.text),
+                          Activated({"energy": 4, "power": ["mind"] * 4, "exhaust": True}, [O.GainPoints(1)], timing="main",
+                                    restriction=at_bf, label="score 1 point", source_text=defn.text)], "replace": True}
+
+
+@script("Nami, Headstrong")
+def nami_headstrong(defn):
+    # (lines 1-2 auto-scripted) When I hold, the next time you play a unit this turn, ready it and [Buff] it.
+    def next_unit(g, c, ev):
+        return ev.get("kind") == "play" and ev.get("card_type") == "unit" and ev.get("player") == c.controller
+    eff = [O.Ready(lambda g, c: c.event.get("uid")), O.Buff(lambda g, c: c.event.get("uid"))]
+    return {"abilities": [Triggered("hold_self", [O.Delayed(lambda g, s, ev: ev.get("kind") == "play", eff, filt=next_unit, expires="turn", once=True,
+                                                            label="Nami: ready and buff the next unit")],
+                                    label=defn.name, source_text=defn.text)], "replace": False}
+
+
+@script("Ezreal, Prodigy")
+def ezreal_prodigy(defn):
+    # (line 1 auto-scripted) Optional additional costs you pay cost [1] or [A] less.
+    return {"abilities": [Static("self", "rule", ("optional_cost_reduce",), label=defn.name, source_text=defn.text)], "replace": False}

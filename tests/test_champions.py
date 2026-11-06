@@ -366,3 +366,53 @@ def test_zed_swaps_with_a_shadow_clone(db, decks):
     g.vm_frames.append(Frame(list(ab.code), ctx))
     settle(g)
     assert g.objects[z].location == ("base", 0) and g.objects[c].location == ("bf", 0)
+
+
+def test_lee_sin_ascetic_stacks_buffs_and_spends_one(db, decks):
+    g = main_phase(db, decks)
+    lee = put(g, db, 0, "Lee Sin, Ascetic", ("base", 0))
+    other = put(g, db, 0, "Sett, Kingpin", ("base", 0), exclude=(lee,))
+    for _ in range(3):
+        g.do_buff(lee); g.do_buff(other)
+    assert g.objects[lee].buffs == 3 and g.objects[other].buffs == 1
+    g.do_spend_buff(lee)
+    assert g.objects[lee].buffs == 2
+
+
+def test_master_yi_unstoppable_costs_less_by_level(db, decks):
+    g = main_phase(db, decks)
+    yi = _card_in(g, db, 0, "Master Yi, Unstoppable", "hand")
+    base_e, base_p = g.card_cost(0, yi, "hand")
+    g.players[0].xp = 6
+    e, p = g.card_cost(0, yi, "hand")
+    assert e == base_e - 4 and len(p) == len(base_p) - 2
+    g.players[0].xp = 11
+    e, p = g.card_cost(0, yi, "hand")
+    assert e == base_e - 6 and len(p) == len(base_p) - 3
+
+
+def test_renata_mastermind_abilities_only_at_a_battlefield(db, decks):
+    g = main_phase(db, decks)
+    r = put(g, db, 0, "Renata Glasc, Mastermind", ("base", 0))
+    ab = g.abilities(r)[0]
+    assert not g._can_activate(0, r, 0, ab)
+    g.do_move([r], ("bf", 0)); settle(g)
+    assert g.objects[r].location == ("bf", 0)
+    assert ab.restriction(g, r)
+
+
+def test_akali_silent_can_be_chosen_only_in_combat(db, decks):
+    g = main_phase(db, decks)
+    ak = put(g, db, 0, "Akali, Silent", ("bf", 0))
+    assert g.chars(ak).keywords.get("untargetable")
+    g.combat = {"bf": 0, "attacker": 1, "defender": 0, "step": "showdown"}
+    g.bump()
+    assert not g.chars(ak).keywords.get("untargetable")
+
+
+def test_ezreal_prodigy_reduces_optional_costs(db, decks):
+    g = main_phase(db, decks)
+    assert g.reduce_optional_cost(0, 1, ["fury"]) == (1, ["fury"])
+    put(g, db, 0, "Ezreal, Prodigy", ("base", 0))
+    assert g.reduce_optional_cost(0, 1, ["fury"]) == (1, [])
+    assert g.reduce_optional_cost(0, 2, []) == (1, [])

@@ -793,10 +793,11 @@ class Game(flow.FlowMixin):
         ev = self.replace_event({"kind": "buff", "uid": uid, "player": o.controller, "loc": o.location})
         if ev is None:
             return
-        if o.buffs >= 1:
+        many = any(src == uid for src, _ in self.rules("many_buffs"))     # Lee Sin, Ascetic
+        if o.buffs >= 1 and not many:
             return
         before = self.chars(uid).might
-        o.buffs = 1
+        o.buffs = o.buffs + 1 if many else 1
         self.bump()
         self.emit("buff", uid=uid, player=o.controller, loc=o.location, ctx=ctx)
         self._check_mighty(uid, before)
@@ -806,7 +807,7 @@ class Game(flow.FlowMixin):
         o = self.objects.get(uid)
         if o is None or o.buffs < 1:
             return False
-        o.buffs = 0
+        o.buffs -= 1          # one buff counter (several only with "any number of buffs")
         self.bump()
         self.emit("spend_buff", uid=uid, player=o.controller, ctx=ctx)
         return True

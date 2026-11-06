@@ -1573,6 +1573,16 @@ def parse_static(line):
     m = re.match(r"i can't be chosen by enemy spells and abilities$", l)
     if m:
         return [Static("self", "keyword", ("untargetable", True), cond=cond, source_text=line)]
+    m = re.match(r"i can't be chosen by enemy spells and abilities unless i'm in combat$", l)
+    if m:
+        def not_in_combat(g, src, cond=cond):
+            o = g.objects[src]
+            fighting = g.combat is not None and o.location == ("bf", g.combat["bf"])
+            return not fighting and (cond is None or cond(g, src))
+        return [Static("self", "keyword", ("untargetable", True), cond=not_in_combat, source_text=line)]
+    m = re.match(r"i can have any number of buffs$", l)
+    if m:
+        return [Static("self", "rule", ("many_buffs",), cond=cond, source_text=line)]
     m = re.match(r"i can't (?:be )?move(?:d)?$", l)
     if m:
         return [Static("self", "rule", ("cant_move",), cond=cond, source_text=line)]
@@ -1740,7 +1750,7 @@ def split_lead_keywords(line):
             break
         line = rest
     line = line.strip()
-    if line.lower() in ("[no text]", ""):
+    if line.lower() in ("[no text]", "", "."):
         line = ""
     return flags, line
 
@@ -1964,7 +1974,11 @@ def script_card(defn):
             complete = False
             errors.append(str(e))
     else:
+        from . import empower_costs
+        has_empower_kw = bool(empower_costs(defn))
         for line in lines:
+            if has_empower_kw and re.match(r"\s*\[Empower\]", line):
+                continue          # the Empower keyword ability (and its cost) comes from keyword_abilities
             try:
                 abilities.extend(script_line(defn, line))
             except ParseError as e:
