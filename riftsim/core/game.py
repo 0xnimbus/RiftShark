@@ -941,8 +941,9 @@ class Game(flow.FlowMixin):
     def do_channel(self, p, n, exhausted=False, ctx=None):
         ps = self.players[p]
         made = []
-        for _ in range(n):
+        for k in range(n):
             if not ps.rune_deck:
+                self.log("channel_short", player=p, missing=n - k)     # rune deck empty: nothing to channel
                 break
             u = ps.rune_deck[0]
             o = self.objects[u]

@@ -1117,14 +1117,23 @@ class FlowMixin:
             if self.objects[u].defn.keywords.get("flow_cost"):
                 sources.append((u, "trash"))
         for u, z in sources:
+            ambush_only = False
             if not self._play_timing_ok(p, u, z):
-                continue
+                # CR 822.1.b: Ambush = "I have [Reaction] as long as I'm being played to a battlefield where you control units"
+                if z != "facedown" and self._ambush_locs(p, u) and self._reaction_window(p):
+                    ambush_only = True
+                else:
+                    continue
             if not self._play_restrictions_ok(p, u, z):
                 continue
             e, pw = self.card_cost(p, u, z)
             if not self.can_pay(p, e, pw, purpose=payment.purpose_of_card(self, u)):
                 continue
-            for loc in self._play_locations(p, u, z):
+            locs = self._play_locations(p, u, z)
+            if ambush_only:
+                amb = self._ambush_locs(p, u)
+                locs = [l for l in locs if l in amb]
+            for loc in locs:
                 if loc is None:
                     if not self._spell_has_targets(p, u, z):
                         continue
@@ -1143,6 +1152,32 @@ class FlowMixin:
             acts.extend(self._move_actions(p))
             acts.extend(self._hide_actions(p))
         return acts
+
+    def _reaction_window(self, p):
+        """Could p play a card with [Reaction] right now?"""
+        if self.closed:
+            return p == self.priority
+        if self.showdown is not None or self.combat is not None:
+            return p == self.focus
+        return p == self.turn_player and self.phase == "main"
+
+    def _ambush_locs(self, p, uid):
+        """Battlefields a unit with Ambush may be played to with Reaction timing (CR 822; Rengar adds enemy-occupied ones)."""
+        o = self.objects[uid]
+        d = o.base_defn()
+        if not d.is_unit or not self.chars(uid).keywords.get("ambush") and not d.keywords.get("ambush"):
+            return []
+        enemy_ok = any(isinstance(ab, PlayPermission) and ab.perm == "to_enemy_bf" for ab in self._abilities_of(uid, o))
+        blocked = {self.objects[src].place for src, v in self.rules("cant_play_here")}
+        out = []
+        for bf in self.battlefields:
+            loc = ("bf", bf.idx)
+            if loc in blocked:
+                continue
+            units = self.units_at(loc)
+            if any(self.objects[x].controller == p for x in units) or (enemy_ok and units):
+                out.append(loc)
+        return out
 
     def _can_react(self, p):
         """May p activate a Reaction ability right now (same windows as _can_activate for reactions)?"""
@@ -1299,6 +1334,10 @@ class FlowMixin:
         self.do_hide(player, hide[0], ("bf", hide[1]), Context(player))
         self.dirty = True
 
+    def _state_name(self):
+        """'combat' | 'showdown' | 'neutral' (open/closed is told by the chain depth)."""
+        return "combat" if self.combat is not None else ("showdown" if self.showdown is not None else "neutral")
+
     def _play(self, p, uid, loc):
         o = self.objects[uid]
         z = o.zone
@@ -1325,7 +1364,9 @@ class FlowMixin:
         self.next_item_id += 1
         item.stamp = self.tick()
         self.chain.append(item)
-        self.log("play", uid=uid, name=d.name, player=p, loc=loc, from_zone=z)
+        self.log("play", uid=uid, name=d.name, player=p, loc=loc, from_zone=z, chain=len(self.chain) - 1,
+                 state=self._state_name(), phase=self.phase, turn_player=self.turn_player,
+                 by_effect=bool(getattr(self, "_limited_play", False)))
         if self.showdown is not None:
             self.showdown["passes"] = 0
         self.passes = 0
@@ -1354,7 +1395,11 @@ class FlowMixin:
         kind = "spell" if "spell" in d.types else ("unit" if "unit" in d.types else "gear")
         if loc is None and kind != "spell":
             loc = ctx.target_bf if (ctx.target_bf is not None and kind == "unit") else ("base", p)
-        it = self._play(p, uid, loc)
+        self._limited_play = True
+        try:
+            it = self._play(p, uid, loc)
+        finally:
+            self._limited_play = False
         it.cost = {"energy": e, "power": pw}
         it.ctx.played_from = z
         return True
@@ -1385,7 +1430,8 @@ class FlowMixin:
         self.next_item_id += 1
         item.stamp = self.tick()
         self.chain.append(item)
-        self.log("activate", uid=uid, name=o.defn.name, player=p, label=ab.label)
+        self.log("activate", uid=uid, name=o.defn.name, player=p, label=ab.label, chain=len(self.chain) - 1,
+                 state=self._state_name(), timing=ab.timing, phase=self.phase, turn_player=self.turn_player)
         if self.showdown is not None:
             self.showdown["passes"] = 0
             if not ab.is_add:
