@@ -29,6 +29,7 @@ def clean_text(t):
     t = re.sub(r"\s*\(([^()]*)\)", "", t)              # reminder text
     t = re.sub(r"\.(\[(?!M\]|A\]|C\]|T\]))", ".\n\\1", t)   # "effect.[1], [T]: ..." lost line breaks
     t = re.sub(r"\[(Predict|Burn) (\d+)\]", r"\1 \2", t)
+    t = re.sub(r"([a-z\]])\.(?=[A-Z][a-z])", r"\1. ", t)                 # lost space after a sentence end
     t = t.replace("’", "'").replace("–", "-").replace("—", "-").replace(" ", " ")
     t = re.sub(r"[ \t]+", " ", t)
     return t.strip()
@@ -69,7 +70,7 @@ def parse_sel(phrase, allow_self=True):
     if m:
         other = m.group(0).strip() in ("another", "other")
         pl = pl[m.end():]
-    m = re.match(r"(two|three|four) ", pl)
+    m = re.match(r"(two|three|four|\d+) ", pl)
     if m:
         n = _num(m.group(1))
         pl = pl[m.end():]
@@ -571,6 +572,8 @@ def parse_sentence(s, state):
     if m:
         return parse_sentence("move " + m.group(1), state) + [O.Ready(Ref("t"))]
     m = re.match(r"move (an? (?:friendly |enemy )?unit(?: [\w ]*?)?)$", sl)
+    if m and (" to " in m.group(1) or m.group(1).endswith((" here", " there"))):
+        m = None
     if m:
         ins, ref, _ = choose(m.group(1), _next_out(state))
         return ins + [O.ChooseLocation(out="__dest", include_bases=True, pred=lambda g, c, l: c.vars.get("t") in g.objects and g.valid_destination(c.vars["t"], l)), O.Move(ref, Ref("__dest"))]
@@ -580,14 +583,14 @@ def parse_sentence(s, state):
     m = re.match(r"channel (\w+) runes? exhausted and draw (\w+)$", sl)
     if m:
         return [O.Channel(parse_amount(m.group(1)), exhausted=True), O.Draw(parse_amount(m.group(2)))]
-    m = re.match(r"play (a|an|two|three) (ready )?(\d+) \[m\] (\w[\w ]*?) unit tokens?(?: with ((?:\[[\w\- ]+\](?: \d+)?(?: and |, | )?)+))?( here| to your base| into your base| to its location| there)?$", sl)
+    m = re.match(r"play (a|an|two|three) (ready )?(\d+) \[m\] (\w[\w ]*?) unit tokens?(?: with ((?:\[?(?:temporary|tank|assault|shield|deflect|ganking|legion|vision|hunt|hidden|accelerate|backline|disarm)\]?(?: \d+)?(?: and |, | )?)+))?( here| to your base| into your base| to its location| there)?$", sl)
     if m:
         cnt = _num(m.group(1)) or 1
         ready = bool(m.group(2))
         tok = m.group(4).strip().title()
         grant = None
         if m.group(5):
-            grant = {k.lower().replace(" ", "_").replace("-", "_"): (int(v) if v else True) for k, v in re.findall(r"\[([\w\- ]+?)(?: (\d+))?\]", m.group(5))}
+            grant = {k.lower().replace(" ", "_").replace("-", "_"): (int(v) if v else True) for k, v in re.findall(r"\[?([a-z][\w\-]+)\]?(?: (\d+))?", m.group(5))}
         locw = (m.group(6) or "").strip()
         loc = "here" if locw == "here" else (Ref("__tloc") if locw in ("to its location", "there") else "base")
         return [O.PlayToken(tok, loc=loc, ready=ready, count=cnt, grant=grant)]
@@ -648,10 +651,31 @@ def parse_sentence(s, state):
             return [O.If(cond, parse_sentence(m.group(1), state))]
         except ParseError:
             pass
-    # ---- "X and Y" with two simple effects
-    m = re.match(r"(draw \d+|draw \w+) and (channel .+)$", sl)
+    # ---- "exhaust me [and COST] to EFFECT": optional self-cost (the "you may" wrapper makes it a choice)
+    m = re.match(r"exhaust me(?: and (.+?))? to (.+)$", sl)
+    if m:
+        cost = parse_sentence(m.group(1), state) if m.group(1) else []
+        return [O.If(lambda g, c: c.source in g.objects and not g.objects[c.source].exhausted, [O.Exhaust(Ref("self"))] + cost + parse_sentence(m.group(2), state))]
+    m = re.match(r"(discard \w+|pay (?:\[[^\]]+\])+) and exhaust me to (.+)$", sl)
+    if m:
+        return parse_sentence("exhaust me and " + m.group(1) + " to " + m.group(2), state)
+    m = re.match(r"(kill|exhaust|banish) (an? .+?) to (.+)$", sl)
+    if m and not sl.startswith(("kill a unit to", "exhaust a unit to")):
+        sel, _, _, _ = parse_sel(("friendly " if "friendly" not in m.group(2) and "enemy" not in m.group(2) and "you control" not in m.group(2) else "") + m.group(2)[m.group(2).index(" ") + 1:])
+        if m.group(1) == "exhaust":
+            sel.ready = True
+        op = {"kill": O.Kill, "exhaust": O.Exhaust, "banish": O.Banish}[m.group(1)]
+        return [O.Choose(sel, out="__cost", targeted=False), O.If(O.has_var("__cost"), [op(Ref("__cost"))] + parse_sentence(m.group(3), state))]
+    m = re.match(r"(.+?) and (pay (?:\[[^\]]+\])+ to .+)$", sl)
     if m:
         return parse_sentence(m.group(1), state) + parse_sentence(m.group(2), state)
+    # ---- "X and Y" with two simple effects
+    m = re.match(r"(draw \w+|discard \w+|gain \w+ xp|ready me|stun it|kill it|buff it|exhaust it) and (channel .+|draw \w+|discard \w+|gain \w+ xp|ready me|stun it|kill it|buff it|exhaust it|give me .+)$", sl)
+    if m:
+        return parse_sentence(m.group(1), state) + parse_sentence(m.group(2), state)
+    m = re.match(r"each player channels (\w+) runes?( exhausted)?$", sl)
+    if m:
+        return [O.Channel(parse_amount(m.group(1)), exhausted=bool(m.group(2))), O.Channel(parse_amount(m.group(1)), exhausted=bool(m.group(2)), player="opponent")]
     # ---- templates
     m = re.match(r"draw (\w+)(?: cards?)?$", sl)
     if m:
@@ -1204,6 +1228,8 @@ TRIGGER_PATTERNS = [
     (r"when a friendly unit becomes stunned", "friendly_unit_stunned"),
     (r"when a friendly unit becomes mighty", "unit_becomes_mighty"),
     (r"at the start of your beginning phase", "start_beginning"),
+    (r"at start of your beginning phase", "start_beginning"),
+    (r"at the start of each player's first beginning phase", lambda g, s, ev: ev.get("kind") == "beginning_phase" and g.turn <= 2),
     (r"at the start of your turn", "start_beginning"),
     (r"at the end of your turn", "end_turn"),
     (r"at the end of each turn", "end_any_turn"),
@@ -1628,7 +1654,7 @@ def script_line(defn, line):
             rest = em.group(2).strip().lower()
             restr = None
             if rest:
-                rm = re.match(r"(?:use|spend) (?:this|it|this energy|this power) only (?:to play |during )?(.+?)\.?$", rest)
+                rm = re.match(r"(?:use|spend)(?: (?:this|it|this energy|this power))? only (?:to play |during |to |on )?(.+?)\.?$", rest)
                 if rm:
                     restr = rm.group(1)
                 else:
