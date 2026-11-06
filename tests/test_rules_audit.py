@@ -311,3 +311,28 @@ def test_gold_pays_power_while_paying(db, decks):
     assert plans and any(a[0] == "ab" for a in plans[0][0])
     g.apply_payment(0, plans[0], None, {"kind": "play", "types": {"spell"}})
     assert g.objects[gold].zone == "trash" or g.objects[gold].zone in (None, "gone")
+
+
+def test_gold_pays_the_hide_cost(db, decks):
+    from test_targeting import give
+    g = main_phase(db, decks)
+    for r in list(g.players[0].runes):
+        g._to_zone(g.objects[r], "rune_deck")
+    gold = g.play_token(0, "Gold", ("base", 0))
+    gold = gold[0] if isinstance(gold, (list, tuple)) else gold
+    g.objects[gold].exhausted = False
+    card = give(g, 0, "Block", db)
+    put(g, db, 0, "Shipyard Skulker", ("bf", 0))
+    g.set_bf_controller(0, 0)
+    g.bump()
+    g.pending = None
+    d = g.run()
+    hides = [a for a in d.options if a[0] == "hide" and a[1] == card]
+    assert hides
+    g.choose(hides[0])
+    for _ in range(5):
+        d = g.run()
+        if g.objects[card].zone == "facedown":
+            break
+        g.choose(d.options[0])
+    assert g.objects[card].zone == "facedown" and g.objects[gold].zone != "board"
