@@ -3,6 +3,25 @@
   const $ = (s, el) => (el || document).querySelector(s);
   const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
   const DATA = "data/";
+  // Optional online store (Supabase, read-only publishable key). Falls back to the static files in ./data/.
+  const CFG = window.RIFTSHARK_CONFIG || {};
+  async function sb(path) {
+    if (!CFG.supabaseUrl || !CFG.supabaseKey) throw new Error("no supabase config");
+    const r = await fetch(CFG.supabaseUrl + "/rest/v1/" + path, { headers: { apikey: CFG.supabaseKey, Authorization: "Bearer " + CFG.supabaseKey } });
+    if (!r.ok) throw new Error("supabase " + r.status);
+    return r.json();
+  }
+  let SB_BATCH = null;
+  async function loadFromSupabase() {
+    const b = (await sb("batches?select=*&order=created_at.desc&limit=1"))[0];
+    if (!b) throw new Error("no batches");
+    const cards = await sb(`card_stats?select=deck,card,games,played,win_rate_when_played&batch_id=eq.${b.id}&order=games.desc&limit=2000`);
+    const decks = await sb(`deck_stats?select=*&batch_id=eq.${b.id}`);
+    const summary = Object.assign({}, b.summary || {}, { games: b.games, draws: b.draws, avg_turns: b.avg_turns, avg_secs: b.avg_secs, cards,
+      decks: Object.fromEntries(decks.map(d => [d.deck, d])) });
+    SB_BATCH = b;
+    return { summary, batch: b };
+  }
 
   // ------------------------------------------------------------ tabs
   $$("nav button").forEach(b => b.addEventListener("click", () => {
@@ -14,10 +33,14 @@
 
   // ------------------------------------------------------------ dashboard
   async function loadDashboard() {
-    let res;
-    try { res = await (await fetch(DATA + "results.json")).json(); }
-    catch (e) { $("#summary").innerHTML = `<div class="stat"><div class="v">No data</div><div class="l">run a batch and export to web/data</div></div>`; return; }
+    let res, source = "static files";
+    try { res = await loadFromSupabase(); source = `Supabase batch #${res.batch.id} (${res.batch.policy_a} vs ${res.batch.policy_b}, ${new Date(res.batch.created_at).toLocaleString()})`; }
+    catch (e) {
+      try { res = await (await fetch(DATA + "results.json")).json(); }
+      catch (e2) { $("#summary").innerHTML = `<div class="stat"><div class="v">No data</div><div class="l">run a batch and export to web/data</div></div>`; return; }
+    }
     const s = res.summary;
+    $("#source").textContent = "source: " + source;
     const stats = [
       ["Games", s.games], ["Avg turns", s.avg_turns], ["Draws / limits", s.draws], ["Avg time / game", s.avg_secs + " s"],
     ];
@@ -53,17 +76,24 @@
   const imgOf = o => (CARDS[o.card] || {}).image || "";
   async function loadReplayList() {
     let idx;
-    try { idx = await (await fetch(DATA + "replays/index.json")).json(); }
-    catch (e) { $("#replay-list").innerHTML = `<div class="muted">No replays exported yet.</div>`; return; }
+    try {
+      const rows = await sb("replays?select=id,seed,decks,winner,turns,frames,batch_id&order=batch_id.desc,seed.asc&limit=40");
+      if (!rows.length) throw new Error("none");
+      idx = { replays: rows.map(r => ({ name: "sb:" + r.id, seed: r.seed, decks: r.decks, frames: r.frames, result: { winner: r.winner, turns: r.turns, points: [] } })) };
+    } catch (e) {
+      try { idx = await (await fetch(DATA + "replays/index.json")).json(); }
+      catch (e2) { $("#replay-list").innerHTML = `<div class="muted">No replays exported yet.</div>`; return; }
+    }
     $("#replay-list").innerHTML = idx.replays.map((r, i) => `<div class="item" data-i="${i}" data-name="${r.name}">
         <div><span class="p0c">${r.decks[0]}</span> vs <span class="p1c">${r.decks[1]}</span></div>
-        <div class="r">seed ${r.seed} · winner P${r.result.winner} · ${r.result.turns} turns · ${r.result.points.join("–")} · ${r.frames} decisions</div>
+        <div class="r">seed ${r.seed} · winner P${r.result.winner} · ${r.result.turns} turns · ${r.result.points.length ? r.result.points.join("–") + " · " : ""}${r.frames} decisions</div>
       </div>`).join("");
     $$("#replay-list .item").forEach(el => el.addEventListener("click", () => openReplay(el.dataset.name, el)));
   }
   async function openReplay(name, el) {
     $$("#replay-list .item").forEach(x => x.classList.toggle("active", x === el));
-    rep = await (await fetch(DATA + "replays/" + name + ".json")).json();
+    rep = name.startsWith("sb:") ? (await sb(`replays?select=data&id=eq.${name.slice(3)}`))[0].data
+                                 : await (await fetch(DATA + "replays/" + name + ".json")).json();
     frame = 0;
     $("#viewer-empty").hidden = true;
     $("#board").hidden = false;
