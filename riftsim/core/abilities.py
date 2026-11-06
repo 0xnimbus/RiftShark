@@ -287,6 +287,35 @@ class Triggered(Ability):
         return True
 
 
+def _trigger_kinds():
+    """Event kinds each TRIGGERS entry can match. Every entry starts with `_ev_is(ev, "kind") [or ...] and`
+    (checked here from the source; an entry that does not is left out, meaning "any kind")."""
+    import re
+    try:
+        with open(__file__, encoding="utf-8") as fh:
+            src = fh.read()
+        i = src.index("TRIGGERS = {")
+        j = src.index("\n}\n", i)
+    except (OSError, ValueError):
+        return {}
+    out = {}
+    for e in re.split(r'\n    (?="[a-z_0-9]+":)', src[i:j])[1:]:
+        m = re.match(r'"([a-z_0-9]+)":\s*lambda g, s, ev:\s*(\(?\s*_ev_is\(ev, "[a-z_]+"\)(?:\s*or\s*_ev_is\(ev, "[a-z_]+"\))*\s*\)?)\s*(?:and\b|,|$)',
+                     e.strip())
+        if m:
+            out[m.group(1)] = frozenset(re.findall(r'_ev_is\(ev, "([a-z_]+)"\)', m.group(2)))
+    return out
+
+
+TRIGGER_KINDS = _trigger_kinds()
+
+
+def event_kinds(ab):
+    """Event kinds a Triggered/Delayed ability can fire on, or None when unknown (custom matcher)."""
+    ev = getattr(ab, "event", None)
+    return TRIGGER_KINDS.get(ev) if isinstance(ev, str) else None
+
+
 class Activated(Ability):
     """cost: dict with any of energy:int, power:list[domain], exhaust:bool (exhaust source), discard:int,
     kill_self:bool, banish_self:bool, recycle:int, sacrifice:Sel, spend_buff:bool, xp:int, custom:instr-tree.

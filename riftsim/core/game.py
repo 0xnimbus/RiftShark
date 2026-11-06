@@ -263,6 +263,22 @@ class Game(flow.FlowMixin):
         elif k == "type":
             c.types.add(m.value)
 
+    def _board_statics(self):
+        """(src, obj, Static) for every printed/copied/mod-granted static ability of objects on the board, in board
+        order. Depends only on the game state, so it is cached per state version (like chars)."""
+        cache = getattr(self, "_statics_cache", None)
+        if cache is not None and cache[0] == self.version:
+            return cache[1]
+        out = []
+        for src, so in self.objects.items():
+            if so.zone != "board":
+                continue
+            for ab in self._abilities_of(src, so):
+                if isinstance(ab, Static):
+                    out.append((src, so, ab))
+        self._statics_cache = (self.version, out)
+        return out
+
     def _compute_chars(self, o):
         c = Chars(o.base_defn())
         if o.copy_of is not None:
@@ -278,12 +294,9 @@ class Game(flow.FlowMixin):
             return c
         # layer 1 (traits) and 2 (abilities/keywords) from own mods and static abilities, then 3 (arithmetic)
         statics = []
-        for src, so in self.objects.items():
-            if so.zone != "board":
-                continue
-            for ab in self._abilities_of(src, so, c if src == uid else None):
-                if isinstance(ab, Static) and ab.active(self, src) and ab.applies_to(self, src, uid):
-                    statics.append((ab.layer, so.entered_stamp, ab, src))
+        for src, so, ab in self._board_statics():
+            if ab.active(self, src) and ab.applies_to(self, src, uid):
+                statics.append((ab.layer, so.entered_stamp, ab, src))
         # equipment effect abilities apply to the unit they are attached to
         for a in o.attachments:
             ao = self.objects.get(a)
@@ -387,14 +400,21 @@ class Game(flow.FlowMixin):
     def rules(self, name, player=None, loc=None):
         """Collect active rule statics named `name` (kind='rule'). Returns list of (src, value)."""
         out = []
-        for src, so in self.objects.items():
-            if so.zone != "board":
-                continue
-            for ab in self.abilities(src):
-                if isinstance(ab, Static) and ab.mod_kind == "rule" and ab.value[0] == name and ab.active(self, src):
-                    if player is not None and ab.sel == "self" and so.controller != player:
-                        continue
-                    out.append((src, ab.value[1] if len(ab.value) > 1 else True))
+        cache = getattr(self, "_rules_cache", None)
+        if cache is None or cache[0] != self.version:
+            idx = {}
+            for src, so in self.objects.items():
+                if so.zone != "board":
+                    continue
+                for ab in self.abilities(src):
+                    if isinstance(ab, Static) and ab.mod_kind == "rule":
+                        idx.setdefault(ab.value[0], []).append((src, so, ab))
+            cache = self._rules_cache = (self.version, idx)
+        for src, so, ab in cache[1].get(name, ()):
+            if ab.active(self, src):
+                if player is not None and ab.sel == "self" and so.controller != player:
+                    continue
+                out.append((src, ab.value[1] if len(ab.value) > 1 else True))
         return out
 
     # ------------------------------------------------------------------ mods / durations
@@ -543,36 +563,60 @@ class Game(flow.FlowMixin):
         self._collect_triggers(ev)
         return ev
 
-    def _collect_triggers(self, ev):
-        pend = []
+    def _trigger_index(self):
+        """Per state version: every triggered ability an object has, in board order, as
+        (uid, obj, ability, event kinds or None, is_equipment_effect), grouped by event kind."""
+        cache = getattr(self, "_trig_cache", None)
+        if cache is not None and cache[0] == self.version:
+            return cache[1]
+        from .abilities import event_kinds
+        entries = []
         for uid, o in list(self.objects.items()):
             if o.zone in (None, "gone"):
                 continue
             abl = self.abilities(uid) if o.zone == "board" else self._abilities_of(uid, o)
             for ab in abl:
-                if not isinstance(ab, Triggered):
-                    continue
-                if not ab.active(self, uid):
-                    # "When you play me" abilities work while the card is still on the chain (CR 340: the
-                    # play event happens before the object enters the board).
-                    if not (ev.get("kind") == "play" and ev.get("uid") == uid and o.zone == "chain" and ab.zone == "board"):
-                        continue
-                if ab.once_per_turn and o.temp.get(("opt", id(ab))) == self.turn:
-                    continue
-                try:
-                    ok = ab.matches(self, uid, ev)
-                except (KeyError, AttributeError, TypeError):
-                    ok = False
-                if ok:
-                    pend.append((uid, ab, None))
-                    if getattr(ab, "keyword", None) == "deathknell":
-                        who = o.controller if o.controller is not None else o.owner
-                        for _ in self.rules("deathknell_twice", player=who):      # Karthus, Eternal
-                            pend.append((uid, ab, None))
-            # equipment effect triggers (active while attached)
+                if isinstance(ab, Triggered):
+                    entries.append((uid, o, ab, event_kinds(ab), False))
             if o.zone == "board" and o.attached_to is not None:
                 for ab in o.defn.effect_abilities:
-                    if isinstance(ab, Triggered) and ab.matches(self, uid, ev):
+                    if isinstance(ab, Triggered):
+                        entries.append((uid, o, ab, None, True))
+        by_kind = {}
+        for k, e in enumerate(entries):
+            for kind in (e[3] if e[3] is not None else ("*",)):
+                by_kind.setdefault(kind, []).append(k)
+        index = (entries, by_kind)
+        self._trig_cache = (self.version, index)
+        return index
+
+    def _collect_triggers(self, ev):
+        pend = []
+        entries, by_kind = self._trigger_index()
+        kind = ev.get("kind")
+        picks = sorted(by_kind.get(kind, []) + by_kind.get("*", []))
+        for k in picks:
+            uid, o, ab, _, equip = entries[k]
+            if equip:
+                if ab.matches(self, uid, ev):
+                    pend.append((uid, ab, None))
+                continue
+            if not ab.active(self, uid):
+                # "When you play me" abilities work while the card is still on the chain (CR 340: the
+                # play event happens before the object enters the board).
+                if not (kind == "play" and ev.get("uid") == uid and o.zone == "chain" and ab.zone == "board"):
+                    continue
+            if ab.once_per_turn and o.temp.get(("opt", id(ab))) == self.turn:
+                continue
+            try:
+                ok = ab.matches(self, uid, ev)
+            except (KeyError, AttributeError, TypeError):
+                ok = False
+            if ok:
+                pend.append((uid, ab, None))
+                if getattr(ab, "keyword", None) == "deathknell":
+                    who = o.controller if o.controller is not None else o.owner
+                    for _ in self.rules("deathknell_twice", player=who):      # Karthus, Eternal
                         pend.append((uid, ab, None))
         for d in list(self.delayed):
             if d.fired and d.once:
@@ -1644,6 +1688,7 @@ class Game(flow.FlowMixin):
     # ------------------------------------------------------------------ cloning / snapshots
     def clone(self):
         g = copy.copy(self)
+        g._statics_cache = g._trig_cache = g._rules_cache = None      # caches hold this game's objects
         self._ctx_map = {}           # keep contexts shared between a chain item and its frames shared in the clone
         g.objects = {u: self._clone_obj(o) for u, o in self.objects.items()}
         g.players = [self._clone_player(p) for p in self.players]
