@@ -471,3 +471,35 @@ def test_ziggs_gear_abilities_deal_bonus_damage(db, decks):
     from riftsim.core.vm import Context
     g.do_deal([foe], 1, Context(0, gear))
     assert g.objects[foe].damage == 2
+
+
+def test_sivir_mercenary_after_spending_two_power(db, decks):
+    g = main_phase(db, decks)
+    s = put(g, db, 0, "Sivir, Mercenary", ("base", 0))
+    m = g.chars(s).might
+    g.turn_memo[("spent", 0)] = [3, 1]; g.bump()
+    assert g.chars(s).might == m
+    g.turn_memo[("spent", 0)] = [3, 2]; g.bump()
+    assert g.chars(s).might == m + 2 and g.chars(s).keywords.get("ganking")
+
+
+def test_irelia_graceful_spell_choosing_her_costs_less(db, decks):
+    g = main_phase(db, decks)
+    ir = put(g, db, 0, "Irelia, Graceful", ("base", 0))
+    have = {g.objects[r].defn.domains[0] for r in g.players[0].runes if g.objects[r].defn.domains}
+    buff = next(c for c in db if c.type == "spell" and "Give a unit +" in (c.text or "") and "Choose" not in c.text
+                and set(c.domains) <= have and (c.energy or 0) >= 1)
+    sp = _card_in(g, db, 0, buff.name, "hand")
+    e, pw = g.card_cost(0, sp, "hand")
+    it = g._play(0, sp, None)
+    g.pending = None
+    for _ in range(30):
+        d = g.run()
+        if d.kind == "choose" and ir in d.options:
+            g.choose(ir); continue
+        if it.cost.get("paid") is not None or d.kind == "action":
+            break
+        g.choose(d.options[0])
+    paid = it.cost.get("paid")
+    assert paid is not None
+    assert (paid[0], len(paid[1])) == ((e, len(pw) - 1) if pw else (e - 1, 0))

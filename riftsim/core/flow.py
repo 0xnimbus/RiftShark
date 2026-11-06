@@ -118,6 +118,15 @@ class _FinalizeCosts(Instr):
         if it.cost is None:
             it.cost = {"energy": 0, "power": []}
         ctx.vars.setdefault("__costs", {})
+        if it.kind == "spell" and not ctx.vars.get("__chosen_reduce_done"):
+            ctx.vars["__chosen_reduce_done"] = True
+            chosen = set(u for u in game._target_uids(ctx) if u is not None)
+            for src, n in game.rules("spells_choosing_me_cost_less", player=it.controller):    # Irelia, Graceful
+                if src in chosen:
+                    if it.cost["power"]:
+                        it.cost = dict(it.cost, power=list(it.cost["power"])[1:])
+                    else:
+                        ctx.vars["__cost_reduce"] = ctx.vars.get("__cost_reduce", 0) + n
         opts = game._optional_costs(it, ctx)
         for name, (energy, power, label) in opts:
             if name in ctx.vars["__costs"]:

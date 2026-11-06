@@ -1213,3 +1213,20 @@ def jarvan_paragon(defn):
     return {"abilities": [Static("self", "rule", ("deploy_gear_action",), label="your [Deploy] gear have [Action]", source_text=defn.text),
                           Triggered("conquer_self", [O.If(deploy_gear_here, [O.Channel(1, exhausted=True)])],
                                     label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Sivir, Mercenary")
+def sivir_mercenary(defn):
+    # [Accelerate]   (keyword)
+    # If you've spent at least [A][A] this turn, I have +2 [M] and [Ganking].
+    spent2 = lambda g, s: g.turn_memo.get(("spent", g.objects[s].controller), [0, 0])[1] >= 2
+    return {"abilities": [Static("self", "might", 2, cond=spent2, label="spent [A][A]: +2 [M]", source_text=defn.text),
+                          Static("self", "keyword", ("ganking", True), cond=spent2, label="spent [A][A]: [Ganking]",
+                                 source_text=defn.text)], "replace": True}
+
+
+@script("Irelia, Graceful")
+def irelia_graceful(defn):
+    # Your spells that choose me cost [1] or [A] less.   (applied once the spell's choices are made, flow._FinalizeCosts)
+    return {"abilities": [Static("self", "rule", ("spells_choosing_me_cost_less", 1), label=defn.name, source_text=defn.text)],
+            "replace": True}

@@ -391,6 +391,9 @@ def apply_plan(game, p, plan, ctx=None, purpose=None):
                 energy += 1
             else:
                 power.append(r)
+    tot = game.turn_memo.setdefault(("spent", p), [0, 0])      # energy, power spent this turn (Sivir, Mercenary)
+    tot[0] += energy
+    tot[1] += len(power)
     game.bump()
     game.log("pay", player=p, energy=energy, power=power)
     if energy or power:
