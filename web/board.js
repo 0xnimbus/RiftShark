@@ -67,7 +67,8 @@ window.RiftBoard = (function () {
     const sd = st && st.showdown ? bfName(st.showdown.bf) : "";
     switch (d.kind) {
       case "action":
-        if (d.chain) return ["Respond?", "Something is on the chain. You may answer with a Reaction, or pass to let it resolve (the newest item resolves first)."];
+        if (d.chain) return ["Respond?", "Something is on the chain. You may answer with a Reaction, or pass to let it resolve (the newest item resolves first)." +
+          (st && (st.phase === "beginning" || st.phase === "scoring") ? " This is a start-of-turn trigger: it resolves before Channel and Draw, so this turn's runes and card haven't arrived yet." : "")];
         if (d.showdown) return [`Showdown at ${esc(sd)}`, "You have focus. Play an Action or Reaction, or pass. When both players pass in a row, the showdown ends (and combat happens if both sides have units)."];
         return ["Your turn", "Play cards, move ready units to a battlefield to contest it, use abilities, or end your turn. Glowing cards in your hand can be played right now."];
       case "choose": return ["Choose a target", `${src} needs a target${pr ? ": " + pr : "."}`];
