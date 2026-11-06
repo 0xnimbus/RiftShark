@@ -2603,3 +2603,21 @@ def perched_grimwyrm(defn):
 def dune_surfer(defn):
     # You ignore [Tank] while assigning combat damage here.
     return [Static("self", "rule", ("ignore_tank_here",), label="you ignore Tank here", source_text=defn.text)]
+
+
+@script("Hard Bargain")
+def hard_bargain(defn):
+    # [Reaction] [Repeat] [2]  Counter a spell unless its controller pays [2].
+    item = lambda g, c: next((it for it in g.chain if it.uid == c.vars.get("__sp")), None)
+    ctl = lambda g, c: item(g, c).controller if item(g, c) is not None else g.opponent(c.controller)
+    return [SpellEffect([O.Choose(Sel("spell", zone="chain", pred=lambda g, c, u: any(it.uid == u and it.kind == "spell" for it in g.chain)),
+                                  out="__sp", targeted=True),
+                         O.PayResources(2, out="__hb", player=ctl),
+                         O.If(lambda g, c: not c.vars.get("__hb"),
+                              [O.CounterItem(lambda g, c: item(g, c).id if item(g, c) is not None else None)])],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Marai Spire")
+def marai_spire(defn):
+    return [Static("self", "rule", ("repeat_cost_reduce", 1), label="friendly [Repeat] costs cost [1] less", source_text=defn.text)]

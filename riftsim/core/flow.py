@@ -1168,7 +1168,9 @@ class FlowMixin:
         if it.kind == "spell":
             rc = self.defn_of(it.uid).keywords.get("repeat_cost")
         if rc:
-            out.append(("repeat", (rc[0], list(rc[1]), f"Repeat {rc}")))
+            # Marai Spire: "friendly [Repeat] costs cost [1] less" (generic energy only)
+            red = sum(int(v) for _, v in self.rules("repeat_cost_reduce", player=it.controller))
+            out.append(("repeat", (max(0, rc[0] - red), list(rc[1]), f"Repeat {rc}")))
         return [(n, (*self.reduce_optional_cost(it.controller, e, p), lbl)) for n, (e, p, lbl) in out]
 
     def reduce_optional_cost(self, p, energy, power):

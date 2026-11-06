@@ -1030,3 +1030,53 @@ def test_dune_surfer_ignores_tank_here(db, decks):
     assert all(p[0] > 0 for p in g._damage_plans([tank, other], 2, 0))
     put(g, db, 0, "Dune Surfer", bf, exclude=(tank, other))
     assert any(p[0] == 0 for p in g._damage_plans([tank, other], 2, 0))
+
+
+def _enemy_spell_on_chain(g, db, name="Get Excited!"):
+    from riftsim.core.objects import ChainItem
+    sp = _card_in(g, db, 1, name, "hand")
+    g._to_zone(g.objects[sp], "chain"); g.bump()
+    it = ChainItem(900, "spell", 1, uid=sp, label=name)
+    from riftsim.core.vm import Context
+    it.cost, it.finalized, it.ctx, it.code = {"energy": 0, "power": []}, True, Context(1, sp), []
+    g.chain.append(it)
+    return sp, it
+
+
+def test_hard_bargain_counters_unless_its_controller_pays_two(db, decks):
+    g = main_phase(db, decks)
+    sp, it = _enemy_spell_on_chain(g, db)
+    _run_spell(g, db, "Hard Bargain", picks=[sp, "decline"])
+    assert it.countered and g.objects[sp].zone == "trash"
+    g = main_phase(db, decks)
+    sp, it = _enemy_spell_on_chain(g, db)
+    g.do_channel(1, 2)
+    ready = sum(not g.objects[r].exhausted for r in g.players[1].runes)
+    assert ready >= 2
+    _run_spell(g, db, "Hard Bargain", picks=[sp])      # the opponent's first pay option is a payment plan
+    assert not getattr(it, "countered", False)
+    assert sum(not g.objects[r].exhausted for r in g.players[1].runes) == ready - 2
+
+
+def test_hard_bargain_counters_when_controller_cannot_pay(db, decks):
+    g = main_phase(db, decks)
+    sp, it = _enemy_spell_on_chain(g, db)
+    for r in g.players[1].runes:
+        g.objects[r].exhausted = True
+    g.bump()
+    _run_spell(g, db, "Hard Bargain", picks=[sp])
+    assert it.countered
+
+
+def test_marai_spire_repeat_costs_one_less(db, decks):
+    from riftsim.core.objects import ChainItem
+    from riftsim.core.vm import Context
+    g = main_phase(db, decks)
+    s = _card_in(g, db, 0, "Hard Bargain", "hand")
+    it = ChainItem(901, "spell", 0, uid=s, label="Hard Bargain")
+    rep = dict(g._optional_costs(it, Context(0, None)))["repeat"]
+    assert rep[0] == 2
+    _bf_card(g, db, "Marai Spire", 0)
+    g.set_bf_controller(0, 0); g.bump()
+    rep = dict(g._optional_costs(it, Context(0, None)))["repeat"]
+    assert rep[0] == 1

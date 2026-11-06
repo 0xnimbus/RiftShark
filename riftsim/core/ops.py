@@ -958,11 +958,11 @@ class Reflexive(Instr):
         return None
 
 
-def _pay_decision(game, ctx, e, pw, purpose, decline=True, label=""):
+def _pay_decision(game, ctx, e, pw, purpose, decline=True, label="", player=None):
     """Offer every distinct way to pay (CR 445.2: paying Energy/Power is always optional; declining negates
     the instruction). Returns a Decision, or applies the only possibility and returns None."""
     from .payment import plan_label
-    p = ctx.controller
+    p = ctx.controller if player is None else player
     plans = game.payment_plans(p, e, pw, purpose) if game.can_pay(p, e, pw, purpose=purpose) else []
     opts = list(plans) + (["decline"] if decline else [])
     if not plans:
@@ -978,16 +978,21 @@ class PayResources(Instr):
     """'You may pay X' / 'pay X' (not a cost of playing). Stores True in out if paid. energy int, power list of domains.
     CR 445.2: a player instructed to pay Energy or Power may always decline, which negates the instruction."""
 
-    def __init__(self, energy=0, power=(), out="paid", optional=True):
-        self.energy, self.power, self.out, self.optional = energy, power, out, optional
+    def __init__(self, energy=0, power=(), out="paid", optional=True, player=None):
+        self.energy, self.power, self.out, self.optional, self.player = energy, power, out, optional, player
+
+    def _payer(self, game, ctx):
+        return ctx.controller if self.player is None else _player(game, ctx, self.player)
 
     def run(self, game, ctx):
         e = val(game, ctx, self.energy)
         pw = [val(game, ctx, p) for p in self.power]
+        payer = self._payer(game, ctx)
         if ctx.vars.get("__optional_cost"):        # an optional additional cost (Ezreal, Prodigy reduces those)
-            e, pw = game.reduce_optional_cost(ctx.controller, e, pw)
+            e, pw = game.reduce_optional_cost(payer, e, pw)
         purpose = {"kind": "effect", "uid": ctx.source}
-        r = _pay_decision(game, ctx, e, pw, purpose, decline=True, label=f"{e} energy {pw}" if pw else f"{e} energy")
+        r = _pay_decision(game, ctx, e, pw, purpose, decline=True, label=f"{e} energy {pw}" if pw else f"{e} energy",
+                          player=payer)
         if r == "cannot":
             ctx.vars[self.out] = False
             return None
@@ -1000,7 +1005,7 @@ class PayResources(Instr):
         if choice == "decline":
             ctx.vars[self.out] = False
         else:
-            game.apply_payment(ctx.controller, choice, ctx, {"kind": "effect", "uid": ctx.source})
+            game.apply_payment(self._payer(game, ctx), choice, ctx, {"kind": "effect", "uid": ctx.source})
             ctx.vars[self.out] = True
         return None
 
