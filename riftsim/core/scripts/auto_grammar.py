@@ -1487,12 +1487,19 @@ def _ev_fn(ev):
 
 
 # ---------------------------------------------------------------------------- static abilities
+def _exile_loc(ev):
+    # "Units you PLAY TO battlefields you control": the location the unit was played to. Baron Nashor's "I enter
+    # there" moves the entry to the Baron Pit, but its controller orders the two replacements (CR 372.1), so a unit
+    # played to a battlefield they control still enters ready.
+    return ev.get("play_loc") or ev.get("loc")
+
+
 def parse_static(line):
     bl = line.strip().lower().rstrip(".")
     if bl == "units can't be played here":
         return [Static("self", "rule", ("cant_play_here",), source_text=line)]
     if bl == "units you play to battlefields you control enter ready":
-        return [Replacement("enter_ready", lambda g, s, ev: ev.get("player") == g.objects[s].controller and ev.get("loc") is not None and ev["loc"][0] == "bf" and g.battlefields[ev["loc"][1]].controller == ev["player"],
+        return [Replacement("enter_ready", lambda g, s, ev: ev.get("player") == g.objects[s].controller and _exile_loc(ev) is not None and _exile_loc(ev)[0] == "bf" and g.battlefields[_exile_loc(ev)[1]].controller == ev["player"],
                             lambda g, s, ev: dict(ev, ready=True), label=line)]
     if bl == "spells and abilities affecting units here each deal 1 bonus damage":
         return [Static("self", "rule", ("bonus_damage_here", 1), source_text=line)]

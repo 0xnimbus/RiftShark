@@ -1410,7 +1410,8 @@ def thrill_of_the_hunt(defn):
     # [Reaction]  Banish a friendly unit, then its owner plays it to any battlefield, ignoring its cost.
     return [SpellEffect([O.Choose(Sel("unit", side="friendly"), out="t"), O.Banish(Ref("t")),
                          O.If(lambda g, c: c.vars.get("t") in g.objects and g.objects[c.vars["t"]].zone == "banish", [
-                             O.ChooseLocation(out="__tl", player=lambda g, c: g.objects[c.vars["t"]].owner),
+                             O.ChooseLocation(out="__tl", player=lambda g, c: g.objects[c.vars["t"]].owner,
+                                              pred=lambda g, c, l: l not in {g.objects[s].place for s, _ in g.rules("cant_play_here")}),
                              O.PlayCard(Ref("t"), ignore="all", loc=Ref("__tl"), player=lambda g, c: g.objects[c.vars["t"]].owner)])],
                         label=defn.name, source_text=defn.text)]
 
