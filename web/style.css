@@ -297,3 +297,89 @@ button.opt.dmg { display: block; }
 
 details.og.runes > summary { cursor: pointer; list-style: revert; }
 details.og.runes:not([open]) { opacity: .75; }
+
+/* ---------------------------------------------------------------- digital TCG client feel (play page) */
+body.play .mat { background:
+    radial-gradient(ellipse 70% 40% at 50% 30%, #ff7a5914, transparent 70%),
+    radial-gradient(ellipse 70% 40% at 50% 72%, #4cc2ff14, transparent 70%),
+    repeating-linear-gradient(135deg, #ffffff03 0 2px, transparent 2px 6px),
+    linear-gradient(180deg, #16223a 0%, #0f1828 48%, #0f1828 52%, #13203a 100%);
+  padding: 10px 96px 10px 10px; min-height: 640px; box-shadow: 0 0 0 1px #000, inset 0 0 60px #000a; }
+body.play .bfs { margin: 4px 0; }
+body.play .bf { min-height: 220px; box-shadow: inset 0 0 30px #000c; }
+/* your hand: a fan of big cards along the bottom edge */
+body.play .my-hand .hand-box { background: linear-gradient(180deg, transparent, #0009); border: none; padding: 10px 6px 4px; }
+body.play .my-hand .hand { justify-content: center; gap: 0; flex-wrap: nowrap; min-height: 150px; padding-top: 18px; }
+body.play .my-hand .card.inhand { width: 104px; margin: 0 -10px; transform-origin: 50% 120%;
+  transform: translateY(var(--lift, 0)) rotate(var(--rot, 0deg)); box-shadow: 0 6px 16px #000a; }
+body.play .my-hand .card.inhand:hover { transform: translateY(-28px) scale(1.18); z-index: 5; filter: none; }
+body.play .my-hand .card.inhand:not(.playable) { filter: brightness(.6) saturate(.7); }
+body.play .seat.op .hand { gap: 0; } body.play .seat.op .hand .card.back { margin-right: -14px; box-shadow: 2px 0 6px #000a; }
+.card.back { background: radial-gradient(circle at 50% 50%, #e3b45a55 0 12%, transparent 13%),
+  repeating-linear-gradient(45deg, #2b3a58, #2b3a58 5px, #1d2840 5px, #1d2840 10px); }
+/* dragging */
+.card[data-drag] { cursor: grab; touch-action: none; }
+.card.draggable:not(.inhand):not(.zone) { box-shadow: 0 0 0 2px #5ad28a99, 0 0 12px #5ad28a55; }
+.card.picked { box-shadow: 0 0 0 3px var(--warn), 0 0 18px #f3c04b99 !important; transform: translateY(-6px); }
+.card.picked.exhausted { transform: rotate(90deg) translateX(-6px); }
+.card.dragging { opacity: .3; }
+.drag-ghost { position: fixed !important; z-index: 60; pointer-events: none; margin: 0 !important; transform: rotate(-4deg) scale(1.12) !important;
+  box-shadow: 0 18px 40px #000e, 0 0 0 2px var(--good) !important; filter: none !important; opacity: .95; transition: none; }
+.ghost-n { position: absolute; top: -8px; right: -8px; background: var(--warn); color: #000; font-style: normal; font-weight: 800; border-radius: 999px; padding: 1px 6px; font-size: 12px; }
+body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select: none; }
+.drop-ok { outline: 2px dashed #5ad28acc; outline-offset: -3px; box-shadow: inset 0 0 30px #5ad28a33 !important; }
+.drop-hover { outline: 3px solid var(--good) !important; background-color: #5ad28a22 !important; }
+.mat.drop-any::after { content: "Drop anywhere on the board to play it"; position: absolute; left: 50%; top: 8px; transform: translateX(-50%);
+  background: #0b0f17ee; border: 1px solid var(--good); color: var(--good); padding: 3px 12px; border-radius: 999px; font-size: 12px; pointer-events: none; z-index: 8; }
+.mat.drop-any.drop-hover { outline-offset: -4px; }
+/* end turn / pass */
+.end-btn { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 76px; height: 76px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffe3a1, #e3b45a 45%, #9a6b1c); color: #1a1205; border: 3px solid #1a1205;
+  font-weight: 900; text-transform: uppercase; font-size: 13px; line-height: 1.1; box-shadow: 0 0 0 2px #e3b45a, 0 6px 20px #000c; z-index: 7; }
+.end-btn:hover:not(:disabled) { filter: brightness(1.12); transform: translateY(-50%) scale(1.05); }
+.end-btn.pass { background: radial-gradient(circle at 35% 30%, #d9f1ff, #4cc2ff 45%, #1a6a96); }
+/* runes as cards with their art: click to tap */
+.rlist { gap: 5px; }
+.rcard { position: relative; width: 34px; aspect-ratio: 744 / 1039; border-radius: 4px; overflow: hidden; border: 1px solid #000; flex: none;
+  transition: transform .2s, filter .2s, box-shadow .2s; box-shadow: 0 2px 6px #0009; }
+.rcard img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rcard > .rune { width: 100%; height: 100%; border-radius: 3px; }
+.rcard.ex { transform: rotate(90deg) scale(.86); filter: brightness(.45) saturate(.4); margin: 0 6px; }
+.rcard.tap { cursor: pointer; box-shadow: 0 0 0 2px var(--good), 0 0 10px #5ad28a88; }
+.rcard.tap:hover { transform: translateY(-4px) scale(1.08); }
+.rcard.ex.tap:hover { transform: rotate(90deg) scale(.95); }
+.rcard.s-ex { transform: rotate(90deg) scale(.9); margin: 0 6px; box-shadow: 0 0 0 2px var(--accent), 0 0 14px #e3b45acc; filter: brightness(.85); }
+.rcard.s-rc { transform: translateY(-8px); box-shadow: 0 0 0 2px #ba68c8, 0 0 14px #ba68c8cc; }
+.rtag { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-style: normal; font-size: 7px; font-weight: 900; padding: 1px 2px; border-radius: 2px; background: #000d; }
+.rtag.ex { color: var(--accent); transform: translate(-50%, -50%) rotate(-90deg); } .rtag.rc { color: #e1bee7; }
+.seat .rune-box { max-width: 330px; }
+/* numbered score */
+.score { gap: 10px; }
+.sc-num { font-size: 34px; font-weight: 900; line-height: 1; min-width: 48px; height: 48px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  border: 3px solid currentColor; background: #0009; font-variant-numeric: tabular-nums; }
+.seat.me .sc-num { color: var(--me); } .seat.op .sc-num { color: var(--op); }
+.sc-of { font-size: 13px; color: var(--muted); line-height: 1.1; } .sc-of small { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; }
+.pips { flex-wrap: wrap; max-width: 130px; }
+.pips i { width: 15px; height: 15px; border-radius: 3px; font-size: 9px; font-style: normal; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; color: #ffffff55; }
+.pips i.win { border-color: var(--accent); color: var(--accent); }
+.seat.me .pips i.on, .seat.op .pips i.on { color: #000; }
+/* drop / rune choice menu */
+#pop-menu { position: fixed; z-index: 70; background: #0b0f17f5; border: 1px solid var(--accent); border-radius: 10px; padding: 6px; display: flex; flex-direction: column; gap: 4px;
+  box-shadow: 0 10px 30px #000e; min-width: 200px; max-width: 320px; }
+#pop-menu button { text-align: left; } #pop-menu button.cancel { color: var(--muted); text-align: center; }
+.pay-tap { background: var(--panel2); border: 1px solid var(--accent); border-radius: 8px; padding: 8px; margin: 6px 0; line-height: 1.4; }
+.pay-now { margin: 6px 0; font-size: 12px; } .pay-now .ok { color: var(--good); }
+@media (max-width: 760px) {
+  body.play .mat { padding-right: 6px; min-height: 0; }
+  body.play .my-hand .card.inhand { width: 66px; margin: 0 -8px; }
+  body.play .my-hand .hand { min-height: 100px; }
+  .end-btn { position: fixed; right: 10px; top: auto; bottom: calc(42vh + 10px); transform: none; width: 62px; height: 62px; font-size: 11px; }
+  .end-btn:hover:not(:disabled) { transform: scale(1.05); }
+  .rcard { width: 24px; }
+  .sc-num { font-size: 22px; min-width: 34px; height: 34px; }
+}
+body.play .my-hand .card.inhand.playable { box-shadow: 0 0 0 2px var(--good), 0 0 18px #5ad28a99, 0 6px 16px #000a; }
+.pips { max-width: none; flex-wrap: nowrap; }
+.card img, .rcard img { -webkit-user-drag: none; user-select: none; }
+button.opt.primary { background: var(--accent); color: #1a1205; border-color: var(--accent); }
+button.opt.primary:hover:not(:disabled) { background: #f0c66e; }
