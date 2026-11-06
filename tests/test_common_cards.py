@@ -1009,3 +1009,24 @@ def test_blighted_battleaxe_hurts_a_unit_that_did_not_conquer(db, decks):
     g.emit("ending_phase", player=0)
     settle(g)
     assert g.objects[gear].attached_to is None and g.objects[u].damage == 4
+
+
+def test_perched_grimwyrm_only_to_a_battlefield_conquered_this_turn(db, decks):
+    g = main_phase(db, decks)
+    from test_targeting import give
+    u = give(g, 0, "Perched Grimwyrm", db)
+    g.set_bf_controller(0, 0)
+    put(g, db, 0, "Shipyard Skulker", ("bf", 0), exclude=(u,))
+    assert g._play_locations(0, u, "hand") == []
+    g.turn_memo[("conquered_bfs", 0)] = {0}
+    assert g._play_locations(0, u, "hand") == [("bf", 0)]
+
+
+def test_dune_surfer_ignores_tank_here(db, decks):
+    g = main_phase(db, decks)
+    bf = ("bf", 0)
+    tank = put(g, db, 1, "Mutated Mouser", bf)               # [Shield 2] [Tank]
+    other = put(g, db, 1, "Shipyard Skulker", bf, exclude=(tank,))
+    assert all(p[0] > 0 for p in g._damage_plans([tank, other], 2, 0))
+    put(g, db, 0, "Dune Surfer", bf, exclude=(tank, other))
+    assert any(p[0] == 0 for p in g._damage_plans([tank, other], 2, 0))

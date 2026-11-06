@@ -2590,3 +2590,16 @@ def blighted_battleaxe(defn):
     return {"abilities": [], "effect_abilities": [Triggered("end_turn", [O.Do(run, label="unattach and deal 4 unless it conquered")],
                                                             label=defn.name, source_text=defn.effect_text)],
             "replace": False}
+
+
+@script("Perched Grimwyrm")
+def perched_grimwyrm(defn):
+    # Play me only to a battlefield you conquered this turn.
+    ok = lambda g, p, loc: loc[0] == "bf" and loc[1] in g.turn_memo.get(("conquered_bfs", p), set())
+    return [PlayPermission("only_to", value=ok, label="only to a battlefield you conquered this turn", source_text=defn.text)]
+
+
+@script("Dune Surfer")
+def dune_surfer(defn):
+    # You ignore [Tank] while assigning combat damage here.
+    return [Static("self", "rule", ("ignore_tank_here",), label="you ignore Tank here", source_text=defn.text)]

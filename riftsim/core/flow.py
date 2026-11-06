@@ -822,7 +822,10 @@ class FlowMixin:
             if need is None:
                 # no amount is lethal (CR 467.2.c.6 "if able"): the unit may absorb any part of the damage
                 need = float("inf")
-            prio = 0 if c.keywords.get("tank") else (2 if (c.keywords.get("backline") or u in last) else 1)
+            tank = c.keywords.get("tank") and not any(
+                self.objects[src].controller == player and self.objects[src].location == self.objects[u].location
+                for src, _ in self.rules("ignore_tank_here"))          # Dune Surfer
+            prio = 0 if tank else (2 if (c.keywords.get("backline") or u in last) else 1)
             info[u] = (need, prio)
         idx = {u: k for k, u in enumerate(targets)}
         plans = set()
@@ -1523,6 +1526,9 @@ class FlowMixin:
                 loc = ("bf", bf.idx)
                 if bf.controller is None and not self.units_at(loc) and loc not in locs:
                     locs.append(loc)
+        for ab in self._abilities_of(uid, o):
+            if isinstance(ab, PlayPermission) and ab.perm == "only_to" and ab.value is not None:
+                locs = [l for l in locs if ab.value(self, p, l)]     # Perched Grimwyrm: "Play me only to ..."
         return [l for l in locs if l[0] == "base" or l not in blocked]
 
     def legal_actions(self, p):
