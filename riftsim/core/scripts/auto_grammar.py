@@ -1466,6 +1466,14 @@ def parse_static(line):
     m = re.match(r"i have ([+\-]\d+) \[m\]$", l)
     if m:
         return [Static("self", "might", int(m.group(1)), cond=cond, source_text=line)]
+    m = re.match(r"i have ([+\-]\d+) \[m\] and \[(\w+)\]$", l)
+    if m:
+        return [Static("self", "might", int(m.group(1)), cond=cond, source_text=line), Static("self", "keyword", (m.group(2).lower(), True), cond=cond, source_text=line)]
+    m = re.match(r"(your|other|your other) (units|tokens) enter ready$", l)
+    if m:
+        tok = m.group(2) == "tokens"
+        return [Replacement("enter_ready", lambda g, s_, ev, tok=tok: ev.get("uid") != s_ and ev.get("player") == g.objects[s_].controller and (not tok or g.objects[ev["uid"]].base_defn().is_token),
+                            lambda g, s_, ev: dict(ev, ready=True), label=line)]
     m = re.match(r"i have an additional ([+\-]\d+) \[m\]$", l)
     if m:
         return [Static("self", "might", int(m.group(1)), cond=cond, source_text=line)]
@@ -1768,7 +1776,7 @@ def script_line(defn, line):
                         raise ParseError(f"restriction {rt!r}")
         return [Activated(cost, eff, timing=timing, once_per_turn=once, is_add=is_add, label=line[:40], source_text=line, cond=cond, restriction=restriction)]
     # triggered: "When ..., effect"
-    m = re.match(r"^((?:Once each turn, )?(?:When|Whenever|At the start|At the end|The first time)[^,]*(?:,[^,]*?(?= if ))?),\s*(.+)$", body)
+    m = re.match(r"^((?:Once each turn, )?(?:When|Whenever|At (?:the )?start|At (?:the )?end|The first time)[^,]*(?:,[^,]*?(?= if ))?),\s*(.+)$", body)
     if m:
         prefix, rest = m.group(1), m.group(2)
         tr = match_trigger(prefix)
