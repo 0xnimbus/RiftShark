@@ -2,6 +2,7 @@
 satisfy. Usage:
   python tools/audit_games.py --vs-random 5          # each deck vs randomly drawn opponents, 5 games per deck
   python tools/audit_games.py --round-robin 2        # every pair of decks, 2 games each (seats swapped)
+  python tools/audit_games.py --adaptive 40          # every pair until its result is clear (6-40 games per pair)
 Options: --policy greedy|mcts:N  --out out/audit  --workers N
 Writes out/audit/report.md and out/audit/games.json."""
 import argparse
@@ -182,6 +183,70 @@ def audit_game(args):
             "problems": problems, "max_chain": max_chain, "secs": round(time.time() - t, 2)}
 
 
+def wilson(wins, n, z=1.96):
+    """95% Wilson score interval for a win rate."""
+    if n == 0:
+        return 0.0, 1.0
+    p = wins / n
+    den = 1 + z * z / n
+    mid = (p + z * z / (2 * n)) / den
+    half = z * ((p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5) / den
+    return mid - half, mid + half
+
+
+def pair_done(wins, n, a):
+    """A matchup is finished when it reached MAX games, or after --min-games when the 95% interval is narrow
+    enough or clearly excludes 50% (one deck is favoured beyond doubt)."""
+    if n >= a.adaptive:
+        return True
+    if n < a.min_games or n % 2:
+        return False                  # seats stay balanced: always an even number of games
+    lo, hi = wilson(wins, n)
+    return (hi - lo) / 2 <= a.precision or lo > 0.5 or hi < 0.5
+
+
+def adaptive_round_robin(paths, a):
+    """Play every pair two games at a time (seats swapped) and keep the pool busy with the pairs still open.
+    Games whose result is a timeout count as unfinished and are not counted (they are kept in the results)."""
+    from concurrent.futures import FIRST_COMPLETED, wait
+    pairs = [(p, q) for i, p in enumerate(paths) for q in paths[i + 1:]]
+    state = {pq: {"n": 0, "wins": 0, "running": 0, "next": 0} for pq in pairs}
+    results, seed = [], a.seed
+    t = time.time()
+    with ProcessPoolExecutor(max_workers=a.workers) as ex:
+        live = {}
+
+        def feed():
+            nonlocal seed
+            for pq in pairs:
+                st = state[pq]
+                while len(live) < a.workers * 2 and not pair_done(st["wins"], st["n"], a) \
+                        and st["n"] + st["running"] < a.adaptive and st["running"] < 2 and st["next"] < 2 * a.adaptive:
+                    k = st["next"]
+                    st["next"] += 1
+                    st["running"] += 1
+                    order = list(pq) if k % 2 == 0 else [pq[1], pq[0]]
+                    live[ex.submit(audit_game, (order, seed, a.policy))] = pq
+                    seed += 1
+
+        feed()
+        while live:
+            done, _ = wait(list(live), return_when=FIRST_COMPLETED)
+            for f in done:
+                pq = live.pop(f)
+                r = f.result()
+                results.append(r)
+                st = state[pq]
+                st["running"] -= 1
+                if not r.get("crash") and r.get("winner") is not None:
+                    st["n"] += 1
+                    st["wins"] += r["paths"][r["winner"]] == pq[0]
+            feed()
+            closed = sum(1 for pq in pairs if pair_done(state[pq]["wins"], state[pq]["n"], a))
+            print(f"{len(results)} games, {closed}/{len(pairs)} matchups settled ({time.time() - t:.0f}s)", file=sys.stderr)
+    return results
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--vs-random", type=int, default=0)
@@ -191,6 +256,11 @@ def main():
     ap.add_argument("--workers", type=int, default=os.cpu_count() or 2)
     ap.add_argument("--seed", type=int, default=1000)
     ap.add_argument("--out", default="out/audit")
+    ap.add_argument("--adaptive", type=int, default=0, metavar="MAX",
+                    help="round-robin that stops each pair once its result is clear (up to MAX games per pair)")
+    ap.add_argument("--min-games", type=int, default=6)
+    ap.add_argument("--precision", type=float, default=0.15,
+                    help="adaptive: stop a pair when its 95%% Wilson half-width is at most this")
     a = ap.parse_args()
     paths = a.decks or sorted(glob.glob(os.path.join(ROOT, "data/decks/tournament/*.json")))
     rng = random.Random(a.seed)
@@ -210,6 +280,9 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     t = time.time()
     results = []
+    if a.adaptive:
+        results = adaptive_round_robin(paths, a)
+        jobs = []
     with ProcessPoolExecutor(max_workers=a.workers) as ex:
         for r in ex.map(audit_game, jobs):
             results.append(r)
@@ -263,6 +336,22 @@ def write_report(results, path, policy):
         lines += ["", f"Average turns {sum(r['turns'] for r in ok) / len(ok):.1f}; longest chain {max(r['max_chain'] for r in ok)}; "
                   f"games without a winner {sum(1 for r in ok if r['winner'] is None)}; first player won "
                   f"{sum(1 for r in ok if r['winner'] == r['first'])}/{len(ok)}."]
+        # matchups: row deck's win rate against the column deck, with games and 95% interval
+        pair = collections.defaultdict(lambda: [0, 0])
+        for r in ok:
+            if r["winner"] is None:
+                continue
+            a_, b_ = r["decks"]
+            w = r["decks"][r["winner"]]
+            for me, opp in ((a_, b_), (b_, a_)):
+                pair[(me, opp)][1] += 1
+                pair[(me, opp)][0] += w == me
+        lines += ["", "## Matchups (row vs column: win%, games, 95% interval)", "",
+                  "| deck | opponent | win% | games | 95% interval |", "|---|---|---|---|---|"]
+        for (me, opp), (w, n) in sorted(pair.items()):
+            if me < opp:
+                lo, hi = wilson(w, n)
+                lines.append(f"| {me[:40]} | {opp[:40]} | {100 * w / n:.0f} | {n} | {100 * lo:.0f}-{100 * hi:.0f} |")
     open(path, "w").write("\n".join(lines) + "\n")
 
 
