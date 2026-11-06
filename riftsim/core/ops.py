@@ -148,10 +148,13 @@ class Do(Instr):
 class AskYesNo(Instr):
     """'You may ...' decided on resolution. Stores bool in ctx.vars[out]."""
 
-    def __init__(self, out="may", label="You may", player=None):
-        self.out, self.label, self.player = out, label, player
+    def __init__(self, out="may", label="You may", player=None, cond=None):
+        self.out, self.label, self.player, self.cond = out, label, player, cond
 
     def run(self, game, ctx):
+        if self.cond is not None and not self.cond(game, ctx):
+            ctx.vars[self.out] = False         # "you may pay ..." when the cost can't be paid: not a choice
+            return None
         return Decision(_player(game, ctx, self.player), "yesno", [True, False], out=self.out, labels=["yes: " + self.label, "no"])
 
 
@@ -164,7 +167,22 @@ class May(Instr):
 
     def compile(self, out, counter):
         var = self.out or new_label(counter, "__may")
-        out.append(AskYesNo(var, self.label, self.player))
+        cond = None
+        first = self.body[0] if self.body else None
+        if isinstance(first, PayResources):
+            # "you may pay X and/to ...": only offered when X can be paid (CR 445.2, a cost that can't be paid
+            # can't be chosen)
+            def cond(game, ctx, pr=first):
+                e = val(game, ctx, pr.energy)
+                pw = [val(game, ctx, p) for p in pr.power]
+                if ctx.vars.get("__optional_cost"):
+                    e, pw = game.reduce_optional_cost(ctx.controller, e, pw)
+                return game.can_pay(ctx.controller, e, pw, purpose={"kind": "effect", "uid": ctx.source})
+        elif isinstance(first, Discard):
+            # "you may discard N to ...": not offered without N cards in hand
+            def cond(game, ctx, dc=first):
+                return len(game.players[_player(game, ctx, dc.player)].hand) >= max(1, val(game, ctx, dc.n) or 0)
+        out.append(AskYesNo(var, self.label, self.player, cond=cond))
         If(Ref(var), self.body).compile(out, counter)
 
 

@@ -172,3 +172,30 @@ def test_emperors_dais_conquer_bounces_a_unit_for_a_sand_soldier(db, decks):
     assert g.objects[u].zone == "hand"
     tokens = [x for x in g.units_at(dest, 0) if g.objects[x].defn.name == "Sand Soldier"]
     assert tokens
+
+
+def test_emperors_dais_does_not_offer_the_payment_without_energy(db, decks):
+    # "you may pay [1] and ...": with nothing to pay with, no choice is offered (CR 445.2)
+    g, bf = setup(db, decks, "Emperor's Dais")
+    u = put_unit(g, 0, ("base", 0))
+    dest = ("bf", bf.idx)
+    asked = []
+
+    def pick(d):
+        if d.kind == "action":
+            for o in d.options:
+                if o[0] == "move" and o[2] == dest and u in o[1]:
+                    for r in g.players[0].runes:          # spend everything first: no energy or power left
+                        g.objects[r].exhausted = True
+                    for r in list(g.players[0].runes):
+                        g._to_zone(g.objects[r], "rune_deck")
+                    g.bump()
+                    return o
+        if d.kind == "yesno":
+            asked.append(d.labels)
+            return True
+        return None
+    drive(g, lambda g: any(e["kind"] == "event:conquer" for e in g.events) and not g.chain or g.turn > 1, pick)
+    assert any(e["kind"] == "event:conquer" for e in g.events)
+    assert not any("Sand Soldier" in " ".join(map(str, l)) for l in asked)
+    assert g.objects[u].zone == "board"
