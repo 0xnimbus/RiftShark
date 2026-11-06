@@ -2739,3 +2739,13 @@ def here_to_help(defn):
                              O.PlayCard(pick, loc=Ref("__htl"),
                                         alt_cost=lambda g, c: cost_at(g, c.controller, pick(g, c), c.vars.get("__htl")))])],
                         label=defn.name, source_text=defn.text)]
+
+
+@script("Temporal Portal")
+def temporal_portal(defn):
+    # [A], [T]: Give the next spell you play this turn [Repeat] equal to its cost.
+    from ..abilities import Activated
+    return [Activated({"energy": 0, "power": ["any"], "exhaust": True},
+                      [O.Do(lambda g, c: g.add_turn_effect(c, "grant_repeat", {}, uses=1),
+                            label="your next spell this turn gets [Repeat] equal to its cost")],
+                      label="next spell gets [Repeat]", source_text=defn.text)]

@@ -191,7 +191,7 @@ class _FinalizeCosts(Instr):
         if choice:
             ctx.vars["__costs"][name] = (energy, list(power))
             ctx.paid[name] = True
-            if name == "repeat":
+            if name.startswith("repeat"):
                 ctx.repeat += 1
         else:
             ctx.vars["__costs"][name] = (0, [])
@@ -1227,6 +1227,10 @@ class FlowMixin:
             # Marai Spire: "friendly [Repeat] costs cost [1] less" (generic energy only)
             red = sum(int(v) for _, v in self.rules("repeat_cost_reduce", player=it.controller))
             out.append(("repeat", (max(0, rc[0] - red), list(rc[1]), f"Repeat {rc}")))
+        gr = it.ctx.vars.get("__granted_repeat") if (it.kind == "spell" and it.ctx is not None) else None
+        if gr:                                   # Temporal Portal: "[Repeat] equal to its cost"
+            red = sum(int(v) for _, v in self.rules("repeat_cost_reduce", player=it.controller))
+            out.append(("repeat_granted", (max(0, gr[0] - red), list(gr[1]), f"Repeat {gr}")))
         return [(n, (*self.reduce_optional_cost(it.controller, e, p), lbl)) for n, (e, p, lbl) in out]
 
     def reduce_optional_cost(self, p, energy, power):
@@ -1243,7 +1247,7 @@ class FlowMixin:
     def _optional_costs_include_repeat(self, it):
         rc = getattr(it.ability, "repeat_cost", None) if it.ability is not None else None
         if it.kind == "spell":
-            rc = self.defn_of(it.uid).keywords.get("repeat_cost")
+            rc = self.defn_of(it.uid).keywords.get("repeat_cost") or (it.ctx.vars.get("__granted_repeat") if it.ctx else None)
         return bool(rc)
 
     def _fizzle_item(self, it, why):
@@ -1896,6 +1900,7 @@ class FlowMixin:
         self._use_play_effects(p, uid)
         if loc is not None and kind in ("unit", "gear"):
             self.turn_memo.setdefault("played_at", []).append((p, loc))
+        grant_repeat = kind == "spell" and bool(self.consume_turn_effects("grant_repeat", player=p))
         if kind == "gear" and not d.is_token:
             self.turn_memo[("gear_played", p)] = self.turn_memo.get(("gear_played", p), 0) + 1     # Ornn's Forge
         ctx = Context(p, uid, here=loc)
@@ -1905,6 +1910,8 @@ class FlowMixin:
         if loc is not None:
             ctx.vars["__loc"] = loc
         ctx.vars["self"] = uid
+        if grant_repeat:
+            ctx.vars["__granted_repeat"] = (e, tuple(pw))
         self._to_zone(o, "chain")
         o.controller = p
         # the card's own play abilities: spells have one 'effect' ability; permanents resolve by entering

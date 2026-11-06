@@ -1226,3 +1226,17 @@ def test_here_to_help_plays_a_unit_to_your_battlefield_for_three_less(db, decks)
     _rune_setup(g, db, 0, [g.objects[u].base_defn().domains[0]] * max(len(pw), max(0, e - 3)))
     _run_spell(g, db, "Here to Help", picks=[(u,)])
     assert g.objects[u].zone == "board" and g.objects[u].location == ("bf", 0)
+
+
+def test_temporal_portal_gives_next_spell_repeat_equal_to_its_cost(db, decks):
+    from riftsim.core.vm import Context
+    g = main_phase(db, decks)
+    sp = _card_in(g, db, 0, "Get Excited!", "hand")
+    e, pw = g.card_cost(0, sp, "hand")
+    g.add_turn_effect(Context(0, None), "grant_repeat", {}, uses=1)
+    it = g._play(0, sp, None)
+    opts = dict(g._optional_costs(it, it.ctx))
+    assert opts["repeat_granted"][:2] == (e, list(pw)) and g._optional_costs_include_repeat(it)
+    sp2 = _card_in(g, db, 0, "Get Excited!", "hand")
+    it2 = g._play(0, sp2, None)                       # only the next spell
+    assert "repeat_granted" not in dict(g._optional_costs(it2, it2.ctx))
