@@ -322,3 +322,47 @@ def test_sona_readies_four_runes_at_end_of_turn_at_a_battlefield(db, decks):
             break
         g.choose(("pass",) if ("pass",) in d.options else d.options[0])
     assert sum(not g.objects[r].exhausted for r in g.players[0].runes) == min(4, len(g.players[0].runes))
+
+
+def test_vex_cheerless_changes_spell_costs_only_in_combat(db, decks):
+    g = main_phase(db, decks)
+    vx = put(g, db, 0, "Vex, Cheerless", ("bf", 0))
+    spell = next(c for c in db if c.type == "spell" and (c.energy or 0) >= 3)
+    mine = _card_in(g, db, 0, spell.name, "hand")
+    theirs = _card_in(g, db, 1, spell.name, "hand")
+    e0, p0 = g.card_cost(0, mine, "hand")
+    assert g.card_cost(1, theirs, "hand") == (e0, p0)
+    g.combat = {"bf": 0, "attacker": 0, "defender": 1, "step": "showdown"}
+    g.bump()
+    e1, p1 = g.card_cost(0, mine, "hand")
+    assert e1 == e0 - 1 and len(p1) == max(0, len(p0) - 1)
+    e2, p2 = g.card_cost(1, theirs, "hand")
+    assert e2 == e0 + 1 and len(p2) == len(p0) + 1
+
+
+def test_draven_scores_first_combat_win_and_gives_a_point_when_he_dies_in_combat(db, decks):
+    g = main_phase(db, decks)
+    dr = put(g, db, 0, "Draven, Audacious", ("bf", 0))
+    p1 = g.players[1].points
+    ab = [a for a in g.abilities(dr) if a.label == "Draven, Audacious"]
+    assert len(ab) == 2
+    _fire(g, dr, "Draven, Audacious")       # first ability: win combat -> score
+    settle(g)
+    from riftsim.core.vm import Context, Frame
+    ctx = Context(0, dr); ctx.vars["self"] = dr
+    g.vm_frames.append(Frame(list(ab[1].code), ctx))
+    settle(g)
+    assert g.players[1].points == p1 + 1
+
+
+def test_zed_swaps_with_a_shadow_clone(db, decks):
+    g = main_phase(db, decks)
+    z = put(g, db, 0, "Zed, Without a Sound", ("bf", 0))
+    c = g.play_token(0, "Shadow Clone", ("base", 0))
+    g.bump()
+    ab = next(a for a in g.abilities(z) if a.label == "swap with a Shadow Clone")
+    from riftsim.core.vm import Context, Frame
+    ctx = Context(0, z); ctx.vars["self"] = z; ctx.vars["t"] = c
+    g.vm_frames.append(Frame(list(ab.code), ctx))
+    settle(g)
+    assert g.objects[z].location == ("base", 0) and g.objects[c].location == ("bf", 0)

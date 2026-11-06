@@ -651,6 +651,7 @@ class FlowMixin:
     def _establish_control(self, i, p):
         bf = self.battlefields[i]
         prev = bf.controller
+        self.conquered_from = prev           # read by "when I conquer an open battlefield" (Yone)
         self.set_bf_controller(i, p)
         self.log("control", bf=i, player=p, prev=prev)
         self.bump()
@@ -1236,6 +1237,8 @@ class FlowMixin:
                     energy = max(0, energy - t["data"].get("energy", 0))
                     if t["data"].get("power"):
                         power = power[t["data"]["power"]:]
+        for src, v in self.rules("cost_mod_all"):            # Vex, Cheerless: affects every player's spells
+            energy, power = v(self, src, uid, energy, power, p)
         if loc is not None:
             for src, v in self.rules("cost_reduce_at"):      # location-dependent reductions (Hunters' Circle)
                 energy, power = v(self, src, uid, energy, power, p, loc)

@@ -903,3 +903,154 @@ def leona_zealot(defn):
     # the -8 [M] static line is parsed by the auto-scripter (kept: replace=False)
     return {"abilities": [Replacement("enter_ready", near, lambda g, s, ev: dict(ev, ready=True), label=defn.name, zone="any")],
             "replace": False}
+
+
+@script("Twisted Fate, Gambler")
+def twisted_fate_gambler(defn):
+    # When I attack, reveal the top rune of your rune deck, then recycle it. Do one of the following based on its
+    # domain: [Fury] — Deal 2 to an enemy unit here and 1 to all other enemy units here. [Mind] — Draw 1.
+    # [Order] — Stun an enemy unit.
+    def reveal(g, c):
+        rd = g.players[c.controller].rune_deck
+        r = rd[0] if rd else None
+        c.vars["__dom"] = (g.objects[r].defn.domains or [None])[0] if r is not None else None
+        if r is not None:
+            g.emit("reveal", player=c.controller, cards=[r], ctx=c)
+            g.do_recycle([r], c)
+    dom = lambda d: (lambda g, c: c.vars.get("__dom") == d)
+    enemy_here = Sel("unit", side="enemy", where="here")
+    others = Sel("unit", side="enemy", where="here", pred=lambda g, c, u: u != c.vars.get("t"))
+    return {"abilities": [Triggered("attack_self", [
+        O.Do(reveal),
+        O.If(dom("fury"), [O.Choose(enemy_here, out="t"), O.Deal(2, Ref("t")), O.Deal(1, others)]),
+        O.If(dom("mind"), [O.Draw(1)]),
+        O.If(dom("order"), [O.Choose(Sel("unit", side="enemy"), out="t"), O.Stun(Ref("t"))])],
+        label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Hwei, Brooding Painter")
+def hwei(defn):
+    # When I move, draw 1, then discard 1. Then, do the following based on the discarded card's type:
+    # Spell — Draw 1. Gear — Ready up to 2 runes. Unit — Give me +3 [M] this turn.
+    def typ(t):
+        def f(g, c):
+            d = c.vars.get("discarded") or ()
+            return bool(d) and (t in g.objects[d[0]].base_defn().types)
+        return f
+    exhausted_runes = lambda g, c: [r for r in g.players[c.controller].runes if g.objects[r].exhausted]
+    return {"abilities": [Triggered("move_self", [
+        O.Draw(1), O.Discard(1),
+        O.If(typ("spell"), [O.Draw(1)]),
+        O.If(typ("gear"), [O.ChooseFromList(exhausted_runes, out="__hr", n=2, up_to=True, label="ready up to 2 runes"),
+                           O.Ready(Ref("__hr"))]),
+        O.If(typ("unit"), [O.GiveMight(Ref("self"), 3, duration="turn")])], label=defn.name, source_text=defn.text)],
+        "replace": True}
+
+
+@script("Vex, Cheerless")
+def vex_cheerless(defn):
+    # While I'm in combat, friendly spells cost [1][A] less to a minimum of [1], and enemy spells cost [1][A] more.
+    def mod(g, src, uid, e, p, player):
+        if not _in_combat(g, src) or g.objects[uid].base_defn().type != "spell":
+            return e, p
+        if g.is_friendly(player, g.objects[src].controller):
+            total = e + len(p)
+            if total <= 1:
+                return e, p
+            # reduce [1] then [A], never below a total of 1
+            if e >= 1:
+                e -= 1
+                total -= 1
+            if total > 1 and p:
+                p = p[1:]
+            return e, p
+        return e + 1, list(p) + ["any"]
+    return {"abilities": [Static("self", "rule", ("cost_mod_all", mod), label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Jayce, Brilliant Inventor")
+def jayce_brilliant(defn):
+    # When you play me or the first time you play a non-token gear each turn, you may ready something besides me
+    # that's exhausted.
+    def first_gear(g, s, ev):
+        if ev.get("kind") != "play" or ev.get("card_type") != "gear" or ev.get("player") != g.objects[s].controller:
+            return False
+        d = g.objects[ev["uid"]].base_defn()
+        if d.is_token:
+            return False
+        gears = [u for u in g.players[ev["player"]].played_this_turn if u in g.objects and
+                 g.objects[u].base_defn().type == "gear" and not g.objects[u].base_defn().is_token]
+        return gears[:1] == [ev["uid"]]
+    sel = Sel("permanent", pred=lambda g, c, u: u != c.source and g.objects[u].exhausted and g.objects[u].controller == c.controller)
+    sel_any = Sel("card", pred=lambda g, c, u: g.objects[u].zone == "board" and u != c.source and g.objects[u].exhausted
+                  and g.objects[u].controller == c.controller)
+    eff = [O.If(lambda g, c: bool(sel_any.candidates(g, c)),
+                [O.May([O.Choose(sel_any, out="t", targeted=False), O.Ready(Ref("t"))], label="ready something exhausted")])]
+    return {"abilities": [Triggered("play_self", list(eff), label=defn.name, source_text=defn.text),
+                          Triggered(first_gear, list(eff), label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Draven, Audacious")
+def draven_audacious(defn):
+    # [Deflect]   (keyword)
+    # The first time I win a combat each turn, you score 1 point.
+    # When I die in combat, choose an opponent. They score 1 point.
+    return {"abilities": [Triggered("win_combat_self", [O.GainPoints(1)], once_per_turn=True, label=defn.name, source_text=defn.text),
+                          Triggered("die_self_combat", [O.ChoosePlayer(out="__opp", opponent=True),
+                                                        O.GainPoints(1, player=Ref("__opp"))],
+                                    label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Illaoi, Prophet of the Great Kraken")
+def illaoi(defn):
+    # When you play me or when I score, play a [1] [M] Tentacle unit token from Bilgewater.
+    # I have +1 [M] for each token unit you control.
+    tok = [O.PlayToken("Tentacle", loc="choose")]
+    n = lambda g, s, u: _token_units(g, g.objects[s].controller)
+    return {"abilities": [Triggered("play_self", list(tok), label=defn.name, source_text=defn.text),
+                          Triggered("score_self", list(tok), label=defn.name, source_text=defn.text),
+                          Static("self", "might", n, label="+1 [M] per token unit", source_text=defn.text)], "replace": True}
+
+
+def _token_units(g, p):
+    n = 0
+    for x, o in g.objects.items():
+        if o.zone == "board" and o.controller == p and o.defn.is_token and o.defn.type == "unit":
+            n += 1
+    return n
+
+
+@script("Yone, Blademaster")
+def yone(defn):
+    # [Weaponmaster]   (keyword)
+    # When I conquer an open battlefield / a battlefield that was uncontrolled, deal damage equal to my Might to an
+    # enemy unit in a base.
+    return {"abilities": [Triggered("conquer_self", [O.Deal(lambda g, c: g.chars(c.source).might or 0, Ref("t"))],
+                                    targets=[O.Choose(Sel("unit", side="enemy", where="base"), out="t")],
+                                    filt=lambda g, s, ev: g.conquered_from is None, label=defn.name, source_text=defn.text)],
+            "replace": False}
+
+
+@script("Zed, Without a Sound")
+def zed(defn):
+    # When I conquer, play a 0 [M] Shadow Clone unit token to your base.
+    # [Action][>] [1][Chaos]: Move me and a Shadow Clone you control to each other's locations.
+    clone = Sel("unit", side="friendly", pred=lambda g, c, u: g.objects[u].defn.name == "Shadow Clone")
+    return {"abilities": [Triggered("conquer_self", [O.PlayToken("Shadow Clone", loc="base")], label=defn.name, source_text=defn.text),
+                          Activated({"energy": 1, "power": ["chaos"]}, [O.SwapLocations(Ref("self"), Ref("t"))],
+                                    targets=[O.Choose(clone, out="t")], timing="action",
+                                    label="swap with a Shadow Clone", source_text=defn.text)], "replace": True}
+
+
+@script("Riven, Deserter")
+def riven_deserter(defn):
+    # When another friendly unit becomes exhausted, give me +1 [M] this turn.
+    # Exhaust a friendly unit: Ready a unit. Use this ability only once each turn.
+    def other_exhausted(g, s, ev):
+        return ev.get("kind") == "exhaust" and ev.get("uid") != s and ev.get("uid") in g.objects and \
+            g.objects[ev["uid"]].controller == g.objects[s].controller and "unit" in g.chars(ev["uid"]).types
+    ready_friendly = Sel("unit", side="friendly", ready=True)
+    return {"abilities": [Triggered(other_exhausted, [O.GiveMight(Ref("self"), 1, duration="turn")], label=defn.name, source_text=defn.text),
+                          Activated({"energy": 0, "power": [], "exhaust_unit": ready_friendly}, [O.Ready(Ref("t"))],
+                                    targets=[O.Choose(Sel("unit"), out="t")], timing="main", once_per_turn=True,
+                                    label="exhaust a friendly unit: ready a unit", source_text=defn.text)], "replace": True}

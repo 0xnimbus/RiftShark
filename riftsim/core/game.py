@@ -54,6 +54,7 @@ class Game(flow.FlowMixin):
         self.delayed: list[DelayedAbility] = []
         self.turn_effects = []         # dicts: kind, data, expires, uses, ctx
         self.scored = set()            # (player, bf idx) scored this turn
+        self.conquered_from = None     # previous controller of the battlefield last conquered
         self.turn_memo = {}            # per-turn memory (cleared at end of turn)
         self.turns_taken = {}          # player -> number of turns they have started (Forgotten Monument)
         self.known = {}                # viewer -> {uid: entered_stamp} of hidden cards revealed to them (hand reveals)
