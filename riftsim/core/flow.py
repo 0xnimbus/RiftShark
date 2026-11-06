@@ -1114,7 +1114,11 @@ class FlowMixin:
             self.dirty = True
         elif k == "hide":
             p = self.turn_player
-            plans = self.payment_plans(p, 0, ["any"], {"kind": "hide"})
+            plans = []
+            for e, pw in self._hide_costs(p):
+                for pl in self.payment_plans(p, e, pw, {"kind": "hide"}):
+                    if pl not in plans:
+                        plans.append(pl)
             if len(plans) == 1:
                 self._hide_paid(plans[0], None, hide=(a[1], a[2]), player=p)
             else:
@@ -1486,7 +1490,7 @@ class FlowMixin:
         acts = []
         ps = self.players[p]
         bfs = [b.idx for b in self.battlefields if b.controller == p and self.can_hide_at(p, b.idx)]
-        if not bfs or not self.can_pay(p, 0, ["any"], purpose={"kind": "hide"}):
+        if not bfs or not self._hide_costs(p):
             return acts
         cards = list(ps.hand) + ([ps.champion] if ps.champion else [])
         for u in cards:
@@ -1494,6 +1498,13 @@ class FlowMixin:
                 for b in bfs:
                     acts.append(("hide", u, b))
         return acts
+
+    def _hide_costs(self, p):
+        """Payable costs to hide a card: [A], or [1] instead with Teemo, Swift Scout. -> list of (energy, power)."""
+        costs = [(0, ["any"])]
+        if self.rules("hide_for_1_energy", player=p):
+            costs.append((1, []))
+        return [c for c in costs if self.can_pay(p, c[0], c[1], purpose={"kind": "hide"})]
 
     def _hide_paid(self, plan, d, hide=None, player=None):
         if d is not None:

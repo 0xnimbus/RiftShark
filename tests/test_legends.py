@@ -116,3 +116,47 @@ def test_enemy_choices_are_counted_from_spells(db, decks):
             break
         g.choose(foe if foe in d.options else d.options[0])
     assert g.turn_memo.get(("chose_enemy", 0)) == 1
+
+
+def test_sivir_readies_once_when_several_enemy_units_die_together(db, decks):
+    g = main_phase(db, decks)
+    lg = legend(g, db, "OPP-203")
+    g.objects[lg].exhausted = True
+    a = unit_at(g, 1, ("bf", 0))
+    b = unit_at(g, 1, ("bf", 0), exclude=(a,))
+    g.do_kill([a, b], None)
+    sivir_items = [it for it in g.chain if it.uid == lg]
+    assert len(sivir_items) == 1                            # "one or more enemy units die": one trigger
+
+
+def test_renata_gold_adds_an_extra_energy_near_victory(db, decks):
+    from riftsim.core.ops import Add
+    from riftsim.core.vm import Context
+    g = main_phase(db, decks)
+    legend(g, db, "SFD-201")
+    gold = g.play_token(0, "Gold", ("base", 0))
+    ps = g.players[0]
+    e = ps.energy
+    Add(energy=0, power=["any"]).run(g, Context(0, gold))
+    assert ps.energy == e                                   # far from victory: no bonus
+    ps.points = g.cfg["victory"] - 3
+    g.bump()
+    Add(energy=0, power=["any"]).run(g, Context(0, gold))
+    assert ps.energy == e + 1
+
+
+def test_bashful_bloom_costs_less_per_temporary_unit(db, decks):
+    g = main_phase(db, decks)
+    lg = legend(g, db, "UNL-189")
+    ab = next(a for a in g.abilities(lg) if getattr(a, "cost", {}).get("energy") == 4)
+    assert g.ability_energy(ab, lg) == 4
+    g.play_token(0, "Sprite", ("base", 0), ready=True)
+    g.bump()
+    assert g.ability_energy(ab, lg) == 3
+
+
+def test_teemo_lets_you_hide_for_1_energy_instead_of_any_power(db, decks):
+    g = main_phase(db, decks)
+    legend(g, db, "OGN-263")
+    costs = g._hide_costs(0)
+    assert (1, []) in costs and (0, ["any"]) in costs

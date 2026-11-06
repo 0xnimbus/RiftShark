@@ -294,3 +294,19 @@ def agonys_embrace(defn):
         return ev.get("kind") == "play" and ev.get("from_zone") == "facedown" and ev.get("player") == g.objects[s].controller
     return {"abilities": [Triggered(facedown_play, [O.Draw(1), O.If(O.not_(O.is_my_turn), [O.Discard(1)])],
                                     once_per_turn=True, label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Swift Scout", "Teemo, Swift Scout")
+def teemo_legend(defn):
+    # You may pay [1] to hide a card with [Hidden] instead of [A].
+    # [1], [T]: Put a Teemo unit you own into your hand from your Champion Zone or the board.
+    def teemo_unit(g, c, u):
+        o = g.objects[u]
+        d = o.base_defn()
+        return o.owner == c.controller and d.is_unit and o.zone in ("champion", "board") and \
+            ("Teemo" in d.tags or d.name.split(",")[0].strip() == "Teemo")
+    return {"abilities": [
+        Static("self", "rule", ("hide_for_1_energy",), label="hide for [1] instead of [A]", source_text=defn.text),
+        Activated({"energy": 1, "exhaust": True}, [O.ToHand(Ref("t"))],
+                  targets=[O.Choose(Sel("card", zone="any", pred=teemo_unit), out="t", targeted=False)], timing="main",
+                  label="put a Teemo unit you own into your hand", source_text=defn.text)], "replace": True}
