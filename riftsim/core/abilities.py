@@ -15,6 +15,7 @@ Trigger conditions
 from __future__ import annotations
 
 from .vm import compile_effect
+from .targeting import split_choices
 
 
 def _ev_is(ev, kind):
@@ -81,14 +82,14 @@ TRIGGERS = {
     "end_turn": lambda g, s, ev: _ev_is(ev, "ending_phase") and _mine(g, s, ev),
     "end_any_turn": lambda g, s, ev: _ev_is(ev, "ending_phase"),
     "start_any_turn": lambda g, s, ev: _ev_is(ev, "beginning_phase"),
-    "you_play_card": lambda g, s, ev: _ev_is(ev, "play") and _mine(g, s, ev) and ev.get("uid") != s,
+    "you_play_card": lambda g, s, ev: _ev_is(ev, "play") and _mine(g, s, ev) and ev.get("uid") != s and not ev.get("token"),
     "you_play_spell": lambda g, s, ev: _ev_is(ev, "play") and _mine(g, s, ev) and ev.get("card_type") == "spell",
     "you_play_unit": lambda g, s, ev: _ev_is(ev, "play") and _mine(g, s, ev) and ev.get("card_type") == "unit" and ev.get("uid") != s,
     "you_play_gear": lambda g, s, ev: _ev_is(ev, "play") and _mine(g, s, ev) and ev.get("card_type") == "gear" and ev.get("uid") != s,
     "you_play_unit_here": lambda g, s, ev: _ev_is(ev, "play") and _mine(g, s, ev) and ev.get("card_type") == "unit" and ev.get("uid") != s and _at_source(g, s, ev),
     "you_play_unit_or_gear": lambda g, s, ev: _ev_is(ev, "play") and _mine(g, s, ev) and ev.get("card_type") in ("unit", "gear") and ev.get("uid") != s,
     "opponent_plays_spell": lambda g, s, ev: _ev_is(ev, "play") and not _mine(g, s, ev) and ev.get("card_type") == "spell",
-    "opponent_plays_card": lambda g, s, ev: _ev_is(ev, "play") and not _mine(g, s, ev),
+    "opponent_plays_card": lambda g, s, ev: _ev_is(ev, "play") and not _mine(g, s, ev) and not ev.get("token"),
     "any_plays_spell": lambda g, s, ev: _ev_is(ev, "play") and ev.get("card_type") == "spell",
     "you_conquer": lambda g, s, ev: _ev_is(ev, "conquer") and _mine(g, s, ev),
     "you_hold": lambda g, s, ev: _ev_is(ev, "hold") and _mine(g, s, ev),
@@ -247,6 +248,9 @@ class Triggered(Ability):
         super().__init__(label, zone, cond, source_text, keyword)
         self.event, self.filt, self.targets, self.effect = event, filt, targets, effect
         self.optional, self.once_per_turn = optional, once_per_turn
+        if targets is None:
+            targets, effect = split_choices(effect)      # choices are made as the trigger is finalized (CR 355, 382)
+            self.targets, self.effect = targets or None, effect
         self.code = compile_effect(effect)
         self.target_code = compile_effect(targets)
         self.store = store or {}       # event field -> ctx var name to copy when triggering
@@ -278,6 +282,9 @@ class Activated(Ability):
         self.cost = dict(cost or {})
         self.timing, self.targets, self.effect = timing, targets, effect
         self.once_per_turn, self.is_add = once_per_turn, is_add
+        if targets is None and not is_add:
+            targets, effect = split_choices(effect)      # choices are made as the ability is activated (CR 355)
+            self.targets, self.effect = targets or None, effect
         self.code = compile_effect(effect)
         self.target_code = compile_effect(targets)
         self.is_equip, self.is_empower = is_equip, is_empower

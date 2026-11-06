@@ -1,0 +1,111 @@
+{
+ "name": "Curator of the Sands (Kenny Tran, 34th Riftbound Showdown 25k LDXP Sacramento)",
+ "legend": "VEN-145",
+ "champion": "VEN-063",
+ "main": [
+  {
+   "id": "UNL-221",
+   "name": "Lonely Poro",
+   "count": 3
+  },
+  {
+   "id": "OGN-103",
+   "name": "Ravenbloom Student",
+   "count": 3
+  },
+  {
+   "id": "UNL-053",
+   "name": "Scuttle Crab",
+   "count": 3
+  },
+  {
+   "id": "VEN-037",
+   "name": "Tomb-Raider Barbara",
+   "count": 1
+  },
+  {
+   "id": "OGN-116",
+   "name": "Thousand-Tailed Watcher",
+   "count": 3
+  },
+  {
+   "id": "RAD-060",
+   "name": "The Empyrean",
+   "count": 3
+  },
+  {
+   "id": "SFD-080",
+   "name": "Bellows Breath",
+   "count": 3
+  },
+  {
+   "id": "OGN-045",
+   "name": "Defy",
+   "count": 3
+  },
+  {
+   "id": "RAD-041",
+   "name": "Hush",
+   "count": 1
+  },
+  {
+   "id": "RAD-029",
+   "name": "Life from Stone",
+   "count": 3
+  },
+  {
+   "id": "OGN-095",
+   "name": "Stupefy",
+   "count": 3
+  },
+  {
+   "id": "OGN-058",
+   "name": "Discipline",
+   "count": 3
+  },
+  {
+   "id": "VEN-066",
+   "name": "Temporal Breach",
+   "count": 2
+  },
+  {
+   "id": "OGN-047",
+   "name": "Find Your Center",
+   "count": 2
+  },
+  {
+   "id": "UNL-069",
+   "name": "Sprite Burst",
+   "count": 1
+  },
+  {
+   "id": "OGN-123",
+   "name": "Unchecked Power",
+   "count": 1
+  },
+  {
+   "id": "OGN-122",
+   "name": "Time Warp",
+   "count": 1
+  }
+ ],
+ "runes": {
+  "calm": 5,
+  "mind": 7
+ },
+ "battlefields": [
+  "UNL-212",
+  "SFD-216",
+  "RAD-166"
+ ],
+ "source": {
+  "url": "https://riftdecks.com/riftbound-metagame/deck-nasus-curator-of-the-sands-337272",
+  "player": "Kenny Tran",
+  "placement": 34,
+  "tournament": "Riftbound Showdown 25k LDXP Sacramento",
+  "players": 755,
+  "date": "2026-10-24",
+  "set": "Radiance",
+  "sideboard": []
+ }
+}

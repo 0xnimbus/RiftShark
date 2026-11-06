@@ -69,8 +69,8 @@ class Deck:
             ch = None
         # CR 103.3: the 40-card Main Deck includes the Chosen Champion, which starts in the Champion Zone,
         # so `main` lists the other 39 cards.
-        if len(self.main) != 39:
-            errs.append(f"main deck has {len(self.main) + 1} cards including the champion, expected 40")
+        if len(self.main) < 39:
+            errs.append(f"main deck has {len(self.main) + 1} cards including the champion, needs at least 40")
         counts = {}
         for c in self.main:
             try:
@@ -83,11 +83,11 @@ class Deck:
             counts[cd.name] = counts.get(cd.name, 0) + 1
             if leg is not None and cd.domains and not set(cd.domains) <= set(leg.domains):
                 errs.append(f"{cd.name} is outside the legend's domains {leg.domains}")
+        if ch is not None:
+            counts[ch.name] = counts.get(ch.name, 0) + 1     # the Chosen Champion counts toward its name's limit
         for n, k in counts.items():
             cd = db.card(n)
             limit = 1 if cd.keywords.get("unique") else 3
-            if cd.is_champion and ch is not None and cd.name == ch.name:
-                continue   # the signature champion can exceed (CR: up to 3 copies incl. champion zone? keep simple)
             if k > limit:
                 errs.append(f"{n}: {k} copies (max {limit})")
         if len(self.runes) != 12:

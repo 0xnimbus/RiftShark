@@ -7,6 +7,7 @@ Conventions
 """
 from __future__ import annotations
 
+import copy
 import itertools
 
 from .selectors import Sel
@@ -173,13 +174,38 @@ class Choose(Instr):
     When a chosen object is required but none exists, stores None (instruction using it is ignored).
     `targeted` marks the choice as targeting (Deflect costs, 'when you choose me' triggers, hidden restrictions)."""
 
-    def __init__(self, sel, out="t", n=1, up_to=False, player=None, targeted=True, label=None, distinct=True, allow_none=False):
+    def __init__(self, sel, out="t", n=1, up_to=False, player=None, targeted=True, label=None, distinct=True, allow_none=False,
+                 same_loc=False):
+        # "up to three units at the same location" (Bellows Breath): a group of targets that must share a location
+        # (CR 355.11), not a location chosen first.
+        if isinstance(sel, Sel) and sel.where == "loc:__tloc" and n != 1:
+            sel = copy.copy(sel)
+            sel.where = None
+            same_loc = True
         self.sel, self.out, self.n, self.up_to, self.player = sel, out, n, up_to, player
         self.targeted, self.label, self.distinct, self.allow_none = targeted, label, distinct, allow_none
+        self.same_loc = same_loc
 
     def run(self, game, ctx):
+        r = self._run(game, ctx)
+        if r is None:
+            _record_pick(ctx, ctx.vars.get(self.out))
+        return r
+
+    def resume(self, game, ctx, choice):
+        _record_pick(ctx, choice)
+        return None
+
+    def _run(self, game, ctx):
         p = _player(game, ctx, self.player)
-        cands = game.choice_candidates(ctx, self.sel, targeted=self.targeted)
+        sel = self.sel
+        if callable(sel) and not isinstance(sel, Sel):
+            sel = list(sel(game, ctx) or [])          # an explicit list computed now (e.g. "two of them")
+        cands = game.choice_candidates(ctx, sel, targeted=self.targeted)
+        if isinstance(sel, Sel) and sel.other:
+            # "another unit": not one already chosen by this spell/ability (nor its source)
+            picked = ctx.vars.get("__picked", ())
+            cands = [u for u in cands if u not in picked]
         n = val(game, ctx, self.n)
         if n == 1 and not self.up_to:
             if not cands:
@@ -197,13 +223,26 @@ class Choose(Instr):
         opts = []
         lo = 0 if self.up_to else maxn
         for k in range(lo, maxn + 1):
-            opts += [tuple(c) for c in itertools.combinations(cands, k)]
+            opts += [tuple(c) for c in itertools.combinations(cands, k)
+                     if not self.same_loc or len({game.objects[u].location for u in c}) <= 1]
+        if not opts and self.same_loc:
+            groups = {}
+            for u in cands:
+                groups.setdefault(game.objects[u].location, []).append(u)
+            k = min(n, max(len(v) for v in groups.values())) if groups else 0
+            opts = [tuple(c) for v in groups.values() for c in itertools.combinations(v, k)] or [()]
         if len(opts) == 1:
             ctx.vars[self.out] = opts[0]
             return None
         return Decision(p, "choose_many", opts, out=self.out,
                         labels=[", ".join(game.label(u) for u in o) or "none" for o in opts],
                         info={"sel": repr(self.sel), "label": self.label or ""})
+
+
+def _record_pick(ctx, v):
+    vs = v if isinstance(v, tuple) else ((v,) if v is not None else ())
+    if vs:
+        ctx.vars["__picked"] = tuple(ctx.vars.get("__picked", ())) + tuple(vs)
 
 
 class ChooseLocation(Instr):
@@ -337,16 +376,57 @@ class Split(Instr):
     """Deal `amount` damage split among chosen targets (targets chosen earlier into Ref). Splits
     as evenly-lethal as the controller decides; the AI uses a greedy lethal-first split."""
 
-    def __init__(self, amount, targets):
-        self.amount, self.targets = amount, targets
+    def __init__(self, amount, targets, source=None):
+        self.amount, self.targets, self.source = amount, targets, source
 
     def run(self, game, ctx):
-        us = _uids(game, ctx, self.targets)
+        us = [u for u in _uids(game, ctx, self.targets) if game.objects[u].zone == "board"]
         amt = val(game, ctx, self.amount)
         if not us or not amt:
             return None
-        game.do_deal_split(us, amt, ctx)
+        ctx.vars["__split_amt"] = amt
+        if len(us) > amt:
+            # CR 355.14.h: more targets than damage: the controller picks which stay targets (exactly `amt` of them)
+            opts = [tuple(c) for c in itertools.combinations(us, amt)]
+            ctx.vars["__split_stage"] = "targets"
+            return Decision(ctx.controller, "choose_many", opts, labels=[", ".join(game.label(u) for u in o) for o in opts],
+                            info={"label": "targets that keep receiving damage"})
+        return self._divide(game, ctx, tuple(us))
+
+    def _divide(self, game, ctx, us):
+        amt = ctx.vars["__split_amt"]
+        plans = _compositions(amt, len(us))
+        if len(plans) == 1:
+            return self._deal(game, ctx, us, plans[0])
+        ctx.vars["__split_stage"] = "divide"
+        ctx.vars["__split_us"] = us
+        labels = [", ".join(f"{game.label(u)}: {a}" for u, a in zip(us, pl)) for pl in plans]
+        return Decision(ctx.controller, "split_damage", plans, labels=labels, info={"targets": us, "amount": amt})
+
+    def _deal(self, game, ctx, us, plan):
+        src = val(game, ctx, self.source) if self.source is not None else None
+        for u, a in zip(us, plan):
+            if a > 0:
+                game.do_deal([u], a, ctx, source_uid=src)
         return None
+
+    def resume(self, game, ctx, choice):
+        if ctx.vars.get("__split_stage") == "targets":
+            return self._divide(game, ctx, tuple(choice))
+        return self._deal(game, ctx, ctx.vars["__split_us"], choice)
+
+
+def _compositions(n, k):
+    """Ways to divide n damage among k targets, each getting at least 1 (CR 355.14.f-g)."""
+    if k == 0:
+        return []
+    if k == 1:
+        return [(n,)]
+    out = []
+    for first in range(1, n - k + 2):
+        for rest in _compositions(n - first, k - 1):
+            out.append((first,) + rest)
+    return out
 
 
 class Kill(Instr):
@@ -893,7 +973,7 @@ class PayAnyEnergy(Instr):
 
 
 class PayEquip(Instr):
-    """Weaponmaster (CR 829): 'you may pay the Equip cost of a gear' -> out True if paid."""
+    """Weaponmaster (CR 821.1.c): pay the chosen Equipment's Equip cost reduced by [A] -> out True if paid."""
 
     def __init__(self, gear, out="__eq"):
         self.gear, self.out = gear, out
@@ -907,6 +987,8 @@ class PayEquip(Instr):
             if isinstance(ab, Activated) and ab.is_equip:
                 d = game.objects[gear].base_defn()
                 pw = ["any" if x == "C" and not d.domains else (d.domains[0] if x == "C" else x) for x in ab.cost.get("power", ())]
+                if pw:
+                    pw = pw[1:]      # "reduced by [A]": one Power symbol of any domain is waived (CR 821.1.c.3)
                 return ab.cost.get("energy", 0), pw
         return None
 

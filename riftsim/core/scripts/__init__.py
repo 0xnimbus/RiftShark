@@ -38,6 +38,9 @@ class SpellEffect:
 
     def __init__(self, effect=None, targets=None, label="", source_text=""):
         from ..vm import compile_effect
+        if targets is None:
+            from ..targeting import split_choices
+            targets, effect = split_choices(effect)      # choices are made as the spell is played (CR 355)
         self.code = compile_effect(effect)
         self.target_code = compile_effect(targets)
         self.label, self.source_text, self.zone, self.cond, self.keyword = label, source_text, "chain", None, None
@@ -75,10 +78,7 @@ def keyword_abilities(defn):
         out.append(Triggered("play_self", [O.Attach(Ref("self"), Ref("t"))], targets=[O.Choose(Sel("unit", side="friendly"), targeted=True)],
                              label="Quick-Draw", keyword="quick_draw"))
     if kws.get("weaponmaster"):
-        out.append(Triggered("play_self", [O.If(lambda g, c: c.vars.get("t") is not None,
-                                                 [O.PayEquip(Ref("t"), out="__eq"), O.If(Ref("__eq"), [O.Attach(Ref("t"), Ref("self"))])])],
-                             targets=[O.Choose(Sel("gear", side="friendly", tags=["Equipment"]), up_to=True, targeted=False)],
-                             label="Weaponmaster", optional=True, keyword="weaponmaster"))
+        out.append(weaponmaster_ability())
     if defn.is_equipment and defn.might:
         defn.effect_abilities.append(Static("attached", "might", defn.might, label=f"+{defn.might} [M]"))
     if kws.get("deploy") and defn.is_gear:
@@ -98,6 +98,14 @@ def keyword_abilities(defn):
         cost = parse_cost(m.group(1)) if m else {"energy": 1}
         out.append(Activated(cost, [O.Empower(Ref("self"))], timing="main", label="Empower", is_empower=True, keyword="empower"))
     return out
+
+
+def weaponmaster_ability():
+    """[Weaponmaster]: when you play me, you may attach an Equipment you control to me, paying its Equip cost."""
+    return Triggered("play_self", [O.If(lambda g, c: c.vars.get("t") is not None,
+                                        [O.PayEquip(Ref("t"), out="__eq"), O.If(Ref("__eq"), [O.Attach(Ref("t"), Ref("self"))])])],
+                     targets=[O.Choose(Sel("gear", side="friendly", tags=["Equipment"]), allow_none=True, targeted=False)],
+                     label="Weaponmaster", optional=True, keyword="weaponmaster")
 
 
 def _equip_cost_text(defn):
@@ -172,7 +180,7 @@ def attach_scripts(db, defn):
 
 
 def script_all(db):
-    from . import cards_manual  # noqa: F401  (registers manual scripts)
+    from . import cards_manual, cards_radiance  # noqa: F401  (registers manual scripts)
     for c in db:
         attach_scripts(db, c)
     db.scripted = True
