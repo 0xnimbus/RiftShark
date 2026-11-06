@@ -2124,3 +2124,103 @@ def remember_the_fallen(defn):
         code.append(O.If(lambda g, c, i=i: len(c.vars.get("__rf") or ()) > i,
                          [O.PlayCard(lambda g, c, i=i: c.vars["__rf"][i], ignore="all")]))
     return [SpellEffect(code, label=defn.name, source_text=defn.text)]
+
+
+# ---------------------------------------------------------------- batch 2026-11-06 16:30
+@script("Primordial Roar")
+def primordial_roar(defn):
+    # [Show Off] a unit.  If you showed off a unit, deal damage equal to that unit's Might to a unit.
+    shown = lambda g, c: bool(getattr(c, "shown_off", None))
+    return [SpellEffect([O.Choose(Sel("unit"), out="t"),
+                         O.If(shown, [O.Deal(lambda g, c: c.shown_off["might"], Ref("t"))])], label=defn.name, source_text=defn.text)]
+
+
+@script("Rousing Display")
+def rousing_display(defn):
+    # [Show Off] a card with Energy cost [7] or more.  Play two 1 [M] Recruit unit tokens to your base. If you showed
+    # off, play four to your base instead.
+    n = lambda g, c: 4 if getattr(c, "shown_off", None) else 2
+    return [SpellEffect([O.PlayToken("Recruit", loc="base", count=n)], label=defn.name, source_text=defn.text)]
+
+
+@script("Black Rose Sanctum")
+def black_rose_sanctum(defn):
+    # For each player, the first time each turn a non-token unit they control dies here, they play a 1 [M] Recruit unit
+    # token to their base.
+    def dies(g, s, ev):
+        if ev.get("kind") != "die" or ev.get("card_type") != "unit" or ev.get("token") or ev.get("loc") != g.objects[s].place:
+            return False
+        key = ("black_rose", s, ev.get("player"))
+        if g.turn_memo.get(key):
+            return False
+        g.turn_memo[key] = True
+        return True
+    return [Triggered(dies, [O.PlayToken("Recruit", loc="base")], controller="event", label=defn.name, source_text=defn.text)]
+
+
+@script("Durand Memorial")
+def durand_memorial(defn):
+    # When you defend here, choose a unit you control here. Give it [Tank] this combat.
+    def defend(g, s, ev):
+        if ev.get("kind") != "defend" or ev.get("loc") != g.objects[s].place or ev.get("player") != g.objects[s].controller:
+            return False
+        key = ("durand", s, id(g.combat))
+        if g.turn_memo.get(key):
+            return False
+        g.turn_memo[key] = True
+        return True
+    here = lambda g, c: [u for u in g.units_at(g.objects[c.source].place) if g.objects[u].controller == c.controller]
+    return [Triggered(defend, [O.ChooseFromList(here, out="__dm", label="give it [Tank] this combat"),
+                               O.Do(lambda g, c: g.add_mod(c.vars["__dm"], "keyword", ("tank", True), duration="combat", source=c.source)
+                                    if c.vars.get("__dm") is not None else None, label="[Tank] this combat")],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Angler Wyrm")
+def angler_wyrm(defn):
+    # [Deflect]  [T]: Choose an opponent. They must move a unit they control to my battlefield.
+    from ..abilities import Activated
+    def theirs(g, c):
+        loc = g.objects[c.source].location
+        return [u for u, o in g.objects.items() if o.zone == "board" and o.controller == c.vars.get("__opp") and "unit" in g.chars(u).types
+                and o.location != loc and g.valid_destination(u, loc)]
+    at_bf = lambda g, c: g.objects[c.source].location is not None and g.objects[c.source].location[0] == "bf"
+    return [Activated({"energy": 0, "power": [], "exhaust": True},
+                      [O.ChoosePlayer(out="__opp", opponent=True),
+                       O.If(at_bf, [O.ChooseFromList(theirs, out="__aw", player=Ref("__opp"), label="move a unit to that battlefield"),
+                                    O.Move(Ref("__aw"), lambda g, c: g.objects[c.source].location)])],
+                      timing="main", label=defn.name, source_text=defn.text)]
+
+
+@script("Cataclysm")
+def cataclysm(defn):
+    # Opponents can't play spells this turn.  Move a friendly unit to an occupied enemy battlefield.
+    occ = lambda g, c, l: g.battlefields[l[1]].controller is not None and not g.is_friendly(g.battlefields[l[1]].controller, c.controller) \
+        and bool(g.units_at(l)) and g.valid_destination(c.vars["t"], l)
+    return [SpellEffect([O.Do(lambda g, c: g.add_turn_effect(c, "cant_play_spells", {"players": tuple(g.opponents(c.controller))}),
+                              label="opponents can't play spells this turn"),
+                         O.Choose(Sel("unit", side="friendly"), out="t"),
+                         O.ChooseLocation(out="loc", pred=occ, label="an occupied enemy battlefield"),
+                         O.Move(Ref("t"), Ref("loc"))], label=defn.name, source_text=defn.text)]
+
+
+@script("Mechanical Bandit")
+def mechanical_bandit(defn):
+    # At the start of your Beginning Phase, each player reveals the top card of their Main Deck. If you revealed a card
+    # with the lowest Energy cost, draw it. Recycle the rest.
+    def run(g, c):
+        tops = {q: g.players[q].deck[0] for q in range(len(g.players)) if g.players[q].deck}
+        if not tops:
+            return
+        for q, u in tops.items():
+            g.emit("reveal", cards=(u,), player=q, ctx=c)
+        low = min(g.objects[u].base_defn().energy or 0 for u in tops.values())
+        me = c.controller
+        rest = [u for q, u in tops.items() if q != me]
+        if me in tops:
+            if (g.objects[tops[me]].base_defn().energy or 0) == low:
+                g.do_draw(me, 1, c)
+            else:
+                rest.append(tops[me])
+        g.do_recycle(rest, c)
+    return [Triggered("start_beginning", [O.Do(run, label="reveal top cards")], label=defn.name, source_text=defn.text)]

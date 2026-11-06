@@ -820,3 +820,31 @@ def test_remember_the_fallen_plays_cheap_cards_from_trash(db, decks):
     b = _card_in(g, db, 0, "Elnuk Herd", "trash")      # costs 6: not allowed
     _run_spell(g, db, "Remember the Fallen", picks=[(a,), ()])
     assert g.objects[a].zone == "board" and g.objects[b].zone == "trash"
+
+
+def test_rousing_display_and_cataclysm(db, decks):
+    g = main_phase(db, decks)
+    _run_spell(g, db, "Rousing Display")
+    assert sum(1 for o in g.objects.values() if o.zone == "board" and o.defn.name == "Recruit" and o.controller == 0) == 2
+    me = put(g, db, 0, "Hunting Dog", ("base", 0))
+    put(g, db, 1, "Elnuk Herd", ("bf", 1), exclude=(me,)); g.set_bf_controller(1, 1)
+    _run_spell(g, db, "Cataclysm", picks=[me])
+    assert any(e["kind"] == "move" and e.get("uid") == me and e.get("to") == ("bf", 1) for e in g.events)
+
+
+def test_black_rose_sanctum_once_per_player_per_turn(db, decks):
+    g = main_phase(db, decks)
+    _bf_card(g, db, "Black Rose Sanctum", 0)
+    a = put(g, db, 1, "Hunting Dog", ("bf", 0)); b = put(g, db, 1, "Hunting Dog", ("bf", 0), exclude=(a,))
+    g.do_kill([a]); settle(g); g.do_kill([b]); settle(g)
+    assert sum(1 for o in g.objects.values() if o.zone == "board" and o.defn.name == "Recruit" and o.controller == 1) == 1
+
+
+def test_mechanical_bandit_draws_the_lowest(db, decks):
+    g = main_phase(db, decks)
+    mb = put(g, db, 0, "Mechanical Bandit", ("base", 0))
+    t0, t1 = g.players[0].deck[0], g.players[1].deck[0]
+    g.objects[t0].defn = next(c for c in db if c.name == "Hunting Dog")
+    g.objects[t1].defn = next(c for c in db if c.name == "Elnuk Herd")
+    _fire(g, mb, "Mechanical Bandit"); settle(g)
+    assert g.objects[t0].zone == "hand" and g.objects[t1].zone == "deck" and g.players[1].deck[-1] == t1
