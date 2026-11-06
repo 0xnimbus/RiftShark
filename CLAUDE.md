@@ -65,6 +65,12 @@ Every entry in the RULES.md "Simplifications" list is a bug to fix, in this orde
    vanilla, so nothing is simplified silently. Add per-card tests against printed text for the tournament decks first.
 Until this is done, treat the published win rates and coach grades as provisional and say so in the UI.
 
+Bugs Derrick reported 2026-11-06 03:35 (do first next session, before item 2):
+- Playing as the first player (P0 seat in play.html), he does not start his first turn with 2 runes. Check the
+  Channel phase on turn 1 (CR: 2 runes per turn, second player 3 on their first turn) and what the page shows.
+- Battlefield effects seem not to apply in play. Check every battlefield in the two tournament decks (Void Gate,
+  Frozen Fortress, Rockfall Path, Emperor's Dais, Rakelstake, Star Spring) fires/applies in real games, add tests.
+
 ## Next steps
 
 1. Keep raising auto-scripter coverage; hand-script legends/champions and competitive staples in
