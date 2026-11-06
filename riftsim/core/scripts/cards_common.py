@@ -2621,3 +2621,31 @@ def hard_bargain(defn):
 @script("Marai Spire")
 def marai_spire(defn):
     return [Static("self", "rule", ("repeat_cost_reduce", 1), label="friendly [Repeat] costs cost [1] less", source_text=defn.text)]
+
+
+@script("Ornn's Forge")
+def ornns_forge(defn):
+    # While you control this battlefield, the first friendly non-token gear played each turn costs [1] less.
+    def reduce(g, src, uid, e, pw):
+        d = g.objects[uid].base_defn()
+        p = g.objects[src].controller
+        if not d.is_gear or d.is_token or g.turn_memo.get(("gear_played", p), 0):
+            return e, pw
+        return max(0, e - 1), pw
+    return [Static("self", "rule", ("cost_reduce", reduce), label="first gear each turn costs [1] less", source_text=defn.text)]
+
+
+@script("Spirit Wheel")
+def spirit_wheel(defn):
+    # When you choose a friendly unit, you may pay [1] and exhaust this to draw 1.
+    def chose_friendly(g, s, ev):
+        me = g.objects[s]
+        if ev.get("kind") != "target" or ev.get("player") != me.controller or me.exhausted:
+            return False
+        return any(u in g.objects and g.objects[u].zone == "board" and g.objects[u].controller == me.controller
+                   and "unit" in g.chars(u).types for u in ev.get("targets", ()))
+    return [Triggered(chose_friendly, [O.May([
+        O.If(lambda g, c: not g.objects[c.source].exhausted, [
+            O.PayResources(1, [], out="__sw", optional=False),
+            O.If(O.has_var("__sw"), [O.Exhaust(Ref("self")), O.Draw(1)])])],
+        label="pay [1] and exhaust Spirit Wheel to draw 1")], label="Spirit Wheel: draw", source_text=defn.text)]

@@ -1835,6 +1835,8 @@ class FlowMixin:
         self._use_play_effects(p, uid)
         if loc is not None and kind in ("unit", "gear"):
             self.turn_memo.setdefault("played_at", []).append((p, loc))
+        if kind == "gear" and not d.is_token:
+            self.turn_memo[("gear_played", p)] = self.turn_memo.get(("gear_played", p), 0) + 1     # Ornn's Forge
         ctx = Context(p, uid, here=loc)
         ctx.played_from = z
         if z == "facedown":

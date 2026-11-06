@@ -1080,3 +1080,31 @@ def test_marai_spire_repeat_costs_one_less(db, decks):
     g.set_bf_controller(0, 0); g.bump()
     rep = dict(g._optional_costs(it, Context(0, None)))["repeat"]
     assert rep[0] == 1
+
+
+def test_ornns_forge_first_gear_each_turn_costs_one_less(db, decks):
+    g = main_phase(db, decks)
+    gear = next(c.name for c in db if c.is_gear and not c.is_token and (c.energy or 0) >= 2)
+    a = _card_in(g, db, 0, gear, "hand")
+    base = g.card_cost(0, a, "hand")[0]
+    _bf_card(g, db, "Ornn's Forge", 0)
+    g.set_bf_controller(0, 0); g.bump()
+    assert g.card_cost(0, a, "hand")[0] == base - 1
+    assert g.card_cost(1, _card_in(g, db, 1, gear, "hand"), "hand")[0] == base     # only friendly gear
+    g.turn_memo[("gear_played", 0)] = 1
+    assert g.card_cost(0, a, "hand")[0] == base
+
+
+def test_spirit_wheel_pays_one_and_exhausts_to_draw(db, decks):
+    g = main_phase(db, decks)
+    w = put(g, db, 0, "Spirit Wheel", ("base", 0))
+    u = put(g, db, 0, "Rell, Magnetic", ("base", 0))
+    hand = len(g.players[0].hand)
+    g.emit("target", targets=(u,), player=0, item=None); settle(g, yes=True)
+    assert g.objects[w].exhausted and len(g.players[0].hand) == hand + 1
+    g = main_phase(db, decks)
+    w = put(g, db, 0, "Spirit Wheel", ("base", 0))
+    foe = put(g, db, 1, "Rell, Magnetic", ("bf", 0))
+    hand = len(g.players[0].hand)
+    g.emit("target", targets=(foe,), player=0, item=None); settle(g, yes=True)     # an enemy unit: no trigger
+    assert not g.objects[w].exhausted and len(g.players[0].hand) == hand
