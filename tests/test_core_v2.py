@@ -209,6 +209,8 @@ def test_play_session_seat_decides_who_goes_first(db):
         assert g.objects[me.legend].defn.name.startswith("Kai'Sa")       # the human always plays deck0
         assert g.first_player == 0
         if human == 0:
+            while g.phase != "main" and g.pending is not None and ("pass",) in g.pending.options:
+                g.choose(("pass",)); g.run()      # a battlefield's Beginning-phase trigger may be on the chain
             assert g.turn == 1 and g.turn_player == 0 and len(me.runes) == 2
         else:
             assert len(me.runes) in (0, 3)       # AI's turn 1 already played out, or human's turn 2 started

@@ -213,8 +213,13 @@ class FlowMixin:
             self.phase = "beginning"
             self.dirty = True
         elif ph == "beginning":
-            self.emit("beginning_phase", player=self.turn_player)
-            self.phase = "scoring"
+            # Beginning-phase triggers (e.g. Frozen Fortress) resolve before the phase ends (CR 315.2):
+            # stay in "beginning" until the chain they opened is empty.
+            if not self.turn_memo.get("beginning_emitted"):
+                self.turn_memo["beginning_emitted"] = True
+                self.emit("beginning_phase", player=self.turn_player)
+            else:
+                self.phase = "scoring"
             self.dirty = True
         elif ph == "scoring":
             for bf in self.battlefields:
