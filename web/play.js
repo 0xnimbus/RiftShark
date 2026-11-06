@@ -53,6 +53,7 @@
   let filterUid = null;    // show only options for this card (clicked in hand)
   const logLines = [];     // {turn, html, cls}
   let lastTurnLogged = null;
+  const chainOpen = new Set();  // chain items currently waiting to resolve (for the log's indentation)
 
   function gradeTag(g) { if (!g) return ""; const cls = g === "only move" ? "only" : g; return `<span class="grade ${cls}">${g}</span>`; }
 
@@ -67,14 +68,16 @@
         logLines.push({ cls: e.player === human ? "me" : "op", html: `${e.player === human ? "You choose" : "Opponent chooses"}: ${B.say(e.choice)}` });
         continue;
       }
+      const cs = B.chainStep(e, chainOpen);
       const h = B.describe(e);
-      if (h) logLines.push({ cls: e.player === human ? "me" : (e.player == null ? "" : "op"), html: h });
+      if (h) logLines.push({ cls: (e.player === human ? "me" : (e.player == null ? "" : "op")) + (chainOpen.size || cs.depth ? " chain" : ""),
+                             html: h + cs.note, depth: cs.depth });
     }
     if (logLines.length > 600) logLines.splice(0, logLines.length - 600);
   }
   function renderLog() {
     const el = $("#log");
-    el.innerHTML = logLines.map(l => `<div class="ln ${l.cls}">${l.html}</div>`).join("");
+    el.innerHTML = logLines.map(l => `<div class="ln ${l.cls}"${l.depth ? ` style="margin-left:${Math.min(4, l.depth) * 14}px"` : ""}>${l.html}</div>`).join("");
     el.scrollTop = el.scrollHeight;
   }
 
@@ -171,7 +174,7 @@
   function show(j) {
     cur = j;
     if (!j.started) return;
-    addEvents(j.events, j.human);
+    if (!j.__logged) { j.__logged = true; addEvents(j.events, j.human); }  // a payload can be drawn twice; log it once
     renderLog();
     drawBoard(j);
     drawDecision(j);
@@ -255,16 +258,19 @@
   }
   $("#btn-new").addEventListener("click", async () => {
     if (inFlight) return;
-    inFlight = true; logLines.length = 0; lastTurnLogged = null; hints = null; filterUid = null;
+    inFlight = true; logLines.length = 0; lastTurnLogged = null; chainOpen.clear(); hints = null; filterUid = null;
     $("#board").innerHTML = `<div class="empty-board"><span class="dots"><span></span><span></span><span></span></span> Shuffling and dealing…</div>`;
     status("starting…");
     try {
+      // a fresh shuffle every game unless a seed was typed in to replay one
+      const seed = $("#seed").value.trim() === "" ? Math.floor(Math.random() * 2147483647) : +$("#seed").value;
       const j = await api("/api/new", { deck0: $("#deck0").value, deck1: $("#deck1").value, human: +$("#human").value, ai: $("#ai").value,
-                                        analysis: +$("#analysis").value, seed: +$("#seed").value });
+                                        analysis: +$("#analysis").value, seed });
       inFlight = false;
       $("#review").textContent = "Every move you make is rated against the engine's best line, like a chess engine.";
       $("#summary").textContent = "";
       $("#setup").open = false;
+      $("#seed-used").textContent = `Game seed ${j.seed != null ? j.seed : seed} (type it under "New game" to replay this exact shuffle).`;
       show(j);
       status("");
     } catch (e) { inFlight = false; status("error: " + e.message); }

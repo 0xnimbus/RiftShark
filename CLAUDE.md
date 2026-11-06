@@ -52,6 +52,9 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   `ai_step` (one AI decision per call, shown from a display queue while the opponent hand shows "thinking") → `grade`.
   2026-11-06 06:00: cards slide between zones (FLIP in `RiftBoard.render`, opponent cards fly out of their hand), phone layout
   (<=760px: smaller cards, decision panel fixed at the bottom), rune float options grouped as "Use runes now".
+  Chain lane (06:10): the chain shows in the middle of the board, oldest left, "resolves next" right, with kind, controller,
+  targets (PlaySession reads chosen uids from each item's ctx.vars) and trigger cause; who has priority; log lines indent by
+  chain depth (`RiftBoard.chainStep`). The page sends a fresh random seed per game unless one is typed in, and shows it.
   Left to do: check order_triggers/mulligan labels once the engine thread lands them.
 - Main deck = 39 cards + chosen champion (CR 103.3). `When you play me` triggers fire from the chain.
 - `riftsim/` top level still holds the v1 simplified engine (engine.py, policies.py, replay.py, runner.py, cli.py).

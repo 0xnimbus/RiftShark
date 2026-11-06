@@ -72,7 +72,34 @@ class PlaySession:
         for p in st["players"]:
             if p["idx"] != self.human:
                 p["hand"] = [{"uid": None, "card": None, "name": "?", "controller": p["idx"], "hidden": True} for _ in p["hand"]]
+        for it, view in zip(self.game.chain, st["chain"]):
+            view["targets"] = self._chain_targets(it)
+            ev = it.ctx.vars.get("ev") if getattr(it, "ctx", None) is not None else None
+            if it.kind in ("trigger", "reflexive") and isinstance(ev, dict) and ev.get("kind"):
+                o = self.game.objects.get(ev.get("uid"))
+                view["cause"] = {"event": str(ev["kind"]), "name": o.defn.name if o is not None and o.zone != "hand" else None}
         return st
+
+    def _chain_targets(self, it):
+        """Public objects a chain item has chosen so far (its targets), read from its context variables."""
+        g, out = self.game, []
+        ctx = getattr(it, "ctx", None)
+        if ctx is None:
+            return out
+        def add(v):
+            if isinstance(v, bool) or not isinstance(v, int) or v == it.uid or v in seen:
+                return
+            o = g.objects.get(v)
+            if o is not None and o.zone in ("board", "champion"):
+                seen.add(v)
+                out.append({"uid": v, "name": o.defn.name, "controller": o.controller})
+        seen = set()
+        for k, v in list(ctx.vars.items()):
+            if str(k).startswith("__") or k in ("self", "ev"):
+                continue
+            for x in (v if isinstance(v, (tuple, list)) else (v,)):
+                add(x)
+        return out[:6]
 
     def summary(self):
         rs = [r for r in self.reviews if r.get("grade") not in (None, "only move")]

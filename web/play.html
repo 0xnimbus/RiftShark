@@ -21,11 +21,12 @@
       <label>Seat <select id="human"><option value="0">go first</option><option value="1">go second</option></select></label>
       <label>AI strength <select id="ai"><option value="greedy">greedy (fast)</option><option value="mcts:60">MCTS 60</option><option value="mcts:150" selected>MCTS 150</option><option value="mcts:400">MCTS 400 (slow)</option></select></label>
       <label>Coach depth <input id="analysis" type="number" value="150" min="20" max="2000" style="width:70px"></label>
-      <label>Seed <input id="seed" type="number" value="0" style="width:60px"></label>
+      <label title="Leave empty for a fresh random shuffle every game; enter a number to replay a shuffle">Seed <input id="seed" type="number" placeholder="random" style="width:80px"></label>
       <button id="btn-new" class="primary">Start game</button>
     </div>
     <div id="mode" class="alt"></div>
   </details>
+  <div id="seed-used" class="alt"></div>
   <div class="play-layout">
     <div id="board" class="board"><div class="empty-board">Pick two decks and press <b>Start game</b>. Hover any card to read it.</div></div>
     <aside class="side-panel">

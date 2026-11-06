@@ -117,10 +117,14 @@
     $("#frame-slider").value = frame;
     // what happened between this decision and the next, in plain words
     const next = rep.frames[frame + 1] ? rep.frames[frame + 1].event_index : rep.events.length;
+    const open = new Set();
+    rep.events.slice(0, f.event_index).forEach(e => B.chainStep(e, open));  // chain state when this decision was made
     const lines = rep.events.slice(f.event_index, next).map(e => {
       if (e.kind === "decision") return null;
+      const cs = B.chainStep(e, open);
       const h = B.describe(e);
-      return h ? `<div class="ln ${e.player === 0 ? "me" : e.player === 1 ? "op" : ""}">${h}</div>` : null;
+      const cls = (e.player === 0 ? "me" : e.player === 1 ? "op" : "") + (open.size || cs.depth ? " chain" : "");
+      return h ? `<div class="ln ${cls}"${cs.depth ? ` style="margin-left:${Math.min(4, cs.depth) * 14}px"` : ""}>${h}${cs.note}</div>` : null;
     }).filter(Boolean);
     $("#events").innerHTML = lines.join("") || '<span class="muted">nothing visible</span>';
   }

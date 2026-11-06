@@ -244,14 +244,49 @@ window.RiftBoard = (function () {
     return `<div class="turnbar"><span class="tn">Turn ${st.turn}</span><span class="whose ${st.turn_player === ME ? "me" : "op"}">${whose}</span>
       <span class="phases">${steps}</span>${special}</div>`;
   }
+  const KIND = { spell: "Spell", unit: "Unit", gear: "Gear", trigger: "Triggered ability", reflexive: "Triggered ability",
+                 activated: "Activated ability", ability: "Activated ability", add: "Add (resolves at once)" };
+  const CAUSE = { play: "was played", enter: "entered", die: "died", move: "moved", attack: "attacked", defend: "defended",
+                  conquer: "conquered", hold: "held", damage: "took damage", draw: "drew", score: "scored", showdown_start: "a showdown began",
+                  combat_start: "combat began", beginning_phase: "the turn began", ending_phase: "the turn ended", stun: "was stunned" };
+  /* The chain as a lane in the middle of the board: oldest on the left, the one that resolves next on the right. */
   function chainBox(st) {
     if (!st.chain || !st.chain.length) return "";
-    const items = st.chain.slice().reverse().map((it, i) => {
+    const n = st.chain.length;
+    const items = st.chain.map((it, i) => {
       const def = CARDS[it.card] || {};
-      return `<div class="chain-item ${it.controller === ME ? "me" : "op"}" ${it.card ? `data-card="${esc(it.card)}"` : ""}>
-        ${def.image ? `<img src="${esc(def.image)}" alt="">` : ""}<div><b>${esc(it.label)}</b><div class="muted">${NEUTRAL ? "P" + it.controller : it.controller === ME ? "yours" : "opponent's"}${i === 0 ? " · resolves next" : ""}${it.finalized ? "" : " · still being put on"}</div></div></div>`;
+      const top = i === n - 1;
+      const owner = NEUTRAL ? "P" + it.controller : it.controller === ME ? "Yours" : "Opponent's";
+      const tg = (it.targets || []).length ? `<div class="ci-tg">→ ${it.targets.map(t => `<b class="${t.controller === ME ? "me" : "op"}" data-uid="${t.uid}">${esc(t.name)}</b>`).join(", ")}</div>` : "";
+      const cause = it.cause ? `<div class="ci-cause">because ${it.cause.name ? esc(it.cause.name) + " " : ""}${esc(CAUSE[it.cause.event] || it.cause.event.replace(/_/g, " "))}</div>` : "";
+      const resp = i > 0 ? `<div class="ci-arrow" title="responds to the item on its left">⟵ responds</div>` : "";
+      return `${resp}<div class="chain-item ${it.controller === ME ? "me" : "op"}${top ? " next" : ""}" ${it.card ? `data-card="${esc(it.card)}"` : ""}>
+        <div class="ci-pos">${top ? "RESOLVES NEXT" : "#" + (i + 1)}</div>
+        ${def.image ? `<img src="${esc(def.image)}" alt="">` : `<div class="ci-noimg">⛓</div>`}
+        <div class="ci-body"><div class="ci-kind">${esc(KIND[it.kind] || it.kind || "")}${it.finalized ? "" : " · being played"}</div>
+          <b>${chips(it.label)}</b><div class="ci-own">${owner}</div>${tg}${cause}</div></div>`;
     }).join("");
-    return `<div class="chain"><div class="zl">Chain (top resolves first)</div>${items}</div>`;
+    let wait = "";
+    if (st.priority != null) {
+      const p = st.priority;
+      wait = NEUTRAL ? `P${p} may respond or pass` : p === ME ? "<b>Your priority:</b> respond with a Reaction or pass" : "<b>Opponent</b> may respond or pass";
+    }
+    return `<div class="chain-lane"><div class="chain-head"><span class="ch-title">⛓ Chain · ${n} item${n === 1 ? "" : "s"}</span>
+        <span class="ch-wait">${wait}</span>
+        <span class="ch-rule" title="CR: while anything is on the chain, only Reaction-speed cards and abilities can be played">Only <i class="kw">Reaction</i> speed can be played now. When both players pass in a row, the item on the right resolves.</span></div>
+      <div class="chain-row">${items}</div></div>`;
+  }
+
+  /* Track chain depth through the log: items go on (play / trigger) and come off (resolve / counter). */
+  function chainStep(e, open) {
+    let depth = open.size, note = "";
+    if ((e.kind === "finalized" || e.kind === "trigger") && e.item != null && !open.has(e.item)) {
+      if (open.size) note = ` <span class="resp">responding (chain ${open.size + 1})</span>`;
+      open.add(e.item); depth = open.size;
+    } else if ((e.kind === "resolve" || e.kind === "counter") && e.item != null) {
+      depth = open.size; open.delete(e.item);
+    }
+    return { depth: Math.max(0, depth - 1), note };
   }
 
   /* opts: {me, thinking, playable: {uid: [option indexes]}, victory, decisionKind, banner} */
@@ -269,9 +304,9 @@ window.RiftBoard = (function () {
         ${seat(op, st, o, true)}
         ${base(op)}
         <div class="bfs">${st.battlefields.map(b => battlefield(b, st, o)).join("")}</div>
+        ${chainBox(st)}
         ${base(me)}
         ${seat(me, st, o, false)}
-        ${chainBox(st)}
         ${o.banner ? `<div class="banner ${o.banner.me ? "me" : "op"}">${o.banner.html}</div>` : ""}
       </div>`;
     if (before) slide(el, before);
@@ -361,5 +396,5 @@ window.RiftBoard = (function () {
     }).join("");
   }
   const getMe = () => ME;
-  return { setCards, render, bindTooltips, say, explain, describe, thumbs, uidsIn, chips, esc, getMe };
+  return { setCards, render, bindTooltips, say, explain, describe, chainStep, thumbs, uidsIn, chips, esc, getMe };
 })();

@@ -16,7 +16,7 @@ def call(cmd, args_json):
     if cmd == "new":
         d0 = json.load(open("/app/" + a["deck0"], encoding="utf-8"))
         d1 = json.load(open("/app/" + a["deck1"], encoding="utf-8"))
-        r = S.new(d0, d1, human=a.get("human", 0), seed=a.get("seed", 0), ai=a.get("ai", "mcts:60"), analysis=a.get("analysis", 60))
+        r = S.new(d0, d1, human=a.get("human", 0), seed=a.get("seed"), ai=a.get("ai", "mcts:60"), analysis=a.get("analysis", 60))
     elif cmd == "state": r = S.payload()
     elif cmd == "choose": r = S.choose(a["index"])
     elif cmd == "apply": r = S.apply(a["index"])
