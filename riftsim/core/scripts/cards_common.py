@@ -2416,3 +2416,19 @@ def fox_fire(defn):
         return [u for u in g.units_at(loc) if (g.chars(u).might or 0) + used <= 4] if loc else []
     return [SpellEffect([O.ChooseLocation(out="loc")] + _pick_up_to(opts, 8, "__ff", "kill a unit there (total Might 4 or less)") +
                         [O.Kill(lambda g, c: list(c.vars.get("__ff") or ()))], label=defn.name, source_text=defn.text)]
+
+
+@script("Stand United")
+def stand_united(defn):
+    # [Hidden]  [Action]  Buff a friendly unit. Buffs give an additional +1 [M] to friendly units this turn.
+    return [SpellEffect([O.Choose(Sel("unit", side="friendly"), out="t"), O.Buff(Ref("t")),
+                         O.Do(lambda g, c: (g.add_turn_effect(c, "buff_bonus", {}), g.bump()), label="buffs give +1 more this turn")],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Spirit's Refuge")
+def spirits_refuge(defn):
+    # When you play this, buff a friendly unit.  Friendly buffed units have [Deflect] if they didn't already.
+    return [Triggered("play_self", [O.Choose(Sel("unit", side="friendly"), out="t"), O.Buff(Ref("t"))], label=defn.name, source_text=defn.text),
+            Static(Sel("unit", side="friendly", buffed=True), "keyword", ("deflect", True), label="buffed units have [Deflect]",
+                   source_text=defn.text)]

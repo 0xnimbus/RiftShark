@@ -244,7 +244,7 @@ class Game(flow.FlowMixin):
         for m in o.mods:
             self._apply_mod(c, m)
         if o.zone == "board" and c.might is not None:
-            c.might += o.buffs
+            c.might += o.buffs + self._buff_bonus(o)
         return c
 
     def _apply_mod(self, c, m):
@@ -305,7 +305,7 @@ class Game(flow.FlowMixin):
         if c.keywords.get("temporary") and not any(getattr(a, "keyword", None) == "temporary" for a in c.abilities):
             c.abilities.append(_temporary_ability())     # granted [Temporary] (CR: kill me at the start of my Beginning Phase)
         if c.might is not None:
-            c.might += o.buffs
+            c.might += o.buffs + self._buff_bonus(o)
             # keywords that modify might by designation
             if o.designation == "attacker":
                 c.might += c.kw("assault")
@@ -660,6 +660,12 @@ class Game(flow.FlowMixin):
         d = DelayedAbility(self.next_item_id, event, compile_effect(effect), filt, expires, once, ctx.clone(), label, self.turn)
         self.next_item_id += 1
         self.delayed.append(d)
+
+    def _buff_bonus(self, o):
+        """Stand United: "Buffs give an additional +1 [M] to friendly units this turn." """
+        if not o.buffs or not self.turn_effects:
+            return 0
+        return o.buffs * sum(1 for t in self.turn_effects if t["kind"] == "buff_bonus" and self.is_friendly(t["player"], o.controller))
 
     def add_turn_effect(self, ctx, kind, data, expires="turn", uses=None):
         self.turn_effects.append({"kind": kind, "data": data, "expires": expires, "uses": uses, "ctx": ctx.clone(), "player": ctx.controller})

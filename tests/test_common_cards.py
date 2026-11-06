@@ -935,3 +935,15 @@ def test_blind_fury_plays_the_opponents_top_card(db, decks):
     g.objects[top].defn = next(c for c in db if c.name == "Hunting Dog"); g.bump()
     _run_spell(g, db, "Blind Fury")
     assert g.objects[top].zone == "board" and g.objects[top].controller == 0
+
+
+def test_stand_united_and_spirits_refuge(db, decks):
+    g = main_phase(db, decks)
+    u = put(g, db, 0, "Hunting Dog", ("base", 0))
+    v = put(g, db, 0, "Hunting Dog", ("base", 0), exclude=(u,))
+    g.objects[v].buffs = 1; g.bump()
+    base_u, base_v = g.chars(u).might, g.chars(v).might
+    _run_spell(g, db, "Stand United", picks=[u])
+    assert g.chars(u).might == base_u + 2 and g.chars(v).might == base_v + 1
+    sr = put(g, db, 0, "Spirit's Refuge", ("base", 0), exclude=(u, v))
+    assert g.has_keyword(v, "deflect")
