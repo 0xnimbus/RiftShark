@@ -65,7 +65,11 @@ def keyword_abilities(defn):
                              label=f"Disarm {n}", keyword="disarm"))
     if kws.get("equip") is not None and defn.is_gear:
         cost = parse_cost(_equip_cost_text(defn))
-        out.append(Activated(cost, [O.Attach(Ref("self"), Ref("t"))], targets=[O.Choose(Sel("unit", side="friendly"), targeted=True)],
+        mx = re.search(r"\[Equip\]\s*(?:[-—–:]\s*)?Spend (\d+) XP", defn.text)
+        if mx:
+            cost["xp"] = int(mx.group(1))
+        out.append(Activated(cost, [O.Attach(Ref("self"), Ref("t"))],
+                             targets=[O.Choose(Sel("unit", side="friendly", pred=lambda g, c, u: g.objects[c.source].attached_to != u), targeted=True)],
                              timing="reaction" if kws.get("quick_draw") else "main", label="Equip", is_equip=True, keyword="equip"))
     if kws.get("quick_draw") and defn.is_gear:
         out.append(Triggered("play_self", [O.Attach(Ref("self"), Ref("t"))], targets=[O.Choose(Sel("unit", side="friendly"), targeted=True)],
@@ -110,7 +114,7 @@ def _pay_equip(g, c):
 
 
 def _equip_cost_text(defn):
-    m = re.search(r"\[Equip\]\s*((?:\[[^\]]+\]\s*)+)", defn.text)
+    m = re.search(r"\[Equip\]\s*(?:[-—–:]\s*)?((?:\[[^\]]+\]\s*)+)", defn.text)
     return m.group(1) if m else ""
 
 
