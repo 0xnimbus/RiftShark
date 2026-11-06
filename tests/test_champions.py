@@ -137,3 +137,57 @@ def test_xin_zhao_enters_ready_with_two_other_units_in_base(db, decks):
     assert g.replace_event(dict(ev))["ready"] is False      # only one other unit in base
     put(g, db, 0, "Sett, Kingpin", ("base", 0), exclude=(s1, u))
     assert g.replace_event(dict(ev))["ready"] is True
+
+
+def test_shen_leader_scores_when_holding_with_exactly_one_other_unit(db, decks):
+    g = main_phase(db, decks)
+    shen = put(g, db, 0, "Shen, Leader of the Kinkou Order", ("bf", 0))
+    pts = g.players[0].points
+    g.emit("hold", player=0, loc=("bf", 0), bf=0, units=(shen,))
+    settle(g)
+    assert g.players[0].points == pts                      # alone: no point
+    put(g, db, 0, "Sett, Kingpin", ("bf", 0), exclude=(shen,))
+    g.emit("hold", player=0, loc=("bf", 0), bf=0, units=(shen,))
+    settle(g)
+    assert g.players[0].points in (pts + 1,)
+
+
+def test_riven_shattered_deals_2_per_equipment(db, decks):
+    g = main_phase(db, decks)
+    riv = put(g, db, 0, "Riven, Shattered", ("bf", 0))
+    foe = put(g, db, 1, "Sett, Kingpin", ("bf", 0))
+    eq = next(c for c in db if c.type == "gear" and "Equipment" in c.tags)
+    for i in range(2):
+        e = put(g, db, 0, eq.name, ("bf", 0), exclude=(riv, foe))
+        g.objects[e].defn = eq
+        g.objects[riv].attachments.append(e)
+        g.objects[e].attached_to = riv if hasattr(g.objects[e], "attached_to") else None
+    g.bump()
+    ab = next(a for a in g.abilities(riv) if a.label == "Riven, Shattered")
+    from riftsim.core.vm import Context
+    ctx = Context(0, riv, here=("bf", 0)); ctx.vars["self"] = riv; ctx.vars["t"] = foe
+    from riftsim.core.vm import Frame
+    g.vm_frames.append(Frame(ab.code, ctx))
+    settle(g)
+    assert g.objects[foe].damage == 4 or g.objects[foe].zone == "trash"
+
+
+def test_swain_scores_after_unit_gear_and_spell(db, decks):
+    g = main_phase(db, decks)
+    sw = put(g, db, 0, "Swain, Visionary", ("bf", 0))
+    pts = g.players[0].points
+    unit = next(c for c in db if c.is_unit and not c.is_token)
+    gear = next(c for c in db if c.type == "gear" and not c.is_token)
+    spell = next(c for c in db if c.type == "spell")
+    used = []
+    for d in (unit, gear, spell):
+        u = next(u for u in g.players[0].deck if g.objects[u].zone == "deck" and u not in used)
+        g.objects[u].defn = d; used.append(u)
+    g.players[0].played_this_turn.extend(used[:2])
+    g.emit("conquer", player=0, loc=("bf", 0), bf=0, units=(sw,))
+    settle(g)
+    assert g.players[0].points == pts                      # no spell yet
+    g.players[0].played_this_turn.append(used[2])
+    g.emit("conquer", player=0, loc=("bf", 0), bf=0, units=(sw,))
+    settle(g)
+    assert g.players[0].points == pts + 1

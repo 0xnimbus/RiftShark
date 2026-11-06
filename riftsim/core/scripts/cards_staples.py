@@ -494,7 +494,7 @@ def vi_hotheaded(defn):
     # [Deflect]   (keyword)
     # [2][Fury]: Double my Might this turn.
     return {"abilities": [Activated({"energy": 2, "power": ["fury"]},
-                                    [O.GiveMight(Ref("self"), lambda g, c: g.chars(c.source).might or 0, duration="turn")],
+                                    [O.DoubleMight(Ref("self"), duration="turn")],
                                     timing="main", label="double my Might this turn", source_text=defn.text)], "replace": True}
 
 
@@ -537,3 +537,99 @@ def leblanc_fragmented(defn):
     n = lambda g, c: 2 if (g.turn_player == c.controller and g.phase == "beginning") else 1
     return {"abilities": [Triggered("die_self", [O.Draw(n)], label="Deathknell", source_text=defn.text, keyword="deathknell")],
             "replace": True}
+
+
+def _others_here(g, s):
+    me = g.objects[s]
+    return [u for u, o in g.objects.items() if u != s and o.zone == "board" and o.location == me.location
+            and o.controller == me.controller and "unit" in g.chars(u).types]
+
+
+@script("Shen, Scourge of Shadows")
+def shen_scourge(defn):
+    # When I hold, if there is exactly one other unit you control here, draw 1.
+    return {"abilities": [Triggered("hold_self", [O.If(lambda g, c: len(_others_here(g, c.source)) == 1, [O.Draw(1)])],
+                                    label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Shen, Leader of the Kinkou Order")
+def shen_leader(defn):
+    # [Shield]   (keyword)
+    # When I hold, if there is exactly one other unit you control here, you score 1 point.
+    return {"abilities": [Triggered("hold_self", [O.If(lambda g, c: len(_others_here(g, c.source)) == 1, [O.GainPoints(1)])],
+                                    label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Riven, Shattered")
+def riven_shattered(defn):
+    # [Weaponmaster]   (keyword)
+    # When I attack, choose an enemy unit here. Deal 2 to it for each Equipment attached to me.
+    def n(g, c):
+        return 2 * len([a for a in g.objects[c.source].attachments if a in g.objects and "Equipment" in g.chars(a).tags])
+    return {"abilities": [Triggered("attack_self", [O.Deal(n, Ref("t"))],
+                                    targets=[O.Choose(Sel("unit", side="enemy", where="here"), out="t")],
+                                    label=defn.name, source_text=defn.text)], "replace": False}
+
+
+@script("Swain, Visionary")
+def swain_visionary(defn):
+    # [Vision]   (keyword)
+    # When I conquer, if you've played a non-token unit, a non-token gear, and a spell this turn, you score 1 point.
+    def did_all(g, c):
+        played = [g.objects[u].base_defn() for u in g.players[c.controller].played_this_turn if u in g.objects]
+        return any(d.is_unit and not d.is_token for d in played) and any(d.type == "gear" and not d.is_token for d in played) \
+            and any(d.type == "spell" for d in played)
+    return {"abilities": [Triggered("conquer_self", [O.If(did_all, [O.GainPoints(1)])], label=defn.name, source_text=defn.text)],
+            "replace": True}
+
+
+@script("Jayce, Hammer in Hand")
+def jayce_hammer(defn):
+    # When I become ready, choose one to give me this turn — [Assault 2] / [Deflect 2] / [Ganking]
+    modes = [("[Assault 2]", [O.GiveKeyword(Ref("self"), "assault", 2, duration="turn")]),
+             ("[Deflect 2]", [O.GiveKeyword(Ref("self"), "deflect", 2, duration="turn")]),
+             ("[Ganking]", [O.GiveKeyword(Ref("self"), "ganking", True, duration="turn")])]
+    return {"abilities": [Triggered("ready_self", [O.ChooseMode(modes)], label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Kha'Zix, Evolving Hunter")
+def khazix_evolving(defn):
+    # [Hunt]   (keyword)
+    # When I attack, you may spend 3 XP to deal damage equal to my Might to an enemy unit here.
+    return {"abilities": [Triggered("attack_self", [
+        O.If(lambda g, c: g.players[c.controller].xp >= 3, [
+            O.SpendXP(3, out="__xp"),
+            O.If(Ref("__xp"), [O.Choose(Sel("unit", side="enemy", where="here"), out="t"),
+                               O.Deal(lambda g, c: g.chars(c.source).might or 0, Ref("t"))])])],
+        label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Morgana, Vindictive")
+def morgana_vindictive(defn):
+    # [Ambush]   (keyword)
+    # When you play me, deal damage to a unit equal to the damage marked on it.
+    return {"abilities": [Triggered("play_self", [O.Deal(lambda g, c: g.objects[c.vars["t"]].damage if c.vars.get("t") in g.objects else 0,
+                                                         Ref("t"))],
+                                    targets=[O.Choose(Sel("unit"), out="t")], label=defn.name, source_text=defn.text)],
+            "replace": True}
+
+
+@script("K'Sante, Dauntless")
+def ksante(defn):
+    # [Shield]   (keyword)
+    # When I attack or defend, double the [Shield] of a unit you control here this turn.
+    eff = [O.GiveKeyword(Ref("t"), "shield", lambda g, c: g.chars(c.vars["t"]).kw("shield") if c.vars.get("t") in g.objects else 0,
+                         duration="turn")]
+    tg = [O.Choose(Sel("unit", side="friendly", where="here"), out="t")]
+    return {"abilities": [Triggered(ev, eff, targets=list(tg), label=defn.name, source_text=defn.text)
+                          for ev in ("attack_self", "defend_self")], "replace": True}
+
+
+@script("Mordekaiser, Dominating")
+def mordekaiser_dominating(defn):
+    # When you play me or when I attack, you may discard 1 to kill a unit or gear.
+    sel = Sel("permanent", pred=lambda g, c, u: bool({"unit", "gear"} & set(g.chars(u).types)))
+    eff = [O.If(lambda g, c: bool(g.players[c.controller].hand) and c.vars.get("t") is not None, [
+        O.May([O.Discard(1), O.Kill(Ref("t"))], label="discard 1 to kill it")])]
+    return {"abilities": [Triggered(ev, list(eff), targets=[O.Choose(sel, out="t")], label=defn.name, source_text=defn.text)
+                          for ev in ("play_self", "attack_self")], "replace": True}
