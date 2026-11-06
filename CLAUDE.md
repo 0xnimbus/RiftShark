@@ -33,6 +33,8 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   publishable key; `tools/upload_supabase.py` needs env SUPABASE_URL + SUPABASE_SERVICE_KEY (Derrick adds the secret).
   Frontend reads the latest batch/replays from Supabase and falls back to `web/data`.
 - `tests/test_core_v2.py` is the v2 regression suite (pytest -q tests/).
+- Play & coach (Derrick's request 2026-11-06): `tools/play_server.py` + `web/play.html` + `riftsim/core/analysis.py`.
+  Grades use MCTS win% loss vs best option; thresholds in analysis.GRADES. Local only (Python backend).
 - Main deck = 39 cards + chosen champion (CR 103.3). `When you play me` triggers fire from the chain.
 - `riftsim/` top level still holds the v1 simplified engine (engine.py, policies.py, replay.py, runner.py, cli.py).
   It will be replaced by v2 equivalents.

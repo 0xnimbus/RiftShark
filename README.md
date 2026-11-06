@@ -19,6 +19,7 @@ python -m riftsim.core verify out/kr/replays/game_0.json.gz      # re-simulate a
 python -m riftsim.core coverage                                  # which cards' text is not fully scripted yet
 python -m riftsim.core deck --legend "Blind Monk" --champion "Lee Sin"   # generate a sample legal deck
 
+python tools/play_server.py                    # play a deck vs the AI at http://localhost:8765/play.html with move grading
 python tools/export_web.py out/kr/results.json out/kr/replays web/data --max-replays 10   # static data for web/
 SUPABASE_URL=... SUPABASE_SERVICE_KEY=... python tools/upload_supabase.py out/kr/results.json out/kr/replays
 ```
@@ -34,7 +35,8 @@ SUPABASE_URL=... SUPABASE_SERVICE_KEY=... python tools/upload_supabase.py out/kr
 | `riftsim/core/scripts/` | Card scripting: keywords, the text grammar (`auto_grammar.py`), hand-written scripts (`cards_manual.py`) |
 | `web/` | Static dashboard + replay viewer (GitHub Pages via `.github/workflows/pages.yml`); reads Supabase when configured |
 | `supabase/schema.sql` | Tables for batches, games, deck/card stats and replays |
-| `tools/` | `smoke_core.py` (random games), `export_web.py`, `upload_supabase.py` |
+| `riftsim/core/analysis.py` | Move analysis: MCTS win% per option, chess-style grades (best/good/inaccuracy/mistake/blunder), replay review |
+| `tools/` | `smoke_core.py` (random games), `export_web.py`, `upload_supabase.py`, `play_server.py` (play & coach, local) |
 | `tests/` | pytest suite |
 | `riftsim/*.py` (top level) | The v1 simplified engine, kept until everything is ported |
 
