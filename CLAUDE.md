@@ -18,6 +18,7 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
 | 2026-11-06 06:47 | 13% used, resets 5:40 AM | 22% used, resets Mon 10:00 AM | +3% in 36 min; continuing |
 | 2026-11-06 07:05 | 18% used, resets 5:40 AM | 22% used, resets Mon 10:00 AM | +5% in 18 min; exact-rules items 2-4 done, round-robin done |
 | 2026-11-06 13:09 | 2% used, resets 12:50 PM | 23% used, resets Mon 10:00 AM | thread was idle 07:21-13:07 (no wake scheduled); resuming item 5 (script remaining cards) |
+| 2026-11-06 13:30 | 9% used, resets 12:50 PM | 24% used, resets Mon 10:00 AM | +7% in 21 min; Rek'Sai deck, 15 legends, coach fix, UI PR merged |
 
 ## Where things stand
 
@@ -31,7 +32,7 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   `deck.py`; `scripts/` (keywords → auto-grammar → manual overrides).
 - `tools/smoke_core.py N SEED`: random-play games; last run 40/40 games without crash, ~0.1 s per game.
 - Script coverage (2026-11-06 02:45): auto 613, manual 9, keywords-only 56, partial 66, none 429, vanilla 23.
-- `data/decks/tournament/`: top Radiance lists (Riven 1st CoolStuffCon Orlando $25k; Kai'Sa 3rd Convergence IV) from
+- `data/decks/tournament/`: 10 decks (Rek'Sai added 2026-11-06 13:15; specs in tools/deckspecs/radiance_2026-11.json). Top Radiance lists (Riven 1st CoolStuffCon Orlando $25k; Kai'Sa 3rd Convergence IV) from
   riftdecks.com qualifying events (3 relevance stars, 256+ players). Derrick wants these refreshed daily and every
   relevant legend covered eventually; Kai'Sa vs Riven is the matchup he cares about now.
 - First Kai'Sa vs Riven batch (200 greedy games): Kai'Sa 52.5%, Riven 47.5%; first player ~58%. Exported to web/data.
