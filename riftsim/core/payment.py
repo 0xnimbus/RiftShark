@@ -58,7 +58,8 @@ def restriction_ok(game, text, purpose):
 # ------------------------------------------------------------------ sources
 def add_sources(game, p):
     """Other permanents' Reaction Add abilities usable while paying: [(uid, idx, energy, power, restriction)].
-    Only abilities whose cost is exhausting their source and whose effect is a single Add qualify."""
+    Abilities whose cost is exhausting their source (and possibly killing it, Gold: "Kill this, [T]: [Add] [A]")
+    and whose effect is a single Add qualify."""
     from .ops import Add
     from .vm import Context, val
     out = []
@@ -72,7 +73,7 @@ def add_sources(game, p):
             c = ab.cost
             if c.get("energy") or c.get("power") or not c.get("exhaust"):
                 continue
-            if any(c.get(k) for k in ("kill_self", "banish_self", "spend_buff", "xp", "discard", "sacrifice", "recycle")):
+            if any(c.get(k) for k in ("banish_self", "spend_buff", "xp", "discard", "sacrifice", "recycle")):
                 continue
             if not ab.active(game, u):
                 continue
@@ -372,6 +373,8 @@ def apply_plan(game, p, plan, ctx=None, purpose=None):
             if ab.once_per_turn:
                 game.objects[u].temp[("act", i)] = game.turn
             game.do_exhaust(u, ctx)
+            if ab.cost.get("kill_self"):
+                game.do_kill([u], ctx, by="cost")          # Gold: "Kill this, [T]: [Add] [A]"
             game.log("activate", uid=u, name=game.objects[u].defn.name, player=p, label=ab.label)
             game.add_resources(p, src[2], src[3], restriction=src[4], ctx=ctx)
     energy, power = 0, []

@@ -294,3 +294,20 @@ def test_determinize_keeps_public_and_known_cards(db, decks):
         x = determinize(g, 0, random.Random(s))
         assert known in x.players[1].hand and x.players[1].trash == trash
         assert len(x.players[1].hand) == len(opp.hand) and x.players[1].champion == opp.champion
+
+
+def test_gold_pays_power_while_paying(db, decks):
+    # Gold: "Kill this, [T]: [Add] [A]" is an Add ability usable while paying a cost (CR 357.1.a)
+    g = main_phase(db, decks)
+    for r in list(g.players[0].runes):
+        g._to_zone(g.objects[r], "rune_deck")
+    g.bump()
+    assert not g.can_pay(0, 0, ["any"], purpose={"kind": "play", "types": {"spell"}})
+    gold = g.play_token(0, "Gold", ("base", 0))
+    gold = gold[0] if isinstance(gold, (list, tuple)) else gold
+    g.objects[gold].exhausted = False
+    g.bump()
+    plans = g.payment_plans(0, 0, ["fury"], {"kind": "play", "types": {"spell"}})
+    assert plans and any(a[0] == "ab" for a in plans[0][0])
+    g.apply_payment(0, plans[0], None, {"kind": "play", "types": {"spell"}})
+    assert g.objects[gold].zone == "trash" or g.objects[gold].zone in (None, "gone")
