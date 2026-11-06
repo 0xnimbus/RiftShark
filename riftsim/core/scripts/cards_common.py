@@ -399,3 +399,181 @@ def yordle_explorer(defn):
         return (ev.get("kind") == "play" and ev.get("player") == g.objects[s].controller and ev.get("uid") in g.objects
                 and (g.objects[ev["uid"]].base_defn().power or 0) >= 2 and not ev.get("token"))
     return [Triggered(big, [O.Draw(1)], label=defn.name, source_text=defn.text)]
+
+
+def _xp(g, p):
+    return g.players[p].xp
+
+
+def _enter_ready_if(defn, pred, label):
+    from ..abilities import Replacement
+    return Replacement("enter_ready", lambda g, s, ev: ev.get("uid") == s and pred(g, s),
+                       lambda g, s, ev: dict(ev, ready=True), label=label, zone="any", source_text=defn.text)
+
+
+@script("Apprentice Smith")
+def apprentice_smith(defn):
+    # When I move, reveal the top card of your Main Deck. If it's a gear, draw it. Otherwise, recycle it.
+    top = lambda g, c: (c.vars.get("looked") or [None])[0]
+    is_gear = lambda g, c: top(g, c) is not None and g.objects[top(g, c)].base_defn().is_gear
+    return [Triggered("move_self", [O.Look(1, out="looked", reveal=True),
+                                    O.If(lambda g, c: top(g, c) is not None and g.objects[top(g, c)].zone == "deck",
+                                         [O.If(is_gear, [O.ToHand(top)], [O.Recycle(top)])])],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Dropboarder")
+def dropboarder(defn):
+    # When you play me, if you control two or more gear, ready me.
+    two_gear = lambda g, s: sum(1 for u, o in g.objects.items() if o.zone == "board" and o.controller == g.objects[s].controller
+                                and "gear" in g.chars(u).types) >= 2
+    return [Triggered("play_self", [O.If(lambda g, c: two_gear(g, c.source), [O.Ready(Ref("self"))])],
+                      filt=lambda g, s, ev: two_gear(g, s), label=defn.name, source_text=defn.text)]
+
+
+@script("Production Surge")
+def production_surge(defn):
+    # This costs [2] less if you control a Mech.  Play a 3 [M] Mech unit token to your base.  Draw 1.
+    def reduce(g, u, e, p):
+        me = _ctrl(g, u)
+        mech = any(o.zone == "board" and o.controller == me and "Mech" in g.chars(x).tags and "unit" in g.chars(x).types
+                   for x, o in g.objects.items())
+        return (max(0, e - 2), p) if mech else (e, p)
+    return [PlayPermission("cost", cost_mod=reduce, label="[2] less if you control a Mech", source_text=defn.text),
+            SpellEffect([O.PlayToken("Mech", loc="base"), O.Draw(1)], label=defn.name, source_text=defn.text)]
+
+
+@script("Beast Below")
+def beast_below(defn):
+    # When you play me, return another friendly unit and an enemy unit to their owners' hands.
+    return [Triggered("play_self", [O.Choose(Sel("unit", side="friendly", other=True), out="a"),
+                                    O.Choose(Sel("unit", side="enemy"), out="b"),
+                                    O.ToHand(lambda g, c: [u for u in (c.vars.get("a"), c.vars.get("b")) if u is not None])],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Glasc Mixologist")
+def glasc_mixologist(defn):
+    # [Deathknell] — You may play a unit with cost no more than [3] and no more than [A] from your trash, ignoring its cost.
+    def units(g, c):
+        return [u for u in g.players[c.controller].trash if u != c.source and g.objects[u].base_defn().is_unit
+                and (g.objects[u].base_defn().energy or 0) <= 3 and (g.objects[u].base_defn().power or 0) <= 1]
+    return [Triggered("die_self", [O.ChooseFromList(units, out="__gm", up_to=True, label="play a unit from your trash"),
+                                   O.Do(_unwrap("__gm")), O.If(Ref("__gm"), [O.PlayCard(Ref("__gm"), ignore="all")])],
+                      label="Deathknell", source_text=defn.text, keyword="deathknell")]
+
+
+@script("Rally the Troops")
+def rally_the_troops(defn):
+    # [Action]  When a friendly unit is played this turn, buff it.  Draw 1.
+    played = lambda g, s, ev: ev.get("kind") == "play" and ev.get("card_type") == "unit"
+    mine = lambda g, c, ev: ev.get("player") == c.controller
+    return [SpellEffect([O.Delayed(played, [O.Buff(lambda g, c: c.event.get("uid"))], filt=mine, expires="turn", once=False,
+                                   label="Rally the Troops: buff it"), O.Draw(1)], label=defn.name, source_text=defn.text)]
+
+
+@script("Unsung Hero")
+def unsung_hero(defn):
+    # [Deathknell] — If I was [Mighty], draw 2.
+    return [Triggered("die_self", [O.Draw(2)], filt=lambda g, s, ev: (ev.get("might") or 0) >= 5,
+                      label="Deathknell", source_text=defn.text, keyword="deathknell")]
+
+
+@script("Tianna Crownguard")
+def tianna_crownguard(defn):
+    # [Deflect]  While I'm at a battlefield, opponents can't score points.
+    from ..abilities import Replacement
+
+    def blocks(g, s, ev):
+        o = g.objects[s]
+        return (o.location is not None and o.location[0] == "bf" and ev.get("player") is not None
+                and not g.is_friendly(ev["player"], o.controller))
+    return [Replacement("gain_points", blocks, lambda g, s, ev: None, label="opponents can't score", source_text=defn.text)]
+
+
+@script("Downwell")
+def downwell(defn):
+    # Return all units and gear to their owners' hands.
+    def all_perms(g, c):
+        return [u for u, o in g.objects.items() if o.zone == "board" and o.location is not None
+                and o.location[0] in ("bf", "base") and ({"unit", "gear"} & g.chars(u).types)]
+    return [SpellEffect([O.ToHand(all_perms)], label=defn.name, source_text=defn.text)]
+
+
+@script("Towering Pairofant")
+def towering_pairofant(defn):
+    # [Assault]  If a unit died this turn, I enter ready.
+    died = lambda g, s: any(v for k, v in g.turn_memo.items() if isinstance(k, tuple) and k[0] == "units_died")
+    return [_enter_ready_if(defn, died, "enter ready if a unit died this turn")]
+
+
+@script("Monch")
+def monch(defn):
+    # If an opponent controls a stunned unit, I cost [2] less and enter ready.
+    def stunned_foe(g, s):
+        me = _ctrl(g, s)
+        return any(o.zone == "board" and o.stunned and o.controller is not None and not g.is_friendly(o.controller, me)
+                   for o in g.objects.values())
+    return [PlayPermission("cost", cost_mod=lambda g, u, e, p: (max(0, e - 2), p) if stunned_foe(g, u) else (e, p),
+                           label="[2] less if an opponent controls a stunned unit", source_text=defn.text),
+            _enter_ready_if(defn, stunned_foe, "enter ready if an opponent controls a stunned unit")]
+
+
+@script("Prepared Neophyte")
+def prepared_neophyte(defn):
+    # If you've spent [4] or more to play a spell this turn, I have +4 [M].
+    return [Static("self", "might", 4, cond=lambda g, s: bool(g.turn_memo.get(("spell_spent_4", g.objects[s].controller))),
+                   label="+4 [M] after spending [4]+ on a spell", source_text=defn.text)]
+
+
+@script("Combat Experience")
+def combat_experience(defn):
+    # [Reaction]  Give a unit +1 [M] this turn.  [Level 6][>] Give it +3 [M] this turn instead.
+    return [SpellEffect([O.Choose(Sel("unit"), out="t"),
+                         O.GiveMight(Ref("t"), lambda g, c: 3 if _xp(g, c.controller) >= 6 else 1)],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Skyward Strike")
+def skyward_strike(defn):
+    # Move an enemy unit.  [Level 6][>] [Stun] an enemy unit.
+    from .auto_grammar import parse_sentence
+    leveled = Sel("unit", side="enemy", pred=lambda g, c, u: _xp(g, c.controller) >= 6)     # chosen as played
+    return [SpellEffect(parse_sentence("move an enemy unit", {"tcount": 0}) + [O.Choose(leveled, out="s2"), O.Stun(Ref("s2"))],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Concentrate")
+def concentrate(defn):
+    # Draw 2.  [Level 6][>] This costs [2] less.  [Level 11][>] This costs [4] less instead.
+    def reduce(g, u, e, p):
+        x = _xp(g, _ctrl(g, u))
+        return (max(0, e - (4 if x >= 11 else 2 if x >= 6 else 0)), p)
+    return [PlayPermission("cost", cost_mod=reduce, label="Level discounts", source_text=defn.text),
+            SpellEffect([O.Draw(2)], label=defn.name, source_text=defn.text)]
+
+
+def _look_reveal_draw_recycle(n, pred, label):
+    cands = lambda g, c: [u for u in c.vars.get("looked", []) if pred(g.objects[u].base_defn())]
+    return [O.Look(n, out="looked"),
+            O.ChooseFromList(cands, out="__lr", up_to=True, label=label), O.Do(_unwrap("__lr")),
+            O.If(Ref("__lr"), [O.Do(lambda g, c: g.emit("reveal", player=c.controller, cards=[c.vars["__lr"]], ctx=c)),
+                               O.ToHand(Ref("__lr"))]),
+            O.Recycle(lambda g, c: [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck"])]
+
+
+@script("Fate Weaver")
+def fate_weaver(defn):
+    # When you play me, look at the top 4 cards of your Main Deck. You may reveal a spell with Energy cost [4] or more
+    # from among them and draw it. Recycle the rest.
+    return [Triggered("play_self", _look_reveal_draw_recycle(4, lambda d: d.type == "spell" and (d.energy or 0) >= 4,
+                                                             "reveal a spell costing [4]+ and draw it"),
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Double Trouble")
+def double_trouble(defn):
+    # [Repeat] [2]  Look at the top 3 cards of your Main Deck. You may reveal a unit from among them and draw it.
+    # Recycle the rest.
+    return [SpellEffect(_look_reveal_draw_recycle(3, lambda d: d.is_unit, "reveal a unit and draw it"),
+                        label=defn.name, source_text=defn.text)]

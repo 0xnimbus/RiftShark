@@ -144,3 +144,66 @@ def test_trusty_ramhound_and_convergent_mutation(db, decks):
             g.choose(big); continue
         break
     assert g.chars(rh).might == g.chars(big).might
+
+
+def test_tianna_stops_opponents_scoring_while_at_a_battlefield(db, decks):
+    g = main_phase(db, decks)
+    t = put(g, db, 0, "Tianna Crownguard", ("base", 0))
+    p1 = g.players[1].points
+    g.gain_points(1, 1)
+    assert g.players[1].points == p1 + 1
+    g._to_zone(g.objects[t], "board", location=("bf", 0), controller=0); g.bump()
+    g.gain_points(1, 1)
+    p0 = g.players[0].points
+    g.gain_points(0, 1)
+    assert g.players[1].points == p1 + 1 and g.players[0].points == p0 + 1
+
+
+def test_downwell_returns_units_and_gear_but_not_runes_or_legends(db, decks):
+    g = main_phase(db, decks)
+    a = put(g, db, 0, "Rell, Magnetic", ("bf", 0))
+    b = put(g, db, 1, "Doran's Blade", ("base", 1))
+    from riftsim.core.vm import Context, Frame
+    s = next(c for c in db if c.name == "Downwell")
+    g.vm_frames.append(Frame(list(s.abilities[-1].code), Context(0, None)))
+    settle(g)
+    assert g.objects[a].zone == "hand" and g.objects[b].zone == "hand"
+    assert g.objects[g.players[0].legend].zone == "board" and all(g.objects[r].zone == "board" for r in g.players[0].runes)
+
+
+def test_unsung_hero_draws_only_if_it_was_mighty(db, decks):
+    g = main_phase(db, decks)
+    u = put(g, db, 0, "Unsung Hero", ("bf", 0))
+    h = len(g.players[0].hand)
+    g.do_kill([u]); settle(g)
+    assert len(g.players[0].hand) == h
+    u2 = put(g, db, 0, "Unsung Hero", ("bf", 0))
+    g.add_mod(u2, "might", 3, "turn")
+    g.do_kill([u2]); settle(g)
+    assert len(g.players[0].hand) == h + 2
+
+
+def test_prepared_neophyte_and_combat_experience_levels(db, decks):
+    g = main_phase(db, decks)
+    n = put(g, db, 0, "Prepared Neophyte", ("base", 0))
+    assert g.chars(n).might == 1
+    g.turn_memo[("spell_spent_4", 0)] = True; g.bump()
+    assert g.chars(n).might == 5
+    from riftsim.core.vm import Context, Frame
+    s = next(c for c in db if c.name == "Combat Experience")
+    for xp, gain in ((0, 1), (6, 3)):
+        g.players[0].xp = xp
+        before = g.chars(n).might
+        ctx = Context(0, None); ctx.vars["t"] = n
+        g.vm_frames.append(Frame([x for x in s.abilities[-1].code if type(x).__name__ != "_Recheck"], ctx))
+        settle(g)
+        assert g.chars(n).might == before + gain
+
+
+def test_monch_costs_less_and_enters_ready_with_a_stunned_enemy(db, decks):
+    g = main_phase(db, decks)
+    m = _card_in(g, db, 0, "Monch", "hand")
+    e0 = g.card_cost(0, m, "hand")[0]
+    foe = put(g, db, 1, "Rell, Magnetic", ("bf", 0))
+    g.objects[foe].stunned = True; g.bump()
+    assert g.card_cost(0, m, "hand")[0] == e0 - 2
