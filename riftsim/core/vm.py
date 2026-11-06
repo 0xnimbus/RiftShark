@@ -56,11 +56,23 @@ class Context:
         self.target_bf = None       # for cards played from facedown: the battlefield index
 
     def clone(self):
+        """Copy with its own containers: nested lists/dicts/sets in vars (targets, chosen stamps, costs) are copied
+        too, so a lookahead clone can never write into the real game's context."""
         c = Context.__new__(Context)
         for k in Context.__slots__:
             v = getattr(self, k)
-            setattr(c, k, dict(v) if isinstance(v, dict) else v)
+            setattr(c, k, _copy_containers(v) if isinstance(v, dict) else v)
         return c
+
+
+def _copy_containers(v):
+    if isinstance(v, dict):
+        return {k: _copy_containers(x) for k, x in v.items()}
+    if isinstance(v, list):
+        return [_copy_containers(x) for x in v]
+    if isinstance(v, set):
+        return set(v)
+    return v
 
 
 def val(game, ctx, v):
