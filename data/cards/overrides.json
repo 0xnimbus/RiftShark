@@ -1,5 +1,5 @@
 {
- "_comment": "Manual corrections applied on top of the gallery data by tools_normalize_cards.py / CardDB.load (card id -> fields).",
+ "_comment": "Manual corrections applied on top of the gallery data by tools_normalize_cards.py (card id -> fields). RAD types, domains and tags were checked against the official card images on 2026-11-06.",
  "RAD-025": {
   "type": "spell",
   "types": [
@@ -10,13 +10,21 @@
   "type": "spell",
   "types": [
    "spell"
-  ]
+  ],
+  "domains": [
+   "mind"
+  ],
+  "data_incomplete": false
  },
  "RAD-012": {
   "type": "gear",
   "types": [
    "gear"
-  ]
+  ],
+  "domains": [
+   "fury"
+  ],
+  "data_incomplete": false
  },
  "RAD-035": {
   "type": "gear",
@@ -40,7 +48,11 @@
   "type": "gear",
   "types": [
    "gear"
-  ]
+  ],
+  "domains": [
+   "chaos"
+  ],
+  "data_incomplete": false
  },
  "RAD-044": {
   "type": "gear",
@@ -57,7 +69,11 @@
  "RAD-003": {
   "domains": [
    "fury"
-  ]
+  ],
+  "tags": [
+   "Bilgewater"
+  ],
+  "data_incomplete": false
  },
  "RAD-041": {
   "domains": [
@@ -69,5 +85,575 @@
  "SFD-187": {
   "text": "When you conquer, you may exhaust me to reveal the top 2 cards of your Main Deck. You may banish one, then play it. Recycle the rest.",
   "_errata": "Spiritforged errata (docs/rules/riftbound-spiritforged-errata.txt)"
+ },
+ "RAD-001": {
+  "domains": [
+   "fury"
+  ],
+  "tags": [
+   "Bandle City",
+   "Yordle"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-004": {
+  "domains": [
+   "fury"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-006": {
+  "domains": [
+   "fury"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-024": {
+  "domains": [
+   "calm"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-026": {
+  "domains": [
+   "calm"
+  ],
+  "tags": [
+   "Freljord"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-047": {
+  "domains": [
+   "mind"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-049": {
+  "domains": [
+   "mind"
+  ],
+  "tags": [
+   "Zaun"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-071": {
+  "domains": [
+   "body"
+  ],
+  "tags": [
+   "Equipment"
+  ],
+  "data_incomplete": false,
+  "text": "[Equip] [1] ([1]: Attach this to a unit you control.)",
+  "keywords": {
+   "equip": true
+  }
+ },
+ "RAD-073": {
+  "domains": [
+   "body"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-093": {
+  "domains": [
+   "chaos"
+  ],
+  "tags": [
+   "Bandle City",
+   "Yordle"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-121": {
+  "domains": [
+   "order"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-123": {
+  "domains": [
+   "order"
+  ],
+  "tags": [
+   "Equipment"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-009": {
+  "domains": [
+   "fury"
+  ],
+  "tags": [
+   "Bandle City",
+   "Yordle",
+   "Mech"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-081": {
+  "domains": [
+   "body"
+  ],
+  "tags": [
+   "Freljord"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-102": {
+  "domains": [
+   "chaos"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-104": {
+  "domains": [
+   "chaos"
+  ],
+  "tags": [
+   "Shadow Isles",
+   "Cat"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-106": {
+  "domains": [
+   "chaos"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-124": {
+  "domains": [
+   "order"
+  ],
+  "type": "spell",
+  "types": [
+   "spell"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-016": {
+  "domains": [
+   "fury"
+  ],
+  "type": "unit",
+  "types": [
+   "unit"
+  ],
+  "tags": [
+   "Shurima"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-017": {
+  "domains": [
+   "fury"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-062": {
+  "domains": [
+   "mind"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-111": {
+  "domains": [
+   "chaos"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-134": {
+  "domains": [
+   "order"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-067": {
+  "domains": [
+   "mind"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-034": {
+  "domains": [
+   "calm"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-127": {
+  "domains": [
+   "order"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-022": {
+  "domains": [
+   "fury"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-007": {
+  "type": "spell",
+  "types": [
+   "spell"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-056": {
+  "type": "spell",
+  "types": [
+   "spell"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-101": {
+  "type": "spell",
+  "types": [
+   "spell"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-064": {
+  "type": "gear",
+  "types": [
+   "gear"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-046": {
+  "type": "gear",
+  "types": [
+   "gear"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-069": {
+  "type": "gear",
+  "types": [
+   "gear"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-072": {
+  "type": "unit",
+  "types": [
+   "unit"
+  ],
+  "tags": [
+   "Bandle City",
+   "Yordle"
+  ],
+  "keywords": {},
+  "data_incomplete": false
+ },
+ "RAD-097": {
+  "type": "unit",
+  "types": [
+   "unit"
+  ],
+  "tags": [
+   "Bilgewater"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-120": {
+  "type": "unit",
+  "types": [
+   "unit"
+  ],
+  "tags": [
+   "Piltover"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-130": {
+  "type": "unit",
+  "types": [
+   "unit"
+  ],
+  "tags": [
+   "Demacia"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-131": {
+  "type": "unit",
+  "types": [
+   "unit"
+  ],
+  "tags": [
+   "Demacia"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-005": {
+  "tags": [
+   "Shadow Isles",
+   "Spirit"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-008": {
+  "tags": [
+   "Demacia",
+   "Yordle"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-027": {
+  "tags": [
+   "Ixtal",
+   "Bird"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-030": {
+  "tags": [
+   "Shurima"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-031": {
+  "tags": [
+   "Bilgewater",
+   "Sentinel"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-050": {
+  "tags": [
+   "Shurima"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-053": {
+  "tags": [
+   "Freljord",
+   "Bird"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-054": {
+  "tags": [
+   "Bandle City",
+   "Yordle"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-074": {
+  "tags": [
+   "Freljord"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-075": {
+  "tags": [
+   "Demacia",
+   "Elite",
+   "Bird"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-076": {
+  "tags": [
+   "Mount Targon"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-077": {
+  "tags": [
+   "Freljord",
+   "Spirit"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-094": {
+  "tags": [
+   "Zaun"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-095": {
+  "tags": [
+   "Shadow Isles",
+   "Demon"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-099": {
+  "tags": [
+   "Bilgewater",
+   "Demon"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-118": {
+  "tags": [
+   "Shurima"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-119": {
+  "tags": [
+   "Demacia",
+   "Dog"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-122": {
+  "tags": [
+   "Zaun"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-011": {
+  "tags": [
+   "Piltover",
+   "Mech"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-014": {
+  "tags": [
+   "Bilgewater"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-036": {
+  "tags": [
+   "Freljord",
+   "Bird"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-037": {
+  "tags": [
+   "Piltover"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-055": {
+  "tags": [
+   "Piltover",
+   "Mech"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-057": {
+  "tags": [
+   "Piltover",
+   "Mech"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-058": {
+  "tags": [
+   "Bilgewater"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-078": {
+  "tags": [
+   "Noxus"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-080": {
+  "tags": [
+   "Shurima"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-083": {
+  "tags": [
+   "Mount Targon"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-103": {
+  "tags": [
+   "Zaun"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-105": {
+  "tags": [
+   "Piltover"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-125": {
+  "tags": [
+   "The Void"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-128": {
+  "tags": [
+   "Demacia"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-129": {
+  "tags": [
+   "Noxus",
+   "Trifarian"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-018": {
+  "tags": [
+   "Noxus"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-019": {
+  "tags": [
+   "Freljord"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-040": {
+  "tags": [
+   "Shadow Isles",
+   "Spirit"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-066": {
+  "tags": [
+   "Freljord",
+   "Spirit"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-088": {
+  "tags": [
+   "Freljord"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-107": {
+  "tags": [
+   "Shadow Isles",
+   "Demon"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-113": {
+  "tags": [
+   "Bilgewater",
+   "Dragon"
+  ],
+  "data_incomplete": false
+ },
+ "RAD-115": {
+  "tags": [
+   "Bilgewater"
+  ],
+  "data_incomplete": false
  }
 }

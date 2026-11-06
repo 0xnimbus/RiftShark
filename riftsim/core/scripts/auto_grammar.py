@@ -1247,10 +1247,11 @@ TRIGGER_PATTERNS = [
     (r"when you ready a friendly unit", lambda g, s, ev: ev.get("kind") == "ready" and ev.get("player") == g.objects[s].controller),
     (r"when you spend a buff", lambda g, s, ev: ev.get("kind") == "spend_buff" and ev.get("player") == g.objects[s].controller),
     (r"when you recycle a rune", lambda g, s, ev: ev.get("kind") == "recycle" and ev.get("player") == g.objects[s].controller and g.objects[ev["uid"]].defn.type == "rune"),
-    (r"when you recycle one or more cards", "you_recycle"),
-    (r"when you discard one or more cards", "you_discard"),
+    (r"when you recycle one or more cards", "you_recycle_batch"),
+    (r"when you discard one or more cards", "you_discard_batch"),
     (r"when one of your units becomes mighty", "unit_becomes_mighty"),
-    (r"when one or more enemy units die", "enemy_unit_dies"),
+    (r"when one or more enemy units die", "enemy_units_die_batch"),
+    (r"when one or more friendly units die", "friendly_units_die_batch"),
     (r"when a player plays a spell", "any_plays_spell"),
     (r"when an opponent plays a unit", lambda g, s, ev: ev.get("kind") == "play" and ev.get("player") != g.objects[s].controller and ev.get("card_type") == "unit"),
     (r"when you kill a stunned enemy unit", lambda g, s, ev: ev.get("kind") == "die" and ev.get("player") != g.objects[s].controller and ev.get("stunned")),
@@ -1994,7 +1995,13 @@ def script_card(defn):
         try:
             flags, body = split_lead_keywords(line)
             if not body:
-                continue       # keyword granted to the equipped unit (handled by keyword layer for equipment)
+                # keywords granted to the unit this is attached to, e.g. "[Shield 2]" or "[Tank]"
+                for f in flags:
+                    m = re.match(r"(.+?)(?:\s+(\d+))?$", f)
+                    name = m.group(1).strip().replace(" ", "_").replace("-", "_")
+                    effect_abilities.append(Static("attached", "keyword", (name, int(m.group(2)) if m.group(2) else True),
+                                                   source_text=line))
+                continue
             abs_ = script_line(defn, line)
             for a in abs_:
                 if isinstance(a, Static) and a.sel == "self":

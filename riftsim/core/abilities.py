@@ -42,6 +42,18 @@ def _mine(g, src, ev):
     return s is not None and ev.get("player") == s.controller
 
 
+def _first_in_batch(g, src, ev, key):
+    """True for the first matching event of a batch (events with the same `batch` id happened together)."""
+    s = g.objects.get(src)
+    if s is None or ev.get("batch") is None:
+        return True
+    seen = s.temp.setdefault(("batches", key), set())
+    if ev["batch"] in seen:
+        return False
+    seen.add(ev["batch"])
+    return True
+
+
 TRIGGERS = {
     # ---- self events
     "play_self": lambda g, s, ev: _ev_is(ev, "play") and ev.get("uid") == s,
@@ -98,6 +110,14 @@ TRIGGERS = {
     "you_hold_here": lambda g, s, ev: _ev_is(ev, "hold") and _mine(g, s, ev) and _at_source(g, s, ev),
     "you_score_here": lambda g, s, ev: _ev_is(ev, "score") and _mine(g, s, ev) and _at_source(g, s, ev),
     "you_draw": lambda g, s, ev: _ev_is(ev, "draw") and _mine(g, s, ev),
+    # "one or more": once per group of events that happened together (same batch id)
+    "you_draw_batch": lambda g, s, ev: _ev_is(ev, "draw") and _mine(g, s, ev) and _first_in_batch(g, s, ev, "draw"),
+    "you_discard_batch": lambda g, s, ev: _ev_is(ev, "discard") and _mine(g, s, ev) and _first_in_batch(g, s, ev, "discard"),
+    "you_recycle_batch": lambda g, s, ev: _ev_is(ev, "recycle") and _mine(g, s, ev) and _first_in_batch(g, s, ev, "recycle"),
+    "enemy_units_die_batch": lambda g, s, ev: _ev_is(ev, "die") and not _mine(g, s, ev) and ev.get("card_type") == "unit"
+        and _first_in_batch(g, s, ev, "enemy_die"),
+    "friendly_units_die_batch": lambda g, s, ev: _ev_is(ev, "die") and _mine(g, s, ev) and ev.get("card_type") == "unit"
+        and _first_in_batch(g, s, ev, "friendly_die"),
     "you_discard": lambda g, s, ev: _ev_is(ev, "discard") and _mine(g, s, ev),
     "you_recycle": lambda g, s, ev: _ev_is(ev, "recycle") and _mine(g, s, ev),
     "you_channel": lambda g, s, ev: _ev_is(ev, "channel") and _mine(g, s, ev),

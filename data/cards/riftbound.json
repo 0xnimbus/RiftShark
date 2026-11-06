@@ -42,13 +42,16 @@
    ],
    "supertype": null,
    "domains": [
-    "chaos"
+    "fury"
    ],
    "energy": 2,
    "power": 0,
    "might": 1,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Bandle City",
+    "Yordle"
+   ],
    "keywords": {},
    "text": "When you play me, play a Bomb gear token to a battlefield.",
    "effect_text": "",
@@ -481,7 +484,9 @@
    "power": 0,
    "might": 3,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Bilgewater"
+   ],
    "keywords": {},
    "text": "When you play me, deal 1 to each of up to 2 units.",
    "effect_text": "",
@@ -794,7 +799,7 @@
    ],
    "supertype": null,
    "domains": [
-    "chaos"
+    "fury"
    ],
    "energy": 3,
    "power": 1,
@@ -1151,7 +1156,10 @@
    "power": 0,
    "might": 2,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Shadow Isles",
+    "Spirit"
+   ],
    "keywords": {},
    "text": "I enter ready if a friendly unit or gear died this turn.",
    "effect_text": "",
@@ -1370,7 +1378,9 @@
     "spell"
    ],
    "supertype": null,
-   "domains": [],
+   "domains": [
+    "fury"
+   ],
    "energy": 4,
    "power": 1,
    "might": null,
@@ -1390,7 +1400,7 @@
    ],
    "source": "official-gallery",
    "script": null,
-   "data_incomplete": true
+   "data_incomplete": false
   },
   {
    "id": "UNL-006",
@@ -1500,9 +1510,9 @@
   {
    "id": "RAD-007",
    "name": "Rally for War",
-   "type": "gear",
+   "type": "spell",
    "types": [
-    "gear"
+    "spell"
    ],
    "supertype": null,
    "domains": [
@@ -1772,7 +1782,10 @@
    "power": 0,
    "might": 2,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Demacia",
+    "Yordle"
+   ],
    "keywords": {
     "accelerate": true
    },
@@ -2264,7 +2277,7 @@
    ],
    "supertype": null,
    "domains": [
-    "chaos"
+    "calm"
    ],
    "energy": 2,
    "power": 0,
@@ -2361,12 +2374,16 @@
     "unit"
    ],
    "supertype": null,
-   "domains": [],
+   "domains": [
+    "calm"
+   ],
    "energy": 2,
    "power": 0,
    "might": 2,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Freljord"
+   ],
    "keywords": {},
    "text": "You may have me enter ready. If you do, I can't move this turn.",
    "effect_text": "",
@@ -2379,7 +2396,7 @@
    ],
    "source": "official-gallery",
    "script": null,
-   "data_incomplete": true
+   "data_incomplete": false
   },
   {
    "id": "VEN-026",
@@ -2462,7 +2479,10 @@
    "power": 0,
    "might": 3,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Ixtal",
+    "Bird"
+   ],
    "keywords": {},
    "text": "[T]: [Buff] a unit. If it's already buffed, give it +2 [M] this turn instead.",
    "effect_text": "",
@@ -2622,7 +2642,9 @@
    "power": 0,
    "might": 5,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Shurima"
+   ],
    "keywords": {},
    "text": "When you play a card with Energy cost [7] or more, ready me.",
    "effect_text": "",
@@ -2751,7 +2773,10 @@
    "power": 0,
    "might": 2,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Bilgewater",
+    "Sentinel"
+   ],
    "keywords": {},
    "text": "[Shield 3] (+3 [M] while I'm a defender.)\nWhen you play me to a battlefield, you may move another unit you control here to your base.",
    "effect_text": "",
@@ -3568,7 +3593,9 @@
     "spell"
    ],
    "supertype": null,
-   "domains": [],
+   "domains": [
+    "mind"
+   ],
    "energy": 3,
    "power": 0,
    "might": null,
@@ -3586,7 +3613,7 @@
    ],
    "source": "official-gallery",
    "script": null,
-   "data_incomplete": true
+   "data_incomplete": false
   },
   {
    "id": "OGN-047",
@@ -3757,12 +3784,16 @@
     "unit"
    ],
    "supertype": null,
-   "domains": [],
+   "domains": [
+    "mind"
+   ],
    "energy": 4,
    "power": 0,
    "might": 1,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Zaun"
+   ],
    "keywords": {},
    "text": "When you play me, play a 3 [M] Mech unit token here.",
    "effect_text": "",
@@ -3775,7 +3806,7 @@
    ],
    "source": "official-gallery",
    "script": null,
-   "data_incomplete": true
+   "data_incomplete": false
   },
   {
    "id": "OGN-049",
@@ -3860,7 +3891,9 @@
    "power": 0,
    "might": 4,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Shurima"
+   ],
    "keywords": {},
    "text": "When you play me, [Predict 2].\n[Disarm 2]",
    "effect_text": "",
@@ -4150,7 +4183,10 @@
    "power": 0,
    "might": 2,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Freljord",
+    "Bird"
+   ],
    "keywords": {},
    "text": "When I become exhausted, [Predict].",
    "effect_text": "",
@@ -4247,7 +4283,10 @@
    "power": 0,
    "might": 3,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Bandle City",
+    "Yordle"
+   ],
    "keywords": {
     "disarm": true
    },
@@ -5105,15 +5144,19 @@
    ],
    "supertype": null,
    "domains": [
-    "order"
+    "body"
    ],
    "energy": 1,
    "power": 0,
    "might": 0,
    "might_bonus": 0,
-   "tags": [],
-   "keywords": {},
-   "text": "Equip [1] ([1]: Attach this to a unit you control.)",
+   "tags": [
+    "Equipment"
+   ],
+   "keywords": {
+    "equip": true
+   },
+   "text": "[Equip] [1] ([1]: Attach this to a unit you control.)",
    "effect_text": "[Shield 2] (+2 [M] while I'm a defender.)",
    "text_raw": "<p>Equip :rb_energy_1: (:rb_energy_1:: Attach this to a unit you control.)</p>",
    "set": "RAD",
@@ -5161,9 +5204,9 @@
   {
    "id": "RAD-072",
    "name": "Overloaded Traveler",
-   "type": "spell",
+   "type": "unit",
    "types": [
-    "spell"
+    "unit"
    ],
    "supertype": null,
    "domains": [
@@ -5173,10 +5216,11 @@
    "power": 0,
    "might": 2,
    "might_bonus": null,
-   "tags": [],
-   "keywords": {
-    "deploy": true
-   },
+   "tags": [
+    "Bandle City",
+    "Yordle"
+   ],
+   "keywords": {},
    "text": "While there's a friendly gear with [Deploy] at my battlefield, I have +1 [M].",
    "effect_text": "",
    "text_raw": "<p>While there's a friendly gear with [Deploy] at my battlefield, I have +1 :rb_might:.</p>",
@@ -5231,7 +5275,7 @@
    ],
    "supertype": null,
    "domains": [
-    "calm"
+    "body"
    ],
    "energy": 1,
    "power": 0,
@@ -5306,7 +5350,9 @@
    "power": 0,
    "might": 3,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Freljord"
+   ],
    "keywords": {
     "mighty": true
    },
@@ -5371,7 +5417,11 @@
    "power": 0,
    "might": 4,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Demacia",
+    "Elite",
+    "Bird"
+   ],
    "keywords": {
     "deflect": true
    },
@@ -5437,7 +5487,9 @@
    "power": 0,
    "might": 1,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Mount Targon"
+   ],
    "keywords": {},
    "text": "When I conquer, [Add] [A].",
    "effect_text": "",
@@ -5499,7 +5551,10 @@
    "power": 0,
    "might": 7,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Freljord",
+    "Spirit"
+   ],
    "keywords": {},
    "text": "I enter ready.\n[Shield 3] (+3 [M] while I'm a defender.)",
    "effect_text": "",
@@ -5981,13 +6036,16 @@
    ],
    "supertype": null,
    "domains": [
-    "fury"
+    "chaos"
    ],
    "energy": 4,
    "power": 0,
    "might": 3,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Bandle City",
+    "Yordle"
+   ],
    "keywords": {},
    "text": "I enter ready if you control no other units.\n[Disarm 2]",
    "effect_text": "",
@@ -6152,7 +6210,9 @@
    "power": 0,
    "might": 6,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Zaun"
+   ],
    "keywords": {},
    "text": "When I hold, play three Bomb gear tokens to a single battlefield.",
    "effect_text": "",
@@ -6318,7 +6378,10 @@
    "power": 0,
    "might": 4,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Shadow Isles",
+    "Demon"
+   ],
    "keywords": {
     "hidden": true,
     "temporary": true
@@ -6632,9 +6695,9 @@
   {
    "id": "RAD-097",
    "name": "Siren of the Shallows",
-   "type": "spell",
+   "type": "unit",
    "types": [
-    "spell"
+    "unit"
    ],
    "supertype": null,
    "domains": [
@@ -6644,7 +6707,9 @@
    "power": 0,
    "might": 1,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Bilgewater"
+   ],
    "keywords": {
     "disarm": true,
     "ganking": true
@@ -6844,7 +6909,10 @@
    "power": 0,
    "might": 3,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Bilgewater",
+    "Demon"
+   ],
    "keywords": {},
    "text": "When you play me, choose an opponent. You and that player each draw 1.",
    "effect_text": "",
@@ -7241,7 +7309,9 @@
    "power": 0,
    "might": 3,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Shurima"
+   ],
    "keywords": {},
    "text": "When you play me, choose a friendly unit. Its base Might becomes 5 this turn.",
    "effect_text": "",
@@ -7305,7 +7375,10 @@
    "power": 0,
    "might": 3,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Demacia",
+    "Dog"
+   ],
    "keywords": {
     "deathknell": true,
     "deflect": true
@@ -7391,9 +7464,9 @@
   {
    "id": "RAD-120",
    "name": "Meticulous Restorationist",
-   "type": "gear",
+   "type": "unit",
    "types": [
-    "gear"
+    "unit"
    ],
    "supertype": null,
    "domains": [
@@ -7404,7 +7477,7 @@
    "might": 2,
    "might_bonus": null,
    "tags": [
-    "Device"
+    "Piltover"
    ],
    "keywords": {},
    "text": "When you play a card with Energy cost [7] or more, you may play me from your trash for [Order].",
@@ -7493,7 +7566,9 @@
     "spell"
    ],
    "supertype": null,
-   "domains": [],
+   "domains": [
+    "order"
+   ],
    "energy": 3,
    "power": 0,
    "might": null,
@@ -7513,7 +7588,7 @@
    ],
    "source": "official-gallery",
    "script": null,
-   "data_incomplete": true
+   "data_incomplete": false
   },
   {
    "id": "VEN-121",
@@ -7627,7 +7702,9 @@
    "power": 1,
    "might": 6,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Zaun"
+   ],
    "keywords": {
     "tank": true
    },
@@ -7751,12 +7828,16 @@
     "gear"
    ],
    "supertype": null,
-   "domains": [],
+   "domains": [
+    "order"
+   ],
    "energy": 2,
    "power": 1,
    "might": 1,
    "might_bonus": 1,
-   "tags": [],
+   "tags": [
+    "Equipment"
+   ],
    "keywords": {
     "quick_draw": true,
     "equip": true,
@@ -7773,7 +7854,7 @@
    ],
    "source": "official-gallery",
    "script": null,
-   "data_incomplete": true
+   "data_incomplete": false
   },
   {
    "id": "VEN-123",
@@ -10418,12 +10499,18 @@
     "unit"
    ],
    "supertype": null,
-   "domains": [],
+   "domains": [
+    "fury"
+   ],
    "energy": 6,
    "power": 1,
    "might": 3,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Bandle City",
+    "Yordle",
+    "Mech"
+   ],
    "keywords": {},
    "text": "I enter ready.\nWhen you play me, play a ready 3 [M] Mech unit token here.",
    "effect_text": "",
@@ -10436,7 +10523,7 @@
    ],
    "source": "official-gallery",
    "script": null,
-   "data_incomplete": true
+   "data_incomplete": false
   },
   {
    "id": "VEN-009",
@@ -10609,7 +10696,10 @@
    "power": 0,
    "might": 4,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Piltover",
+    "Mech"
+   ],
    "keywords": {
     "show_off": true
    },
@@ -10769,7 +10859,7 @@
    ],
    "supertype": null,
    "domains": [
-    "chaos"
+    "fury"
    ],
    "energy": 1,
    "power": 0,
@@ -11033,7 +11123,9 @@
    "power": 0,
    "might": 3,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Bilgewater"
+   ],
    "keywords": {},
    "text": "You may kill a friendly unit or gear as an additional cost to play me.\nWhen you play me, if you paid the additional cost, deal 2 to a unit.",
    "effect_text": "",
@@ -11836,7 +11928,7 @@
    ],
    "source": "official-gallery",
    "script": null,
-   "data_incomplete": true
+   "data_incomplete": false
   },
   {
    "id": "VEN-034",
@@ -11982,7 +12074,10 @@
    "power": 0,
    "might": 6,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Freljord",
+    "Bird"
+   ],
    "keywords": {
     "deflect": true
    },
@@ -12046,7 +12141,9 @@
    "power": 1,
    "might": 4,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Piltover"
+   ],
    "keywords": {
     "deflect": true
    },
@@ -12675,7 +12772,10 @@
    "power": 0,
    "might": 2,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Piltover",
+    "Mech"
+   ],
    "keywords": {
     "disarm": true
    },
@@ -12760,9 +12860,9 @@
   {
    "id": "RAD-056",
    "name": "Improvised Projectile",
-   "type": "gear",
+   "type": "spell",
    "types": [
-    "gear"
+    "spell"
    ],
    "supertype": null,
    "domains": [
@@ -12872,7 +12972,10 @@
    "power": 0,
    "might": 3,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Piltover",
+    "Mech"
+   ],
    "keywords": {},
    "text": "When you play a card, you may have my base Might become equal to that card's Energy cost this turn.",
    "effect_text": "",
@@ -12935,7 +13038,9 @@
    "power": 1,
    "might": 3,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Bilgewater"
+   ],
    "keywords": {
     "accelerate": true
    },
@@ -13026,7 +13131,7 @@
    ],
    "supertype": null,
    "domains": [
-    "order"
+    "mind"
    ],
    "energy": 9,
    "power": 1,
@@ -13777,7 +13882,9 @@
    "power": 1,
    "might": 4,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Noxus"
+   ],
    "keywords": {
     "tank": true,
     "shield": true
@@ -13974,7 +14081,9 @@
    "power": 2,
    "might": 8,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Shurima"
+   ],
    "keywords": {},
    "text": "I cost [2] less for each battlefield you've conquered this turn.",
    "effect_text": "",
@@ -14030,13 +14139,15 @@
    ],
    "supertype": null,
    "domains": [
-    "fury"
+    "body"
    ],
    "energy": 6,
    "power": 0,
    "might": 5,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Freljord"
+   ],
    "keywords": {
     "hidden": true
    },
@@ -14194,7 +14305,9 @@
    "power": 0,
    "might": 2,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Mount Targon"
+   ],
    "keywords": {},
    "text": "[Shield 2] (+2 [M] while I'm a defender.)\nWhen you play me, you may kill a gear with Energy cost [4] or less.",
    "effect_text": "",
@@ -14376,9 +14489,9 @@
   {
    "id": "RAD-101",
    "name": "An Offer You Can't Refuse",
-   "type": "gear",
+   "type": "spell",
    "types": [
-    "gear"
+    "spell"
    ],
    "supertype": null,
    "domains": [
@@ -14576,7 +14689,7 @@
    ],
    "supertype": null,
    "domains": [
-    "fury"
+    "chaos"
    ],
    "energy": 3,
    "power": 0,
@@ -14714,7 +14827,9 @@
    "power": 0,
    "might": 3,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Zaun"
+   ],
    "keywords": {
     "hidden": true,
     "show_off": true
@@ -14904,12 +15019,17 @@
     "unit"
    ],
    "supertype": null,
-   "domains": [],
+   "domains": [
+    "chaos"
+   ],
    "energy": 5,
    "power": 1,
    "might": 5,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Shadow Isles",
+    "Cat"
+   ],
    "keywords": {},
    "text": "[T]: [Stun] an enemy unit.",
    "effect_text": "",
@@ -14922,7 +15042,7 @@
    ],
    "source": "official-gallery",
    "script": null,
-   "data_incomplete": true
+   "data_incomplete": false
   },
   {
    "id": "OGN-104",
@@ -15037,7 +15157,9 @@
    "power": 0,
    "might": 3,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Piltover"
+   ],
    "keywords": {
     "accelerate": true
    },
@@ -15256,7 +15378,7 @@
    ],
    "supertype": null,
    "domains": [
-    "body"
+    "chaos"
    ],
    "energy": 3,
    "power": 1,
@@ -15477,13 +15599,13 @@
   {
    "id": "RAD-124",
    "name": "Burn Away",
-   "type": "gear",
+   "type": "spell",
    "types": [
-    "gear"
+    "spell"
    ],
    "supertype": null,
    "domains": [
-    "body"
+    "order"
    ],
    "energy": 3,
    "power": 1,
@@ -15553,7 +15675,9 @@
    "power": 1,
    "might": 7,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "The Void"
+   ],
    "keywords": {
     "deflect": true
    },
@@ -15699,7 +15823,7 @@
    ],
    "source": "official-gallery",
    "script": null,
-   "data_incomplete": true
+   "data_incomplete": false
   },
   {
    "id": "VEN-128",
@@ -15751,7 +15875,9 @@
    "power": 0,
    "might": 3,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Demacia"
+   ],
    "keywords": {
     "tank": true
    },
@@ -15816,7 +15942,10 @@
    "power": 0,
    "might": 1,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Noxus",
+    "Trifarian"
+   ],
    "keywords": {},
    "text": "When you play me, look at the top 4 cards of your Main Deck. You may reveal from among them a unit or gear with Energy cost no more than [3] and with Power cost no more than [A] and draw it. Recycle the rest.",
    "effect_text": "",
@@ -20133,19 +20262,21 @@
   {
    "id": "RAD-016",
    "name": "Coalesced Energy",
-   "type": "spell",
+   "type": "unit",
    "types": [
-    "spell"
+    "unit"
    ],
    "supertype": null,
    "domains": [
-    "mind"
+    "fury"
    ],
    "energy": 4,
    "power": 2,
    "might": 4,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Shurima"
+   ],
    "keywords": {},
    "text": "At the end of your turn, recycle all your runes, then channel 4 runes exhausted.",
    "effect_text": "",
@@ -20237,7 +20368,7 @@
    ],
    "supertype": null,
    "domains": [
-    "chaos"
+    "fury"
    ],
    "energy": 4,
    "power": 1,
@@ -20314,7 +20445,9 @@
    "power": 2,
    "might": 9,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Noxus"
+   ],
    "keywords": {},
    "text": "When you play me, reveal the top card of each opponent's Main Deck. Choose one and banish it, then play it, ignoring its cost. Recycle the rest.",
    "effect_text": "",
@@ -20440,7 +20573,9 @@
    "power": 1,
    "might": 6,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Freljord"
+   ],
    "keywords": {},
    "text": "I enter ready.\nWhen you play me, ready all enemy units.\nOther units enter ready.\nUnits don't ready during the Awaken Phase.",
    "effect_text": "",
@@ -21723,7 +21858,10 @@
    "power": 1,
    "might": 7,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Shadow Isles",
+    "Spirit"
+   ],
    "keywords": {},
    "text": "When you play me, ready a friendly legend.\nFriendly legends have \"[T]: Give a unit +3 [M] this turn.\"",
    "effect_text": "",
@@ -22572,7 +22710,7 @@
    ],
    "supertype": null,
    "domains": [
-    "calm"
+    "mind"
    ],
    "energy": 5,
    "power": 1,
@@ -22738,9 +22876,9 @@
   {
    "id": "RAD-064",
    "name": "Scrutinizing Scope",
-   "type": "spell",
+   "type": "gear",
    "types": [
-    "spell"
+    "gear"
    ],
    "supertype": null,
    "domains": [
@@ -22885,7 +23023,10 @@
    "power": 1,
    "might": 4,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Freljord",
+    "Spirit"
+   ],
    "keywords": {},
    "text": "You may return a friendly gear to its owner's hand as an additional cost to play me.\nWhen you play me, if you paid the additional cost, ready me and give me +[M] this turn equal to the Energy cost of the gear you returned.",
    "effect_text": "",
@@ -24165,7 +24306,9 @@
    "power": 1,
    "might": 2,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Freljord"
+   ],
    "keywords": {},
    "text": "[Assault 2], [Shield 2] (+2 [M] while I'm an attacker or defender.)",
    "effect_text": "",
@@ -24291,7 +24434,10 @@
    "power": 0,
    "might": 2,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Shadow Isles",
+    "Demon"
+   ],
    "keywords": {
     "hidden": true
    },
@@ -24347,7 +24493,7 @@
    ],
    "supertype": null,
    "domains": [
-    "fury"
+    "chaos"
    ],
    "energy": 1,
    "power": 0,
@@ -24885,7 +25031,7 @@
    ],
    "supertype": null,
    "domains": [
-    "fury"
+    "chaos"
    ],
    "energy": 4,
    "power": 1,
@@ -25638,9 +25784,9 @@
   {
    "id": "RAD-130",
    "name": "Battlefield Armorer",
-   "type": "spell",
+   "type": "unit",
    "types": [
-    "spell"
+    "unit"
    ],
    "supertype": null,
    "domains": [
@@ -25650,7 +25796,9 @@
    "power": 0,
    "might": 3,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Demacia"
+   ],
    "keywords": {},
    "text": "When a friendly gear at a battlefield dies, you may pay [1] to return it to its owner's hand.",
    "effect_text": "",
@@ -25698,9 +25846,9 @@
   {
    "id": "RAD-131",
    "name": "Demacian Illuminators",
-   "type": "spell",
+   "type": "unit",
    "types": [
-    "spell"
+    "unit"
    ],
    "supertype": null,
    "domains": [
@@ -25710,7 +25858,9 @@
    "power": 1,
    "might": 3,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Demacia"
+   ],
    "keywords": {},
    "text": "When one or more friendly units die, [Buff] a friendly unit.",
    "effect_text": "",
@@ -25904,7 +26054,9 @@
     "spell"
    ],
    "supertype": null,
-   "domains": [],
+   "domains": [
+    "order"
+   ],
    "energy": 7,
    "power": 1,
    "might": null,
@@ -25922,7 +26074,7 @@
    ],
    "source": "official-gallery",
    "script": null,
-   "data_incomplete": true
+   "data_incomplete": false
   },
   {
    "id": "VEN-135",
@@ -30565,7 +30717,9 @@
     "gear"
    ],
    "supertype": null,
-   "domains": [],
+   "domains": [
+    "fury"
+   ],
    "energy": 4,
    "power": 1,
    "might": null,
@@ -30583,7 +30737,7 @@
    ],
    "source": "official-gallery",
    "script": null,
-   "data_incomplete": true
+   "data_incomplete": false
   },
   {
    "id": "VEN-023",
@@ -31314,9 +31468,9 @@
   {
    "id": "RAD-046",
    "name": "Resplendent Rostrum",
-   "type": "spell",
+   "type": "gear",
    "types": [
-    "spell"
+    "gear"
    ],
    "supertype": null,
    "domains": [
@@ -31667,7 +31821,7 @@
    ],
    "supertype": null,
    "domains": [
-    "fury"
+    "mind"
    ],
    "energy": 8,
    "power": 2,
@@ -31798,9 +31952,9 @@
   {
    "id": "RAD-069",
    "name": "Zero Point Inflection",
-   "type": "spell",
+   "type": "gear",
    "types": [
-    "spell"
+    "gear"
    ],
    "supertype": null,
    "domains": [
@@ -32488,7 +32642,10 @@
    "power": 0,
    "might": 8,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Bilgewater",
+    "Dragon"
+   ],
    "keywords": {
     "deflect": true
    },
@@ -32656,7 +32813,9 @@
    "power": 0,
    "might": 4,
    "might_bonus": null,
-   "tags": [],
+   "tags": [
+    "Bilgewater"
+   ],
    "keywords": {},
    "text": "[Chaos], [T]: Return a friendly unit to its owner's hand. You may play a unit with less Might than that unit had, ignoring its cost.",
    "effect_text": "",

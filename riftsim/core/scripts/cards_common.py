@@ -1433,8 +1433,8 @@ def rally_for_war(defn):
     # Choose an occupied enemy battlefield. Play three 1 [M] Recruit unit tokens there.
     occ = lambda g, c, l: g.battlefields[l[1]].controller is not None and not g.is_friendly(g.battlefields[l[1]].controller, c.controller) \
         and bool(g.units_at(l))
-    return [Triggered("play_self", [O.ChooseLocation(out="loc", pred=occ), O.PlayToken("Recruit", loc=Ref("loc"), count=3)],
-                      label=defn.name, source_text=defn.text)]
+    return [SpellEffect([O.ChooseLocation(out="loc", pred=occ), O.PlayToken("Recruit", loc=Ref("loc"), count=3)],
+                        label=defn.name, source_text=defn.text)]
 
 
 @script("Siphoning Strike")
@@ -1468,3 +1468,118 @@ def affectionate_poro(defn):
     # When a combat that I was in ends, if I haven't been dealt damage this turn, draw 1.
     unhurt = lambda g, s, ev: not g.objects[s].temp.get(("dealt_damage", g.turn))
     return [Triggered("survive_combat_self", [O.Draw(1)], filt=unhurt, label=defn.name, source_text=defn.text)]
+
+
+# ---------------------------------------------------------------- Radiance cards whose gallery type was wrong
+def _gear_with_deploy_at(g, p, loc):
+    return any(o.zone == "board" and o.location == loc and g.is_friendly(o.controller, p) and o.defn.is_gear
+               and g.has_keyword(u, "deploy") for u, o in g.objects.items())
+
+
+@script("Overloaded Traveler")
+def overloaded_traveler(defn):
+    # While there's a friendly gear with [Deploy] at my battlefield, I have +1 [M].
+    def cond(g, s):
+        o = g.objects[s]
+        return o.location is not None and o.location[0] == "bf" and _gear_with_deploy_at(g, o.controller, o.location)
+    return [Static("self", "might", 1, cond=cond, label="+1 [M] with a friendly [Deploy] gear here", source_text=defn.text)]
+
+
+@script("Meticulous Restorationist")
+def meticulous_restorationist(defn):
+    # When you play a card with Energy cost [7] or more, you may play me from your trash for [Order].
+    def big(g, s, ev):
+        if ev.get("kind") != "play" or ev.get("token") or ev.get("player") != g.objects[s].owner or ev.get("uid") == s:
+            return False
+        o = g.objects.get(ev.get("uid"))
+        return o is not None and (o.base_defn().energy or 0) >= 7
+    return [Triggered(big, [O.May([O.PlayCard(Ref("self"), alt_cost=(0, ["order"]))], label="play me from your trash for [Order]")],
+                      zone="trash", label=defn.name, source_text=defn.text)]
+
+
+@script("Improvised Projectile")
+def improvised_projectile(defn):
+    # [Action]  Choose a friendly gear. Deal damage equal to its Energy cost to a unit at a battlefield.
+    cost = lambda g, c: g.objects[c.vars["gr"]].base_defn().energy or 0 if c.vars.get("gr") is not None else 0
+    return [SpellEffect([O.Choose(Sel("gear", side="friendly"), out="gr"), O.Choose(Sel("unit", where="battlefield"), out="t"),
+                         O.Deal(cost, Ref("t"))], label=defn.name, source_text=defn.text)]
+
+
+@script("An Offer You Can't Refuse")
+def an_offer_you_cant_refuse(defn):
+    # [Action]  Kill a gear. Its controller plays a Gold gear token exhausted.
+    def gold(g, c):
+        p = c.vars.get("__ctl")
+        if p is not None:
+            g.play_token(p, "Gold", ("base", p), exhausted_gear=True, ctx=c)
+    def remember(g, c):
+        t = c.vars.get("t")
+        c.vars["__ctl"] = g.objects[t].controller if t is not None else None
+    return [SpellEffect([O.Choose(Sel("gear"), out="t"), O.Do(remember, label="its controller"), O.Kill(Ref("t")),
+                         O.Do(gold, label="its controller plays a Gold gear token exhausted")], label=defn.name, source_text=defn.text)]
+
+
+@script("Burn Away")
+def burn_away(defn):
+    # Banish a unit with 3 [M] or less or a gear. [Burn 2].
+    ok = lambda g, c, u: "gear" in g.chars(u).types or (g.chars(u).might or 0) <= 3
+    return [SpellEffect([O.Choose(Sel("permanent", pred=ok), out="t"), O.Banish(Ref("t")), O.Burn(2)],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Scrutinizing Scope")
+def scrutinizing_scope(defn):
+    # [1], [T]: Choose an opponent. They guess a card type. Reveal the top card of your Main Deck. If it has that type,
+    # recycle it. Otherwise, draw it. (Unit, gear, and spell are types.)
+    from ..abilities import Activated
+    kinds = ["unit", "gear", "spell"]
+    top = lambda g, c: (c.vars.get("looked") or [None])[0]
+    guessed = lambda g, c: top(g, c) is not None and kinds[c.vars.get("__guess", 0)] in g.objects[top(g, c)].base_defn().types
+    return [Activated({"energy": 1, "power": [], "exhaust": True},
+                      [O.ChoosePlayer(out="__opp", opponent=True),
+                       O.ChooseMode([(f"guess {k}", []) for k in kinds], out="__guess", player=Ref("__opp")),
+                       O.Look(1, out="looked", reveal=True),
+                       O.If(lambda g, c: top(g, c) is not None and g.objects[top(g, c)].zone == "deck",
+                            [O.If(guessed, [O.Recycle(top)], [O.Draw(1)])])],
+                      timing="main", label=defn.name, source_text=defn.text)]
+
+
+@script("Battlefield Armorer")
+def battlefield_armorer(defn):
+    # When a friendly gear at a battlefield dies, you may pay [1] to return it to its owner's hand.
+    def dies(g, s, ev):
+        return ev.get("kind") == "die" and ev.get("card_type") == "gear" and ev.get("loc") is not None and ev["loc"][0] == "bf" \
+            and g.is_friendly(ev.get("player"), g.objects[s].controller)
+    back = lambda g, c: c.event.get("uid") if g.objects[c.event.get("uid")].zone == "trash" else None
+    return [Triggered(dies, [O.PayResources(1, out="__ba"), O.If(Ref("__ba"), [O.ToHand(back)])],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Demacian Illuminators")
+def demacian_illuminators(defn):
+    # When one or more friendly units die, [Buff] a friendly unit.
+    return [Triggered("friendly_units_die_batch", [O.Choose(Sel("unit", side="friendly"), out="t"), O.Buff(Ref("t"))],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Zero Point Inflection")
+def zero_point_inflection(defn):
+    # When you play a card, draw 2.
+    # When you draw 1 or more cards with 9 or more other cards in your hand, discard your hand, kill this, and choose an
+    # opponent. They score 1 point.
+    def full(g, s, ev):
+        if ev.get("kind") != "draw" or ev.get("player") != g.objects[s].controller:
+            return False
+        memo = g.objects[s].temp.setdefault("zpi_batches", {})     # batch -> [cards drawn so far, already triggered]
+        st = memo.setdefault(ev.get("batch"), [0, False])
+        st[0] += 1
+        if st[1] or len(g.players[ev["player"]].hand) - st[0] < 9:
+            return False
+        st[1] = True
+        return True
+    def discard_all(g, c):
+        g.do_discard(c.controller, list(g.players[c.controller].hand), c)
+    return [Triggered("you_play_card", [O.Draw(2)], label="When you play a card, draw 2", source_text=defn.text),
+            Triggered(full, [O.Do(discard_all, label="discard your hand"), O.Kill(Ref("self")),
+                             O.ChoosePlayer(out="__opp", opponent=True), O.GainPoints(1, player=Ref("__opp"))],
+                      label="hand overflow", source_text=defn.text)]

@@ -754,6 +754,7 @@ class Game(flow.FlowMixin):
     # ------------------------------------------------------------------ game actions
     def do_draw(self, p, n, ctx=None):
         ps = self.players[p]
+        batch = self.tick()            # cards drawn by one instruction share it ("when you draw 1 or more cards")
         for _ in range(n):
             ev = self.replace_event({"kind": "draw", "player": p})
             if ev is None:
@@ -769,7 +770,7 @@ class Game(flow.FlowMixin):
             u = self._draw_raw(p)
             self.turn_memo[("draws", p)] = self.turn_memo.get(("draws", p), 0) + 1
             self.log("draw", player=p, uid=u)
-            self.emit("draw", player=p, uid=u, ctx=ctx)
+            self.emit("draw", player=p, uid=u, ctx=ctx, batch=batch)
 
     def do_burn_out(self, p):
         """CR 432: deck empty -> opponent(s) gain a point? No: the player recycles trash into deck and each
@@ -1023,13 +1024,14 @@ class Game(flow.FlowMixin):
             self.dirty = True
 
     def do_discard(self, p, uids, ctx=None):
+        batch = self.tick()            # "when you discard one or more cards" fires once per batch
         for u in list(uids):
             o = self.objects.get(u)
             if o is None or o.zone != "hand":
                 continue
             self._to_zone(o, "trash")
             self.log("discard", player=p, uid=u)
-            self.emit("discard", uid=u, player=o.owner, ctx=ctx)
+            self.emit("discard", uid=u, player=o.owner, ctx=ctx, batch=batch)
 
     def do_recycle(self, uids, ctx=None):
         """Recycle (CR 417): cards go to the bottom of their owner's deck; runes to the bottom of the rune deck.
@@ -1037,6 +1039,7 @@ class Game(flow.FlowMixin):
         uids = list(uids)
         if len(uids) > 1:
             self.rng.shuffle(uids)
+        batch = self.tick()
         for u in uids:
             o = self.objects.get(u)
             if o is None or o.zone in (None, "gone"):
@@ -1048,7 +1051,7 @@ class Game(flow.FlowMixin):
                 self._to_zone(o, "gone")
             else:
                 self._to_zone(o, "deck")
-            self.emit("recycle", uid=u, player=o.owner, from_zone=was, loc=loc, ctx=ctx)
+            self.emit("recycle", uid=u, player=o.owner, from_zone=was, loc=loc, ctx=ctx, batch=batch)
             if was == "board":
                 self.emit("leave", uid=u, player=o.owner, loc=loc, ctx=ctx)
                 self.dirty = True

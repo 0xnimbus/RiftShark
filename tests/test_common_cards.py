@@ -1,5 +1,5 @@
 """Hand-scripted common cards (riftsim/core/scripts/cards_common.py) against printed text."""
-from test_champions import db, decks, put, settle, _card_in  # noqa: F401  (fixtures)
+from test_champions import db, decks, put, settle, _card_in, _fire  # noqa: F401  (fixtures)
 from test_targeting import main_phase, give
 
 
@@ -408,3 +408,128 @@ def test_tactical_retreat_saves_the_unit_once(db, decks):
     assert g.objects[u].zone == "board" and g.objects[u].location == ("base", 0) and g.objects[u].exhausted
     g.do_kill([u])
     assert g.objects[u].zone == "trash"
+
+
+# ---------------------------------------------------------------- Radiance type fixes (checked against card images)
+def test_radiance_type_fixes(db):
+    by = {c.id: c for c in db}
+    assert by["RAD-007"].type == "spell" and by["RAD-056"].type == "spell" and by["RAD-124"].type == "spell"
+    assert by["RAD-064"].type == "gear" and by["RAD-046"].type == "gear" and by["RAD-069"].type == "gear"
+    for i in ("RAD-016", "RAD-072", "RAD-097", "RAD-120", "RAD-130", "RAD-131"):
+        assert by[i].is_unit and by[i].might
+    assert by["RAD-071"].domains == ("body",) or list(by["RAD-071"].domains) == ["body"]
+    assert "Equipment" in by["RAD-071"].tags and "Yordle" in by["RAD-001"].tags
+
+
+def test_equipment_grants_its_keywords_to_the_unit(db, decks):
+    g = main_phase(db, decks)
+    u = put(g, db, 0, "Stalwart Goatherd", ("base", 0))
+    n = put(g, db, 0, "Nazuman Ntofo", ("base", 0), exclude=(u,))
+    p = put(g, db, 0, "Protector's Shield", ("base", 0), exclude=(u, n))
+    assert not g.chars(u).kw("shield")
+    g.do_attach(n, u); g.do_attach(p, u); g.bump()
+    assert g.chars(u).kw("shield") == 2 and g.has_keyword(u, "tank")
+
+
+def test_overloaded_traveler_with_a_deploy_gear_at_its_battlefield(db, decks):
+    g = main_phase(db, decks)
+    t = put(g, db, 0, "Overloaded Traveler", ("bf", 0))
+    assert g.chars(t).might == 2
+    gear = put(g, db, 0, "The Good Stuff", ("bf", 1), exclude=(t,))
+    assert g.chars(t).might == 2                      # a different battlefield
+    g.objects[gear].location = ("bf", 0); g.bump()
+    assert g.chars(t).might == 3
+
+
+def test_improvised_projectile_and_burn_away(db, decks):
+    g = main_phase(db, decks)
+    gear = put(g, db, 0, "Protector's Shield", ("base", 0))
+    foe = put(g, db, 1, "Stalwart Goatherd", ("bf", 0))
+    _run_spell(g, db, "Improvised Projectile", picks=[gear, foe])
+    assert g.objects[foe].damage == 2 or g.objects[foe].zone == "trash"
+    big = put(g, db, 1, "Elnuk Herd", ("bf", 1))
+    small = put(g, db, 1, "Hunting Dog", ("bf", 1), exclude=(big,))
+    trash = len(g.players[0].trash)
+    _run_spell(g, db, "Burn Away", picks=[small])
+    assert g.objects[big].zone == "board" and g.objects[small].zone == "banish"
+    assert len(g.players[0].trash) == trash + 2
+
+
+def test_an_offer_you_cant_refuse_gives_its_controller_a_gold(db, decks):
+    g = main_phase(db, decks)
+    gear = put(g, db, 1, "Protector's Shield", ("base", 1))
+    _run_spell(g, db, "An Offer You Can't Refuse", picks=[gear])
+    assert g.objects[gear].zone == "trash"
+    gold = [u for u, o in g.objects.items() if o.zone == "board" and o.defn.name == "Gold"]
+    assert len(gold) == 1 and g.objects[gold[0]].controller == 1 and g.objects[gold[0]].exhausted
+
+
+def test_scrutinizing_scope_recycles_on_a_right_guess(db, decks):
+    g = main_phase(db, decks)
+    s = put(g, db, 0, "Scrutinizing Scope", ("base", 0))
+    top = g.players[0].deck[0]
+    kind = next(k for k in ("unit", "gear", "spell") if k in g.objects[top].base_defn().types)
+    hand = len(g.players[0].hand)
+    _fire(g, s, "Scrutinizing Scope")
+    settle(g, picks=[["unit", "gear", "spell"].index(kind)])
+    assert g.objects[top].zone == "deck" and g.players[0].deck[-1] == top and len(g.players[0].hand) == hand
+    top = g.players[0].deck[0]
+    wrong = next(i for i, k in enumerate(("unit", "gear", "spell")) if k not in g.objects[top].base_defn().types)
+    _fire(g, s, "Scrutinizing Scope")
+    settle(g, picks=[wrong])
+    assert g.objects[top].zone == "hand"
+
+
+def test_battlefield_armorer_returns_a_dead_gear(db, decks):
+    g = main_phase(db, decks)
+    put(g, db, 0, "Battlefield Armorer", ("base", 0))
+    gear = put(g, db, 0, "The Good Stuff", ("bf", 0))
+    g.do_kill([gear])
+    settle(g)
+    assert g.objects[gear].zone == "hand"
+
+
+def test_demacian_illuminators_buff_once_per_batch(db, decks):
+    g = main_phase(db, decks)
+    il = put(g, db, 0, "Demacian Illuminators", ("base", 0))
+    a = put(g, db, 0, "Hunting Dog", ("bf", 0), exclude=(il,))
+    b = put(g, db, 0, "Hunting Dog", ("bf", 0), exclude=(il, a))
+    g.do_kill([a, b])
+    settle(g, picks=[il])
+    assert g.objects[il].buffs == 1
+
+
+def test_zero_point_inflection_overflows(db, decks):
+    g = main_phase(db, decks)
+    z = put(g, db, 0, "Zero Point Inflection", ("base", 0))
+    while len(g.players[0].hand) < 9:
+        g.do_draw(0, 1)
+    pts = g.players[1].points
+    g.do_draw(0, 1)
+    settle(g)
+    assert g.objects[z].zone == "trash" and not g.players[0].hand and g.players[1].points == pts + 1
+
+
+def test_zero_point_inflection_counts_only_other_cards(db, decks):
+    g = main_phase(db, decks)
+    z = put(g, db, 0, "Zero Point Inflection", ("base", 0))
+    while len(g.players[0].hand) > 8:
+        g.do_discard(0, [g.players[0].hand[-1]])
+    while len(g.players[0].hand) < 8:
+        g.do_draw(0, 1)
+    g.do_draw(0, 2)                                    # 8 others: no trigger
+    settle(g)
+    assert g.objects[z].zone == "board" and len(g.players[0].hand) == 10
+
+
+def test_meticulous_restorationist_replays_from_trash(db, decks):
+    g = main_phase(db, decks)
+    m = _card_in(g, db, 0, "Meticulous Restorationist", "trash")
+    for r in g.players[0].runes[:1]:
+        g.objects[r].defn = next(c for c in db if c.name == "Order Rune")
+        g.objects[r].domain = "order"
+    g.bump()
+    big = _card_in(g, db, 0, "Supernova", "hand")
+    g.emit("play", uid=big, player=0, card_type="spell")
+    settle(g)
+    assert g.objects[m].zone == "board"
