@@ -8,6 +8,7 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
 | Time (UTC) | Session (5h window) | Week | Note |
 |---|---|---|---|
 | 2026-11-06 01:48 | 40% used, resets Fri 12:40 AM | 13% used, resets Mon 10:00 AM | Max plan; on track |
+| 2026-11-06 02:10 | 56% used, resets Fri 12:40 AM | 15% used, resets Mon 10:00 AM | ~16%/20 min; session likely exhausted around 03:00 UTC |
 
 ## Where things stand
 
@@ -20,7 +21,11 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   `flow.py` (turns, HOT FEPR chain, cleanups per CR 323, showdowns, combat per CR 466-468, scoring);
   `deck.py`; `scripts/` (keywords → auto-grammar → manual overrides).
 - `tools/smoke_core.py N SEED`: random-play games; last run 40/40 games without crash, ~0.1 s per game.
-- Script coverage (2026-11-06 01:48): auto 500, keywords-only 69, partial 77, none 527, vanilla 23.
+- Script coverage (2026-11-06 02:10): auto 555, manual 9, keywords-only 60, partial 72, none 477, vanilla 23.
+- `data/decks/tournament/`: top Radiance lists (Riven 1st CoolStuffCon Orlando $25k; Kai'Sa 3rd Convergence IV) from
+  riftdecks.com qualifying events (3 relevance stars, 256+ players). Derrick wants these refreshed daily and every
+  relevant legend covered eventually; Kai'Sa vs Riven is the matchup he cares about now.
+- Main deck = 39 cards + chosen champion (CR 103.3). `When you play me` triggers fire from the chain.
 - `riftsim/` top level still holds the v1 simplified engine (engine.py, policies.py, replay.py, runner.py, cli.py).
   It will be replaced by v2 equivalents.
 
