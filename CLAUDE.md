@@ -75,6 +75,9 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   Mulligan (06:50): hand view, click up to two cards then confirm (`decision.option_uids` from PlaySession); order_triggers
   explained one pick at a time. 07:00: Difficulty picker (novice..elite, default advanced), show_off decisions, any number of
   battlefields, facedown cards the human knows drawn face up (`facedown_known`), cards only slide when they change zone.
+  16:50: showdown Focus strip on the battlefield (who has Focus, passes in a row), "◉ focus" on the seat, pass lines in the
+  log; combat strip (attack vs defend Might), ATK/DEF badges, assigned damage on each unit (combat.assign), assign_damage
+  options drawn as bars with "dies"; play.js serialises grade/apply so clicking during grading no longer stalls the page.
 - Main deck = 39 cards + chosen champion (CR 103.3). `When you play me` triggers fire from the chain.
 - `riftsim/` top level still holds the v1 simplified engine (engine.py, policies.py, replay.py, runner.py, cli.py).
   It will be replaced by v2 equivalents.

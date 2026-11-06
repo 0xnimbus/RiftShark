@@ -87,7 +87,7 @@ window.RiftBoard = (function () {
       case "mode": return ["Choose a mode", `${src} has several modes. Pick one.`];
       case "yesno": return ["Optional effect", `${src} offers an optional effect. Do you want it?`];
       case "additional_cost": return ["Additional cost", `Pay the optional additional cost${d.prompt ? " (" + esc(d.prompt) + ")" : ""}? Paying it turns on the extra text of the card.`];
-      case "assign_damage": return ["Assign combat damage", "Split your units' combat damage among the enemy units. A unit dies when its damage reaches its Might."];
+      case "assign_damage": return ["Assign combat damage", "Your side's total Might is dealt as damage to the enemy units (CR 467.2.c): Tanks first, Backline last, and each unit must get lethal damage before the next gets any; extra can only be spread once all have lethal. Each option shows where the damage goes and who dies."];
       case "pay_amount": return ["How much?", `${src}: choose how much to pay.`];
       case "discard": return ["Discard", `${src}: choose what to discard.`];
       case "recycle": return ["Recycle", `${src}: choose what to put on the bottom of its deck.`];
@@ -113,6 +113,8 @@ window.RiftBoard = (function () {
       case "pay": return (e.energy || (e.power && e.power.length)) ? `${whoS(p, "pay")} ${e.energy || 0} energy${e.power && e.power.length ? " and " + e.power.length + " power" : ""}.` : null;
       case "mulligan": return e.count ? `${whoS(p, "mulligan")} ${e.count} card${e.count === 1 ? "" : "s"}.` : `${whoS(p, "keep")} their opening hand.`.replace("You keep their", "You keep your");
       case "trigger_order": return `${whoS(p, "order")} simultaneous triggers.`;
+      case "channel_phase": return `${whoS(p, "channel")} ${e.made != null ? e.made : e.n} rune${(e.made != null ? e.made : e.n) === 1 ? "" : "s"}.`;
+      case "token": return `${whoS(p, "create")} a <b>${esc(e.name || "token")}</b> token${e.loc ? " at " + locName(e.loc) : ""}.`;
       case "rune": return e.how === "recycle" ? `${whoS(p, "recycle")} a ${esc(nameOf(e.uid))} for power.` : `${whoS(p, "exhaust")} a ${esc(nameOf(e.uid))} for energy.`;
       case "trigger": return `<b>${chips(e.label)}</b> triggers.`;
       case "resolve": return `<b>${chips(e.label)}</b> resolves.`;
@@ -126,7 +128,11 @@ window.RiftBoard = (function () {
       case "lose_control": return `${whoS(p, "lose")} control of ${esc(bfName(e.bf))}.`;
       case "points": return `<span class="pts-ev">${whoS(p, "score")} ${e.points} point${e.points === 1 ? "" : "s"}</span> (${esc(e.reason || "")}).`;
       case "combat": return `Combat at ${esc(bfName(e.bf))}: ${whoS(e.attacker, "attack")}.`;
-      case "combat_damage": return "Combat damage: " + (e.assignments || []).map(a => { const t = a.__t || a; return `${esc(String(t[0]).replace(/#\d+/, ""))} ${t[1]}`; }).join(", ") + ".";
+      case "combat_damage": return "Combat damage: " + (e.assignments || []).map(a => {
+        const t = a.__t || a, m = String(t[0]).match(/#(\d+)/), o = m ? OBJ[m[1]] : null;
+        const dead = o && o.might != null && t[1] >= o.might - (o.damage || 0);
+        return `<b class="${o ? (o.controller === ME ? "me" : "op") : ""}">${esc(String(t[0]).replace(/#\d+/, ""))}</b> takes ${t[1]}${dead ? " ☠" : ""}`;
+      }).join(", ") + ".";
       case "combat_result": return e.winner == null ? "Nobody wins the combat." : `${whoS(e.winner, "win")} the combat.`;
       case "activate": return `${whoS(p, "use")} <b>${esc(n)}</b>: ${chips(e.label || "")}`;
       case "hide": return `${whoS(p, "hide")} a card face down at ${esc(bfName(e.bf))}.`;
@@ -157,13 +163,15 @@ window.RiftBoard = (function () {
     const flags = [];
     if (o.exhausted) flags.push(`<span class="flag ex">EXHAUSTED</span>`);
     if (o.stunned) flags.push(`<span class="flag st">STUNNED</span>`);
+    const role = o.designation === "attacker" ? `<span class="role atk" title="attacking">⚔ ATK</span>` : o.designation === "defender" ? `<span class="role def" title="defending">🛡 DEF</span>` : "";
+    const pend = o.pending_damage ? `<span class="pend" title="combat damage assigned to it">-${o.pending_damage}${o.pending_damage >= o.might - (o.damage || 0) ? " ☠" : ""}</span>` : "";
     const m = unit ? `<span class="m${o.damage ? " hurt" : ""}">${o.damage ? (o.might - o.damage) + "/" : ""}${o.might}</span>` : "";
     const b = (o.buffs || o.empowered) ? `<span class="b">${o.buffs ? "+" + o.buffs : ""}${o.empowered ? " E" : ""}</span>` : "";
     const cost = (cls || "").includes("inhand") && def.energy != null ? `<span class="cost">${def.energy}${def.power ? "+" + def.power : ""}</span>` : "";
     const cl = ["card", "p" + (o.controller === ME ? "me" : "op"), o.exhausted ? "exhausted" : "", o.stunned ? "stunned" : "", o.token ? "token" : "", cls || ""].join(" ");
     return `<div class="${cl}" data-uid="${o.uid}" ${extra || ""}>
       ${im ? `<img src="${esc(im)}" loading="lazy" alt="">` : `<div class="noimg">${esc(o.name)}</div>`}
-      ${cost}${m}${b}${flags.join("")}<span class="n">${esc(o.name)}</span></div>`;
+      ${cost}${m}${b}${role}${pend}${flags.join("")}<span class="n">${esc(o.name)}</span></div>`;
   }
   function remember(o) { if (o && o.uid != null && o.name && o.name !== "?") OBJ[o.uid] = o; }
   function runeDomain(r) { const d = (r.name || "").split(" ")[0].toLowerCase(); return DOMAINS.includes(d) ? d : "any"; }
@@ -197,7 +205,7 @@ window.RiftBoard = (function () {
     const handZone = `<div data-zone="hand${p.idx}" class="zone-box hand-box${!mine && o.thinking ? " thinking" : ""}"><div class="zl">${NEUTRAL ? seatName(p.idx) + "'s hand" : mine ? "Your hand" : "Opponent's hand"} · ${p.hand_size != null ? p.hand_size : p.hand.length}</div>
         <div class="hand">${hand || '<span class="muted">empty</span>'}</div>${thinking}</div>`;
     const info = `<div class="seat-info">
-        <div class="who ${mine ? "me" : "op"}">${seatName(p.idx)}${st.turn_player === p.idx ? ' <span class="turnflag">to play</span>' : ""}</div>
+        <div class="who ${mine ? "me" : "op"}">${seatName(p.idx)}${st.turn_player === p.idx ? ' <span class="turnflag">turn</span>' : ""}${st.showdown && st.focus === p.idx ? ' <span class="focusflag" title="has Focus in the showdown">◉ focus</span>' : ""}</div>
         <div class="deckname" title="${esc(p.deck)}">${esc(p.legend)}</div>
         ${scorePips(p, o.victory || 8)}
         <div class="counts"><span title="cards left in main deck">Deck ${p.deck_size}</span><span title="trash (discard pile)">Trash ${p.trash.length}</span><span title="cards left in rune deck">Rune deck ${p.rune_deck}</span>${p.xp ? `<span>XP ${p.xp}</span>` : ""}</div>
@@ -242,14 +250,66 @@ window.RiftBoard = (function () {
     return `<div data-zone="bf${b.idx}" class="bf ${b.controller == null ? "" : (b.controller === ME ? "c-me" : "c-op")}${hot}">
       ${im ? `<div class="bf-art" style="background-image:url('${esc(im)}')"></div>` : ""}
       <div class="bf-head"><span class="bf-name" data-uid="bf${b.idx}">${esc(b.name)}</span>${ctrl}${con}${here}${fd}</div>
-      <div class="side op">${theirs.map(u => card(u, "unit")).join("") || `<span class="muted">no ${NEUTRAL ? "P" + (1 - ME) : "enemy"} units</span>`}</div>
-      <div class="side me">${mine.map(u => card(u, "unit")).join("") || `<span class="muted">no ${NEUTRAL ? "P" + ME : "units of yours"}${NEUTRAL ? " units" : ""}</span>`}</div>
+      <div class="side op">${theirs.map(u => card(u, "unit")).join("")}</div>
+      ${fightStrip(b, st)}
+      <div class="side me">${mine.map(u => card(u, "unit")).join("")}</div>
     </div>`;
   }
   function base(p) {
     const mine = p.idx === ME;
     return `<div data-zone="base${p.idx}" class="base ${mine ? "me" : "op"}"><div class="zl">${NEUTRAL ? seatName(p.idx) + "'s base" : mine ? "Your base" : "Opponent's base"}</div>
-      <div class="row">${p.base.map(c => card(c, "unit")).join("") || '<span class="muted">empty</span>'}</div></div>`;
+      <div class="row">${p.base.map(c => card(c, "unit")).join("")}</div></div>`;
+  }
+  const T = v => (v && v.__t) ? v.__t : v;
+  /* Showdown / combat strip between the two sides of the battlefield where it happens:
+     who has Focus, how many passes in a row, Might totals and where the damage goes. */
+  function fightStrip(b, st) {
+    const sd = st.showdown, cb = st.combat;
+    if (!(sd && sd.bf === b.idx) && !(cb && cb.bf === b.idx)) return "";
+    const nm = p => NEUTRAL ? "P" + p : p === ME ? "You" : "Opponent";
+    const parts = [];
+    if (sd && sd.bf === b.idx) {
+      const f = st.focus;
+      const passes = sd.passes || 0;
+      parts.push(`<div class="focus ${f === ME ? "me" : "op"}"><span class="orb"></span><b>Focus: ${f == null ? "nobody" : nm(f)}</b>
+        <span class="muted">${passes ? `${passes} pass${passes === 1 ? "" : "es"} in a row (2 in a row ends the showdown${sd.combat ? " and combat damage follows" : ""})` :
+          `${f === ME && !NEUTRAL ? "you may" : "they may"} play an Action or Reaction, or pass Focus`}</span></div>`);
+    }
+    if (cb && cb.bf === b.idx) {
+      const tot = T(cb.totals);
+      const att = b.units.filter(u => u.designation === "attacker"), dfn = b.units.filter(u => u.designation === "defender");
+      const sum = us => us.filter(u => !u.stunned).reduce((a, u) => a + (u.might || 0), 0);
+      const aT = tot ? tot[0] : sum(att), dT = tot ? tot[1] : sum(dfn);
+      const step = cb.step === "damage" ? "assigning damage" : "showdown before damage";
+      parts.push(`<div class="clash"><span class="side-a ${cb.attacker === ME ? "me" : "op"}">⚔ ${nm(cb.attacker)} attack: <b>${aT}</b> Might</span>
+        <span class="vs">vs</span><span class="side-d ${cb.defender === ME ? "me" : "op"}">🛡 ${nm(cb.defender)} defend: <b>${dT}</b> Might</span>
+        <span class="muted">· ${step}</span></div>`);
+    }
+    return `<div class="fight">${parts.join("")}</div>`;
+  }
+  /* Annotate units with the damage already assigned to them this combat (combat.assign + assign_targets_P). */
+  function markPending(st) {
+    const cb = st.combat;
+    if (!cb || !cb.assign) return;
+    const per = {};
+    for (const [p, plan] of Object.entries(cb.assign)) {
+      const tg = T(cb["assign_targets_" + p]) || [];
+      (T(plan) || []).forEach((a, i) => { if (a && tg[i] != null) per[tg[i]] = (per[tg[i]] || 0) + a; });
+    }
+    st.battlefields.forEach(b => b.units.forEach(u => { u.pending_damage = per[u.uid] || 0; }));
+  }
+  /* A damage-assignment option as bars: each target, its health left, the damage it gets, and whether that kills it. */
+  function damagePlan(label) {
+    const items = String(label).split(/,\s*/).map(x => x.match(/^(.*?)#(\d+):(\d+)$/)).filter(Boolean);
+    if (!items.length) return null;
+    return `<div class="dmg-plan">${items.map(m => {
+      const o = OBJ[m[2]] || {}, amt = +m[3];
+      const hp = Math.max(1, (o.might || amt) - (o.damage || 0));
+      const pct = Math.min(100, Math.round(100 * amt / hp));
+      const dead = amt >= hp;
+      return `<div class="dp" data-uid="${m[2]}"><span class="dp-n">${esc(m[1])}</span><span class="dp-bar"><i style="width:${pct}%"></i></span>
+        <span class="dp-a">${amt}/${hp}${dead ? ' <b class="kill">☠ dies</b>' : ""}</span></div>`;
+    }).join("")}</div>`;
   }
   function turnBar(st, o) {
     const cur = (PHASES.find(x => x[0] === st.phase) || [null, ""])[1];
@@ -291,7 +351,7 @@ window.RiftBoard = (function () {
     }
     return `<div class="chain-lane"><div class="chain-head"><span class="ch-title">⛓ Chain · ${n} item${n === 1 ? "" : "s"}</span>
         <span class="ch-wait">${wait}</span>
-        <span class="ch-rule" title="CR: while anything is on the chain, only Reaction-speed cards and abilities can be played">Only <i class="kw">Reaction</i> speed can be played now. When both players pass in a row, the item on the right resolves.</span></div>
+        <span class="ch-rule" title="While anything is on the chain, only Reaction-speed cards and abilities can be played. When both players pass in a row, the item on the right resolves.">ⓘ</span></div>
       <div class="chain-row">${items}</div></div>`;
   }
 
@@ -313,6 +373,7 @@ window.RiftBoard = (function () {
     ME = o.me != null ? o.me : 0;
     NEUTRAL = !!o.neutral;
     BFN = st.battlefields.map(b => b.name);
+    markPending(st);
     st.players.forEach(p => { p.hand.forEach(remember); p.base.forEach(remember); p.runes.forEach(remember); p.trash.forEach(remember); remember(p.champion); remember(p.legend_obj); });
     st.battlefields.forEach(b => b.units.forEach(remember));
     const me = st.players.find(p => p.idx === ME), op = st.players.find(p => p.idx !== ME);
@@ -417,5 +478,5 @@ window.RiftBoard = (function () {
     }).join("");
   }
   const getMe = () => ME;
-  return { setCards, render, bindTooltips, say, explain, describe, chainStep, thumbs, uidsIn, chips, esc, getMe };
+  return { setCards, render, bindTooltips, say, explain, describe, chainStep, damagePlan, thumbs, uidsIn, chips, esc, getMe };
 })();
