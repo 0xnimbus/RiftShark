@@ -1057,9 +1057,11 @@ class Game(flow.FlowMixin):
             self.emit("leave_loc", uid=u, player=o.controller, **{"from": frm}, to=dest_u, ctx=ctx)
         if not moved:
             return []
-        for u in moved:
+        batch = self.tick()          # units moved together by one action/effect share a batch ("when an opponent moves")
+        for i, u in enumerate(moved):
             o = self.objects[u]
-            self.emit("move", uid=u, player=o.controller, **{"from": origin.get(u)}, to=o.location, loc=o.location, standard=standard, ctx=ctx)
+            self.emit("move", uid=u, player=o.controller, **{"from": origin.get(u)}, to=o.location, loc=o.location, standard=standard,
+                      batch=batch, batch_index=i, ctx=ctx)
             self.emit("arrive", uid=u, player=o.controller, loc=o.location, ctx=ctx)
         self._apply_contested(dest, self.objects[moved[0]].controller)
         self.dirty = True

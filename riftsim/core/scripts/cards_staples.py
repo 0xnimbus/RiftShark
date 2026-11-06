@@ -424,3 +424,116 @@ def deceiver(defn):
             O.GiveKeyword(Ref("token"), "temporary", True, duration="permanent")]
     return {"abilities": [Triggered(conquer_or_hold, [O.If(can, [O.May(body, label="discard 1 and exhaust Deceiver to play a Reflection copy there")])],
                                     label=defn.name, source_text=defn.text)], "replace": True}
+
+
+# ----------------------------------------------------------------------------------------- champion units
+def _at_bf(g, u):
+    o = g.objects.get(u)
+    return o is not None and o.zone == "board" and o.location is not None and o.location[0] == "bf"
+
+
+def _buffed_friendly_at_my_bf(g, s, other=False):
+    me = g.objects[s]
+    if not _at_bf(g, s):
+        return []
+    return [u for u, o in g.objects.items() if o.zone == "board" and o.location == me.location and o.controller == me.controller
+            and o.buffs > 0 and "unit" in g.chars(u).types and not (other and u == s)]
+
+
+@script("Master Yi, Meditative")
+def master_yi_meditative(defn):
+    # While you have 8+ runes, I have +4 [M].
+    return {"abilities": [Static("self", "might", 4, cond=lambda g, s: len(g.players[g.objects[s].controller].runes) >= 8,
+                                 label="8+ runes: +4 [M]", source_text=defn.text)], "replace": True}
+
+
+@script("Sett, Kingpin")
+def sett_kingpin(defn):
+    # [Tank]   (keyword)
+    # I get +1 [M] for each buffed friendly unit at my battlefield.
+    return {"abilities": [Static("self", "might", lambda g, s, u: len(_buffed_friendly_at_my_bf(g, s)),
+                                 label="+1 [M] per buffed friendly unit at my battlefield", source_text=defn.text)], "replace": True}
+
+
+@script("Lee Sin, Centered")
+def lee_sin_centered(defn):
+    # [Accelerate]   (keyword)
+    # Other buffed friendly units at my battlefield have +2 [M].
+    sel = Sel("unit", pred=lambda g, c, u: u in _buffed_friendly_at_my_bf(g, c.source, other=True))
+    return {"abilities": [Static(sel, "might", 2, label="other buffed friendly units at my battlefield +2 [M]",
+                                 source_text=defn.text)], "replace": True}
+
+
+@script("Xin Zhao, Vigilant")
+def xin_zhao_vigilant(defn):
+    # [Tank]   (keyword)
+    # I enter ready if you have two or more other units in your base.
+    from ..abilities import Replacement
+
+    def cond(g, s, ev):
+        if ev.get("uid") != s:
+            return False
+        p = g.objects[s].controller
+        return len([u for u, o in g.objects.items() if u != s and o.zone == "board" and o.location == ("base", p)
+                    and "unit" in g.chars(u).types]) >= 2
+    return {"abilities": [Replacement("enter_ready", cond, lambda g, s, ev: dict(ev, ready=True), label=defn.name, zone="any")],
+            "replace": True}
+
+
+@script("Kog'Maw, Caustic")
+def kogmaw_caustic(defn):
+    # [Deathknell] — Deal 4 to all units at my battlefield.
+    here = Sel("unit", pred=lambda g, c, u: c.event.get("loc") is not None and c.event["loc"][0] == "bf"
+               and g.objects[u].location == c.event["loc"])
+    return {"abilities": [Triggered("die_self", [O.Deal(4, here)], label="Deathknell", source_text=defn.text,
+                                    keyword="deathknell")], "replace": True}
+
+
+@script("Vi, Hotheaded")
+def vi_hotheaded(defn):
+    # [Deflect]   (keyword)
+    # [2][Fury]: Double my Might this turn.
+    return {"abilities": [Activated({"energy": 2, "power": ["fury"]},
+                                    [O.GiveMight(Ref("self"), lambda g, c: g.chars(c.source).might or 0, duration="turn")],
+                                    timing="main", label="double my Might this turn", source_text=defn.text)], "replace": True}
+
+
+@script("Lucian, Gunslinger")
+def lucian_gunslinger(defn):
+    # [Assault]   (keyword)
+    # When I attack, deal damage equal to my [Assault] to an enemy unit here.
+    return {"abilities": [Triggered("attack_self", [O.Deal(lambda g, c: g.chars(c.source).kw("assault"), Ref("t"))],
+                                    targets=[O.Choose(Sel("unit", side="enemy", where="here"), out="t")],
+                                    label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Yuumi, Magical Cat")
+def yuumi(defn):
+    # When I attack or defend, give one of your other units here +3 [M] and [Tank] this turn.
+    sel = Sel("unit", side="friendly", where="here", other=True)
+    eff = [O.GiveMight(Ref("t"), 3, duration="turn"), O.GiveKeyword(Ref("t"), "tank", True, duration="turn")]
+    return {"abilities": [Triggered(ev, eff, targets=[O.Choose(sel, out="t")], label=defn.name, source_text=defn.text)
+                          for ev in ("attack_self", "defend_self")], "replace": True}
+
+
+@script("Volibear, Imposing")
+def volibear_imposing(defn):
+    # [Shield 3] [Tank]   (keywords)
+    # When an opponent moves to a battlefield other than mine, draw 1.
+    def opp_moves_elsewhere(g, s, ev):
+        if ev.get("kind") != "move":
+            return False
+        me = g.objects[s]
+        to = ev.get("to")
+        return ev.get("player") not in (None, me.controller) and not g.is_friendly(ev["player"], me.controller) and \
+            to is not None and to[0] == "bf" and to != me.location and ev.get("batch_index", 0) == 0   # one move = one trigger
+    return {"abilities": [Triggered(opp_moves_elsewhere, [O.Draw(1)], label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("LeBlanc, Fragmented")
+def leblanc_fragmented(defn):
+    # [Assault]   (keyword)
+    # [Deathknell][>] Draw 1. If it's your Beginning Phase, draw 2 instead.
+    n = lambda g, c: 2 if (g.turn_player == c.controller and g.phase == "beginning") else 1
+    return {"abilities": [Triggered("die_self", [O.Draw(n)], label="Deathknell", source_text=defn.text, keyword="deathknell")],
+            "replace": True}
