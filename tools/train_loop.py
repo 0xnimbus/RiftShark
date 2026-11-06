@@ -59,6 +59,39 @@ def best_spec():
         return json.load(f)["spec"]
 
 
+class GameTimeout(Exception):
+    pass
+
+
+def _timed(fn, args, limit):
+    """Run one game with a wall-clock limit (SIGALRM in the worker). A game that runs out of time is dropped from the
+    data and reported, never shortened: the engine is not changed to make it fit. Seen 2026-11-06: one combat
+    enumerating millions of legal damage assignments (flow._damage_plans) stalled self-play for 15+ minutes."""
+    import signal
+
+    def _raise(*_):
+        raise GameTimeout()
+    old = signal.signal(signal.SIGALRM, _raise)
+    signal.alarm(limit)
+    try:
+        return fn(args)
+    except GameTimeout:
+        return {"timeout": True, "args": [os.path.basename(x) for x in args[0]] + [args[1]]}
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old)
+
+
+def _selfplay_timed(args):
+    return _timed(_selfplay_game, args, GAME_LIMIT)
+
+
+def _gate_timed(args):
+    return _timed(_gate_game, args, GAME_LIMIT)
+
+
+GAME_LIMIT = 300
+
 # ------------------------------------------------------------------------------------------------ self-play
 def _selfplay_game(args):
     paths, seed, spec, every, epsilon = args
@@ -105,9 +138,14 @@ def selfplay(games, spec, out, workers, seed, every=3, epsilon=0.03):
         jobs.append((pair, seed + 2 * i, spec, every, epsilon))
         jobs.append((pair[::-1], seed + 2 * i + 1, spec, every, epsilon))
     X, Y, G = [], [], []
+    timeouts = []
     t = time.time()
     with ProcessPoolExecutor(max_workers=workers) as ex:
-        for k, r in enumerate(ex.map(_selfplay_game, jobs)):
+        for k, r in enumerate(ex.map(_selfplay_timed, jobs)):
+            if r.get("timeout"):
+                timeouts.append(r["args"])
+                print(f"self-play game {r['args']} ran out of time, dropped", file=sys.stderr)
+                continue
             X += r["x"]
             Y += r["y"]
             G += [k] * len(r["y"])
@@ -116,7 +154,7 @@ def selfplay(games, spec, out, workers, seed, every=3, epsilon=0.03):
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     np.savez_compressed(out, x=np.array(X, dtype=np.float32), y=np.array(Y, dtype=np.float32),
                         game=np.array(G, dtype=np.int32))
-    return len(jobs), len(Y)
+    return len(jobs), len(Y), timeouts
 
 
 # ------------------------------------------------------------------------------------------------ training
@@ -235,9 +273,13 @@ def gate(cand, best, games, workers, seed):
         jobs.append((pair, s, [best, cand]))     # same decks and shuffle, the two AIs swap seats
     wins = draws = 0
     per_deck = {}
+    timeouts = []
     t = time.time()
     with ProcessPoolExecutor(max_workers=workers) as ex:
-        for k, r in enumerate(ex.map(_gate_game, jobs)):
+        for k, r in enumerate(ex.map(_gate_timed, jobs)):
+            if r.get("timeout"):
+                timeouts.append(r["args"])      # dropped from the score (neither AI is credited)
+                continue
             if r["winner"] is None:
                 draws += 1
             else:
@@ -249,14 +291,15 @@ def gate(cand, best, games, workers, seed):
                 per_deck[dk] = (w + won, n + 1)
             if (k + 1) % 20 == 0:
                 print(f"gate {k + 1}/{len(jobs)}: candidate {wins} wins ({time.time() - t:.0f}s)", file=sys.stderr)
-    n = len(jobs)
+    n = len(jobs) - len(timeouts)
     score = (wins + 0.5 * draws) / n
     z = 1.96
     p = score
     half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
     centre = (p + z * z / (2 * n)) / (1 + z * z / n)
     return {"candidate": cand, "best": best, "games": n, "wins": wins, "draws": draws, "score": round(score, 4),
-            "interval": [round(centre - half, 3), round(centre + half, 3)], "per_deck": per_deck}
+            "interval": [round(centre - half, 3), round(centre + half, 3)], "per_deck": per_deck,
+            "timeouts": timeouts}
 
 
 # ------------------------------------------------------------------------------------------------ one generation
@@ -273,7 +316,8 @@ def generation(a):
     data_file = os.path.join(data_dir, f"{name}.npz")
     if not os.path.exists(data_file):
         print(f"{name}: self-play {a.games} games with {best}", file=sys.stderr)
-        selfplay(a.games, best, data_file, a.workers, seed=a.seed + 100000 * gen)
+        sp = selfplay(a.games, best, data_file, a.workers, seed=a.seed + 100000 * gen)
+        json.dump({"games": sp[0], "positions": sp[1], "timeouts": sp[2]}, open(data_file + ".info.json", "w"))
     t1 = time.time()
     buffer = sorted(glob.glob(os.path.join(data_dir, "gen_*.npz")))[-a.buffer:]
     warm = None
