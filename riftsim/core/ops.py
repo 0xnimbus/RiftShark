@@ -984,7 +984,7 @@ class PayEquip(Instr):
         if gear is None or gear not in game.objects:
             return None
         for ab in game.abilities(gear):
-            if isinstance(ab, Activated) and ab.is_equip:
+            if isinstance(ab, Activated) and ab.is_equip and ab.cost.get("exhaust_unit") is None:
                 d = game.objects[gear].base_defn()
                 pw = ["any" if x == "C" and not d.domains else (d.domains[0] if x == "C" else x) for x in ab.cost.get("power", ())]
                 if pw:

@@ -54,6 +54,7 @@ window.RiftBoard = (function () {
     if ((m = s.match(/^activate (.+?)#\d+: (.*)$/))) return `Use <b>${esc(m[1])}</b>: ${chips(m[2])}`;
     if ((m = s.match(/^exhaust an? (\w+) rune: add 1 energy$/))) return `Exhaust a ${esc(m[1])} rune for 1 energy`;
     if ((m = s.match(/^recycle an? (\w+) rune: add (\w+) power$/))) return `Recycle a ${esc(m[1])} rune for 1 ${esc(m[2])} power`;
+    if ((m = s.match(/^pay: (.*?);? ?spend (.*)$/))) return `${m[1] ? esc(m[1].replace(/;\s*/g, ", ").replace(/^\w/, c => c.toUpperCase())) : "Use your pool"} <span class="muted">(${esc(m[2])})</span>`;
     if ((m = s.match(/^yes: (.*)$/))) return `Yes, ${chips(m[1])}`;
     if ((m = s.match(/^recycle: (.*)$/))) return `Recycle ${esc(m[1].replace(/#\d+/g, ""))}`;
     return chips(s.replace(/#\d+/g, ""));
@@ -85,6 +86,7 @@ window.RiftBoard = (function () {
       case "discard": return ["Discard", `${src}: choose what to discard.`];
       case "recycle": return ["Recycle", `${src}: choose what to put on the bottom of its deck.`];
       case "predict": return ["Predict", `${src}: look at the top of your deck and choose what to recycle (send to the bottom).`];
+      case "show_off": return ["Show Off?", `${src} has <i class="kw">Show Off</i>: you may reveal or pick a card to turn on its extra effect, or don't show off.`];
       case "pay": return ["Pay with runes", "Choose which runes pay. Exhausting a rune adds 1 energy; recycling a rune adds 1 power of its domain."];
       case "order_triggers": return ["Order your triggers", "Several of your abilities triggered at the same time (CR 383). Pick " +
         (/next/i.test(d.prompt || "") ? "which of the rest resolves next." : "which one resolves first; you'll then order the rest one at a time.")];
@@ -101,6 +103,7 @@ window.RiftBoard = (function () {
       case "turn": return null;
       case "draw": return e.uid != null && (p === ME || NEUTRAL) ? `${whoS(p, "draw")} <b>${esc(nameOf(e.uid))}</b>.` : `${whoS(p, "draw")} a card.`;
       case "play": return `${whoS(p, "play")} <b>${esc(n)}</b>${e.loc ? " to " + locName(e.loc) : ""}.`;
+      case "show_off": return ["Show Off?", `${src} has <i class="kw">Show Off</i>: you may reveal or pick a card to turn on its extra effect, or don't show off.`];
       case "pay": return (e.energy || (e.power && e.power.length)) ? `${whoS(p, "pay")} ${e.energy || 0} energy${e.power && e.power.length ? " and " + e.power.length + " power" : ""}.` : null;
       case "mulligan": return e.count ? `${whoS(p, "mulligan")} ${e.count} card${e.count === 1 ? "" : "s"}.` : `${whoS(p, "keep")} their opening hand.`.replace("You keep their", "You keep your");
       case "trigger_order": return `${whoS(p, "order")} simultaneous triggers.`;
@@ -185,7 +188,7 @@ window.RiftBoard = (function () {
       return card(p.champion, "zone" + (opts.length ? " playable" : ""), extra);
     })() : `<div class="card empty zone">played</div>`;
     const thinking = !mine && o.thinking ? `<div class="think"><span></span><span></span><span></span> thinking</div>` : "";
-    const handZone = `<div class="zone-box hand-box${!mine && o.thinking ? " thinking" : ""}"><div class="zl">${NEUTRAL ? seatName(p.idx) + "'s hand" : mine ? "Your hand" : "Opponent's hand"} · ${p.hand_size != null ? p.hand_size : p.hand.length}</div>
+    const handZone = `<div data-zone="hand${p.idx}" class="zone-box hand-box${!mine && o.thinking ? " thinking" : ""}"><div class="zl">${NEUTRAL ? seatName(p.idx) + "'s hand" : mine ? "Your hand" : "Opponent's hand"} · ${p.hand_size != null ? p.hand_size : p.hand.length}</div>
         <div class="hand">${hand || '<span class="muted">empty</span>'}</div>${thinking}</div>`;
     const info = `<div class="seat-info">
         <div class="who ${mine ? "me" : "op"}">${seatName(p.idx)}${st.turn_player === p.idx ? ' <span class="turnflag">to play</span>' : ""}</div>
@@ -193,8 +196,8 @@ window.RiftBoard = (function () {
         ${scorePips(p, o.victory || 8)}
         <div class="counts"><span title="cards left in main deck">Deck ${p.deck_size}</span><span title="trash (discard pile)">Trash ${p.trash.length}</span><span title="cards left in rune deck">Rune deck ${p.rune_deck}</span>${p.xp ? `<span>XP ${p.xp}</span>` : ""}</div>
       </div>`;
-    const zones = `<div class="zone-box"><div class="zl">Legend</div>${card(p.legend_obj, "zone")}</div>
-      <div class="zone-box"><div class="zl" title="Your Chosen Champion waits here until you play it">Champion</div>${champ}</div>`;
+    const zones = `<div data-zone="legend${p.idx}" class="zone-box"><div class="zl">Legend</div>${card(p.legend_obj, "zone")}</div>
+      <div data-zone="champ${p.idx}" class="zone-box"><div class="zl" title="Your Chosen Champion waits here until you play it">Champion</div>${champ}</div>`;
     const rn = `<div class="zone-box rune-box">${runes(p)}</div>`;
     return `<div class="seat ${mine ? "me" : "op"}">${info}${zones}${rn}${mine && o.playable ? "" : handZone}</div>` +
       (mine && o.playable ? `<div class="my-hand">${handZone}</div>` : "");
@@ -224,10 +227,13 @@ window.RiftBoard = (function () {
     const ctrl = b.controller == null ? `<span class="ctl none">uncontrolled</span>` : `<span class="ctl ${b.controller === ME ? "me" : "op"}">held by ${seatName(b.controller).toLowerCase().replace(/^p/, "P")}</span>`;
     const con = b.contested_by != null ? `<span class="tag warn">contested by ${seatName(b.contested_by).toLowerCase().replace(/^p/, "P")}</span>` : "";
     const here = st.combat && st.combat.bf === b.idx ? `<span class="tag hot">combat</span>` : (st.showdown && st.showdown.bf === b.idx ? `<span class="tag hot">showdown</span>` : "");
-    const fd = Object.keys(b.facedown || {}).map(k => `<span class="tag" title="a face-down card is hidden here">${yours(+k)} hidden card</span>`).join("");
+    const known = b.facedown_known || {};
+    const fd = Object.keys(b.facedown || {}).map(k => known[k]
+      ? `<span class="fd-known" title="face down: only ${NEUTRAL ? "its owner" : "you"} can see it">${card(Object.assign({ controller: +k, zone: "facedown" }, known[k]), "tiny")}<span class="tag">${yours(+k)} hidden card</span></span>`
+      : `<span class="tag" title="a face-down card is hidden here">${yours(+k)} hidden card</span>`).join("");
     const im = imgOf(b);
     const hot = here ? " hot" : "";
-    return `<div class="bf ${b.controller == null ? "" : (b.controller === ME ? "c-me" : "c-op")}${hot}">
+    return `<div data-zone="bf${b.idx}" class="bf ${b.controller == null ? "" : (b.controller === ME ? "c-me" : "c-op")}${hot}">
       ${im ? `<div class="bf-art" style="background-image:url('${esc(im)}')"></div>` : ""}
       <div class="bf-head"><span class="bf-name" data-uid="bf${b.idx}">${esc(b.name)}</span>${ctrl}${con}${here}${fd}</div>
       <div class="side op">${theirs.map(u => card(u, "unit")).join("") || `<span class="muted">no ${NEUTRAL ? "P" + (1 - ME) : "enemy"} units</span>`}</div>
@@ -236,7 +242,7 @@ window.RiftBoard = (function () {
   }
   function base(p) {
     const mine = p.idx === ME;
-    return `<div class="base ${mine ? "me" : "op"}"><div class="zl">${NEUTRAL ? seatName(p.idx) + "'s base" : mine ? "Your base" : "Opponent's base"}</div>
+    return `<div data-zone="base${p.idx}" class="base ${mine ? "me" : "op"}"><div class="zl">${NEUTRAL ? seatName(p.idx) + "'s base" : mine ? "Your base" : "Opponent's base"}</div>
       <div class="row">${p.base.map(c => card(c, "unit")).join("") || '<span class="muted">empty</span>'}</div></div>`;
   }
   function turnBar(st, o) {
@@ -271,7 +277,9 @@ window.RiftBoard = (function () {
           <b>${chips(it.label)}</b><div class="ci-own">${owner}</div>${tg}${cause}</div></div>`;
     }).join("");
     let wait = "";
-    if (st.priority != null) {
+    const playing = st.chain.find(it => !it.finalized);
+    if (playing) wait = `${NEUTRAL ? "P" + playing.controller + " is" : playing.controller === ME ? "You are" : "Opponent is"} still playing <b>${esc(playing.label)}</b> (choosing targets and paying)`;
+    else if (st.priority != null) {
       const p = st.priority;
       wait = NEUTRAL ? `P${p} may respond or pass` : p === ME ? "<b>Your priority:</b> respond with a Reaction or pass" : "<b>Opponent</b> may respond or pass";
     }
@@ -320,17 +328,20 @@ window.RiftBoard = (function () {
   const REDUCED = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   function snapRects(el) {
     const r = { cards: {}, opHand: null, meHand: null };
-    el.querySelectorAll(".mat .card[data-uid]").forEach(c => { r.cards[c.dataset.uid] = c.getBoundingClientRect(); });
+    el.querySelectorAll(".mat .card[data-uid]").forEach(c => { r.cards[c.dataset.uid] = { rect: c.getBoundingClientRect(), zone: zoneOf(c) }; });
     const oh = el.querySelector(".seat.op .hand-box"), mh = el.querySelector(".seat.me .hand-box, .my-hand .hand-box");
     if (oh) r.opHand = oh.getBoundingClientRect();
     if (mh) r.meHand = mh.getBoundingClientRect();
     return Object.keys(r.cards).length || r.opHand ? r : null;
   }
+  const zoneOf = c => { const z = c.closest("[data-zone]"); return z ? z.dataset.zone : ""; };
   function slide(el, before) {
     if (REDUCED || !el.animate && !Element.prototype.animate) return;
     el.querySelectorAll(".mat .card[data-uid]").forEach(c => {
       const now = c.getBoundingClientRect();
-      let from = before.cards[c.dataset.uid];
+      const was = before.cards[c.dataset.uid];
+      if (was && was.zone === zoneOf(c)) return;   // same zone: only the layout shifted, don't animate
+      let from = was && was.rect;
       let fresh = false;
       if (!from) {
         // a card that just appeared: the opponent's came out of their hidden hand, a new one of yours from your hand area

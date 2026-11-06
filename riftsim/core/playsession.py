@@ -75,9 +75,15 @@ class PlaySession:
     # ------------------------------------------------------------------ views
     def masked_snapshot(self):
         st = _jsonable(self.game.snapshot())
+        g = self.game
         for p in st["players"]:
             if p["idx"] != self.human:
-                p["hand"] = [{"uid": None, "card": None, "name": "?", "controller": p["idx"], "hidden": True} for _ in p["hand"]]
+                p["hand"] = [h if g.knows(self.human, h["uid"]) else
+                             {"uid": None, "card": None, "name": "?", "controller": p["idx"], "hidden": True} for h in p["hand"]]
+        for b in st["battlefields"]:          # facedown cards the human may see (own, or Scuttle Crab's look this turn)
+            b["facedown_known"] = {k: {"uid": u, "card": g.objects[u].defn.id, "name": g.objects[u].defn.name,
+                                       "image": g.objects[u].defn.image}
+                                   for k, u in b["facedown"].items() if u in g.objects and g.knows(self.human, u)}
         for it, view in zip(self.game.chain, st["chain"]):
             view["targets"] = self._chain_targets(it)
             ev = it.ctx.vars.get("ev") if getattr(it, "ctx", None) is not None else None
@@ -96,7 +102,8 @@ class PlaySession:
             if isinstance(v, bool) or not isinstance(v, int) or v == it.uid or v in seen:
                 return
             o = g.objects.get(v)
-            if o is not None and o.zone in ("board", "champion"):
+            hidden = any(v in b.facedown.values() for b in g.battlefields) and not g.knows(self.human, v)
+            if o is not None and o.zone in ("board", "champion") and not hidden:
                 seen.add(v)
                 out.append({"uid": v, "name": o.defn.name, "controller": o.controller})
         seen = set()

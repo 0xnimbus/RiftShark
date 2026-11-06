@@ -35,7 +35,7 @@
     } catch (e) { /* static host */ }
     backend = "browser";
     $("#mode").textContent = "The engine runs in your browser: the first start downloads it (a few seconds), and the AI thinks a little slower than the local server.";
-    $("#ai").value = "mcts:60"; $("#analysis").value = 60;
+    $("#analysis").value = 60;
     return workerApi("/api/decks");
   }
   const api = async (path, body) => {

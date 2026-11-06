@@ -295,12 +295,16 @@ class Activated(Ability):
 class Replacement(Ability):
     """`event`: event kind this applies to ('damage','die','draw','move','recall','play','buff','discard'...).
     `applies`: callable(g, src, ev) -> bool. `replace`: callable(g, src, ev) -> new ev dict, or None to prevent.
-    The engine executes replacements once per event per source (optional ones are auto-applied)."""
+    The engine executes replacements once per event per source. "You may ... instead" replacements need a player
+    choice the synchronous replacement pass cannot ask, so `optional=True` is refused (no scripted card uses it;
+    Mordekaiser, Zilean, Heimerdinger and Sett stay unscripted until it is built) rather than silently auto-applied."""
     kind = "replacement"
     __slots__ = ("event", "applies", "replace", "once_per_turn", "optional")
 
     def __init__(self, event, applies, replace, once_per_turn=False, zone="board", cond=None, label="", source_text="", optional=False):
         super().__init__(label, zone, cond, source_text)
+        if optional:
+            raise NotImplementedError("optional replacement effects are not supported yet (no auto-apply): " + label)
         self.event, self.applies, self.replace, self.once_per_turn, self.optional = event, applies, replace, once_per_turn, optional
 
 

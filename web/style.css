@@ -264,4 +264,6 @@ button.opt img.th { width: 26px; border-radius: 3px; }
 .mull-card.sel img { filter: brightness(.5); }
 .mull-tag { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); font-style: normal; font-weight: 800; font-size: 9px; background: #000d; color: var(--warn); padding: 2px 4px; border-radius: 3px; white-space: nowrap; }
 button.opt.primary { justify-content: center; font-weight: 700; }
+.fd-known { display: inline-flex; align-items: center; gap: 4px; }
+.fd-known .card { opacity: .85; border-style: dashed; }
 [hidden] { display: none !important; }

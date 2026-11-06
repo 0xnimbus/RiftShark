@@ -74,9 +74,12 @@ def run_batch(decks, games=100, policies=("greedy", "greedy"), workers=None, rep
 def summarize(results):
     by_deck = collections.defaultdict(lambda: {"games": 0, "wins": 0, "first_games": 0, "first_wins": 0, "points": 0})
     cards = collections.defaultdict(lambda: {"played": 0, "wins": 0, "games": 0})
-    turns, draws = [], 0
+    turns, draws, unfinished = [], 0, 0
     for r in results:
         turns.append(r["turns"])
+        if r.get("reason") == "turn limit":
+            unfinished += 1            # the safety cap is not a rule of the game: never count it as a draw
+            continue
         if r["winner"] is None:
             draws += 1
         for seat, name in enumerate(r["decks"]):
@@ -105,7 +108,10 @@ def summarize(results):
         card_stats.append({"deck": deck, "card": cname, "played": s["played"], "games": s["games"],
                            "win_rate_when_played": round(s["wins"] / max(1, s["games"]), 3)})
     card_stats.sort(key=lambda x: (-x["games"], x["card"]))
-    return {"games": len(results), "draws": draws, "avg_turns": round(sum(turns) / max(1, len(turns)), 2),
+    if unfinished:
+        import sys
+        print(f"WARNING: {unfinished} game(s) hit the safety turn cap and were left out of the stats", file=sys.stderr)
+    return {"games": len(results) - unfinished, "unfinished": unfinished, "draws": draws, "avg_turns": round(sum(turns) / max(1, len(turns)), 2),
             "decks": decks, "cards": card_stats,
             "avg_secs": round(sum(r["secs"] for r in results) / max(1, len(results)), 3)}
 

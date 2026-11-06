@@ -23,6 +23,81 @@ def _depends_on_choice(ins):
     return w.startswith("loc:")
 
 
+def showoff_requirement(text):
+    """Parse the object of '[Show Off] X.' (CR 832.1.b) into predicate(game, uid) -> bool, or None if unknown."""
+    import re
+    m = re.search(r"\[Show Off\]\s*([^.\n]*)", text or "")
+    if not m:
+        return None
+    x = m.group(1).strip().lower()
+    x = re.sub(r"^an? ", "", x)
+    if x == "card":
+        return lambda g, u: True
+    if x in ("unit", "gear", "spell"):
+        return lambda g, u, t=x: t in g.chars(u).types if g.objects[u].zone == "board" else t in g.objects[u].defn.types
+    m = re.fullmatch(r"card with \[(\w+)\]", x)
+    if m:
+        kw = m.group(1).lower()
+        return lambda g, u, kw=kw: bool((g.chars(u).keywords if g.objects[u].zone == "board" else g.objects[u].defn.keywords or {}).get(kw))
+    m = re.fullmatch(r"card with energy cost \[(\d+)\] or more", x)
+    if m:
+        n = int(m.group(1))
+        return lambda g, u, n=n: (g.objects[u].defn.energy or 0) >= n
+    if re.fullmatch(r"[a-z'-]+", x):
+        tag = x.capitalize()
+        return lambda g, u, tag=tag: tag in (g.chars(u).tags if g.objects[u].zone == "board" else g.objects[u].defn.tags)
+    return None
+
+
+class _ShowOff(Instr):
+    """CR 832.1.c: as you play this, you may reveal a matching card from hand or pick a matching friendly object on the
+    board. Decided while finalizing (832.1.c.2). The shown-off object's information is locked in (832.1.d)."""
+
+    def __init__(self, item_id, req):
+        self.item_id, self.req = item_id, req
+
+    def run(self, game, ctx):
+        it = next((x for x in game.chain if x.id == self.item_id), None)
+        if it is None:
+            return None
+        game.shown_off[it.uid] = None
+        ctx.shown_off = None
+        ps = game.players[ctx.controller]
+        cands = [u for u in ps.hand if u != it.uid]
+        cands += [u for u, o in game.objects.items() if o.zone == "board" and o.controller == ctx.controller
+                  and u != it.uid and o.location is not None and o.location[0] in ("base", "bf", "legend", "runes")
+                  and o.defn.type != "battlefield"]
+        opts = [None]
+        for u in cands:
+            try:
+                if self.req(game, u):
+                    opts.append(u)
+            except (KeyError, AttributeError, TypeError):
+                pass
+        if len(opts) == 1:
+            return None
+        labels = ["don't show off"] + [("reveal " if game.objects[u].zone == "hand" else "show off ") + game.label(u)
+                                       for u in opts[1:]]
+        return Decision(ctx.controller, "show_off", opts, labels=labels, out="__showoff_pick",
+                        info={"item": it.id, "label": "Show Off"})
+
+    def resume(self, game, ctx, choice):
+        it = next((x for x in game.chain if x.id == self.item_id), None)
+        if choice is None or it is None:
+            return None
+        o = game.objects[choice]
+        c = game.chars(choice) if o.zone == "board" else None
+        snap = {"uid": choice, "name": o.defn.name, "energy": o.defn.energy or 0, "power": o.defn.power or 0,
+                "might": (c.might if c is not None else o.defn.might) or 0, "zone": o.zone}
+        ctx.shown_off = snap
+        game.shown_off[it.uid] = snap
+        if o.zone == "hand":
+            game.emit("reveal", player=ctx.controller, cards=[choice], ctx=ctx)
+        game.emit("showoff", player=ctx.controller, uid=it.uid, shown=choice, ctx=ctx)
+        game.log("showoff", player=ctx.controller, item=it.id, shown=o.defn.name)
+        return None
+
+
 class _FinalizeCosts(Instr):
     """Last instruction of a finalize program: Deflect costs, optional additional costs
     (Accelerate, Repeat), then the base cost."""
@@ -312,6 +387,9 @@ class FlowMixin:
             self.dirty = True
         elif ph == "main":
             if self.turn > self.max_turns:
+                # Not a rule of the game: a safety cap for simulations. Reported as unfinished, never as a draw.
+                import sys
+                print(f"WARNING: game stopped at the safety cap of {self.max_turns} turns (unfinished, not a draw)", file=sys.stderr)
                 self._end_game(None, "turn limit")
                 return
             if self.showdown is not None:
@@ -793,8 +871,16 @@ class FlowMixin:
     def _finalize(self, it):
         ctx = it.ctx
         pre = []
+        show = []
+        if it.kind in ("spell", "unit", "gear") and (self.objects[it.uid].defn.keywords or {}).get("show_off"):
+            req = showoff_requirement(self.objects[it.uid].defn.text)
+            if req is None:
+                raise NotImplementedError("unparsed Show Off requirement: " + self.objects[it.uid].defn.name)
+            show = [_ShowOff(it.id, req)]
         if it.kind in ("spell", "unit", "gear"):
             for ab in self._abilities_of(it.uid, self.objects[it.uid]):
+                if isinstance(ab, PlayPermission) and ab.perm == "as_play":
+                    show = show + list(compile_effect(ab.value))
                 if isinstance(ab, PlayPermission) and ab.perm == "additional_cost":
                     req, ins, mandatory = ab.value
                     if mandatory:
@@ -803,7 +889,7 @@ class FlowMixin:
                         outs = [i.out for i in ins if isinstance(i, PayResources)]
                         pre.append(May(list(ins) + [Do(lambda g, c, outs=tuple(outs): c.paid.__setitem__("add", all(c.vars.get(o) for o in outs)))],
                                        label="pay the additional cost", out="__addq"))
-        code = compile_effect(pre) + list(it.target_code or []) + [_FinalizeCosts(it.id)]
+        code = show + compile_effect(pre) + list(it.target_code or []) + [_FinalizeCosts(it.id)]
         self.vm_frames.append(Frame(code, ctx, tag=("finalize", it.id)))
 
     def _finalized(self, item_id):
@@ -1342,6 +1428,10 @@ class FlowMixin:
             ctx = Context(p, uid, here=o.place)
             if not cost["sacrifice"].candidates(self, ctx):
                 return False
+        if cost.get("exhaust_unit") is not None:
+            ctx = Context(p, uid, here=o.place)
+            if not cost["exhaust_unit"].candidates(self, ctx):
+                return False
         if cost.get("kill_self") and o.zone != "board":
             return False
         e = cost.get("energy", 0)
@@ -1514,6 +1604,9 @@ class FlowMixin:
         if cost.get("sacrifice") is not None:
             out.append(_C(cost["sacrifice"], out="__sac", targeted=False))
             out.append(Do(lambda g, c: g.do_kill([c.vars["__sac"]], c, by="cost")))
+        if cost.get("exhaust_unit") is not None:      # "exhaust a friendly unit" (Blade of the Exile's Equip)
+            out.append(_C(cost["exhaust_unit"], out="__exh", targeted=False))
+            out.append(Do(lambda g, c: g.do_exhaust(c.vars["__exh"], c)))
         if cost.get("recycle"):
             from .ops import Recycle
             out.append(Recycle(n=cost["recycle"], zone=cost.get("recycle_zone", "trash")))
