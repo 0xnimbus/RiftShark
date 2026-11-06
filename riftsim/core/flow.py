@@ -1109,7 +1109,7 @@ class FlowMixin:
             if it.kind in ("unit", "gear") and pl is not None and pl[0] == "bf":
                 self.turn_memo[("played_to_bf", it.controller)] = True      # Hold 'Em
             o = self.objects[it.uid]
-            self.emit("play", uid=it.uid, player=it.controller, card_type=it.kind, loc=ctx.target_bf or ctx.vars.get("__loc"),
+            self.emit("play", uid=it.uid, player=it.controller, card_type=it.kind, loc=ctx.vars.get("__loc") or ctx.target_bf,
                       from_zone=ctx.played_from, item=it.id, energy=self._energy_spent(it), paid=dict(ctx.paid), ctx=ctx)
         elif it.kind == "ability":
             self.emit("activate", uid=it.uid, player=it.controller, energy=(it.cost or {}).get("energy", 0), item=it.id, ctx=ctx)

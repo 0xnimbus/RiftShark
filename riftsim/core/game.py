@@ -632,6 +632,8 @@ class Game(flow.FlowMixin):
         if ev.get("kind") == "play" and ev.get("uid") == uid:
             ctx.shown_off = self.shown_off.get(uid)      # "When you play me, if you showed off" (CR 832.1.c.1)
             ctx.paid = dict(ev.get("paid") or {})          # "When you play me, if you paid the additional cost"
+            if ev.get("from_zone") == "facedown" and ev.get("loc") is not None and ev["loc"][0] == "bf":
+                ctx.target_bf = ev["loc"]                   # CR 811.1.d.3: play effects target at the battlefield played to
         for k, v in ab.store.items():
             ctx.vars[v] = ev.get(k)
         if ev.get("kind") == "die":
@@ -1599,6 +1601,21 @@ class Game(flow.FlowMixin):
         return None
 
     # ------------------------------------------------------------------ choices
+    @staticmethod
+    def _could_target_at_bf(sel):
+        """CR 811.1.d.2-3: a hidden card's targets must be at its battlefield "unless it explicitly restricts
+        targeting in such a way that makes this impossible". True when the selector itself could match something
+        at a battlefield (so an empty choice there means no valid target, not a free choice)."""
+        if not hasattr(sel, "kind") or getattr(sel, "zone", "board") != "board":
+            return False
+        if sel.kind in ("legend", "rune", "battlefield"):
+            return False
+        if sel.where in ("base", "own_base") or (isinstance(sel.where, str) and sel.where.startswith("loc:")):
+            return False
+        if sel.pred is not None:
+            return False          # arbitrary conditions ("at another location", Tideturner): cannot tell, keep free
+        return True
+
     def choice_candidates(self, ctx, sel, targeted=True):
         if isinstance(sel, (list, tuple)):
             return [u for u in sel if u in self.objects]
@@ -1607,8 +1624,8 @@ class Game(flow.FlowMixin):
             # Hidden (CR 811.1.d): targets of a card played from facedown must be at that battlefield when possible
             if ctx.target_bf is not None:
                 here = [u for u in cands if self.objects[u].location == ctx.target_bf]
-                if here:
-                    cands = here
+                if here or self._could_target_at_bf(sel):
+                    cands = here          # no valid target at that battlefield -> no target (CR 811.1.d)
             # Deflect (CR 809): opponents' targeting costs [A] per deflect value; drop unaffordable targets
             out = []
             paid = ctx.vars.get("__deflect_cost", 0)

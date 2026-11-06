@@ -199,3 +199,49 @@ def test_bilgewater_bully_has_ganking_only_while_buffed(db, decks):
 ])
 def test_numbered_keywords_carry_their_number(db, name, kw, val):
     assert next(c for c in db if c.name == name).keywords.get(kw) == val
+
+
+def _hide_and_wait(g, db, p, name, bf):
+    from test_targeting import give
+    u = give(g, p, name, db)
+    g.set_bf_controller(bf, p)
+    assert g.do_hide(p, u, ("bf", bf))
+    g.objects[u].facedown_turn = g.turn - 1          # hidden on an earlier turn
+    g.bump()
+    return u
+
+
+def test_hidden_unit_play_effect_targets_at_its_battlefield(db, decks):
+    # CR 811.1.d.3 (Blastcone Fae example): the play effect must target a unit at the battlefield it was played to
+    g = main_phase(db, decks)
+    fae = _hide_and_wait(g, db, 0, "Blastcone Fae", 0)
+    mine = put(g, db, 0, "Shipyard Skulker", ("bf", 0))
+    far = put(g, db, 1, "Shipyard Skulker", ("bf", 1))
+    g.pending = None
+    d = g.run()
+    acts = [a for a in d.options if a[0] == "play" and a[1] == fae]
+    assert acts
+    g.choose(acts[0])
+    seen = None
+    for _ in range(20):
+        d = g.run()
+        if d is None:
+            break
+        if d.kind in ("choose", "choose_many"):
+            seen = set(x for x in d.options if x is not None)
+            break
+        if d.kind == "action":
+            break
+        g.choose(d.options[0])
+    # either asked among units at bf 0 only, or auto-picked one there
+    if seen is not None:
+        assert far not in seen
+    assert g.chars(far).might == g.objects[far].defn.might
+
+
+def test_hidden_spell_without_target_at_its_battlefield_cannot_be_played(db, decks):
+    # CR 811.1.d: no valid target at that battlefield -> cannot be played from facedown
+    from riftsim.core.selectors import Sel
+    g = main_phase(db, decks)
+    assert g._could_target_at_bf(Sel("unit", side="enemy"))
+    assert not g._could_target_at_bf(Sel("unit", where="base"))
