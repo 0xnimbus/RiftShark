@@ -1163,3 +1163,17 @@ def leblanc_everywhere(defn):
     # [Backline]   (keyword)
     # Your [Temporary] effects at my battlefield don't trigger.
     return {"abilities": [Static("self", "rule", ("no_temporary_here",), label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Kayle, Justified")
+def kayle_justified(defn):
+    # [Empower] [3]   (keyword)
+    # I can be [Empowered] up to three times. I have +2 [M] for each time I'm [Empowered].
+    # While I'm [Empowered] three times, I have [Deflect 3] and [Ganking].
+    three = lambda g, s: g.objects[s].empowered >= 3
+    return {"abilities": [Static("self", "rule", ("max_empower", 3), label="can be Empowered up to three times", source_text=defn.text),
+                          Static("self", "might", lambda g, s, u: 2 * g.objects[s].empowered, label="+2 [M] per Empowered",
+                                 source_text=defn.text),
+                          Static("self", "keyword", ("deflect", 3), cond=three, label="[Deflect 3] at three", source_text=defn.text),
+                          Static("self", "keyword", ("ganking", True), cond=three, label="[Ganking] at three", source_text=defn.text)],
+            "replace": True}

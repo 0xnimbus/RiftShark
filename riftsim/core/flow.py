@@ -1485,8 +1485,8 @@ class FlowMixin:
             return False
         if ab.restriction is not None and not ab.restriction(self, uid):
             return False
-        if ab.is_empower and o.empowered:
-            return False
+        if ab.is_empower and o.empowered and self.empower_cap(uid) == 1:
+            return False        # objects that can be empowered several times ignore "only if not empowered" (Radiance patch)
         if ab.once_per_turn and o.temp.get(("act", idx)) == self.turn:
             return False
         timing = ab.timing

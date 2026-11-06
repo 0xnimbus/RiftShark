@@ -986,12 +986,17 @@ class Game(flow.FlowMixin):
             self.emit("channel", uid=u, player=p, ctx=ctx)
         return made
 
+    def empower_cap(self, uid):
+        """How many times an object can be Empowered (CR 442.1.c.1): 1, or more with a 'max_empower' rule on itself."""
+        caps = [v for src, v in self.rules("max_empower") if src == uid]
+        return max(caps) if caps else 1
+
     def do_empower(self, uid, ctx=None):
         o = self.objects.get(uid)
         if o is None or o.zone != "board":
             return False
-        stack = any(True for _ in self.rules("empower_stacks")) and False
-        if o.empowered and not stack:
+        cap = self.empower_cap(uid)
+        if o.empowered >= cap:          # CR 442.1.c: already (fully) empowered -> nothing happens
             return False
         o.empowered += 1
         self.bump()

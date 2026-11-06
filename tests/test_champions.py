@@ -446,3 +446,18 @@ def test_leblanc_everywhere_stops_temporary_at_her_battlefield(db, decks):
     put(g, db, 0, "LeBlanc, Everywhere at Once", ("bf", 0))
     from riftsim.core.scripts import temporary_blocked
     assert temporary_blocked(g, s1) and not temporary_blocked(g, s2)
+
+
+def test_kayle_empowers_three_times(db, decks):
+    g = main_phase(db, decks)
+    k = put(g, db, 0, "Kayle, Justified", ("base", 0))
+    m = g.chars(k).might
+    emp = next(i for i, a in enumerate(g.abilities(k)) if getattr(a, "is_empower", False))
+    for n in (1, 2, 3):
+        assert g._can_activate(0, k, emp, g.abilities(k)[emp]) or g.players[0].runes == []
+        g.do_empower(k)
+        assert g.objects[k].empowered == n
+    g.do_empower(k)
+    assert g.objects[k].empowered == 3
+    c = g.chars(k)
+    assert c.might == m + 6 and c.kw("deflect") >= 3 and c.keywords.get("ganking")
