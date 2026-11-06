@@ -88,19 +88,27 @@ def main(gallery_path, codex_path, out_path):
             cards[key]['printings'].append(c['id'])
         else:
             cards[key] = x; order.append(key)
-    by_name_text = {(k[0].replace(' - ', ', '), k[1]): k for k in cards}
+    known_printings = {p.lower() for x in cards.values() for p in x['printings']}
+    norm = lambda s: re.sub(r'[^a-z0-9]', '', s.lower())
+    by_name = {}
+    for k, x in cards.items():
+        by_name.setdefault((norm(x['name']), x['type']), k)
     added = 0
     for c in json.load(open(codex_path)):
-        if c['metadata']['alternate_art'] or c['metadata']['signature']:
+        if c['riftbound_id'].lower() in known_printings:
             continue
         x = from_codex(c)
-        if (x['name'], x['text']) in by_name_text:
-            cards[by_name_text[(x['name'], x['text'])]]['printings'].append(c['riftbound_id'])
+        k = by_name.get((norm(x['name']), x['type']))
+        if k is not None:   # promo / alternate printing of a card the gallery already has
+            cards[k]['printings'].append(c['riftbound_id'])
+            continue
+        if c['metadata']['alternate_art'] or c['metadata']['signature']:
             continue
         key = (x['name'], x['text'], '')
         if key in cards:
             cards[key]['printings'].append(c['riftbound_id']); continue
         cards[key] = x; order.append(key); added += 1
+        by_name[(norm(x['name']), x['type'])] = key
     out = [cards[k] for k in order]
     seen = collections.Counter(x['id'] for x in out)
     for x in out:
