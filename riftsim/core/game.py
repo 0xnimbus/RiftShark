@@ -496,6 +496,10 @@ class Game(flow.FlowMixin):
                 if u in self.objects:
                     for q in range(len(self.players)):
                         self.known.setdefault(q, {})[u] = self.objects[u].entered_stamp
+                    if self.objects[u].zone == "deck":          # "As I'm revealed from your deck, ..." (Undertitan)
+                        for ab in self._abilities_of(u, self.objects[u]):
+                            if isinstance(ab, PlayPermission) and ab.perm == "as_revealed_from_deck":
+                                ab.value(self, u, ctx)
         self.log("event:" + kind, **{k: v for k, v in data.items() if k != "ctx"})
         self._collect_triggers(ev)
         return ev

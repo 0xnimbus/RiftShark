@@ -65,5 +65,9 @@
   ],
   "data_incomplete": false,
   "_why": "riftdecks.com shows the Calm domain icon (2026-11-06)"
+ },
+ "SFD-187": {
+  "text": "When you conquer, you may exhaust me to reveal the top 2 cards of your Main Deck. You may banish one, then play it. Recycle the rest.",
+  "_errata": "Spiritforged errata (docs/rules/riftbound-spiritforged-errata.txt)"
  }
 }

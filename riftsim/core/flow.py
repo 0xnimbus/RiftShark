@@ -942,7 +942,9 @@ class FlowMixin:
         out = []
         if it.kind == "unit":
             c = self.chars(it.uid)
-            if c.keywords.get("accelerate"):
+            granted = ctx.played_from not in ("hand", None) and \
+                bool(self.rules("accelerate_if_not_from_hand", player=it.controller))      # Rek'Sai, Breacher
+            if c.keywords.get("accelerate") or granted:
                 dom = [c.domains[0]] if len(c.domains) == 1 else (["any"] if not c.domains else [c.domains[0]])
                 out.append(("accelerate", (1, dom, "Accelerate [1][C]")))
         rc = getattr(it.ability, "repeat_cost", None) if it.ability is not None else None
@@ -1144,8 +1146,8 @@ class FlowMixin:
             return
 
     # ------------------------------------------------------------------ playing cards (CR 349-359)
-    def card_cost(self, p, uid, from_zone):
-        """(energy, power list) to play card uid from zone, after reductions."""
+    def card_cost(self, p, uid, from_zone, loc=None):
+        """(energy, power list) to play card uid from zone (to location loc, if known), after reductions."""
         o = self.objects[uid]
         d = o.base_defn()
         energy = d.energy or 0
@@ -1177,6 +1179,9 @@ class FlowMixin:
                     energy = max(0, energy - t["data"].get("energy", 0))
                     if t["data"].get("power"):
                         power = power[t["data"]["power"]:]
+        if loc is not None:
+            for src, v in self.rules("cost_reduce_at"):      # location-dependent reductions (Hunters' Circle)
+                energy, power = v(self, src, uid, energy, power, p, loc)
         return max(0, energy), power
 
     def _play_timing_ok(self, p, uid, from_zone):
@@ -1275,14 +1280,15 @@ class FlowMixin:
                     continue
             if not self._play_restrictions_ok(p, u, z):
                 continue
-            e, pw = self.card_cost(p, u, z)
-            if not self.can_pay(p, e, pw, purpose=payment.purpose_of_card(self, u)):
-                continue
             locs = self._play_locations(p, u, z)
             if ambush_only:
                 amb = self._ambush_locs(p, u)
                 locs = [l for l in locs if l in amb]
+            purpose = payment.purpose_of_card(self, u)
             for loc in locs:
+                e, pw = self.card_cost(p, u, z, loc)
+                if not self.can_pay(p, e, pw, purpose=purpose):
+                    continue
                 if loc is None:
                     if not self._spell_has_targets(p, u, z):
                         continue
@@ -1496,7 +1502,9 @@ class FlowMixin:
         z = o.zone
         d = o.base_defn()
         kind = "spell" if "spell" in d.types else ("unit" if "unit" in d.types else "gear")
-        e, pw = self.card_cost(p, uid, z)
+        e, pw = self.card_cost(p, uid, z, loc)
+        if loc is not None and kind in ("unit", "gear"):
+            self.turn_memo.setdefault("played_at", []).append((p, loc))
         ctx = Context(p, uid, here=loc)
         ctx.played_from = z
         if z == "facedown":
@@ -1534,7 +1542,10 @@ class FlowMixin:
             return False
         d = o.base_defn()
         z = o.zone
-        e, pw = self.card_cost(p, uid, z)
+        kind = "spell" if "spell" in d.types else ("unit" if "unit" in d.types else "gear")
+        if loc is None and kind != "spell":
+            loc = ctx.target_bf if (ctx.target_bf is not None and kind == "unit") else ("base", p)
+        e, pw = self.card_cost(p, uid, z, loc if kind != "spell" else None)
         if ignore == "all":
             e, pw = 0, []
         elif ignore == "energy":

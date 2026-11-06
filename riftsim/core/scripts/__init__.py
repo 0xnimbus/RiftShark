@@ -180,7 +180,7 @@ def attach_scripts(db, defn):
 
 
 def script_all(db):
-    from . import cards_manual, cards_radiance  # noqa: F401  (registers manual scripts)
+    from . import cards_manual, cards_radiance, cards_staples  # noqa: F401  (registers manual scripts)
     for c in db:
         attach_scripts(db, c)
     db.scripted = True
