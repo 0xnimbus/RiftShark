@@ -1,0 +1,176 @@
+{
+ "name": "Hand of Noxus / Darius, Executioner",
+ "legend": "OGN-253",
+ "champion": "OGN-243",
+ "main": [
+  {
+   "id": "UNL-010",
+   "count": 1
+  },
+  {
+   "id": "OGN-040",
+   "count": 1
+  },
+  {
+   "id": "OGN-009",
+   "count": 1
+  },
+  {
+   "id": "OGN-245",
+   "count": 1
+  },
+  {
+   "id": "RAD-002",
+   "count": 1
+  },
+  {
+   "id": "OGN-029",
+   "count": 1
+  },
+  {
+   "id": "OGN-209",
+   "count": 1
+  },
+  {
+   "id": "RAD-116",
+   "count": 1
+  },
+  {
+   "id": "SFD-007",
+   "count": 1
+  },
+  {
+   "id": "UNL-009",
+   "count": 1
+  },
+  {
+   "id": "UNL-014",
+   "count": 1
+  },
+  {
+   "id": "VEN-014",
+   "count": 1
+  },
+  {
+   "id": "UNL-003",
+   "count": 1
+  },
+  {
+   "id": "UNL-002",
+   "count": 1
+  },
+  {
+   "id": "OGN-004",
+   "count": 1
+  },
+  {
+   "id": "OGN-010",
+   "count": 1
+  },
+  {
+   "id": "SFD-005",
+   "count": 1
+  },
+  {
+   "id": "OGS-003",
+   "count": 1
+  },
+  {
+   "id": "SFD-017",
+   "count": 1
+  },
+  {
+   "id": "OGN-217",
+   "count": 1
+  },
+  {
+   "id": "RAD-008",
+   "count": 1
+  },
+  {
+   "id": "OGN-213",
+   "count": 1
+  },
+  {
+   "id": "OGN-211",
+   "count": 1
+  },
+  {
+   "id": "UNL-225",
+   "count": 1
+  },
+  {
+   "id": "OGN-024",
+   "count": 1
+  },
+  {
+   "id": "SFD-155",
+   "count": 1
+  },
+  {
+   "id": "OGN-210",
+   "count": 1
+  },
+  {
+   "id": "OGN-218",
+   "count": 1
+  },
+  {
+   "id": "OGN-013",
+   "count": 1
+  },
+  {
+   "id": "OGN-003",
+   "count": 1
+  },
+  {
+   "id": "UNL-016",
+   "count": 1
+  },
+  {
+   "id": "OGN-226",
+   "count": 1
+  },
+  {
+   "id": "VEN-120",
+   "count": 1
+  },
+  {
+   "id": "VEN-123",
+   "count": 1
+  },
+  {
+   "id": "OGN-222",
+   "count": 1
+  },
+  {
+   "id": "SFD-006",
+   "count": 1
+  },
+  {
+   "id": "RAD-119",
+   "count": 1
+  },
+  {
+   "id": "UNL-153",
+   "count": 1
+  },
+  {
+   "id": "VEN-020",
+   "count": 1
+  },
+  {
+   "id": "SFD-013",
+   "count": 1
+  }
+ ],
+ "runes": {
+  "fury": 6,
+  "order": 6
+ },
+ "battlefields": [
+  "OGN-283",
+  "OGN-279",
+  "OGN-294"
+ ]
+}

@@ -1,0 +1,176 @@
+{
+ "name": "Blind Monk / Lee Sin, Ascetic",
+ "legend": "OGN-257",
+ "champion": "OGN-078",
+ "main": [
+  {
+   "id": "UNL-039",
+   "count": 1
+  },
+  {
+   "id": "SFD-097",
+   "count": 1
+  },
+  {
+   "id": "VEN-043",
+   "count": 1
+  },
+  {
+   "id": "OGN-163",
+   "count": 1
+  },
+  {
+   "id": "OGN-081",
+   "count": 1
+  },
+  {
+   "id": "OGN-145",
+   "count": 1
+  },
+  {
+   "id": "OGN-139",
+   "count": 1
+  },
+  {
+   "id": "RAD-087",
+   "count": 1
+  },
+  {
+   "id": "SFD-031",
+   "count": 1
+  },
+  {
+   "id": "SFD-040",
+   "count": 1
+  },
+  {
+   "id": "RAD-025",
+   "count": 1
+  },
+  {
+   "id": "UNL-092",
+   "count": 1
+  },
+  {
+   "id": "OGN-043",
+   "count": 1
+  },
+  {
+   "id": "OGN-044",
+   "count": 1
+  },
+  {
+   "id": "UNL-094",
+   "count": 1
+  },
+  {
+   "id": "RAD-076",
+   "count": 1
+  },
+  {
+   "id": "OGN-129",
+   "count": 1
+  },
+  {
+   "id": "OGN-128",
+   "count": 1
+  },
+  {
+   "id": "OGN-057",
+   "count": 1
+  },
+  {
+   "id": "RAD-088",
+   "count": 1
+  },
+  {
+   "id": "SFD-043",
+   "count": 1
+  },
+  {
+   "id": "UNL-102",
+   "count": 1
+  },
+  {
+   "id": "OGN-054",
+   "count": 1
+  },
+  {
+   "id": "SFD-039",
+   "count": 1
+  },
+  {
+   "id": "OGN-127",
+   "count": 1
+  },
+  {
+   "id": "OGN-058",
+   "count": 1
+  },
+  {
+   "id": "OGN-052",
+   "count": 1
+  },
+  {
+   "id": "UNL-041",
+   "count": 1
+  },
+  {
+   "id": "OGN-051",
+   "count": 1
+  },
+  {
+   "id": "OGN-136",
+   "count": 1
+  },
+  {
+   "id": "OGN-132",
+   "count": 1
+  },
+  {
+   "id": "OGN-141",
+   "count": 1
+  },
+  {
+   "id": "OGN-135",
+   "count": 1
+  },
+  {
+   "id": "UNL-036",
+   "count": 1
+  },
+  {
+   "id": "SFD-099",
+   "count": 1
+  },
+  {
+   "id": "SFD-098",
+   "count": 1
+  },
+  {
+   "id": "RAD-037",
+   "count": 1
+  },
+  {
+   "id": "SFD-037",
+   "count": 1
+  },
+  {
+   "id": "VEN-076",
+   "count": 1
+  },
+  {
+   "id": "UNL-043",
+   "count": 1
+  }
+ ],
+ "runes": {
+  "calm": 6,
+  "body": 6
+ },
+ "battlefields": [
+  "OGN-283",
+  "OGN-282",
+  "OGN-288"
+ ]
+}
