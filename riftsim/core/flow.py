@@ -1176,8 +1176,9 @@ class FlowMixin:
             self._play(self.priority if self.priority is not None else self.turn_player, a[1], a[2] if len(a) > 2 else None)
         elif k == "move":
             p = self.turn_player
+            b = self.tick()
             for u in a[1]:
-                self.do_exhaust(u)
+                self.do_exhaust(u, batch=b)
             self.do_move(list(a[1]), a[2], Context(p), standard=True)
             self.dirty = True
         elif k == "hide":

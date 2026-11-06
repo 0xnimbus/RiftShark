@@ -503,3 +503,21 @@ def test_irelia_graceful_spell_choosing_her_costs_less(db, decks):
     paid = it.cost.get("paid")
     assert paid is not None
     assert (paid[0], len(paid[1])) == ((e, len(pw) - 1) if pw else (e - 1, 0))
+
+
+def test_seraphine_draws_when_three_units_exhaust_together(db, decks):
+    g = main_phase(db, decks)
+    put(g, db, 0, "Seraphine, Inspiring", ("base", 0))
+    us = []
+    for _ in range(3):
+        us.append(put(g, db, 0, "Sett, Kingpin", ("base", 0), exclude=tuple(us)))
+    hand = len(g.players[0].hand)
+    g.do_exhaust(us[0]); g.do_exhaust(us[1]); settle(g)
+    assert len(g.players[0].hand) == hand
+    for u in us:
+        g.objects[u].exhausted = False
+    b = g.tick()
+    for u in us:
+        g.do_exhaust(u, batch=b)
+    settle(g)
+    assert len(g.players[0].hand) == hand + 1

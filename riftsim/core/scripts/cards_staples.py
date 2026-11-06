@@ -1230,3 +1230,13 @@ def irelia_graceful(defn):
     # Your spells that choose me cost [1] or [A] less.   (applied once the spell's choices are made, flow._FinalizeCosts)
     return {"abilities": [Static("self", "rule", ("spells_choosing_me_cost_less", 1), label=defn.name, source_text=defn.text)],
             "replace": True}
+
+
+@script("Seraphine, Inspiring")
+def seraphine_inspiring(defn):
+    # [Disarm 2]   (keyword)
+    # Once each turn, when you exhaust three or more friendly units at the same time, you may draw 1.
+    def three_at_once(g, s, ev):
+        return ev.get("kind") == "exhaust" and ev.get("player") == g.objects[s].controller and ev.get("units_in_batch") == 3
+    return {"abilities": [Triggered(three_at_once, [O.May([O.Draw(1)], label="draw 1")], once_per_turn=True,
+                                    label=defn.name, source_text=defn.text)], "replace": True}

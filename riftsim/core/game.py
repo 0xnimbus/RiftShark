@@ -749,13 +749,19 @@ class Game(flow.FlowMixin):
         self.rng.shuffle(ps.deck)
         self.emit("burn_out", player=p)
 
-    def do_exhaust(self, uid, ctx=None):
+    def do_exhaust(self, uid, ctx=None, batch=None):
+        """`batch`: objects exhausted at the same time share it (Seraphine, Inspiring)."""
         o = self.objects.get(uid)
         if o is None or o.zone != "board" or o.exhausted:
             return False
         o.exhausted = True
         self.bump()
-        self.emit("exhaust", uid=uid, player=o.controller, loc=o.location, ctx=ctx)
+        b = batch if batch is not None else self.tick()
+        n = 0
+        if "unit" in self.chars(uid).types:
+            key = ("exhaust_batch", b, o.controller)
+            n = self.turn_memo[key] = self.turn_memo.get(key, 0) + 1
+        self.emit("exhaust", uid=uid, player=o.controller, loc=o.location, batch=b, units_in_batch=n, ctx=ctx)
         self.dirty = True
         return True
 

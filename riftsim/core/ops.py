@@ -490,8 +490,9 @@ class Exhaust(Instr):
         self.targets = targets
 
     def run(self, game, ctx):
+        b = game.tick()
         for u in _uids(game, ctx, self.targets):
-            game.do_exhaust(u, ctx)
+            game.do_exhaust(u, ctx, batch=b)
         return None
 
 
