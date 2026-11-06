@@ -25,19 +25,20 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
 | 2026-11-06 15:03 | 22% used, resets 12:50 PM | 26% used, resets Mon 10:00 AM | +4% in 20 min; 12 champions scripted, paid-additional-cost and [Calm]-cost fixes; rr20 restarted 14:58 |
 | 2026-11-06 15:24 | 25% used, resets 12:50 PM | 26% used, resets Mon 10:00 AM | +3% in 21 min; 85 common cards scripted (none 306 -> 222), cards_common.py; rr20 at ~560/900 |
 | 2026-11-06 15:45 | 30% used, resets 12:50 PM | 27% used, resets Mon 10:00 AM | +5% in 21 min; 84 RAD cards fixed from images, equipment keywords fix, batch triggers; rr20 written up, re-run on fixed engine in out/rr20b |
+| 2026-11-06 16:11 | 33% used, resets 12:50 PM | 27% used, resets Mon 10:00 AM | +3% in 26 min; 55 more cards scripted (none 148 -> 93), Elder Dragon/Seraphic Wyvern/enter-ready-token engine support; rr20b at ~560/900 |
 
 ## Where things stand
 
 - `data/cards/riftbound.json`: 1180 cards (OGN, OGS, SFD, UNL, VEN, RAD) from the official gallery + riftcodex promos.
-  `data/cards/overrides.json` fixes gallery typos (9 RAD cards mistyped as units). 13 RAD cards still lack
-  domains in the source data (`data_incomplete`), to be read from their images.
+  `data/cards/overrides.json` fixes gallery typos; all RAD types/domains/tags were checked against the card images
+  on 2026-11-06 (images at each card's `image` URL).
 - `docs/rules/`: Core Rules 2026-10-09 (text + PDF), errata, patch notes, tournament rules.
 - `riftsim/core/`: engine v2 (rules-accurate). `vm.py` bytecode VM + `Decision`; `ops.py` instruction set;
   `selectors.py`; `abilities.py` (+ `TRIGGERS` table); `objects.py`; `game.py` (actions, layers, events, costs);
   `flow.py` (turns, HOT FEPR chain, cleanups per CR 323, showdowns, combat per CR 466-468, scoring);
   `deck.py`; `scripts/` (keywords → auto-grammar → manual overrides).
 - `tools/smoke_core.py N SEED`: random-play games; last run 40/40 games without crash, ~0.1 s per game.
-- Script coverage (2026-11-06 15:45): auto 628, manual 346, keywords-only 27, partial 24, none 148, vanilla 23.
+- Script coverage (2026-11-06 16:11): auto 628, manual 401, keywords-only 28, partial 23, none 93, vanilla 23.
   RAD gallery data had wrong types/domains/tags on 84 cards: checked against the card images, fixed in data/cards/overrides.json.
   Common cards are hand-scripted in `riftsim/core/scripts/cards_common.py` (tests: tests/test_common_cards.py).
   Hand scripts for staples/legends/champions live in `riftsim/core/scripts/cards_staples.py` (tests: tests/test_legends.py, tests/test_champions.py).
