@@ -2438,3 +2438,130 @@ def spirits_refuge(defn):
 def symbol_of_the_solari(defn):
     # If a combat where you are the attacker ends in a tie, recall ALL units instead.
     return [Static("self", "rule", ("attacker_tie_recall_all",), source_text=defn.text)]
+
+
+# ---------------------------------------------------------------- batch 2026-11-06 17:00
+@script("Counter Strike")
+def counter_strike(defn):
+    # [Reaction]  Choose a unit. The next time that unit would be dealt damage this turn, prevent it. Draw 1.
+    return [SpellEffect([O.Choose(Sel("unit"), out="t"),
+                         O.Do(lambda g, c: g.add_mod(c.vars["t"], "prevent_next", True, duration="turn", source=c.source)
+                              if c.vars.get("t") is not None else None, label="prevent the next damage this turn"),
+                         O.Draw(1)], label=defn.name, source_text=defn.text)]
+
+
+@script("Lotus Trap")
+def lotus_trap(defn):
+    # [Hidden]  [Reaction]  Choose a unit. Double all damage that would be dealt to it this turn.
+    return [SpellEffect([O.Choose(Sel("unit"), out="t"),
+                         O.Do(lambda g, c: g.add_mod(c.vars["t"], "double_damage", True, duration="turn", source=c.source)
+                              if c.vars.get("t") is not None else None, label="double damage to it this turn")],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Arcane Shift")
+def arcane_shift(defn):
+    # [Action]  Banish a friendly unit, then its owner plays it, ignoring its cost. Deal 3 to an enemy unit at a
+    # battlefield. Banish this.
+    owner = lambda g, c: g.objects[c.vars["t"]].owner
+    return [SpellEffect([O.Choose(Sel("unit", side="friendly"), out="t"), O.Choose(Sel("unit", side="enemy", where="battlefield"), out="t2"),
+                         O.Banish(Ref("t")),
+                         O.If(lambda g, c: c.vars.get("t") in g.objects and g.objects[c.vars["t"]].zone == "banish",
+                              [O.PlayCard(Ref("t"), ignore="all", player=owner)]),
+                         O.Deal(3, Ref("t2")),
+                         O.Do(lambda g, c: c.vars.__setitem__("__banish_after", True), label="banish this")],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Hostile Takeover")
+def hostile_takeover(defn):
+    # [Hidden]  Take control of an enemy unit at a battlefield. Ready it.  Lose control of that unit and recall it at end
+    # of turn.
+    end = lambda g, s, ev: ev.get("kind") == "ending_phase"
+    return [SpellEffect([O.Choose(Sel("unit", side="enemy", where="battlefield"), out="t"), O.TakeControl(Ref("t"), duration="turn"),
+                         O.Ready(Ref("t")),
+                         O.Delayed(end, [O.Do(lambda g, c: g.do_recall(c.vars["t"], c) if g.objects[c.vars["t"]].zone == "board" else None,
+                                              label="recall it")], expires="turn", once=True, label="Hostile Takeover: recall")],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Flurry of Feathers")
+def flurry_of_feathers(defn):
+    # [Reaction]  Choose one — Counter a spell. / Play four 1 [M] Bird unit tokens with [Deflect].
+    spell = lambda g, c: [it.uid for it in g.chain if it.kind == "spell" and it.uid != c.source]
+    def counter(g, c):
+        it = next((x for x in g.chain if x.uid == c.vars.get("__ff") and x.kind == "spell"), None)
+        if it is not None:
+            g.do_counter(it.id, c)
+    return [SpellEffect([O.ChooseMode([("counter a spell", [O.ChooseFromList(spell, out="__ff", label="counter a spell"),
+                                                            O.Do(counter, label="counter it")]),
+                                       ("play four Bird tokens", [O.PlayToken("Bird", loc="base", count=4)])])],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Ripper's Bay")
+def rippers_bay(defn):
+    # When a unit here is returned to a player's hand, that player may pay [1] to channel 1 rune exhausted.
+    def returned(g, s, ev):
+        return ev.get("kind") == "to_hand" and ev.get("from_zone") == "board" and ev.get("loc") == g.objects[s].place
+    return [Triggered(returned, [O.PayResources(1, out="__rb"), O.If(Ref("__rb"), [O.Channel(1, exhausted=True)])],
+                      controller="event", label=defn.name, source_text=defn.text)]
+
+
+@script("Altar of Memories")
+def altar_of_memories(defn):
+    # When a friendly unit dies, you may exhaust me to draw 1, then put a card from your hand on the top or bottom of
+    # your Main Deck.
+    hand = lambda g, c: list(g.players[c.controller].hand)
+    def put_back(g, c):
+        u = c.vars.get("__am")
+        if u is None:
+            return
+        ps = g.players[c.controller]
+        g._to_zone(g.objects[u], "deck", top=c.vars.get("__amw") == 0); g.bump()
+    return [Triggered("friendly_unit_dies", [O.If(lambda g, c: not g.objects[c.source].exhausted, [
+        O.May([O.Exhaust(Ref("self")), O.Draw(1),
+               O.ChooseFromList(hand, out="__am", label="put a card from your hand on top or bottom of your deck"),
+               O.ChooseMode([("top", []), ("bottom", [])], out="__amw"),
+               O.Do(put_back, label="put it back")], label="exhaust me to draw 1")])], label=defn.name, source_text=defn.text)]
+
+
+@script("Shadow Watcher")
+def shadow_watcher(defn):
+    # If a friendly unit died during your Beginning Phase this turn, I enter ready.
+    return [_enter_ready_if(defn, lambda g, u: bool(g.turn_memo.get(("died_in_beginning", _ctrl(g, u)))) and g.turn_player == _ctrl(g, u),
+                            "a friendly unit died during your Beginning Phase")]
+
+
+@script("Marching Orders")
+def marching_orders(defn):
+    # [Action]  [Repeat] [3]  Choose a friendly unit anywhere and an enemy unit at a battlefield. They deal damage equal
+    # to their Mights to each other.
+    return [SpellEffect([O.Choose(Sel("unit", side="friendly"), out="t"), O.Choose(Sel("unit", side="enemy", where="battlefield"), out="t2"),
+                         O.Do(lambda g, c: _fight(g, c, c.vars.get("t"), c.vars.get("t2")) if c.vars.get("t") and c.vars.get("t2") else None,
+                              label="they deal damage to each other")], label=defn.name, source_text=defn.text)]
+
+
+@script("Temptation")
+def temptation(defn):
+    # [Repeat] [2]  Move an enemy unit to a location where there's a unit with the same controller.
+    def dests(g, c, l):
+        u = c.vars.get("t")
+        o = g.objects[u]
+        return l != o.location and any(g.objects[x].controller == o.controller for x in g.units_at(l)) and g.valid_destination(u, l)
+    return [SpellEffect([O.Choose(Sel("unit", side="enemy"), out="t"),
+                         O.ChooseLocation(out="loc", pred=dests, include_bases=True, label="where one of its controller's units is"),
+                         O.Move(Ref("t"), Ref("loc"))], label=defn.name, source_text=defn.text)]
+
+
+@script("Fae Porter")
+def fae_porter(defn):
+    # When I move to a battlefield, you may pay [Chaos] to move a unit you control to the same battlefield.
+    to_bf = lambda g, s, ev: ev.get("kind") == "move" and ev.get("uid") == s and ev.get("to") and ev["to"][0] == "bf"
+    others = lambda g, c: [u for u, o in g.objects.items() if o.zone == "board" and o.controller == c.controller and u != c.source
+                           and "unit" in g.chars(u).types and o.location != g.objects[c.source].location
+                           and g.valid_destination(u, g.objects[c.source].location)]
+    return [Triggered(to_bf, [O.PayResources(0, ["chaos"], out="__fp"),
+                              O.If(Ref("__fp"), [O.ChooseFromList(others, out="__fpu", label="move a unit you control here"),
+                                                 O.Move(Ref("__fpu"), lambda g, c: g.objects[c.source].location)])],
+                      label=defn.name, source_text=defn.text)]

@@ -957,3 +957,34 @@ def test_symbol_of_the_solari_recalls_everyone_on_a_tie(db, decks):
     g._task_combat_cleanup()
     assert g.objects[a].location == ("base", 0) and g.objects[d].location == ("base", 1)
     g.combat = None
+
+
+def test_counter_strike_lotus_trap_hostile_takeover(db, decks):
+    from riftsim.core.vm import Context
+    g = main_phase(db, decks)
+    u = put(g, db, 1, "Elnuk Herd", ("bf", 0))
+    _run_spell(g, db, "Counter Strike", picks=[u])
+    g.do_deal([u], 2, Context(0, None))
+    assert g.objects[u].damage == 0
+    g.do_deal([u], 1, Context(0, None))
+    assert g.objects[u].damage == 1
+    _run_spell(g, db, "Lotus Trap", picks=[u])
+    g.do_deal([u], 1, Context(0, None))
+    assert g.objects[u].damage == 3
+    g = main_phase(db, decks)
+    foe = put(g, db, 1, "Hunting Dog", ("bf", 0))
+    g.objects[foe].exhausted = True
+    _run_spell(g, db, "Hostile Takeover", picks=[foe])
+    assert g.objects[foe].controller == 0 and not g.objects[foe].exhausted
+
+
+def test_flurry_of_feathers_birds_and_rippers_bay(db, decks):
+    g = main_phase(db, decks)
+    _run_spell(g, db, "Flurry of Feathers", picks=[1])
+    birds = [o for o in g.objects.values() if o.zone == "board" and o.defn.name == "Bird" and o.controller == 0]
+    assert len(birds) == 4
+    _bf_card(g, db, "Ripper's Bay", 0)
+    u = put(g, db, 0, "Hunting Dog", ("bf", 0))
+    n = len(g.players[0].runes)
+    g.put_in_hand(u); settle(g, yes=True)
+    assert len(g.players[0].runes) == n + 1

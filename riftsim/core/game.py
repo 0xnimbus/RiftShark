@@ -941,6 +941,16 @@ class Game(flow.FlowMixin):
             if ev is None or ev.get("amount", 0) <= 0:
                 continue
             amt = ev["amount"]
+            # Lotus Trap: "Double all damage that would be dealt to it this turn." (one doubling per effect)
+            for m in o.mods:
+                if m.kind == "double_damage":
+                    amt *= 2
+            # Counter Strike: "The next time that unit would be dealt damage this turn, prevent it."
+            nxt = next((m for m in o.mods if m.kind == "prevent_next"), None)
+            if nxt is not None:
+                o.mods.remove(nxt)
+                self.log("prevent", uid=u, amount=amt)
+                continue
             # prevention shields (mods of kind 'prevent')
             for m in o.mods:
                 if m.kind == "prevent" and m.value > 0 and amt > 0:
@@ -1022,6 +1032,8 @@ class Game(flow.FlowMixin):
             if ev["card_type"] == "unit":
                 key = ("units_died", ev["player"])           # "if an enemy unit has died this turn"
                 self.turn_memo[key] = self.turn_memo.get(key, 0) + 1
+            if ev["card_type"] == "unit" and getattr(self, "phase", None) == "beginning":
+                self.turn_memo[("died_in_beginning", ev["player"])] = True      # Shadow Watcher
             key = ("perms_died", ev["player"])               # "if a friendly unit or gear died this turn"
             self.turn_memo[key] = self.turn_memo.get(key, 0) + 1
             self.emit("die", ctx=ctx, **{k: v for k, v in ev.items() if k != "kind"})
@@ -1406,6 +1418,7 @@ class Game(flow.FlowMixin):
             return
         self._to_zone(o, "hand")
         if was == "board":
+            self.emit("to_hand", uid=uid, player=o.owner, from_zone=was, loc=loc, ctx=ctx)     # Ripper's Bay
             self.emit("leave", uid=uid, player=o.owner, loc=loc, ctx=ctx)
             self.dirty = True
 
