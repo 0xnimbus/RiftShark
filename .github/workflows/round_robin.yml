@@ -1,0 +1,61 @@
+name: Round-robin (sharded)
+# Started by hand from the Actions tab. Splits the tournament-deck round-robin across parallel runners
+# (each with its own CPUs), then merges the shards into one report artifact.
+on:
+  workflow_dispatch:
+    inputs:
+      policy:
+        description: "AI level for both seats (novice, intermediate, advanced, expert, elite, greedy, mcts:N)"
+        default: "advanced"
+      max_games:
+        description: "Most games per matchup (adaptive: a matchup stops early once its result is clear)"
+        default: "40"
+      shards:
+        description: "Number of parallel runners"
+        default: "12"
+permissions:
+  contents: read
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      shards: ${{ steps.s.outputs.list }}
+    steps:
+      - id: s
+        run: echo "list=$(python3 -c "import json; print(json.dumps(list(range(int('${{ inputs.shards }}')))))")" >> "$GITHUB_OUTPUT"
+  play:
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJson(needs.plan.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: >
+          python tools/audit_games.py --adaptive ${{ inputs.max_games }} --policy ${{ inputs.policy }}
+          --shard ${{ matrix.shard }}/${{ inputs.shards }} --out out/shard
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shard-${{ matrix.shard }}
+          path: out/shard/games.json
+  merge:
+    needs: play
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/download-artifact@v4
+        with:
+          path: shards
+      - run: python tools/audit_games.py --merge shards/*/games.json --policy ${{ inputs.policy }} --out out/round_robin
+      - run: cat out/round_robin/report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: round-robin-report
+          path: out/round_robin

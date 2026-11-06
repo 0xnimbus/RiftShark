@@ -205,19 +205,26 @@ def pair_done(wins, n, a):
     return (hi - lo) / 2 <= a.precision or lo > 0.5 or hi < 0.5
 
 
+def shard_pairs(pairs, shard):
+    if not shard:
+        return pairs
+    i, n = (int(x) for x in shard.split("/"))
+    return [pq for k, pq in enumerate(pairs) if k % n == i]
+
+
 def adaptive_round_robin(paths, a):
     """Play every pair two games at a time (seats swapped) and keep the pool busy with the pairs still open.
     Games whose result is a timeout count as unfinished and are not counted (they are kept in the results)."""
     from concurrent.futures import FIRST_COMPLETED, wait
-    pairs = [(p, q) for i, p in enumerate(paths) for q in paths[i + 1:]]
+    all_pairs = [(p, q) for i, p in enumerate(paths) for q in paths[i + 1:]]
+    pairs = shard_pairs(all_pairs, a.shard)
     state = {pq: {"n": 0, "wins": 0, "running": 0, "next": 0} for pq in pairs}
-    results, seed = [], a.seed
+    results = []
     t = time.time()
     with ProcessPoolExecutor(max_workers=a.workers) as ex:
         live = {}
 
         def feed():
-            nonlocal seed
             for pq in pairs:
                 st = state[pq]
                 while len(live) < a.workers * 2 and not pair_done(st["wins"], st["n"], a) \
@@ -226,8 +233,8 @@ def adaptive_round_robin(paths, a):
                     st["next"] += 1
                     st["running"] += 1
                     order = list(pq) if k % 2 == 0 else [pq[1], pq[0]]
+                    seed = a.seed + 1000 * all_pairs.index(pq) + k     # fixed per pair and game: reproducible
                     live[ex.submit(audit_game, (order, seed, a.policy))] = pq
-                    seed += 1
 
         feed()
         while live:
@@ -259,9 +266,19 @@ def main():
     ap.add_argument("--adaptive", type=int, default=0, metavar="MAX",
                     help="round-robin that stops each pair once its result is clear (up to MAX games per pair)")
     ap.add_argument("--min-games", type=int, default=6)
+    ap.add_argument("--shard", default=None, metavar="I/N",
+                    help="play only matchups with index %% N == I (split a round-robin across machines)")
     ap.add_argument("--precision", type=float, default=0.15,
                     help="adaptive: stop a pair when its 95%% Wilson half-width is at most this")
+    ap.add_argument("--merge", nargs="*", help="combine games.json files from shards into one report in --out")
     a = ap.parse_args()
+    if a.merge:
+        results = [r for f in a.merge for r in json.load(open(f))]
+        os.makedirs(a.out, exist_ok=True)
+        json.dump(results, open(os.path.join(a.out, "games.json"), "w"), indent=1)
+        write_report(results, os.path.join(a.out, "report.md"), a.policy)
+        print(open(os.path.join(a.out, "report.md")).read())
+        return
     paths = a.decks or sorted(glob.glob(os.path.join(ROOT, "data/decks/tournament/*.json")))
     rng = random.Random(a.seed)
     jobs = []
@@ -273,10 +290,13 @@ def main():
                 pair = [p, opp] if i % 2 == 0 else [opp, p]
                 jobs.append((pair, s, a.policy)); s += 1
     if a.round_robin:
-        for i, p in enumerate(paths):
-            for q in paths[i + 1:]:
-                for k in range(a.round_robin):
-                    jobs.append(([p, q] if k % 2 == 0 else [q, p], s, a.policy)); s += 1
+        all_pairs = [(p, q) for i, p in enumerate(paths) for q in paths[i + 1:]]
+        mine = set(shard_pairs(all_pairs, a.shard))
+        for pq in all_pairs:
+            for k in range(a.round_robin):
+                if pq in mine:          # seeds stay the same whichever shard plays the pair
+                    jobs.append(([pq[0], pq[1]] if k % 2 == 0 else [pq[1], pq[0]], s, a.policy))
+                s += 1
     os.makedirs(a.out, exist_ok=True)
     t = time.time()
     results = []

@@ -52,7 +52,12 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
 - Supabase: tables created from `supabase/schema.sql` (project ndobcpnialrdregjtqdd); `web/config.js` holds the
   publishable key; `tools/upload_supabase.py` needs env SUPABASE_URL + SUPABASE_SERVICE_KEY (Derrick adds the secret).
   Frontend reads the latest batch/replays from Supabase and falls back to `web/data`.
-- `tests/test_core_v2.py` is the v2 regression suite (pytest -q tests/).
+- `tests/test_core_v2.py` is the v2 regression suite (pytest -q tests/). `tests/test_rules_audit.py` covers the 2026-11-06 audit.
+- Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
+  clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
+  `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
+  N shards in parallel. Engine caches per state version (`_board_statics`, `_trigger_index`, rules) gave ~25%.
+- AIs and the coach never see hidden information: every lookahead uses `policies.determinize` (see memory).
 - Play & coach (Derrick's request 2026-11-06): `tools/play_server.py` + `web/play.html` + `riftsim/core/analysis.py`.
   Grades use MCTS win% loss vs best option; thresholds in analysis.GRADES. `riftsim/core/playsession.py` is shared by the
   server and the browser build: `tools/build_web_engine.py` copies the engine + cards + decks into `web/engine/`
