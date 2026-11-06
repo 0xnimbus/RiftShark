@@ -1729,7 +1729,12 @@ def split_lead_keywords(line):
         if not m:
             break
         flags.append((m.group(1) if m.re is LEAD_KW else "show off").lower())
-        line = line[m.end():]
+        rest = line[m.end():]
+        if m.re is LEAD_KW and m.group(2) and rest.lstrip().startswith(":"):
+            rest = m.group(2) + rest.lstrip()      # "[Reaction][>] [T]: ..." -- the cost belongs to an activated ability
+            line = rest
+            break
+        line = rest
     line = line.strip()
     if line.lower() in ("[no text]", ""):
         line = ""
