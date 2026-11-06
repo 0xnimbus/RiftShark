@@ -95,18 +95,239 @@
     return m;
   }
 
+  /* ---- drag and drop, clickable runes (the decision's meta says what each option does to which card and where) */
+  let picked = {};        // uid -> true: units chosen to move together
+  let paySel = {};        // uid -> "ex" | "rc": runes you tapped for the current payment
+  let payKey = null;      // which pay decision paySel belongs to
+  const myTurnDecision = j => j && j.decision && j.decision.player === j.human && !j.over && !inFlight;
+  function dragInfo(d) {
+    const drag = {}, runes = {};
+    if (!d) return { drag, runes };
+    if (d.kind === "action" && d.meta) {
+      d.meta.forEach(m => {
+        if (m.k === "play" || m.k === "move" || m.k === "hide") m.uids.forEach(u => { drag[u] = true; });
+        if (m.k === "rune") runes[m.uids[0]] = "tap";
+      });
+    }
+    if (d.kind === "pay" && d.plans) {
+      const grp = payGroups(cur);
+      d.plans.forEach(pl => pl.runes.forEach(r => { (grp.members[grp.of[r.uid]] || [r.uid]).forEach(u => { if (!runes[u]) runes[u] = "pick"; }); }));
+      Object.entries(paySel).forEach(([u, h]) => { runes[u] = h; });
+    }
+    return { drag, runes };
+  }
   function drawBoard(j, opts) {
     if (!j || !j.started) return;
-    const mine = j.decision && j.decision.player === j.human && !j.over && !inFlight;
+    const mine = myTurnDecision(j);
+    const d = mine ? j.decision : null;
+    if (d && d.kind === "pay") { const k = d.labels.join("|"); if (k !== payKey) { payKey = k; paySel = {}; } } else { paySel = {}; payKey = null; }
+    if (!d || d.kind !== "action") picked = {};
+    const di = dragInfo(d);
     B.render($("#board"), j.state, Object.assign({
       me: j.human, victory: j.victory || 8, thinking: inFlight && !(j.decision && j.decision.player === j.human),
       playable: mine ? playableMap(j.decision) : {}, decisionKind: mine ? j.decision.kind : null, banner,
+      drag: di.drag, runes: di.runes, selected: picked,
     }, opts || {}));
-    $("#board").querySelectorAll(".card[data-opts]").forEach(el => el.addEventListener("click", () => {
-      const ix = el.dataset.opts.split(",").map(Number);
+    // a big button on the mat for ending the turn / passing, like a digital TCG client
+    if (d && d.kind === "action") {
+      const i = d.labels.findIndex(l => l === "end turn"), k = i >= 0 ? i : d.labels.findIndex(l => l === "pass");
+      const mat = $("#board .mat");
+      if (k >= 0 && mat) {
+        mat.insertAdjacentHTML("beforeend", `<button class="end-btn ${i >= 0 ? "end" : "pass"}" data-i="${k}">${i >= 0 ? "End<br>turn" : "Pass"}</button>`);
+        mat.querySelector(".end-btn").addEventListener("click", ev => { ev.stopPropagation(); choose(k); });
+      }
+    }
+  }
+
+  // which options a drop of `uids` on zone `zone` (data-zone key, or null = anywhere on the mat) would take
+  const sortKey = a => a.slice().sort((x, y) => x - y).join(",");
+  function dropOptions(d, uids, zone) {
+    if (!d || !d.meta) return [];
+    const set = sortKey(uids), out = [];
+    d.meta.forEach((m, i) => {
+      if (m.k === "play" || m.k === "hide") {
+        if (uids.length === 1 && m.uids[0] === uids[0] && (m.to === zone || (zone == null && m.to == null && m.k === "play"))) out.push(i);
+      } else if (m.k === "move" && zone && m.to === zone && sortKey(m.uids) === set) out.push(i);
+    });
+    if (!out.length && zone) d.meta.forEach((m, i) => { if (m.k === "move_select" && m.to === zone) out.push(i); });
+    return out;
+  }
+  function zonesFor(d, uids) {
+    const z = new Set(); let anywhere = false;
+    if (!d || !d.meta) return { z, anywhere };
+    const set = sortKey(uids);
+    d.meta.forEach(m => {
+      if ((m.k === "play" || m.k === "hide") && uids.length === 1 && m.uids[0] === uids[0]) { if (m.to) z.add(m.to); else if (m.k === "play") anywhere = true; }
+      if (m.k === "move" && sortKey(m.uids) === set) z.add(m.to);
+    });
+    if (!z.size && uids.length > 1) d.meta.forEach(m => { if (m.k === "move_select") z.add(m.to); });  // choose which on drop
+    return { z, anywhere };
+  }
+  /* A small menu at the pointer when a drop (or a rune click) could mean more than one thing. */
+  function popMenu(x, y, items) {
+    closePop();
+    const el = document.createElement("div");
+    el.id = "pop-menu";
+    el.innerHTML = items.map((it, k) => `<button data-k="${k}">${it.html}</button>`).join("") + `<button class="cancel" data-k="-1">Cancel</button>`;
+    document.body.appendChild(el);
+    const w = el.offsetWidth, h = el.offsetHeight;
+    el.style.left = Math.max(6, Math.min(window.innerWidth - w - 6, x - w / 2)) + "px";
+    el.style.top = Math.max(6, Math.min(window.innerHeight - h - 6, y + 10)) + "px";
+    el.addEventListener("click", ev => { const b = ev.target.closest("button"); if (!b) return; ev.stopPropagation(); const k = +b.dataset.k; closePop(); if (k >= 0) items[k].go(); });
+    setTimeout(() => document.addEventListener("pointerdown", outsidePop, true), 0);
+  }
+  function outsidePop(ev) { if (!ev.target.closest("#pop-menu")) closePop(); }
+  function closePop() { const e = $("#pop-menu"); if (e) e.remove(); document.removeEventListener("pointerdown", outsidePop, true); }
+  function chooseAmong(ix, x, y) {
+    const d = cur.decision;
+    if (ix.length === 1) choose(ix[0]);
+    else if (ix.length > 1) popMenu(x, y, ix.map(i => ({ html: B.say(d.labels[i]), go: () => choose(i) })));
+  }
+
+  let drag = null, suppressClick = false;
+  const boardEl = $("#board");
+  boardEl.addEventListener("dragstart", ev => ev.preventDefault());   // no native image drag: it would cancel ours
+  boardEl.addEventListener("pointerdown", ev => {
+    if (ev.button !== 0 || !myTurnDecision(cur)) return;
+    const c = ev.target.closest(".card[data-drag]");
+    if (!c) return;
+    drag = { el: c, uid: +c.dataset.uid, x0: ev.clientX, y0: ev.clientY, on: false, pid: ev.pointerId };
+  });
+  window.addEventListener("pointermove", ev => {
+    if (!drag || ev.pointerId !== drag.pid) return;
+    if (!drag.on) {
+      if (Math.hypot(ev.clientX - drag.x0, ev.clientY - drag.y0) < 7) return;
+      startDrag(ev);
+    }
+    ev.preventDefault();
+    const g = drag.ghost;
+    g.style.left = (ev.clientX - drag.dx) + "px"; g.style.top = (ev.clientY - drag.dy) + "px";
+    const under = document.elementFromPoint(ev.clientX, ev.clientY);
+    const zEl = under && under.closest("[data-zone]");
+    const zone = zEl && drag.zones.z.has(zEl.dataset.zone) ? zEl.dataset.zone : null;
+    boardEl.querySelectorAll(".drop-hover").forEach(e => e.classList.remove("drop-hover"));
+    const overMat = !!(under && under.closest(".mat") && !under.closest(".my-hand"));
+    if (zone) zEl.classList.add("drop-hover");
+    else if (drag.zones.anywhere && overMat) boardEl.querySelector(".mat").classList.add("drop-hover");
+    drag.zone = zone; drag.overMat = overMat;
+  });
+  function startDrag(ev) {
+    drag.on = true;
+    const d = cur.decision;
+    const group = picked[drag.uid] ? Object.keys(picked).map(Number) : [drag.uid];
+    if (!picked[drag.uid]) picked = {};
+    drag.uids = group;
+    drag.zones = zonesFor(d, group);
+    const r = drag.el.getBoundingClientRect();
+    drag.dx = ev.clientX - r.left; drag.dy = ev.clientY - r.top;
+    const g = drag.el.cloneNode(true);
+    g.classList.add("drag-ghost"); g.classList.remove("exhausted");
+    g.style.width = drag.el.offsetWidth + "px"; g.style.left = r.left + "px"; g.style.top = r.top + "px";
+    if (group.length > 1) g.insertAdjacentHTML("beforeend", `<i class="ghost-n">×${group.length}</i>`);
+    document.body.appendChild(g);
+    drag.ghost = g;
+    group.forEach(u => { const e = boardEl.querySelector(`.card[data-uid="${u}"]`); if (e) e.classList.add("dragging"); });
+    drag.zones.z.forEach(k => { const e = boardEl.querySelector(`[data-zone="${k}"]`); if (e) e.classList.add("drop-ok"); });
+    if (drag.zones.anywhere) boardEl.querySelector(".mat").classList.add("drop-any");
+    document.body.classList.add("is-dragging");
+    $("#tooltip").hidden = true;
+  }
+  function endDragVisuals() {
+    document.body.classList.remove("is-dragging");
+    boardEl.querySelectorAll(".drop-ok,.drop-hover,.drop-any,.dragging").forEach(e => e.classList.remove("drop-ok", "drop-hover", "drop-any", "dragging"));
+  }
+  window.addEventListener("pointerup", ev => {
+    if (!drag || ev.pointerId !== drag.pid) return;
+    const dg = drag; drag = null;
+    if (!dg.on) return;                     // a plain click: the click listener handles it
+    suppressClick = true; setTimeout(() => { suppressClick = false; }, 0);
+    endDragVisuals();
+    const d = cur && cur.decision;
+    let ix = [];
+    if (dg.zone) ix = dropOptions(d, dg.uids, dg.zone);
+    else if (dg.zones.anywhere && dg.overMat) ix = dropOptions(d, dg.uids, null);
+    if (ix.length) { dg.ghost.remove(); picked = {}; status(""); chooseAmong(ix, ev.clientX, ev.clientY); return; }
+    // dropped somewhere it can't go: fly back
+    const r = dg.el.getBoundingClientRect();
+    const a = dg.ghost.animate([{ left: dg.ghost.style.left, top: dg.ghost.style.top }, { left: r.left + "px", top: r.top + "px" }], { duration: 220, easing: "ease-out" });
+    a.onfinish = () => dg.ghost.remove();
+  });
+  window.addEventListener("pointercancel", () => { if (drag && drag.ghost) drag.ghost.remove(); drag = null; endDragVisuals(); });
+
+  boardEl.addEventListener("click", ev => {
+    if (suppressClick || !myTurnDecision(cur)) return;
+    const d = cur.decision;
+    const rn = ev.target.closest("[data-rune]");
+    if (rn) { runeClick(+rn.dataset.rune, ev); return; }
+    const c = ev.target.closest(".card[data-uid]");
+    if (!c) return;
+    const uid = +c.dataset.uid;
+    if (c.dataset.opts) {                       // a playable card in hand / champion zone
+      const ix = c.dataset.opts.split(",").map(Number);
       if (ix.length === 1) choose(ix[0]);
-      else { filterUid = +el.dataset.uid; drawDecision(cur); }
-    }));
+      else { filterUid = uid; drawDecision(cur); }
+      return;
+    }
+    if (c.dataset.drag && d.kind === "action") {  // a unit on the board: pick it to move together with others
+      if (picked[uid]) delete picked[uid]; else picked[uid] = true;
+      drawBoard(cur);
+      const n = Object.keys(picked).length;
+      status(n ? `${n} unit${n === 1 ? "" : "s"} picked: drag one of them to a battlefield or your base to move them together` : "");
+    }
+  });
+
+  /* Runes that the engine treats as the same (same domain, same ready state). */
+  function payGroups(j) {
+    const of = {}, members = {};
+    if (!j || !j.state) return { of, members };
+    const me = j.state.players.find(p => p.idx === j.human);
+    me.runes.forEach(r => { const g = `${(r.name || "").split(" ")[0]}|${r.exhausted ? 1 : 0}`; of[r.uid] = g; (members[g] = members[g] || []).push(r.uid); });
+    return { of, members };
+  }
+  /* Runes: on your turn a click offers Exhaust / Recycle; while paying, a click cycles untouched -> tap -> recycle -> untouched. */
+  function runeClick(uid, ev) {
+    const d = cur.decision;
+    if (d.kind === "action" && d.meta) {
+      const ix = d.meta.map((m, i) => m.k === "rune" && m.uids[0] === uid ? i : -1).filter(i => i >= 0);
+      if (ix.length) popMenu(ev.clientX, ev.clientY, ix.map(i => ({ html: B.say(d.labels[i]) + ' <span class="muted">(adds to your pool)</span>', go: () => choose(i) })));
+      return;
+    }
+    if (d.kind === "pay" && d.plans) {
+      const grp = payGroups(cur), g = grp.of[uid];
+      const hows = new Set();
+      d.plans.forEach(pl => pl.runes.forEach(r => { if (grp.of[r.uid] === g) hows.add(r.how); }));
+      if (!hows.size) return;
+      const order = [undefined, "ex", "rc"].filter(h => h === undefined || hows.has(h));
+      const nx = order[(order.indexOf(paySel[uid]) + 1) % order.length];
+      if (nx) paySel[uid] = nx; else delete paySel[uid];
+      drawBoard(cur); drawDecision(cur);
+    }
+  }
+  /* The payment plan that matches the runes you tapped (by group and tap/recycle; runes of a group are interchangeable). */
+  function matchPlan(j, d) {
+    const grp = payGroups(j);
+    const sig = list => list.map(x => `${grp.of[x.uid]}|${x.how}`).sort().join(",");
+    const want = sig(Object.entries(paySel).map(([u, h]) => ({ uid: +u, how: h })));
+    let best = -1;
+    d.plans.forEach((pl, i) => { if (!pl.decline && sig(pl.runes) === want && (best < 0 || pl.abilities.length < d.plans[best].abilities.length)) best = i; });
+    return best;
+  }
+  function drawPay(j, d) {
+    const n = Object.keys(paySel).length;
+    const m = matchPlan(j, d);
+    const pw = (d.cost && d.cost.power) || [];
+    const cost = d.cost ? `${d.cost.energy || 0} energy${pw.length ? " + " + pw.length + " " + esc(pw.join("/")) + " power" : ""}` : "";
+    let html = `<div class="pay-tap"><b>Tap your runes</b> on the board to pay${cost ? " <b>" + cost + "</b>" : ""}. Click a glowing rune once to exhaust it (1 energy), again to recycle it (1 power of its domain), and again to undo.
+      <div class="pay-now">${n ? `${n} rune${n === 1 ? "" : "s"} chosen` : "No runes chosen yet"}${m >= 0 ? `: <span class="ok">${B.say(d.labels[m])}</span>` : n ? ' <span class="muted">(not a complete payment yet)</span>' : ""}</div>
+      <button class="opt primary" id="pay-go" ${m >= 0 ? "" : "disabled"}>Pay</button></div>`;
+    const dec = d.plans.findIndex(p => p.decline);
+    html += `<details class="og runes"><summary class="ogt">Or pick a payment from the list (${d.plans.filter(p => !p.decline).length})</summary>` +
+      d.labels.map((_, i) => i === dec ? "" : optionButton(d, i)).join("") + `</details>`;
+    if (dec >= 0) html += `<div class="og end">${optionButton(d, dec)}</div>`;
+    $("#options").innerHTML = html;
+    $("#options").querySelectorAll("button.opt[data-i]").forEach(b => b.addEventListener("click", () => choose(+b.dataset.i)));
+    $("#pay-go").addEventListener("click", () => { const k = matchPlan(cur, cur.decision); if (k >= 0) choose(k); });
+    $("#btn-hint").disabled = d.n < 2;
   }
 
   function optionButton(d, i) {
@@ -142,6 +363,7 @@
       if (f.length) idx = f; else filterUid = null;
     }
     if (d.kind === "mulligan" && d.option_uids) { drawMulligan(j, d); return; }
+    if (d.kind === "pay" && d.plans && !hints) { drawPay(j, d); return; }
     let html = "";
     if (filterUid != null) html += `<button class="link" id="clear-filter">← show all options</button>`;
     if (d.kind === "action") {

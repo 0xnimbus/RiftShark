@@ -86,6 +86,11 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   16:50: showdown Focus strip on the battlefield (who has Focus, passes in a row), "◉ focus" on the seat, pass lines in the
   log; combat strip (attack vs defend Might), ATK/DEF badges, assigned damage on each unit (combat.assign), assign_damage
   options drawn as bars with "dies"; play.js serialises grade/apply so clicking during grading no longer stalls the page.
+  17:55 (Derrick: feel like a digital TCG client): drag hand cards onto the board to play them and drag units (click several
+  to pick them, then drag one) to move them; `PlaySession.decision_view` adds `meta` per action option ({k, uids, to: data-zone key})
+  and `plans` per pay option (runes exhausted/recycled). Runes are drawn with their card art: on your turn a click offers
+  exhaust/recycle, during a payment a click cycles tap -> recycle -> undo and "Pay" picks the matching plan (same-domain runes are
+  interchangeable). Score is a big number plus a numbered 1..8 track; hand is a fan; round End turn / Pass button on the mat.
 - Main deck = 39 cards + chosen champion (CR 103.3). `When you play me` triggers fire from the chain.
 - `riftsim/` top level still holds the v1 simplified engine (engine.py, policies.py, replay.py, runner.py, cli.py).
   It will be replaced by v2 equivalents.

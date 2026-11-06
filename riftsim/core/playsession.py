@@ -138,6 +138,11 @@ class PlaySession:
               "showdown": bool(info.get("showdown")), "chain": bool(info.get("chain"))}
         if d.kind == "mulligan":   # which hand cards each option sets aside, so the page can show a pick-up-to-two hand
             dv["option_uids"] = [list(o) for o in d.options]
+        if d.kind == "action":     # what each option does to which card and where, for drag and drop and clickable runes
+            dv["meta"] = [self._action_meta(a) for a in d.options]
+        elif d.kind == "pay":      # which runes each plan exhausts or recycles, so the player can tap runes themselves
+            dv["plans"] = [self._plan_meta(pl) for pl in d.options]
+            dv["cost"] = {"energy": info.get("energy", 0), "power": list(info.get("power") or [])}
         src = None
         if not info.get("handler") and getattr(g, "vm_frames", None):
             src = g.vm_frames[-1].ctx.source
@@ -146,6 +151,39 @@ class PlaySession:
             dv["source"] = {"uid": src, "card": o.defn.id, "name": o.defn.name, "image": o.defn.image,
                             "text": o.defn.text}       # shown under the prompt so the player sees why it is asked
         return dv
+
+    @staticmethod
+    def _zone_key(loc):
+        """Engine location -> the board's data-zone key ("base0", "bf1")."""
+        if not loc:
+            return None
+        return f"{loc[0]}{loc[1]}" if loc[0] in ("base", "bf") else None
+
+    def _action_meta(self, a):
+        k = a[0] if isinstance(a, tuple) and a else str(a)
+        if k == "play":
+            return {"k": "play", "uids": [a[1]], "to": self._zone_key(a[2] if len(a) > 2 else None)}
+        if k == "move":
+            return {"k": "move", "uids": list(a[1]), "to": self._zone_key(a[2])}
+        if k == "move_select":
+            return {"k": "move_select", "uids": [], "to": self._zone_key(a[1])}
+        if k == "hide":
+            return {"k": "hide", "uids": [a[1]], "to": f"bf{a[2]}"}
+        if k == "rune":
+            return {"k": "rune", "how": a[1], "uids": [a[2]]}
+        if k == "activate":
+            return {"k": "activate", "uids": [a[1]]}
+        return {"k": k, "uids": []}
+
+    @staticmethod
+    def _plan_meta(plan):
+        if not isinstance(plan, tuple):
+            return {"decline": True, "runes": [], "abilities": []}
+        acts = plan[0]
+        rc = {x[1] for x in acts if x[0] == "rc"}
+        runes = [{"uid": x[1], "how": "rc" if x[1] in rc else "ex"} for x in acts if x[0] == "ex" and x[1] not in rc]
+        runes += [{"uid": u, "how": "rc"} for u in rc]
+        return {"runes": runes, "abilities": [x[1] for x in acts if x[0] == "ab"]}
 
     def new_events(self):
         """Engine log entries since the last call (internal 'event:*' mirrors dropped), for the plain-language log."""

@@ -9,6 +9,9 @@ window.RiftBoard = (function () {
   let BFN = [];              // battlefield index -> name
   let ME = 0;                // seat shown at the bottom ("you")
   let NEUTRAL = false;       // replays: say "P0"/"P1" instead of "you"/"opponent"
+  let DRAG = {};             // uid -> true: you can drag this card (play it, move it)
+  let SEL = {};              // uid -> true: units picked to move together
+  let RUNE = {};             // uid -> "tap" (click for rune actions) | "ex" | "rc" (chosen in a payment) | "pick" (can be chosen)
   const setCards = j => { CARDS = j || {}; };
   const defOf = o => CARDS[o && o.card] || {};
   const imgOf = o => (o && o.image) || defOf(o).image || "";
@@ -109,7 +112,7 @@ window.RiftBoard = (function () {
       case "turn": return null;
       case "draw": return e.uid != null && (p === ME || NEUTRAL) ? `${whoS(p, "draw")} <b>${esc(nameOf(e.uid))}</b>.` : `${whoS(p, "draw")} a card.`;
       case "play": return `${whoS(p, "play")} <b>${esc(n)}</b>${e.loc ? " to " + locName(e.loc) : ""}.`;
-      case "show_off": return ["Show Off?", `${src} has <i class="kw">Show Off</i>: you may reveal or pick a card to turn on its extra effect, or don't show off.`];
+      case "show_off": return `${whoS(p, "show")} off${n ? " with <b>" + esc(n) + "</b>" : ""}.`;
       case "pay": return (e.energy || (e.power && e.power.length)) ? `${whoS(p, "pay")} ${e.energy || 0} energy${e.power && e.power.length ? " and " + e.power.length + " power" : ""}.` : null;
       case "mulligan": return e.count ? `${whoS(p, "mulligan")} ${e.count} card${e.count === 1 ? "" : "s"}.` : `${whoS(p, "keep")} their opening hand.`.replace("You keep their", "You keep your");
       case "trigger_order": return `${whoS(p, "order")} simultaneous triggers.`;
@@ -168,8 +171,9 @@ window.RiftBoard = (function () {
     const m = unit ? `<span class="m${o.damage ? " hurt" : ""}">${o.damage ? (o.might - o.damage) + "/" : ""}${o.might}</span>` : "";
     const b = (o.buffs || o.empowered) ? `<span class="b">${o.buffs ? "+" + o.buffs : ""}${o.empowered ? " E" : ""}</span>` : "";
     const cost = (cls || "").includes("inhand") && def.energy != null ? `<span class="cost">${def.energy}${def.power ? "+" + def.power : ""}</span>` : "";
-    const cl = ["card", "p" + (o.controller === ME ? "me" : "op"), o.exhausted ? "exhausted" : "", o.stunned ? "stunned" : "", o.token ? "token" : "", cls || ""].join(" ");
-    return `<div class="${cl}" data-uid="${o.uid}" ${extra || ""}>
+    const drag = DRAG[o.uid] ? " draggable" : "", sel = SEL[o.uid] ? " picked" : "";
+    const cl = ["card", "p" + (o.controller === ME ? "me" : "op"), o.exhausted ? "exhausted" : "", o.stunned ? "stunned" : "", o.token ? "token" : "", cls || ""].join(" ") + drag + sel;
+    return `<div class="${cl}" data-uid="${o.uid}" ${DRAG[o.uid] ? 'data-drag="1"' : ""} ${extra || ""}>
       ${im ? `<img src="${esc(im)}" loading="lazy" alt="">` : `<div class="noimg">${esc(o.name)}</div>`}
       ${cost}${m}${b}${role}${pend}${flags.join("")}<span class="n">${esc(o.name)}</span></div>`;
   }
@@ -177,23 +181,33 @@ window.RiftBoard = (function () {
   function runeDomain(r) { const d = (r.name || "").split(" ")[0].toLowerCase(); return DOMAINS.includes(d) ? d : "any"; }
   function runes(p) {
     const ready = p.runes.filter(r => !r.exhausted).length;
-    const list = p.runes.map(r => `<span class="rune ${runeDomain(r)}${r.exhausted ? " ex" : ""}" title="${esc(r.name)}${r.exhausted ? " (exhausted)" : " (ready)"}"></span>`).join("");
+    const list = p.runes.map(r => {
+      const im = imgOf(r), st = RUNE[r.uid] || "";
+      const tag = st === "ex" ? '<i class="rtag ex">TAP</i>' : st === "rc" ? '<i class="rtag rc">RECYCLE</i>' : "";
+      const tip = `${r.name}${r.exhausted ? " (exhausted)" : " (ready)"}` + (st === "tap" ? ": click to exhaust it for 1 energy or recycle it for 1 power" : st ? ": click to change how it pays" : "");
+      return `<span class="rcard ${runeDomain(r)}${r.exhausted ? " ex" : ""}${st ? " tap s-" + st : ""}" data-rune="${r.uid}" data-uid="${r.uid}" title="${esc(tip)}">` +
+        `${im ? `<img src="${esc(im)}" alt="" loading="lazy">` : `<span class="rune ${runeDomain(r)}"></span>`}${tag}</span>`;
+    }).join("");
     const pool = (p.energy || p.power.length) ? `<span class="pool" title="unspent energy and power in your pool">pool ${p.energy}⚡${p.power.length ? " · " + p.power.map(x => `<span class="rune mini ${x}"></span>`).join("") : ""}</span>` : "";
     return `<div class="runes" title="Runes: exhaust one for 1 energy, recycle one for 1 power of its domain">
       <span class="lbl">Runes ${ready}/${p.runes.length} ready</span><div class="rlist">${list || '<span class="muted">none yet</span>'}</div>${pool}</div>`;
   }
+  /* Score as numbers: the big count, and a numbered track 1..victory filled up to it. */
   function scorePips(p, victory) {
     let s = "";
-    for (let i = 1; i <= victory; i++) s += `<i class="${i <= p.points ? "on" : ""}"></i>`;
-    return `<div class="score" title="${p.points} of ${victory} points to win"><b>${p.points}</b><span class="pips">${s}</span></div>`;
+    for (let i = 1; i <= victory; i++) s += `<i class="${i <= p.points ? "on" : ""}${i === victory ? " win" : ""}">${i}</i>`;
+    return `<div class="score" title="${p.points} of ${victory} points to win"><span class="sc-num">${p.points}</span><span class="sc-of">/ ${victory}<br><small>points</small></span>` +
+      `<span class="pips">${s}</span></div>`;
   }
 
   function seat(p, st, o, top) {
     const mine = p.idx === ME;
-    const hand = p.hand.map(c => {
-      if (!mine || !o.playable) return card(c, top ? "tiny" : "inhand");
+    const nH = p.hand.length;
+    const fan = i => { const k = i - (nH - 1) / 2; return `style="--rot:${(k * Math.min(4, 24 / Math.max(1, nH))).toFixed(1)}deg;--lift:${(Math.abs(k) * Math.abs(k) * 1.2).toFixed(1)}px"`; };
+    const hand = p.hand.map((c, i) => {
+      if (!mine || !o.playable) return card(c, top ? "tiny" : "inhand", mine && !top ? fan(i) : "");
       const opts = o.playable[c.uid] || [];
-      const extra = opts.length ? `data-opts="${opts.join(",")}"` : `data-why="${esc(whyNot(c, p, st, o))}"`;
+      const extra = (opts.length ? `data-opts="${opts.join(",")}"` : `data-why="${esc(whyNot(c, p, st, o))}"`) + " " + fan(i);
       return card(c, "inhand" + (opts.length ? " playable" : ""), extra);
     }).join("");
     const champ = p.champion ? (() => {
@@ -372,6 +386,7 @@ window.RiftBoard = (function () {
     o = o || {};
     ME = o.me != null ? o.me : 0;
     NEUTRAL = !!o.neutral;
+    DRAG = o.drag || {}; SEL = o.selected || {}; RUNE = o.runes || {};
     BFN = st.battlefields.map(b => b.name);
     markPending(st);
     st.players.forEach(p => { p.hand.forEach(remember); p.base.forEach(remember); p.runes.forEach(remember); p.trash.forEach(remember); remember(p.champion); remember(p.legend_obj); });
@@ -445,7 +460,8 @@ window.RiftBoard = (function () {
     if (o.stunned) lines.push(`<div class="tt-st st">${STATUS_HELP.stunned}</div>`);
     if (o.damage) lines.push(`<div class="tt-st">${o.damage} damage marked (dies at ${o.might}).</div>`);
     if (el.dataset.why) lines.push(`<div class="tt-st why">${chips(el.dataset.why)}</div>`);
-    if (el.dataset.opts) lines.push(`<div class="tt-st ok">Playable now: click to see the options.</div>`);
+    if (el.dataset.opts) lines.push(`<div class="tt-st ok">Playable now: drag it onto the board, or click it.</div>`);
+    else if (el.dataset.drag) lines.push(`<div class="tt-st ok">Drag it to a battlefield or your base to move it. Click to pick several units, then drag them together.</div>`);
     return `${im ? `<img src="${esc(im)}" alt="">` : ""}<div class="tt-body"><b>${esc(o.name || def.name || "")}</b>${lines.join("")}</div>`;
   }
   function bindTooltips(root) {
