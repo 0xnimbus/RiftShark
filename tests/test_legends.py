@@ -302,3 +302,33 @@ def test_virtuoso_banishes_4_energy_spells_and_pays_off_at_four(db, decks):
     assert all(g.objects[u].zone == "trash" for u in spells[1:])     # put each in its trash
     assert len(g.players[0].runes) == runes0 + min(4, deck0)                  # channel 4 runes
     assert len(g.players[0].hand) == hand0 + 4 + 1                     # the spell draws 4, Virtuoso draws 1
+
+
+def _gear_on_board(g, db, p=0, exclude=()):
+    ps = g.players[p]
+    u = next(u for u in ps.deck if u not in exclude and g.objects[u].zone == "deck")
+    g.objects[u].defn = next(c for c in db if c.type == "gear" and (c.energy or 0) >= 2 and "Equipment" not in c.tags)
+    g._to_zone(g.objects[u], "board", location=("base", p), controller=p)
+    g.bump()
+    return u
+
+
+def test_lady_of_clockwork_animates_one_gear_at_a_time(db, decks):
+    g = main_phase(db, decks)
+    legend(g, db, "RAD-145")
+    a = _gear_on_board(g, db)
+    b = _gear_on_board(g, db, exclude=(a,))
+    for pick in (a, b):
+        g.emit("main_phase", player=0)
+        g.dirty = True
+        g.pending = None
+        for _ in range(40):
+            d = g.run()
+            if d.kind == "choose" and pick in d.options:
+                g.choose(pick); continue
+            if d.kind == "action" and not g.chain:
+                break
+            g.choose(("pass",) if ("pass",) in d.options else d.options[0])
+        c = g.chars(pick)
+        assert "unit" in c.types and "gear" in c.types and c.might == g.objects[pick].defn.energy
+    assert "unit" not in g.chars(a).types                   # a stopped being a unit when b was chosen

@@ -371,3 +371,30 @@ def virtuoso(defn):
                                              O.Do(payoff),
                                              O.If(lambda g, c: c.vars.get("__virt"), [O.Channel(4), O.Draw(1)])],
                                     label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Lady of Clockwork")
+def lady_of_clockwork(defn):
+    # At the start of your Main Phase, you may pay [1] to choose a friendly gear. It becomes a unit gear with Might
+    # equal to its Energy cost until you choose another gear with me.
+    gear = Sel("gear", side="friendly")
+
+    def animate(g, c):
+        lady = g.objects[c.source]
+        new = c.vars.get("t")
+        if new is None or new not in g.objects:
+            return
+        old = lady.temp.get("clockwork")
+        if old is not None and old in g.objects:            # "until you choose another gear with me"
+            o = g.objects[old]
+            o.mods = [m for m in o.mods if not (m.source == c.source and m.kind in ("type", "base_might"))]
+        lady.temp["clockwork"] = new
+        g.add_mod(new, "type", "unit", duration="permanent", source=c.source)
+        g.add_mod(new, "base_might", g.objects[new].base_defn().energy or 0, duration="permanent", source=c.source)
+        g.bump()
+
+    return {"abilities": [Triggered("start_main", [
+        O.If(lambda g, c: bool(g.choice_candidates(c, gear, targeted=True)), [
+            O.PayResources(1, out="__lady"),
+            O.If(Ref("__lady"), [O.Choose(gear, out="t", targeted=True), O.Do(animate)])])],
+        label=defn.name, source_text=defn.text)], "replace": True}
