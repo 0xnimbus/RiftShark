@@ -529,10 +529,11 @@ def parse_sentence(s, state):
         from . import parse_cost
         c = parse_cost(m.group(1).upper())
         return [O.PayResources(c["energy"], c["power"], out="__did", optional=False)]
-    m = re.match(r"counter a spell that costs no more than \[(\d+)\](?: and no more than \[a\])?$", sl)
+    m = re.match(r"counter a spell that costs no more than \[(\d+)\]( and no more than \[a\])?$", sl)
     if m:
         n = int(m.group(1))
-        return [O.Choose(Sel("spell", zone="chain", pred=lambda g, c, u, n=n: any(it.uid == u and it.kind == "spell" for it in g.chain) and (g.objects[u].defn.energy or 0) <= n), out="__sp", targeted=True),
+        pmax = 1 if m.group(2) else 99
+        return [O.Choose(Sel("spell", zone="chain", pred=lambda g, c, u, n=n, pmax=pmax: any(it.uid == u and it.kind == "spell" for it in g.chain) and (g.objects[u].defn.energy or 0) <= n and (g.objects[u].defn.power or 0) <= pmax), out="__sp", targeted=True),
                 O.CounterItem(lambda g, c: next((it.id for it in g.chain if it.uid == c.vars.get("__sp")), None))]
     m = re.match(r"recycle one of your runes$", sl)
     if m:

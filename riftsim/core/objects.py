@@ -143,6 +143,8 @@ class ChainItem:
 
     def __init__(self, id, kind, controller, uid=None, ability=None, ctx=None, label="", code=None, target_code=None, cost=None):
         self.id, self.kind, self.controller, self.uid, self.ability, self.ctx = id, kind, controller, uid, ability, ctx
+        if ctx is not None and getattr(ctx, "item", None) is None:
+            ctx.item = id          # effects know which chain item they belong to (spell-only bonuses, kill credit)
         self.finalized = False
         self.label = label
         self.resolves_now = kind in ("unit", "gear", "add")

@@ -21746,7 +21746,9 @@
     "spell"
    ],
    "supertype": null,
-   "domains": [],
+   "domains": [
+    "calm"
+   ],
    "energy": 1,
    "power": 2,
    "might": null,
@@ -21766,7 +21768,7 @@
    ],
    "source": "official-gallery",
    "script": null,
-   "data_incomplete": true
+   "data_incomplete": false
   },
   {
    "id": "VEN-041",

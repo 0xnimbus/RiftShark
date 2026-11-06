@@ -13,6 +13,8 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
 | 2026-11-06 02:45 | 72% used, resets Fri 12:40 AM | 17% used, resets Mon 10:00 AM | +10% in 21 min; one more block, then likely stop near 03:05 |
 | 2026-11-06 03:08 | 85% used, resets Fri 12:40 AM | 19% used, resets Mon 10:00 AM | last block: Vercel setup + handoff, then stop until the session resets |
 | 2026-11-06 03:30 | (switched to Opus by Derrick at 03:13) | | Derrick asked to stop after this commit: credits running low. Next: items 2-5 below, then re-run Kai'Sa vs Riven batches |
+| 2026-11-06 05:55 | 6% used, resets 5:40 AM | 21% used, resets Mon 10:00 AM | new 5h window; Opus; decks + targeting work |
+| 2026-11-06 06:11 | 10% used, resets 5:40 AM | 21% used, resets Mon 10:00 AM | +4% in 16 min; continuing |
 
 ## Where things stand
 

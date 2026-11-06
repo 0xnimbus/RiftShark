@@ -58,5 +58,12 @@
   "domains": [
    "fury"
   ]
+ },
+ "RAD-041": {
+  "domains": [
+   "calm"
+  ],
+  "data_incomplete": false,
+  "_why": "riftdecks.com shows the Calm domain icon (2026-11-06)"
  }
 }

@@ -11,7 +11,7 @@ import itertools
 from .abilities import Activated, PlayPermission, Static
 from .objects import ChainItem
 from .vm import Context, Decision, Frame, Instr, compile_effect, run_vm, resume_vm, val
-from .ops import Choose, May, SetVar, Do
+from .ops import Choose, May, SetVar, Do, PayResources
 from . import payment
 
 PHASES = ["awaken", "beginning", "scoring", "channel", "draw", "main", "ending", "expiration"]
@@ -272,6 +272,7 @@ class FlowMixin:
         self.turn += 1
         self.scored = set()
         self.turn_memo = {}
+        self.turns_taken[self.turn_player] = self.turns_taken.get(self.turn_player, 0) + 1
         for p in self.players:
             p.played_this_turn = []
             p.memo = {}
@@ -374,7 +375,8 @@ class FlowMixin:
             elif o.location[0] == "base" and o.location[1] != o.controller and o.attached_to is None:
                 self.do_recall(u)
         for bf in self.battlefields:
-            for p, u in list(bf.facedown.items()):
+            for k, u in list(bf.facedown.items()):
+                p = k if isinstance(k, int) else k[0]
                 if bf.controller != p:
                     self.log("hidden_lost", uid=u, bf=bf.idx)
                     self._to_zone(self.objects[u], "trash")
@@ -517,6 +519,11 @@ class FlowMixin:
     def _score(self, p, i, how):
         if (p, i) in self.scored:
             return
+        here = ("bf", i)
+        for src, n in self.rules("no_score_before_turn"):
+            if self.objects[src].place == here and self.turns_taken.get(p, 0) < n:
+                self.log("cant_score", player=p, bf=i, why=self.objects[src].defn.name)
+                return          # e.g. Forgotten Monument: no point and no conquer/hold event
         self.scored.add((p, i))
         ps = self.players[p]
         v = self.cfg["victory"]
@@ -548,8 +555,8 @@ class FlowMixin:
             return
         self.combat["step"] = "damage"
         self.combat["assign"] = {}
-        a_total = sum((self.chars(u).might or 0) for u in att if not self.objects[u].stunned)
-        d_total = sum((self.chars(u).might or 0) for u in dfn if not self.objects[u].stunned)
+        a_total = sum((self.chars(u).might or 0) for u in att if not self.objects[u].stunned and not self.no_combat_damage(u))
+        d_total = sum((self.chars(u).might or 0) for u in dfn if not self.objects[u].stunned and not self.no_combat_damage(u))
         self.combat["totals"] = (a_total, d_total)
         self.tasks.append(("combat_deal",))
         self.tasks.append(("assign", c["defender"], tuple(att), d_total))
@@ -730,7 +737,9 @@ class FlowMixin:
                     if mandatory:
                         pre += list(ins) + [SetVar("__add", True), Do(lambda g, c: c.paid.__setitem__("add", True))]
                     else:
-                        pre.append(May(list(ins) + [Do(lambda g, c: c.paid.__setitem__("add", True))], label="pay the additional cost", out="__addq"))
+                        outs = [i.out for i in ins if isinstance(i, PayResources)]
+                        pre.append(May(list(ins) + [Do(lambda g, c, outs=tuple(outs): c.paid.__setitem__("add", all(c.vars.get(o) for o in outs)))],
+                                       label="pay the additional cost", out="__addq"))
         code = compile_effect(pre) + list(it.target_code or []) + [_FinalizeCosts(it.id)]
         self.vm_frames.append(Frame(code, ctx, tag=("finalize", it.id)))
 
@@ -749,6 +758,8 @@ class FlowMixin:
             o = self.objects[it.uid]
             self.emit("play", uid=it.uid, player=it.controller, card_type=it.kind, loc=ctx.target_bf or ctx.vars.get("__loc"),
                       from_zone=ctx.played_from, item=it.id, ctx=ctx)
+        elif it.kind == "ability":
+            self.emit("activate", uid=it.uid, player=it.controller, energy=(it.cost or {}).get("energy", 0), item=it.id, ctx=ctx)
         self.priority = it.controller
         self.passes = 0
         self.dirty = True
@@ -1049,6 +1060,9 @@ class FlowMixin:
         if from_zone == "facedown":
             return [o.hidden_at]
         locs = [("base", p)]
+        if "unit" in d.types:
+            # CR 355.2.a: a unit may be played to its controller's base or a battlefield that player controls
+            locs += [("bf", bf.idx) for bf in self.battlefields if bf.controller == p]
         kws = d.keywords
         anywhere = False
         for t in self.turn_effects:
@@ -1060,18 +1074,28 @@ class FlowMixin:
                     anywhere = True
         blocked = {self.objects[src].place for src, v in self.rules("cant_play_here")}
         if "unit" in d.types:
+            if any(isinstance(ab, PlayPermission) and ab.perm == "to_enemy_bf" for ab in self._abilities_of(uid, o)):
+                for bf in self.battlefields:          # "I can be played to a battlefield where there are enemy units"
+                    loc = ("bf", bf.idx)
+                    if any(self.objects[x].controller != p for x in self.units_at(loc)) and loc not in locs:
+                        locs.append(loc)
             if kws.get("ambush") or anywhere:
                 for bf in self.battlefields:
                     loc = ("bf", bf.idx)
                     if anywhere or self.units_at(loc, p):
                         players = {self.objects[u].controller for u in self.units_at(loc)}
-                        if (p in players or len(players) < 2) and loc not in blocked:
+                        if (p in players or len(players) < 2) and loc not in blocked and loc not in locs:
                             locs.append(loc)
         elif "gear" in d.types:
             if kws.get("deploy") or anywhere:
                 for bf in self.battlefields:
                     locs.append(("bf", bf.idx))
-        return locs
+        if self.rules("play_open_bf", player=p) and "unit" in d.types:
+            for bf in self.battlefields:          # "Friendly units may be played to open battlefields"
+                loc = ("bf", bf.idx)
+                if bf.controller is None and not self.units_at(loc) and loc not in locs:
+                    locs.append(loc)
+        return [l for l in locs if l[0] == "base" or l not in blocked]
 
     def legal_actions(self, p):
         """Discretionary actions available to player p right now."""
@@ -1087,8 +1111,7 @@ class FlowMixin:
         if ps.champion is not None:
             sources.append((ps.champion, "champion"))
         for bf in self.battlefields:
-            u = bf.facedown.get(p)
-            if u is not None:
+            for u in self.facedown_cards(bf.idx, p):
                 sources.append((u, "facedown"))
         for u in ps.trash:
             if self.objects[u].defn.keywords.get("flow_cost"):
@@ -1241,8 +1264,6 @@ class FlowMixin:
         by_loc = {}
         for u, o in self.objects.items():
             if o.zone == "board" and o.controller == p and not o.exhausted and not o.stunned and "unit" in self.chars(u).types:
-                if any(True for _ in self.rules("cant_move", player=None) if False):
-                    continue
                 by_loc.setdefault(o.location, []).append(u)
         dests = [("bf", b.idx) for b in self.battlefields] + [("base", p)]
         for loc, units in by_loc.items():
@@ -1261,7 +1282,7 @@ class FlowMixin:
     def _hide_actions(self, p):
         acts = []
         ps = self.players[p]
-        bfs = [b.idx for b in self.battlefields if b.controller == p and p not in b.facedown]
+        bfs = [b.idx for b in self.battlefields if b.controller == p and self.can_hide_at(p, b.idx)]
         if not bfs or not self.can_pay(p, 0, ["any"], purpose={"kind": "hide"}):
             return acts
         cards = list(ps.hand) + ([ps.champion] if ps.champion else [])

@@ -188,7 +188,10 @@ class Choose(Instr):
 
     def run(self, game, ctx):
         p = _player(game, ctx, self.player)
-        cands = game.choice_candidates(ctx, self.sel, targeted=self.targeted)
+        sel = self.sel
+        if callable(sel) and not isinstance(sel, Sel):
+            sel = list(sel(game, ctx) or [])          # an explicit list computed now (e.g. "two of them")
+        cands = game.choice_candidates(ctx, sel, targeted=self.targeted)
         n = val(game, ctx, self.n)
         if n == 1 and not self.up_to:
             if not cands:
@@ -353,16 +356,57 @@ class Split(Instr):
     """Deal `amount` damage split among chosen targets (targets chosen earlier into Ref). Splits
     as evenly-lethal as the controller decides; the AI uses a greedy lethal-first split."""
 
-    def __init__(self, amount, targets):
-        self.amount, self.targets = amount, targets
+    def __init__(self, amount, targets, source=None):
+        self.amount, self.targets, self.source = amount, targets, source
 
     def run(self, game, ctx):
-        us = _uids(game, ctx, self.targets)
+        us = [u for u in _uids(game, ctx, self.targets) if game.objects[u].zone == "board"]
         amt = val(game, ctx, self.amount)
         if not us or not amt:
             return None
-        game.do_deal_split(us, amt, ctx)
+        ctx.vars["__split_amt"] = amt
+        if len(us) > amt:
+            # CR 355.14.h: more targets than damage: the controller picks which stay targets (exactly `amt` of them)
+            opts = [tuple(c) for c in itertools.combinations(us, amt)]
+            ctx.vars["__split_stage"] = "targets"
+            return Decision(ctx.controller, "choose_many", opts, labels=[", ".join(game.label(u) for u in o) for o in opts],
+                            info={"label": "targets that keep receiving damage"})
+        return self._divide(game, ctx, tuple(us))
+
+    def _divide(self, game, ctx, us):
+        amt = ctx.vars["__split_amt"]
+        plans = _compositions(amt, len(us))
+        if len(plans) == 1:
+            return self._deal(game, ctx, us, plans[0])
+        ctx.vars["__split_stage"] = "divide"
+        ctx.vars["__split_us"] = us
+        labels = [", ".join(f"{game.label(u)}: {a}" for u, a in zip(us, pl)) for pl in plans]
+        return Decision(ctx.controller, "split_damage", plans, labels=labels, info={"targets": us, "amount": amt})
+
+    def _deal(self, game, ctx, us, plan):
+        src = val(game, ctx, self.source) if self.source is not None else None
+        for u, a in zip(us, plan):
+            if a > 0:
+                game.do_deal([u], a, ctx, source_uid=src)
         return None
+
+    def resume(self, game, ctx, choice):
+        if ctx.vars.get("__split_stage") == "targets":
+            return self._divide(game, ctx, tuple(choice))
+        return self._deal(game, ctx, ctx.vars["__split_us"], choice)
+
+
+def _compositions(n, k):
+    """Ways to divide n damage among k targets, each getting at least 1 (CR 355.14.f-g)."""
+    if k == 0:
+        return []
+    if k == 1:
+        return [(n,)]
+    out = []
+    for first in range(1, n - k + 2):
+        for rest in _compositions(n - first, k - 1):
+            out.append((first,) + rest)
+    return out
 
 
 class Kill(Instr):

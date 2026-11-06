@@ -55,6 +55,7 @@ class Game(flow.FlowMixin):
         self.turn_effects = []         # dicts: kind, data, expires, uses, ctx
         self.scored = set()            # (player, bf idx) scored this turn
         self.turn_memo = {}            # per-turn memory (cleared at end of turn)
+        self.turns_taken = {}          # player -> number of turns they have started (Forgotten Monument)
         self.events = []               # structured log of everything that happened
         self.log_enabled = log
         self.winner = None
@@ -155,6 +156,16 @@ class Game(flow.FlowMixin):
 
     def is_friendly(self, a, b):
         return a == b
+
+    def cant_move(self, uid):
+        """'I can't move' statics on the unit, or a 'can't move this turn' effect on it."""
+        if self.has_keyword(uid, "cant_move"):
+            return True
+        return any(src == uid for src, _ in self.rules("cant_move"))
+
+    def no_combat_damage(self, uid):
+        """'I don't deal combat damage' (possibly conditional, e.g. Orianna, Exquisite)."""
+        return self.has_keyword(uid, "no_combat_damage") or any(src == uid for src, _ in self.rules("no_combat_damage"))
 
     def board_uids(self):
         return [u for u, o in self.objects.items() if o.zone == "board"]
@@ -412,8 +423,9 @@ class Game(flow.FlowMixin):
         elif z == "facedown":
             if o.hidden_at is not None:
                 bf = self.battlefields[o.hidden_at[1]]
-                if bf.facedown.get(o.controller) == o.uid:
-                    del bf.facedown[o.controller]
+                for k, v in list(bf.facedown.items()):
+                    if v == o.uid:
+                        del bf.facedown[k]
             o.hidden_at = None
         elif z == "board":
             if o.defn.is_unit or o.defn.is_gear or o.defn.type == "rune" or o.copy_of is not None:
@@ -814,6 +826,7 @@ class Game(flow.FlowMixin):
             if "unit" not in self.chars(u).types:
                 continue
             o.damage += amt
+            o.temp["dmg_item"] = ctx.item if ctx is not None else None
             self.bump()
             self.log("damage", uid=u, amount=amt, source=src, combat=combat)
             self.emit("damage", uid=u, amount=amt, source=src, player=o.controller, loc=o.location, by=by, combat=combat, ctx=ctx)
@@ -844,6 +857,11 @@ class Game(flow.FlowMixin):
 
     def do_kill(self, uids, ctx=None, by=None, in_combat=False):
         """Kill permanents (CR 429): they are sent to their owner's trash; deathknell triggers first."""
+        alone = {}
+        for u in list(uids):
+            o = self.objects.get(u)
+            if o is not None and o.zone == "board" and o.location is not None:
+                alone[u] = len([x for x in self.units_at(o.location, o.controller)]) == 1
         for u in list(uids):
             o = self.objects.get(u)
             if o is None or o.zone != "board" or not self.defn_of(u).is_permanent:
@@ -852,7 +870,8 @@ class Game(flow.FlowMixin):
             ev = self.replace_event({"kind": "die", "uid": u, "player": o.controller, "loc": o.location, "killer": killer,
                                      "in_combat": in_combat or self.combat is not None and o.location == ("bf", self.combat["bf"]),
                                      "card_type": "unit" if "unit" in self.chars(u).types else "gear", "by": by,
-                                     "token": o.defn.is_token, "might": self.chars(u).might, "stunned": o.stunned, "buffed": o.buffs > 0})
+                                     "token": o.defn.is_token, "might": self.chars(u).might, "stunned": o.stunned, "buffed": o.buffs > 0,
+                                     "alone": alone.get(u, False), "dmg_item": o.temp.get("dmg_item") if by == "damage" else None})
             if ev is None:
                 continue
             if ev.get("replaced_with") == "recall":
@@ -888,8 +907,12 @@ class Game(flow.FlowMixin):
             self.emit("discard", uid=u, player=o.owner, ctx=ctx)
 
     def do_recycle(self, uids, ctx=None):
-        """Recycle (CR 417): cards go to the bottom of their owner's deck; runes to the bottom of the rune deck."""
-        for u in list(uids):
+        """Recycle (CR 417): cards go to the bottom of their owner's deck; runes to the bottom of the rune deck.
+        Several cards recycled at once go to the bottom in a random order (CR 417.5)."""
+        uids = list(uids)
+        if len(uids) > 1:
+            self.rng.shuffle(uids)
+        for u in uids:
             o = self.objects.get(u)
             if o is None or o.zone in (None, "gone"):
                 continue
@@ -955,7 +978,11 @@ class Game(flow.FlowMixin):
         o = self.objects[uid]
         if dest == o.location:
             return False
+        if self.cant_move(uid):
+            return False
         if dest[0] == "base":
+            if any(self.objects[src].place == o.location for src, _ in self.rules("cant_move_to_base")):
+                return False          # "Units can't move from here to base"
             return dest[1] == o.controller
         if dest[0] != "bf":
             return False
@@ -977,10 +1004,12 @@ class Game(flow.FlowMixin):
     def do_move(self, uids, dest, ctx=None, standard=False):
         """Move units (CR 447-455). Applies Contested when moving to a battlefield not controlled by the mover."""
         moved = []
+        origin = {}
         for u in list(uids):
             o = self.objects.get(u)
             if o is None or o.zone != "board" or "unit" not in self.chars(u).types:
                 continue
+            origin[u] = o.location
             if not self.valid_destination(u, dest):
                 continue
             ev = self.replace_event({"kind": "move", "uid": u, "player": o.controller, "from": o.location, "to": dest, "standard": standard})
@@ -997,7 +1026,7 @@ class Game(flow.FlowMixin):
             return []
         for u in moved:
             o = self.objects[u]
-            self.emit("move", uid=u, player=o.controller, **{"from": None}, to=o.location, loc=o.location, standard=standard, ctx=ctx)
+            self.emit("move", uid=u, player=o.controller, **{"from": origin.get(u)}, to=o.location, loc=o.location, standard=standard, ctx=ctx)
             self.emit("arrive", uid=u, player=o.controller, loc=o.location, ctx=ctx)
         self._apply_contested(dest, self.objects[moved[0]].controller)
         self.dirty = True
@@ -1073,6 +1102,7 @@ class Game(flow.FlowMixin):
         self.bump()
         self.log("token", uid=o.uid, name=name, loc=o.location, player=p)
         ctype = "unit" if defn.is_unit else "gear"
+        self.emit("play", uid=o.uid, player=p, card_type=ctype, loc=o.location, from_zone=None, token=True, ctx=ctx)
         self.emit("enter", uid=o.uid, player=p, loc=o.location, card_type=ctype, token=True, ctx=ctx)
         if defn.is_unit:
             self.emit("arrive", uid=o.uid, player=p, loc=o.location, ctx=ctx)
@@ -1135,6 +1165,7 @@ class Game(flow.FlowMixin):
         if g.attached_to is not None:
             self._detach_raw(gear)
         g.attached_to = unit
+        g.temp["attached_turn"] = (self.turn, unit)
         u.attachments.append(gear)
         g.location = u.location
         self.bump()
@@ -1199,18 +1230,31 @@ class Game(flow.FlowMixin):
         self.bump()
         self.dirty = True
 
+    def facedown_cards(self, bf_idx, p):
+        """Player p's facedown cards at a battlefield (one, or more with 'hide an additional card here')."""
+        return [u for k, u in self.battlefields[bf_idx].facedown.items() if (k if isinstance(k, int) else k[0]) == p]
+
+    def can_hide_at(self, p, bf_idx):
+        bf = self.battlefields[bf_idx]
+        here = ("bf", bf_idx)
+        extra = sum(1 for src, _ in self.rules("extra_hide_here") if self.objects[src].place == here)
+        return len(self.facedown_cards(bf_idx, p)) < 1 + extra
+
     def do_hide(self, p, uid, loc, ctx=None):
         o = self.objects.get(uid)
         if o is None or loc[0] != "bf":
             return False
         bf = self.battlefields[loc[1]]
-        if bf.controller != p or p in bf.facedown:
+        if bf.controller != p or not self.can_hide_at(p, bf.idx):
             return False
         self._to_zone(o, "facedown")
         o.controller = p
         o.hidden_at = loc
         o.facedown_turn = self.turn
-        bf.facedown[p] = uid
+        k = 0
+        while (p if k == 0 else (p, k)) in bf.facedown:
+            k += 1
+        bf.facedown[p if k == 0 else (p, k)] = uid
         self.log("hide", uid=uid, bf=loc[1], player=p)
         self.emit("hide", uid=uid, player=p, loc=loc, ctx=ctx)
         return True
@@ -1307,6 +1351,7 @@ class Game(flow.FlowMixin):
         g.turn_effects = [dict(t, ctx=t["ctx"].clone()) for t in self.turn_effects]
         g.scored = set(self.scored)
         g.turn_memo = dict(self.turn_memo)
+        g.turns_taken = dict(self.turns_taken)
         g.turn_queue = list(self.turn_queue)
         g.events = []
         g.log_enabled = False
