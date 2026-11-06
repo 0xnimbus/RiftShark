@@ -902,6 +902,15 @@ class FlowMixin:
         targets = [u for u in self._target_uids(ctx) if u is not None]
         if targets:
             self.emit("target", targets=tuple(targets), player=it.controller, item=it.id, ctx=ctx)
+            src = self.objects.get(it.uid) if it.uid is not None else None
+            by_unit_ability = it.kind in ("ability", "trigger", "reflexive") and src is not None and \
+                "unit" in (self.chars(it.uid).types if src.zone == "board" else src.defn.types)
+            enemy = [u for u in targets if u in self.objects and self.objects[u].zone == "board"
+                     and self.objects[u].controller is not None and not self.is_friendly(self.objects[u].controller, it.controller)
+                     and ({"unit", "gear"} & set(self.chars(u).types))]
+            if enemy and (it.kind == "spell" or by_unit_ability):      # Ezreal: "chosen enemy units and/or gear"
+                k = ("chose_enemy", it.controller)
+                self.turn_memo[k] = self.turn_memo.get(k, 0) + 1
         if it.kind in ("spell", "unit", "gear"):
             self.players[it.controller].played_this_turn.append(it.uid)
             o = self.objects[it.uid]
