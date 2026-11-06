@@ -2432,3 +2432,9 @@ def spirits_refuge(defn):
     return [Triggered("play_self", [O.Choose(Sel("unit", side="friendly"), out="t"), O.Buff(Ref("t"))], label=defn.name, source_text=defn.text),
             Static(Sel("unit", side="friendly", buffed=True), "keyword", ("deflect", True), label="buffed units have [Deflect]",
                    source_text=defn.text)]
+
+
+@script("Symbol of the Solari")
+def symbol_of_the_solari(defn):
+    # If a combat where you are the attacker ends in a tie, recall ALL units instead.
+    return [Static("self", "rule", ("attacker_tie_recall_all",), source_text=defn.text)]

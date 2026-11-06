@@ -947,3 +947,13 @@ def test_stand_united_and_spirits_refuge(db, decks):
     assert g.chars(u).might == base_u + 2 and g.chars(v).might == base_v + 1
     sr = put(g, db, 0, "Spirit's Refuge", ("base", 0), exclude=(u, v))
     assert g.has_keyword(v, "deflect")
+
+
+def test_symbol_of_the_solari_recalls_everyone_on_a_tie(db, decks):
+    g = main_phase(db, decks)
+    put(g, db, 0, "Symbol of the Solari", ("base", 0))
+    a = put(g, db, 0, "Elnuk Herd", ("bf", 0)); d = put(g, db, 1, "Elnuk Herd", ("bf", 0), exclude=(a,))
+    g.combat = {"bf": 0, "attacker": 0, "defender": 1, "step": "damage"}
+    g._task_combat_cleanup()
+    assert g.objects[a].location == ("base", 0) and g.objects[d].location == ("base", 1)
+    g.combat = None

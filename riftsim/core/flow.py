@@ -852,7 +852,9 @@ class FlowMixin:
         dfn = self.units_at(loc, c["defender"])
         att = self.units_at(loc, c["attacker"])
         if dfn and att:
-            for u in att:
+            # Symbol of the Solari: "If a combat where you are the attacker ends in a tie, recall ALL units instead."
+            everyone = bool(self.rules("attacker_tie_recall_all", player=c["attacker"]))
+            for u in (att + dfn if everyone else att):
                 self.do_recall(u)
             c["recalled"] = True
         self.dirty = True
