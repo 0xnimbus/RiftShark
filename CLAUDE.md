@@ -17,6 +17,7 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
 | 2026-11-06 06:11 | 10% used, resets 5:40 AM | 21% used, resets Mon 10:00 AM | +4% in 16 min; continuing |
 | 2026-11-06 06:47 | 13% used, resets 5:40 AM | 22% used, resets Mon 10:00 AM | +3% in 36 min; continuing |
 | 2026-11-06 07:05 | 18% used, resets 5:40 AM | 22% used, resets Mon 10:00 AM | +5% in 18 min; exact-rules items 2-4 done, round-robin done |
+| 2026-11-06 13:09 | 2% used, resets 12:50 PM | 23% used, resets Mon 10:00 AM | thread was idle 07:21-13:07 (no wake scheduled); resuming item 5 (script remaining cards) |
 
 ## Where things stand
 
