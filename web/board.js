@@ -90,6 +90,7 @@ window.RiftBoard = (function () {
       case "mode": return ["Choose a mode", `${src} has several modes. Pick one.`];
       case "yesno": return ["Optional effect", `${src} offers an optional effect. Do you want it?`];
       case "additional_cost": return ["Additional cost", `Pay the optional additional cost${d.prompt ? " (" + esc(d.prompt) + ")" : ""}? Paying it turns on the extra text of the card.`];
+      case "assign_damage_step": return ["Assign combat damage", "So many splits are legal that you choose them one unit at a time (CR 467.2.c): pick how much of the damage left goes to this unit. Every amount shown can still be finished legally: Tanks first, Backline last, lethal in full before the next unit, and extra only once all have lethal."];
       case "assign_damage": return ["Assign combat damage", "Your side's total Might is dealt as damage to the enemy units (CR 467.2.c): Tanks first, Backline last, and each unit must get lethal damage before the next gets any; extra can only be spread once all have lethal. Each option shows where the damage goes and who dies."];
       case "pay_amount": return ["How much?", `${src}: choose how much to pay.`];
       case "discard": return ["Discard", `${src}: choose what to discard.`];

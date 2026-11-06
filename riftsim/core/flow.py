@@ -235,11 +235,96 @@ class _FinalizeCosts(Instr):
                         info={"item": it.id, "for": it.label, "energy": e, "power": list(p)})
 
 
-def _weak_compositions(n, k):
-    """Ways to write n as an ordered sum of k non-negative parts."""
-    if k == 1:
-        return [(n,)]
-    return [(a,) + rest for a in range(n + 1) for rest in _weak_compositions(n - a, k - 1)]
+class DamageAssignments:
+    """Legal combat damage assignments (CR 467.2.c) for targets with (lethal need or None, priority) each, priority
+    0 = Tank, 1 = normal, 2 = Backline / "assigned last". Units are dealt lethal in full in priority order (any order
+    inside a priority, 467.2.c.3/6/7); the unit reached when damage runs out takes the rest; nobody gets more than
+    lethal while another unit can still take damage (467.2.c.4); a unit no amount can kill may absorb any part and
+    be passed; once every unit has lethal the excess may go anywhere. As a test on a plan a:
+      - every killable unit has a >= lethal (then any split is fine), or
+      - nobody gets more than lethal, at most one unit is partly damaged, and with p = the lowest priority of a
+        killable unit short of lethal, no unit of a higher priority gets damage and the partly damaged one has p.
+    The automaton walks the targets in order with state (damage left, lowest short priority, highest damaged
+    priority, any over lethal, priority of the partial one), so counting and offering amounts never enumerates."""
+
+    NONE = 3
+
+    def __init__(self, info, total):
+        self.info, self.total = list(info), total
+        self._memo = {}
+
+    def _step(self, i, st, a):
+        s, low, high, over, part = st
+        need, p = self.info[i]
+        if a > 0:
+            high = max(high, p)
+        if need is not None:
+            if a > need:
+                over = True
+            elif a < need:
+                low = min(low, p)
+                if a > 0:
+                    if part != self.NONE:
+                        return None
+                    part = p
+        return (s - a, low, high, over, part)
+
+    def _accept(self, st):
+        s, low, high, over, part = st
+        if s:
+            return False
+        if low == self.NONE:
+            return True
+        return not over and high <= low and part in (self.NONE, low)
+
+    def _count(self, i, st):
+        key = (i, st)
+        if key in self._memo:
+            return self._memo[key]
+        if i == len(self.info):
+            n = 1 if self._accept(st) else 0
+        else:
+            n = 0
+            for a in range(st[0] + 1):
+                nx = self._step(i, st, a)
+                if nx is not None:
+                    n += self._count(i + 1, nx)
+        self._memo[key] = n
+        return n
+
+    def _start(self):
+        return (self.total, self.NONE, -1, False, self.NONE)
+
+    def _state(self, prefix):
+        st = self._start()
+        for i, a in enumerate(prefix):
+            st = self._step(i, st, a)
+            if st is None or st[0] < 0:
+                return None
+        return st
+
+    def count(self, prefix=()):
+        st = self._state(prefix)
+        return 0 if st is None else self._count(len(prefix), st)
+
+    def amounts(self, prefix):
+        """Amounts the next unit may get so that a legal assignment can still be completed."""
+        st = self._state(prefix)
+        i = len(prefix)
+        return [a for a in range(st[0] + 1) if (nx := self._step(i, st, a)) is not None and self._count(i + 1, nx)]
+
+    def plans(self):
+        out = []
+
+        def walk(prefix):
+            if len(prefix) == len(self.info):
+                out.append(tuple(prefix))
+                return
+            for a in self.amounts(prefix):
+                walk(prefix + (a,))
+        if self.count():
+            walk(())
+        return sorted(out, reverse=True)
 
 
 class FlowMixin:
@@ -779,12 +864,21 @@ class FlowMixin:
         self.tasks.append(("assign", c["defender"], tuple(att), d_total))
         self.tasks.append(("assign", c["attacker"], tuple(dfn), a_total))
 
+    ASSIGN_FLAT_LIMIT = 64          # more legal assignments than this: ask one unit at a time instead of one flat list
+
     def _task_assign(self, player, targets, total):
         targets = [u for u in targets if u in self.objects and self.objects[u].zone == "board"]
         if total <= 0 or not targets:
             return
-        plans = self._damage_plans(targets, total, player)
         self.combat["assign_targets_" + str(player)] = tuple(targets)
+        dp = self._assign_dp(targets, total, player)
+        if dp.count() > self.ASSIGN_FLAT_LIMIT:
+            # Exact, but the flat list would be huge (a big Might total over many units splits its excess in
+            # C(excess + units - 1, units - 1) ways): the player picks each unit's amount in turn, and every amount
+            # offered still has a legal completion, so the reachable assignments are exactly the legal ones.
+            self.tasks.append(("assign_step", player, tuple(targets), total, ()))
+            return
+        plans = dp.plans()
         if len(plans) == 1:
             self.combat["assign"][player] = plans[0]
             return
@@ -794,6 +888,30 @@ class FlowMixin:
     def _on_assign(self, choice, d):
         self.combat["assign"][d.player] = choice
         self.combat["assign_targets_" + str(d.player)] = d.info["targets"]
+
+    def _task_assign_step(self, player, targets, total, prefix):
+        targets = list(targets)
+        dp = self._assign_dp(targets, total, player)
+        prefix = tuple(prefix)
+        while len(prefix) < len(targets):
+            opts = dp.amounts(prefix)
+            if len(opts) == 1:
+                prefix += (opts[0],)
+                continue
+            u = targets[len(prefix)]
+            need = dp.info[len(prefix)][0]
+            left = total - sum(prefix)
+            labels = [f"{self.label(u)}:{a}" + (" (lethal)" if need is not None and a >= need else "") for a in opts]
+            self.ask(player, "assign_damage_step", opts, labels, "_on_assign_step", targets=tuple(targets), total=total,
+                     prefix=prefix, unit=u, left=left,
+                     label=f"Combat damage: how much of the {left} left goes to {self.label(u)}?",
+                     done=[(self.label(x), a) for x, a in zip(targets, prefix)])
+            return
+        self.combat["assign"][player] = prefix
+        self.combat["assign_targets_" + str(player)] = tuple(targets)
+
+    def _on_assign_step(self, choice, d):
+        self.tasks.append(("assign_step", d.player, d.info["targets"], d.info["total"], d.info["prefix"] + (choice,)))
 
     def _lethal_need(self, u, total, by):
         """CR 467.2.c.4.a / 467.2.c.5: the least assigned amount that would be lethal once replacement effects and
@@ -813,65 +931,23 @@ class FlowMixin:
         return any(not self.is_friendly(self.objects[src].controller, o.controller) and self.objects[src].controller == by
                    for src, _ in self.rules("any_damage_kills_enemies"))
 
-    def _damage_plans(self, targets, total, player=None):
-        """Every legal combat damage assignment (CR 467.2.c): units in priority order (Tank first, then units
-        without a requirement, then Backline / "assigned last", CR 467.2.c.6-7, any order inside a priority) each
-        get lethal damage in full before the next one gets any (467.2.c.3); the unit reached when damage runs out
-        gets the rest; no unit gets more than lethal while another can still receive damage (467.2.c.4); once
-        every unit has lethal assigned, the excess may go to any of them in any split."""
+    def _assign_dp(self, targets, total, player=None):
+        """The legal combat damage assignments (CR 467.2.c) as a counting automaton over the targets in order."""
         last = {src for src, _ in self.rules("assigned_damage_last")}
-        info = {}
+        info = []
         for u in targets:
             c = self.chars(u)
-            need = self._lethal_need(u, total, player)
-            if need is None:
-                # no amount is lethal (CR 467.2.c.6 "if able"): the unit may absorb any part of the damage
-                need = float("inf")
+            need = self._lethal_need(u, total, player)      # None: no amount is lethal (CR 467.2.c.6 "if able")
             tank = c.keywords.get("tank") and not any(
                 self.objects[src].controller == player and self.objects[src].location == self.objects[u].location
                 for src, _ in self.rules("ignore_tank_here"))          # Dune Surfer
             prio = 0 if tank else (2 if (c.keywords.get("backline") or u in last) else 1)
-            info[u] = (need, prio)
-        idx = {u: k for k, u in enumerate(targets)}
-        plans = set()
-        memo = {}
+            info.append((need, prio))
+        return DamageAssignments(info, total)
 
-        def rec(left, rem):
-            key = (left, rem)
-            if key in memo:
-                return memo[key]
-            out = set()
-            if rem == 0:
-                out.add(())
-            elif not left:
-                # everything has lethal: split the excess among all targets in any way
-                for comp in _weak_compositions(rem, len(targets)):
-                    out.add(tuple((targets[k], a) for k, a in enumerate(comp) if a))
-            else:
-                p = min(info[u][1] for u in left)
-                for u in left:
-                    if info[u][1] != p:
-                        continue
-                    need = info[u][0]
-                    if need > rem:
-                        if need == float("inf"):      # cannot be made lethal: any amount it absorbs before moving on
-                            for a in range(0, rem + 1):
-                                for sub in (rec(left - {u}, rem - a) if a < rem else {()}):
-                                    out.add((((u, a),) if a else ()) + sub)
-                        else:
-                            out.add(((u, rem),))
-                    else:
-                        for sub in rec(left - {u}, rem - need):
-                            out.add(((u, need),) + sub)
-            memo[key] = out
-            return out
-
-        for combo in rec(frozenset(targets), total):
-            plan = [0] * len(targets)
-            for u, a in combo:
-                plan[idx[u]] += a
-            plans.add(tuple(plan))
-        return sorted(plans, reverse=True)
+    def _damage_plans(self, targets, total, player=None):
+        """Every legal combat damage assignment, as plan tuples in target order (see DamageAssignments)."""
+        return self._assign_dp(targets, total, player).plans()
 
     def _task_combat_deal(self):
         c = self.combat
