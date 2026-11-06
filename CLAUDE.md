@@ -50,8 +50,9 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   status help, "why can't I play this"), plain-language log and decision explanations (`RiftBoard.say/describe/explain`, already
   covers pay/order_triggers/mulligan), click a glowing hand card to play it. Play page no longer greys out: `PlaySession.apply` →
   `ai_step` (one AI decision per call, shown from a display queue while the opponent hand shows "thinking") → `grade`.
-  Left to do: compact layout for small screens, animate cards moving between zones, check pay/order_triggers/mulligan labels once
-  the engine thread lands them.
+  2026-11-06 06:00: cards slide between zones (FLIP in `RiftBoard.render`, opponent cards fly out of their hand), phone layout
+  (<=760px: smaller cards, decision panel fixed at the bottom), rune float options grouped as "Use runes now".
+  Left to do: check order_triggers/mulligan labels once the engine thread lands them.
 - Main deck = 39 cards + chosen champion (CR 103.3). `When you play me` triggers fire from the chain.
 - `riftsim/` top level still holds the v1 simplified engine (engine.py, policies.py, replay.py, runner.py, cli.py).
   It will be replaced by v2 equivalents.

@@ -131,10 +131,11 @@
     let html = "";
     if (filterUid != null) html += `<button class="link" id="clear-filter">← show all options</button>`;
     if (d.kind === "action") {
-      const groups = [["play", "Play a card"], ["move", "Move units"], ["activate", "Use an ability"], ["hide", "Hide a card"]];
+      const groups = [[/^play /, "Play a card"], [/^move /, "Move units"], [/^activate /, "Use an ability"], [/^hide /, "Hide a card"],
+                      [/^(exhaust|recycle) an? \w+ rune/, "Use runes now (adds to your pool)"]];
       const used = new Set();
       for (const [k, t] of groups) {
-        const g = idx.filter(i => d.labels[i].startsWith(k + " "));
+        const g = idx.filter(i => k.test(d.labels[i]));
         g.forEach(i => used.add(i));
         if (g.length) html += `<div class="og"><div class="ogt">${t}</div>${g.map(i => optionButton(d, i)).join("")}</div>`;
       }

@@ -52,6 +52,8 @@ window.RiftBoard = (function () {
     if ((m = s.match(/^move (.+) to (.+)$/))) return `Move <b>${esc(m[1].replace(/#\d+/g, ""))}</b> to ${esc(m[2])}`;
     if ((m = s.match(/^hide (.+?)#\d+ at (.+)$/))) return `Hide <b>${esc(m[1])}</b> face down at ${esc(m[2])}`;
     if ((m = s.match(/^activate (.+?)#\d+: (.*)$/))) return `Use <b>${esc(m[1])}</b>: ${chips(m[2])}`;
+    if ((m = s.match(/^exhaust an? (\w+) rune: add 1 energy$/))) return `Exhaust a ${esc(m[1])} rune for 1 energy`;
+    if ((m = s.match(/^recycle an? (\w+) rune: add (\w+) power$/))) return `Recycle a ${esc(m[1])} rune for 1 ${esc(m[2])} power`;
     if ((m = s.match(/^yes: (.*)$/))) return `Yes, ${chips(m[1])}`;
     if ((m = s.match(/^recycle: (.*)$/))) return `Recycle ${esc(m[1].replace(/#\d+/g, ""))}`;
     return chips(s.replace(/#\d+/g, ""));
@@ -98,6 +100,7 @@ window.RiftBoard = (function () {
       case "draw": return e.uid != null && (p === ME || NEUTRAL) ? `${whoS(p, "draw")} <b>${esc(nameOf(e.uid))}</b>.` : `${whoS(p, "draw")} a card.`;
       case "play": return `${whoS(p, "play")} <b>${esc(n)}</b>${e.loc ? " to " + locName(e.loc) : ""}.`;
       case "pay": return (e.energy || (e.power && e.power.length)) ? `${whoS(p, "pay")} ${e.energy || 0} energy${e.power && e.power.length ? " and " + e.power.length + " power" : ""}.` : null;
+      case "rune": return e.how === "recycle" ? `${whoS(p, "recycle")} a ${esc(nameOf(e.uid))} for power.` : `${whoS(p, "exhaust")} a ${esc(nameOf(e.uid))} for energy.`;
       case "trigger": return `<b>${chips(e.label)}</b> triggers.`;
       case "resolve": return `<b>${chips(e.label)}</b> resolves.`;
       case "enter": return e.ready === false && OBJ[e.uid] && OBJ[e.uid].might != null ? `<b>${esc(n)}</b> enters exhausted (it can't move this turn).` : null;
@@ -257,9 +260,10 @@ window.RiftBoard = (function () {
     ME = o.me != null ? o.me : 0;
     NEUTRAL = !!o.neutral;
     BFN = st.battlefields.map(b => b.name);
-    st.players.forEach(p => { p.hand.forEach(remember); p.base.forEach(remember); p.trash.forEach(remember); remember(p.champion); remember(p.legend_obj); });
+    st.players.forEach(p => { p.hand.forEach(remember); p.base.forEach(remember); p.runes.forEach(remember); p.trash.forEach(remember); remember(p.champion); remember(p.legend_obj); });
     st.battlefields.forEach(b => b.units.forEach(remember));
     const me = st.players.find(p => p.idx === ME), op = st.players.find(p => p.idx !== ME);
+    const before = o.animate === false ? null : snapRects(el);
     el.innerHTML = `${turnBar(st, o)}
       <div class="mat">
         ${seat(op, st, o, true)}
@@ -270,6 +274,40 @@ window.RiftBoard = (function () {
         ${chainBox(st)}
         ${o.banner ? `<div class="banner ${o.banner.me ? "me" : "op"}">${o.banner.html}</div>` : ""}
       </div>`;
+    if (before) slide(el, before);
+  }
+
+  // ------------------------------------------------------------------ card movement (FLIP: first, last, invert, play)
+  const REDUCED = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function snapRects(el) {
+    const r = { cards: {}, opHand: null, meHand: null };
+    el.querySelectorAll(".mat .card[data-uid]").forEach(c => { r.cards[c.dataset.uid] = c.getBoundingClientRect(); });
+    const oh = el.querySelector(".seat.op .hand-box"), mh = el.querySelector(".seat.me .hand-box, .my-hand .hand-box");
+    if (oh) r.opHand = oh.getBoundingClientRect();
+    if (mh) r.meHand = mh.getBoundingClientRect();
+    return Object.keys(r.cards).length || r.opHand ? r : null;
+  }
+  function slide(el, before) {
+    if (REDUCED || !el.animate && !Element.prototype.animate) return;
+    el.querySelectorAll(".mat .card[data-uid]").forEach(c => {
+      const now = c.getBoundingClientRect();
+      let from = before.cards[c.dataset.uid];
+      let fresh = false;
+      if (!from) {
+        // a card that just appeared: the opponent's came out of their hidden hand, a new one of yours from your hand area
+        if (c.closest(".hand")) return;
+        from = c.classList.contains("pop") ? before.opHand : before.meHand;
+        fresh = true;
+        if (!from) { c.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300 }); return; }
+      }
+      const dx = (from.left + from.width / 2) - (now.left + now.width / 2), dy = (from.top + from.height / 2) - (now.top + now.height / 2);
+      if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
+      const base = getComputedStyle(c).transform;
+      const end = base === "none" ? "none" : base;
+      const start = `translate(${dx}px, ${dy}px) ${base === "none" ? "" : base}`;
+      c.animate([{ transform: start, opacity: fresh ? 0.2 : 1, zIndex: 4 }, { transform: end, opacity: 1, zIndex: 4 }],
+                { duration: 450, easing: "cubic-bezier(.2,.8,.2,1)" });
+    });
   }
 
   // ------------------------------------------------------------------ tooltip (card preview)
