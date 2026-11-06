@@ -985,8 +985,8 @@ def parse_sentence(s, state):
         if rest.startswith("here") or rest.startswith("to this battlefield"):
             loc = "here"
             rest = re.sub(r"^(here|to this battlefield)", "", rest).strip()
-        elif rest.startswith("to your base") or rest.startswith("to base"):
-            rest = re.sub(r"^to (your )?base", "", rest).strip()
+        elif rest.startswith("to your base") or rest.startswith("to base") or rest.startswith("in your base"):
+            rest = re.sub(r"^(to|in) (your )?base", "", rest).strip()
         if rest.startswith("ready"):
             ready = True
             rest = rest[5:].strip()
