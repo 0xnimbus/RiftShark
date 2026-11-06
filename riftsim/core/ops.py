@@ -891,6 +891,23 @@ class Look(Instr):
         return None
 
 
+class Mill(Instr):
+    """Put the top n cards of a player's main deck into their trash."""
+
+    def __init__(self, n=1, player=None):
+        self.n, self.player = n, player
+
+    def run(self, game, ctx):
+        p = _player(game, ctx, self.player)
+        for _ in range(val(game, ctx, self.n)):
+            ps = game.players[p]
+            if not ps.deck:
+                break
+            u = ps.deck.pop(0) if isinstance(ps.deck, list) else game._draw_raw(p)
+            game.put_in_trash(u, ctx)
+        return None
+
+
 class RevealTopRune(Instr):
     def __init__(self, out="rune", player=None):
         self.out, self.player = out, player

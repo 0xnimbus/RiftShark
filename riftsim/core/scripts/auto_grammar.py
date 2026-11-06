@@ -854,9 +854,35 @@ def parse_sentence(s, state):
     m = re.match(r"(?:an|each) opponent (?:gains|scores) (\w+) points?$", sl)
     if m:
         return [O.GainPoints(parse_amount(m.group(1)), player="opponent")]
-    m = re.match(r"\[?predict\]?$", sl)
+    m = re.match(r"\[?predict(?: (\d+))?\]?$", sl)
     if m:
-        return [O.Predict(1)]
+        return [O.Predict(int(m.group(1)) if m.group(1) else 1)]
+    m = re.match(r"(?:they|it|its owner) burns? (\d+)$", sl)
+    if m:
+        return [O.Burn(int(m.group(1)), player=Ref("__p"))]
+    m = re.match(r"reveal the top (\w+) cards? of your main deck$", sl)
+    if m:
+        raise ParseError("reveal top cards")
+    m = re.match(r"put the top (\w+) cards? of your main deck into your trash$", sl)
+    if m:
+        return [O.Mill(parse_amount(m.group(1)))]
+    m = re.match(r"play (?:me|this) to your base, ignoring (?:my|its) cost$", sl)
+    if m:
+        return [O.PlayCard(Ref("self"), ignore="all", loc=lambda g, c: ("base", c.controller))]
+    m = re.match(r"play (?:me|this) from your trash$", sl)
+    if m:
+        return [O.PlayCard(Ref("self"))]
+    m = re.match(r"that player (gains|scores) (\w+) points?$", sl)
+    if m:
+        return [O.GainPoints(parse_amount(m.group(2)), player=Ref("__p"))]
+    m = re.match(r"that player channels (\w+) runes?( exhausted)?$", sl)
+    if m:
+        return [O.Channel(parse_amount(m.group(1)), exhausted=bool(m.group(2)), player=Ref("__p"))]
+    m = re.match(r"your non-token units cost ((?:\[[^\]]+\])+) more to play this turn$", sl)
+    if m:
+        from . import parse_cost
+        c = parse_cost(m.group(1))
+        return [O.DelayedPassive("cost_reduce", {"energy": -c["energy"], "filter": lambda g, u: g.objects[u].base_defn().is_unit and not g.objects[u].base_defn().is_token}, uses=None)]
     m = re.match(r"\[?burn (\d+)\]?$", sl)
     if m:
         return [O.Burn(int(m.group(1)))]
@@ -1866,6 +1892,8 @@ def script_card(defn):
     lines = [l.strip() for l in text.split("\n") if l.strip()]
     if defn.type == "spell":
         # the whole text is the spell effect, possibly with keyword prefixes and trailing abilities
+        kw_only = [l for l in lines if split_lead_keywords(l)[1] == ""]
+        lines = [l for l in lines if l not in kw_only] or lines
         flags, body = split_lead_keywords(" ".join(lines))
         body = body.strip()
         try:
