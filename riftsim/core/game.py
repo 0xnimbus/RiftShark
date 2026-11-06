@@ -10,7 +10,7 @@ from .cards import CardDB, DOMAINS
 from .objects import Mod, Chars, GameObject, PlayerState, BattlefieldState, ChainItem
 from .selectors import Sel
 from . import payment
-from .vm import Context, Decision, Frame, compile_effect
+from .vm import Context, Decision, Frame, compile_effect, _copy_containers
 from . import flow
 
 MODES = {
@@ -1390,6 +1390,7 @@ class Game(flow.FlowMixin):
     # ------------------------------------------------------------------ cloning / snapshots
     def clone(self):
         g = copy.copy(self)
+        self._ctx_map = {}           # keep contexts shared between a chain item and its frames shared in the clone
         g.objects = {u: self._clone_obj(o) for u, o in self.objects.items()}
         g.players = [self._clone_player(p) for p in self.players]
         g.battlefields = [self._clone_bf(b) for b in self.battlefields]
@@ -1399,7 +1400,7 @@ class Game(flow.FlowMixin):
         g.delayed = [self._clone_delayed(d) for d in self.delayed]
         g.turn_effects = [dict(t, ctx=t["ctx"].clone()) for t in self.turn_effects]
         g.scored = set(self.scored)
-        g.turn_memo = dict(self.turn_memo)
+        g.turn_memo = _copy_containers(self.turn_memo)
         g.turns_taken = dict(self.turns_taken)
         g.shown_off = dict(self.shown_off)
         g.known = {k: dict(v) for k, v in self.known.items()}
@@ -1410,13 +1411,15 @@ class Game(flow.FlowMixin):
         g.events = []
         g.log_enabled = False
         g.history = []
-        g.showdown = dict(self.showdown) if self.showdown else None
-        g.combat = dict(self.combat) if self.combat else None
+        g.showdown = _copy_containers(self.showdown) if self.showdown else None
+        g.combat = _copy_containers(self.combat) if self.combat else None
         g.rng = random.Random()
         g.rng.setstate(self.rng.getstate())
         g.pending = self._clone_decision(self.pending) if self.pending else None
         g._computing = set()
         g.combat_result_memo = {}
+        self.__dict__.pop("_ctx_map", None)
+        g.__dict__.pop("_ctx_map", None)
         return g
 
     def _clone_obj(self, o):
@@ -1428,7 +1431,7 @@ class Game(flow.FlowMixin):
             elif k in ("attachments",):
                 v = list(v)
             elif k in ("counters", "temp"):
-                v = dict(v)
+                v = _copy_containers(v)
             elif k == "chars_cache":
                 v = None
             setattr(c, k, v)
@@ -1438,10 +1441,8 @@ class Game(flow.FlowMixin):
         c = PlayerState.__new__(PlayerState)
         for k in PlayerState.__slots__:
             v = getattr(p, k)
-            if isinstance(v, list):
-                v = list(v)
-            elif isinstance(v, dict):
-                v = dict(v)
+            if isinstance(v, (list, dict, set)):
+                v = _copy_containers(v)
             setattr(c, k, v)
         return c
 
@@ -1459,14 +1460,23 @@ class Game(flow.FlowMixin):
         for k in ChainItem.__slots__:
             v = getattr(it, k)
             if k == "ctx" and v is not None:
-                v = v.clone()
+                v = self._clone_ctx(v)
             elif k == "cost" and isinstance(v, dict):
                 v = dict(v)
             setattr(c, k, v)
         return c
 
+    def _clone_ctx(self, ctx):
+        m = getattr(self, "_ctx_map", None)
+        if m is None:
+            return ctx.clone()
+        c = m.get(id(ctx))
+        if c is None:
+            c = m[id(ctx)] = ctx.clone()
+        return c
+
     def _clone_frame(self, f):
-        nf = Frame(f.code, f.ctx.clone(), f.tag)
+        nf = Frame(f.code, self._clone_ctx(f.ctx), f.tag)
         nf.pc = f.pc
         return nf
 

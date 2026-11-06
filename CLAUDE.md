@@ -16,6 +16,8 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
 | 2026-11-06 05:55 | 6% used, resets 5:40 AM | 21% used, resets Mon 10:00 AM | new 5h window; Opus; decks + targeting work |
 | 2026-11-06 06:11 | 10% used, resets 5:40 AM | 21% used, resets Mon 10:00 AM | +4% in 16 min; continuing |
 | 2026-11-06 06:47 | 13% used, resets 5:40 AM | 22% used, resets Mon 10:00 AM | +3% in 36 min; continuing |
+| 2026-11-06 07:05 | 18% used, resets 5:40 AM | 22% used, resets Mon 10:00 AM | +5% in 18 min; exact-rules items 2-4 done, round-robin done |
+| 2026-11-06 13:09 | 2% used, resets 12:50 PM | 23% used, resets Mon 10:00 AM | thread was idle 07:21-13:07 (no wake scheduled); resuming item 5 (script remaining cards) |
 
 ## Where things stand
 
@@ -72,10 +74,11 @@ Every entry in the RULES.md "Simplifications" list is a bug to fix, in this orde
    float actions ("rune", exhaust|recycle, uid), Add restrictions enforced via payment purpose, effect payments always
    optional. AIs skip floats (`policies.ai_options`) and rollouts use the standard plan; one-ply lookahead pays
    before evaluating. Old replays no longer verify (new decisions): re-run batches and re-export web/data.
-2. Simultaneous triggers ordered by their controller (CR 383) via a Decision, not automatically.
-3. Mulligan at game start (CR 1v1 setup); optional replacement effects as a Decision; enforce "Add" restrictions.
-4. `[Show Off]`, Baron Pit token, Blade of the Exile alternative Equip cost, Scuttle Crab reveal; remove the 60-turn cap
-   once games are proven to end (or make it a loud error, never a silent draw).
+2. DONE 2026-11-06: simultaneous triggers ordered by their controller (CR 383), decision `order_triggers`.
+3. DONE 2026-11-06: mulligan (CR 117, decision `mulligan`). Optional replacements: engine refuses them (4 unscripted
+   cards need them; build a decision path before scripting those).
+4. DONE 2026-11-06: Show Off (CR 832), Baron Pit, Blade of the Exile alt cost, Scuttle Crab information; the 60-turn cap
+   is reported as unfinished with a warning (0 of 216 round-robin games hit it).
 5. Script every card (`python -m riftsim.core coverage`: 425 none / 67 partial / 55 keywords-only on 2026-11-06), and
    make `Deck.validate` refuse (or the batch/coach warn loudly about) any card whose script_status is not auto/manual/
    vanilla, so nothing is simplified silently. Add per-card tests against printed text for the tournament decks first.
@@ -86,6 +89,10 @@ Bugs Derrick reported 2026-11-06 03:35 (do first next session, before item 2):
   Channel phase on turn 1 (CR: 2 runes per turn, second player 3 on their first turn) and what the page shows.
 - Battlefield effects seem not to apply in play. Check every battlefield in the two tournament decks (Void Gate,
   Frozen Fortress, Rockfall Path, Emperor's Dais, Rakelstake, Star Spring) fires/applies in real games, add tests.
+
+- AI levels (2026-11-06, 20 games each): random 7-13 novice, novice 8-12 intermediate, intermediate 6-14 advanced,
+  advanced 7-13 expert, advanced 2-10 elite (mcts:120, ~5 min per game). Round-robin of the 9 tournament decks:
+  docs/results/round_robin_2026-11-06.md (Vex 75%, Riven 65%, Kai'Sa 62% ... Azir 25%).
 
 ## Next steps
 
