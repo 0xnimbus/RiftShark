@@ -1,33 +1,45 @@
-# What the engine models (and what it does not yet)
+# Rules coverage (engine v2, `riftsim/core`)
 
-This is a deliberately simplified model of Riftbound 1v1 so the search, batch runner and
-replay tooling could be built and tested end to end. Everything below is in
-`riftsim/engine.py`; the card data in `data/cards/demo_set.json` is **placeholder cards,
-not real Riftbound cards**. Treat this file as the checklist to review against the real
-rulebook before trusting any win rates.
+Reference: Riftbound Core Rules 2026-10-09 (`docs/rules/`). The engine enumerates every legal option at every
+decision, so a replay that re-simulates identically (`python -m riftsim.core verify`) contained only legal moves
+under the rules as modelled here. Anything listed under *Simplifications* is where results can differ from paper play.
 
-## Modeled
+## Modelled
 
-- 2 players, 40 card main deck, 12 rune deck, 1 legend, 1 champion in a champion zone, 1 battlefield per player (picked at random from the deck's list each game). Deck legality is validated (40/12, max 3 copies, legend domain identity).
-- Win at 8 points. Opening hand 4. Each turn: ready everything you control ("awaken"), score 1 point per battlefield you still hold, channel 2 runes (3 on the second player's first turn), draw 1.
-- Costs: energy is paid by exhausting any ready rune; power is paid by recycling a rune of the matching domain (back to the bottom of the rune deck). Exhausted runes may be recycled.
-- Burn out: drawing from an empty deck shuffles the trash back in and gives the opponent a point.
-- Actions: play a unit/spell from hand, play the champion from the champion zone, move ready units (any set of base units to one battlefield, or a unit from a battlefield back to base), end turn. Units arrive exhausted unless Accelerated. Moving exhausts the unit.
-- Arriving at an empty battlefield conquers it (1 point, once per battlefield per turn). Arriving at a defended one triggers combat: total attacking might vs total defending might, damage assigned to kill as many units as possible, Tank units must be assigned lethal damage first. If defenders are wiped the attackers conquer; if both sides survive the attackers are recalled to base. Damage and temporary buffs clear at end of turn.
-- Final point rule: the winning point cannot come from a conquest unless every battlefield was scored this turn (the engine draws a card instead).
-- Keywords: Assault N (+N might attacking), Shield N (+N might defending), Tank, Ganking (may move battlefield to battlefield), Accelerate (pay +1 energy and +1 power to arrive ready).
-- Effects (spells and "on play" unit triggers): draw N, damage N to a unit, +N might buff until end of turn, kill a unit with might <= N, ready N runes. Legend abilities: "+1 might attacking for a domain", "draw on first conquest each turn".
-- A safety cap of 40 actions per turn and 60 half-turns per game (counted as a draw).
+- 1v1 mode: 8 points to win, 2 battlefields (one picked at random from each deck's three), 12-rune rune deck,
+  40-card main deck including the Chosen Champion (which starts in the Champion Zone), legend on the board.
+- Turn structure: Awaken (ready, stunned objects stay exhausted), Beginning, Scoring (hold), Channel (2 runes; the
+  second player channels 3 on their first turn), Draw, Main, Ending (end-of-turn cleanup, buffs/mods expire),
+  Expiration. Extra turns via a turn queue (Time Warp).
+- The chain with HOT FEPR ordering, priority vs focus, Neutral/Showdown × Open/Closed states, reactions and actions,
+  cleanups per CR 323, triggered abilities ordered turn player first, reflexive and delayed triggers, replacement
+  effects, static layers (might, keywords, tags, types, granted abilities, rule flags).
+- Showdowns (CR 345-348) and combat (CR 466-468): designations, attack/defend triggers, lethal-first damage assignment
+  with Tank first and Backline last, combat cleanup, result, control and conquer; hold/conquer scoring, the final-point
+  rule 473.1.b, the standard move (exhaust cost, base ↔ battlefield, Ganking battlefield → battlefield), hiding cards
+  face down and playing them later as reactions.
+- Costs: energy and power (domain) costs, Accelerate/Repeat/Flow alternative costs, Deflect, exhaust/kill/banish/
+  discard/spend-buff/XP costs, "Add" resource abilities with pools emptying at the start of the main phase and end of
+  turn.
+- Keywords CR 805-832: Accelerate, Assault, Deathknell, Deflect, Ganking, Hidden, Legion, Shield, Tank, Temporary,
+  Vision, Equip, Quick-Draw, Repeat, Weaponmaster, Ambush, Hunt, Level, Unique, Backline, Empower/Empowered, Flow,
+  Deploy, Disarm, Mighty.
+- Card text is compiled from the printed rules text by a grammar (`scripts/auto_grammar.py`), with hand-written
+  scripts for cards the grammar cannot express (`scripts/cards_manual.py`). `python -m riftsim.core coverage` lists
+  cards whose text is not fully scripted: such cards play with whatever part of their text was understood (keywords
+  always work).
 
-## Not modeled yet (biggest gaps first)
+## Simplifications (results can differ from paper play)
 
-1. **Real card text.** Only the effect primitives above exist; real cards need more (reactions, triggered abilities, gear, equipment, "hold" effects, choose-one, conditional costs).
-2. **Priority and the reaction window.** Riftbound lets the non-active player respond (Reaction spells, burst speed). The engine is strictly turn-based: only the active player acts.
-3. **Showdowns and combat ordering.** Combat is resolved as one simultaneous exchange with automatic damage assignment. The real game has a showdown with both players acting, chosen damage assignment, and Deflect/Hidden style keywords.
-4. **Battlefield effects.** Battlefields are names only; their printed abilities do nothing.
-5. **Multi-battlefield splits.** A move sends all chosen units to one battlefield; a unit cannot move twice in a turn even if an effect readies it.
-6. **Mulligans, 3 and 4 player modes, legend-specific points thresholds.**
-
-Each item is isolated enough to add without touching the search or replay code: new card
-effects go in `_resolve_effect` and `effect_targets`, new structure (reactions) changes
-`legal_actions`/`apply` and the turn loop.
+- Rune payment is automatic (greedy heuristic: pay energy from the pool, then exhaust ready runes; pay power by
+  recycling, exhausting ready runes first). Players never choose which runes to spend.
+- Simultaneous triggers are ordered automatically (turn player first, then in object order), not by player choice.
+- Optional replacement effects are auto-applied; mulligans are skipped.
+- "Add" spending restrictions ("use only to play spells") are recorded but not enforced.
+- `[Show Off]` is not implemented: "if you showed off" clauses never fire (The Empyrean, Battle Preparations).
+- Blade of the Exile's alternative Equip cost (exhaust a friendly unit) is not offered; only [A] is.
+- Baron Nashor's Baron Pit battlefield token is not modelled: Baron plays like a normal unit (its other abilities work).
+- Scuttle Crab's "look at their facedown cards" is a no-op (the AI already sees the full state).
+- Card text the grammar could not parse is skipped for that card (see coverage); the long tail is being hand-scripted,
+  competitive staples first.
+- A safety cap of 60 turns per game counts as a draw.
