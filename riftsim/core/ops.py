@@ -187,11 +187,25 @@ class Choose(Instr):
         self.same_loc = same_loc
 
     def run(self, game, ctx):
+        r = self._run(game, ctx)
+        if r is None:
+            _record_pick(ctx, ctx.vars.get(self.out))
+        return r
+
+    def resume(self, game, ctx, choice):
+        _record_pick(ctx, choice)
+        return None
+
+    def _run(self, game, ctx):
         p = _player(game, ctx, self.player)
         sel = self.sel
         if callable(sel) and not isinstance(sel, Sel):
             sel = list(sel(game, ctx) or [])          # an explicit list computed now (e.g. "two of them")
         cands = game.choice_candidates(ctx, sel, targeted=self.targeted)
+        if isinstance(sel, Sel) and sel.other:
+            # "another unit": not one already chosen by this spell/ability (nor its source)
+            picked = ctx.vars.get("__picked", ())
+            cands = [u for u in cands if u not in picked]
         n = val(game, ctx, self.n)
         if n == 1 and not self.up_to:
             if not cands:
@@ -223,6 +237,12 @@ class Choose(Instr):
         return Decision(p, "choose_many", opts, out=self.out,
                         labels=[", ".join(game.label(u) for u in o) or "none" for o in opts],
                         info={"sel": repr(self.sel), "label": self.label or ""})
+
+
+def _record_pick(ctx, v):
+    vs = v if isinstance(v, tuple) else ((v,) if v is not None else ())
+    if vs:
+        ctx.vars["__picked"] = tuple(ctx.vars.get("__picked", ())) + tuple(vs)
 
 
 class ChooseLocation(Instr):
@@ -953,7 +973,7 @@ class PayAnyEnergy(Instr):
 
 
 class PayEquip(Instr):
-    """Weaponmaster (CR 829): 'you may pay the Equip cost of a gear' -> out True if paid."""
+    """Weaponmaster (CR 821.1.c): pay the chosen Equipment's Equip cost reduced by [A] -> out True if paid."""
 
     def __init__(self, gear, out="__eq"):
         self.gear, self.out = gear, out
@@ -967,6 +987,8 @@ class PayEquip(Instr):
             if isinstance(ab, Activated) and ab.is_equip:
                 d = game.objects[gear].base_defn()
                 pw = ["any" if x == "C" and not d.domains else (d.domains[0] if x == "C" else x) for x in ab.cost.get("power", ())]
+                if pw:
+                    pw = pw[1:]      # "reduced by [A]": one Power symbol of any domain is waived (CR 821.1.c.3)
                 return ab.cost.get("energy", 0), pw
         return None
 

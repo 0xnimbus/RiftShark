@@ -131,6 +131,11 @@ class FlowMixin:
                 if d is not None:
                     return d
                 continue
+            if self.reorder_requests:
+                d = self._ask_trigger_order()
+                if d is not None:
+                    return d
+                continue
             if self.dirty:
                 self.dirty = False
                 self._cleanup()
@@ -161,6 +166,58 @@ class FlowMixin:
             getattr(self, handler)(choice, d)
         else:
             resume_vm(self, choice)
+
+    def _ask_trigger_order(self):
+        """CR 383: the controller picks, one at a time, which of their simultaneous triggers resolves first."""
+        req = self.reorder_requests[0]
+        live = [i for i in req["items"] if any(it.id == i and not it.finalized for it in self.chain)]
+        left = [i for i in live if i not in req["order"]]
+        if len(left) <= 1:
+            order = [i for i in req["order"] if i in live] + left
+            self._apply_trigger_order(live, order)
+            self.reorder_requests.pop(0)
+            return None
+        labels = []
+        for i in left:
+            it = next(x for x in self.chain if x.id == i)
+            src = self.objects.get(it.uid)
+            labels.append(f"{it.label}" + (f" ({src.defn.name})" if src is not None and src.defn.name not in it.label else ""))
+        return self.ask(req["player"], "order_triggers", left, labels, "_on_trigger_order",
+                        label="Choose which of your triggered abilities resolves first" if not req["order"] else "Which resolves next?")
+
+    def _on_trigger_order(self, choice, d):
+        self.reorder_requests[0]["order"].append(choice)
+
+    def _apply_trigger_order(self, ids, order):
+        """Put the group's items back into their chain slots so order[0] is on top (resolves first)."""
+        slots = sorted(k for k, it in enumerate(self.chain) if it.id in ids)
+        by_id = {it.id: it for it in self.chain if it.id in ids}
+        for k, i in zip(reversed(slots), order):
+            self.chain[k] = by_id[i]
+        self.log("trigger_order", player=self.chain[slots[0]].controller if slots else None, order=list(order))
+
+    def _ask_mulligan(self, p):
+        """CR 117.1: choose up to two cards in hand. Options are every subset of size 0-2 (keep first)."""
+        from itertools import combinations
+        hand = list(self.players[p].hand)
+        opts = [()] + [(u,) for u in hand] + list(combinations(hand, 2))
+        labels = ["Keep hand"] + ["Mulligan " + ", ".join(self.objects[u].defn.name for u in o) for o in opts[1:]]
+        return self.ask(p, "mulligan", opts, labels, "_on_mulligan", label="Mulligan: set aside up to two cards")
+
+    def _on_mulligan(self, choice, d):
+        p = d.player
+        ps = self.players[p]
+        aside = [u for u in choice if u in ps.hand]
+        for u in aside:                                   # CR 117.1: set aside
+            ps.hand.remove(u)
+            self.objects[u].zone = "aside"
+        for _ in aside:                                   # CR 117.2: draw as many
+            self._draw_raw(p)
+        if aside:                                         # CR 117.3: recycle them (random order, CR 417.5)
+            self.do_recycle(aside)
+        self.log("mulligan", player=p, count=len(aside))
+        self.mulligan_queue.pop(0)
+        self.bump()
 
     def ask(self, player, kind, options, labels, handler, **info):
         info["handler"] = handler
@@ -212,6 +269,12 @@ class FlowMixin:
     # ------------------------------------------------------------------ phases (CR 314-317)
     def _advance_phase(self):
         ph = self.phase
+        if ph == "mulligan":
+            if self.mulligan_queue:
+                self._ask_mulligan(self.mulligan_queue[0])
+            else:
+                self.phase = "start"
+            return
         if ph in ("start", "next_turn"):
             self._start_turn()
         elif ph == "awaken":

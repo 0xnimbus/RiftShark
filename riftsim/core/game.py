@@ -56,6 +56,7 @@ class Game(flow.FlowMixin):
         self.scored = set()            # (player, bf idx) scored this turn
         self.turn_memo = {}            # per-turn memory (cleared at end of turn)
         self.turns_taken = {}          # player -> number of turns they have started (Forgotten Monument)
+        self.reorder_requests = []     # simultaneous triggers a player still has to order (CR 383)
         self.events = []               # structured log of everything that happened
         self.log_enabled = log
         self.winner = None
@@ -125,8 +126,9 @@ class Game(flow.FlowMixin):
         for i, p in enumerate(self.players):
             for _ in range(self.cfg["hand"]):
                 self._draw_raw(i)
-        # Mulligan is skipped (deterministic simplification; see RULES.md).
-        self.phase = "start"
+        # CR 117: in turn order, each player may set aside up to two cards, draw that many, then recycle them.
+        self.mulligan_queue = list(self.turn_queue)
+        self.phase = "mulligan"
         self.first_player = first
         for i, p in enumerate(self.players):
             p.conceded = False
@@ -534,8 +536,16 @@ class Game(flow.FlowMixin):
             ctrl = o.controller if (o is not None and o.controller is not None) else self.turn_player
             return ((ctrl - self.turn_player) % len(self.players), getattr(ab, "priority", 0))
         pend.sort(key=order)
+        groups = {}
         for uid, ab, _ in pend:
-            self._add_trigger(uid, ab, ev)
+            item = self._add_trigger(uid, ab, ev)
+            if item is not None:
+                groups.setdefault(item.controller, []).append(item)
+        # CR 383: each player puts their own simultaneous triggers on the chain in the order they choose
+        # (the turn player's go on first, so they resolve last). Identical abilities need no choice.
+        for ctrl, items in groups.items():
+            if len(items) > 1 and len({id(it.ability) if it.ability is not None else it.label for it in items}) > 1:
+                self.reorder_requests.append({"player": ctrl, "items": [it.id for it in items], "order": []})
 
     def _add_trigger(self, uid, ab, ev):
         o = self.objects.get(uid)
@@ -549,7 +559,7 @@ class Game(flow.FlowMixin):
             item.stamp = self.tick()
             self.log("trigger", item=item.id, source=uid, label=item.label)
             self.dirty = True
-            return
+            return item
         if ab.controller == "self":
             ctrl = o.controller
             if ctrl is None:
@@ -578,6 +588,7 @@ class Game(flow.FlowMixin):
         self.chain.append(item)
         self.log("trigger", item=item.id, source=uid, label=item.label, controller=ctrl)
         self.dirty = True
+        return item
 
     def add_reflexive(self, ctx, effect, label="do this"):
         c = ctx.clone()
@@ -1353,6 +1364,8 @@ class Game(flow.FlowMixin):
         g.scored = set(self.scored)
         g.turn_memo = dict(self.turn_memo)
         g.turns_taken = dict(self.turns_taken)
+        g.mulligan_queue = list(getattr(self, "mulligan_queue", []))
+        g.reorder_requests = [dict(r, items=list(r["items"]), order=list(r["order"])) for r in self.reorder_requests]
         g.turn_queue = list(self.turn_queue)
         g.events = []
         g.log_enabled = False

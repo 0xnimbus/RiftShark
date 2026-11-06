@@ -6,6 +6,7 @@ import pytest
 
 from riftsim.core.cards import CardDB
 from riftsim.core.deck import Deck
+from riftsim.core.game import Game
 from riftsim.core.policies import make_policy
 from riftsim.core.replay import play_game, verify
 from riftsim.core.scripts import script_all
@@ -208,6 +209,8 @@ def test_play_session_seat_decides_who_goes_first(db):
         me = g.players[human]
         assert g.objects[me.legend].defn.name.startswith("Kai'Sa")       # the human always plays deck0
         assert g.first_player == 0
+        assert g.pending.kind == "mulligan" and g.pending.player == human   # CR 117: P0 first, then P1
+        s.choose(0)                                                          # keep
         if human == 0:
             while g.phase != "main" and g.pending is not None and ("pass",) in g.pending.options:
                 g.choose(("pass",)); g.run()      # a battlefield's Beginning-phase trigger may be on the chain
@@ -218,3 +221,25 @@ def test_play_session_seat_decides_who_goes_first(db):
     s1.new(d0, d1, ai="greedy", analysis=20)
     s2.new(d0, d1, ai="greedy", analysis=20)
     assert s1.seed != s2.seed                      # every game is a fresh shuffle
+
+
+def test_mulligan_sets_aside_draws_and_recycles(db):
+    """CR 117: in turn order, set aside up to two cards, draw that many, then recycle the set-aside cards."""
+    d0 = Deck.load(str(ROOT / "data/decks/tournament/kaisa_void.json"), db)
+    d1 = Deck.load(str(ROOT / "data/decks/tournament/riven_exile.json"), db)
+    g = Game(db, [d0, d1], seed=3, first_player=1)
+    d = g.run()
+    assert d.kind == "mulligan" and d.player == 1 and d.options[0] == ()
+    assert len(d.options) == 1 + 4 + 6 and max(len(o) for o in d.options) == 2
+    ps = g.players[1]
+    aside = d.options[-1]
+    top2 = ps.deck[:2]
+    g.choose(aside)
+    assert sorted(ps.hand) == sorted([u for u in d.options[1] + d.options[2] + d.options[3] + d.options[4]
+                                      if u not in aside] + top2)
+    assert set(ps.deck[-2:]) == set(aside) and len(ps.hand) == 4
+    d = g.run()
+    assert d.kind == "mulligan" and d.player == 0
+    g.choose(())
+    d = g.run()
+    assert d.kind != "mulligan" and g.turn_player == 1

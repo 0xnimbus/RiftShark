@@ -104,7 +104,7 @@ def weaponmaster_ability():
     """[Weaponmaster]: when you play me, you may attach an Equipment you control to me, paying its Equip cost."""
     return Triggered("play_self", [O.If(lambda g, c: c.vars.get("t") is not None,
                                         [O.PayEquip(Ref("t"), out="__eq"), O.If(Ref("__eq"), [O.Attach(Ref("t"), Ref("self"))])])],
-                     targets=[O.Choose(Sel("gear", side="friendly", tags=["Equipment"]), up_to=True, targeted=False)],
+                     targets=[O.Choose(Sel("gear", side="friendly", tags=["Equipment"]), allow_none=True, targeted=False)],
                      label="Weaponmaster", optional=True, keyword="weaponmaster")
 
 

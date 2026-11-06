@@ -36,9 +36,17 @@ def heuristic(g, p):
         elif "gear" in c.types:
             v += 2.0 if o.controller == p else -2.0
     v += 1.5 * (len(me.hand) - len(opp.hand))
-    v += 1.0 * (len(me.runes) - len(opp.runes))
+    # runes are permanent resources: recycling one for a marginal gain is a real cost (was 1.0: the AI
+    # recycled whole rune pools to move Equipment back and forth)
+    v += RUNE_VALUE * (len(me.runes) - len(opp.runes))
+    if g.turn_player == p and g.phase == "main":
+        # unspent ready runes keep options open for reactions; tiny weight so real plays always win
+        v += 0.15 * sum(1 for u in me.runes if not g.objects[u].exhausted)
     v += 0.5 * (me.xp - opp.xp)
     return v
+
+
+RUNE_VALUE = 3.0
 
 
 def _is_payment_source(game, o):
@@ -59,6 +67,17 @@ def ai_options(dec, game=None):
     if dec.kind == "action":
         return [o for o in dec.options if o[0] != "rune" and not _is_payment_source(game, o)] or list(dec.options)
     return list(dec.options)
+
+
+def mulligan_choice(game, d):
+    """Mulligan heuristic shared by the built-in AIs (CR 117): set aside the costliest cards (energy + power
+    of 5 or more), up to two, keeping the cheapest early plays. Ties go to the card with the higher cost."""
+    hand = sorted({u for o in d.options for u in o}, key=lambda u: -(game.objects[u].defn.energy + game.objects[u].defn.power))
+    out = tuple(u for u in hand if game.objects[u].defn.energy + game.objects[u].defn.power >= 5)[:2]
+    for o in d.options:
+        if set(o) == set(out) and len(o) == len(out):
+            return o
+    return d.options[0]
 
 
 class Policy:
@@ -96,6 +115,8 @@ def _advance_default(g, p, max_steps=400, rollout_rng=None):
         opts = ai_options(d, g)
         if d.kind == "action":
             opts = [o for o in opts if o[0] == "pass"] or opts
+        elif d.kind == "mulligan":
+            opts = [mulligan_choice(g, d)]
         elif d.kind == "pay":
             opts = opts[:1]           # standard payment plan
         g.choose(rng.choice(opts))
@@ -107,28 +128,54 @@ class GreedyPolicy(Policy):
     """One-ply lookahead: try each option on a clone, advance to the next own decision, evaluate."""
     name = "greedy"
 
-    def __init__(self, seed=0, noise=0.01, max_options=60):
+    def __init__(self, seed=0, noise=0.01, max_options=60, temperature=0.0, miss_reactions=0.0, samples=1):
         self.rng = random.Random(seed)
         self.noise = noise
         self.max_options = max_options
+        self.temperature = temperature          # 0: always the best option; >0: softmax over evaluations
+        self.miss_reactions = miss_reactions    # chance to let an opponent's chain item resolve without looking
+        self.samples = samples                  # determinised evaluations per option (hidden information)
+
+    def evaluate(self, game, d, opts):
+        vals = []
+        for o in opts:
+            v = 0.0
+            for k in range(self.samples):
+                g = determinize(game, d.player, self.rng) if self.samples > 1 else game.clone()
+                if o not in (g.pending.options if g.pending is not None else d.options):
+                    g = game.clone()
+                g.choose(o)
+                _advance_default(g, d.player, rollout_rng=random.Random(self.rng.random()))
+                v += heuristic(g, d.player)
+            v /= self.samples
+            v += self.rng.random() * self.noise
+            if d.kind == "action" and o[0] == "end_turn":
+                v -= 0.01
+            vals.append(v)
+        return vals
 
     def choose(self, game, d):
         opts = ai_options(d, game)
+        if d.kind == "mulligan":
+            return mulligan_choice(game, d) if self.temperature < 8 else self.rng.choice(opts)
         if len(opts) == 1:
             return opts[0]
+        if self.miss_reactions and d.kind == "action" and ("pass",) in opts and game.chain \
+                and game.chain[-1].controller != d.player and self.rng.random() < self.miss_reactions:
+            return ("pass",)
         if len(opts) > self.max_options:
             opts = self.rng.sample(opts, self.max_options)
-        best, best_v = None, -1e18
-        for o in opts:
-            g = game.clone()
-            g.choose(o)
-            _advance_default(g, d.player, rollout_rng=random.Random(self.rng.random()))
-            v = heuristic(g, d.player) + self.rng.random() * self.noise
-            if d.kind == "action" and o[0] == "end_turn":
-                v -= 0.01
-            if v > best_v:
-                best, best_v = o, v
-        return best
+        vals = self.evaluate(game, d, opts)
+        if self.temperature <= 0:
+            return opts[max(range(len(opts)), key=lambda i: vals[i])]
+        top = max(vals)
+        ws = [math.exp(max(-50.0, (v - top) / self.temperature)) for v in vals]
+        r = self.rng.random() * sum(ws)
+        for o, w in zip(opts, ws):
+            r -= w
+            if r <= 0:
+                return o
+        return opts[-1]
 
 
 # ---------------------------------------------------------------------------- MCTS
@@ -177,6 +224,8 @@ class MCTSPolicy(Policy):
 
     def choose(self, game, d):
         opts = ai_options(d, game)
+        if d.kind == "mulligan":
+            return mulligan_choice(game, d)
         if len(opts) == 1:
             return opts[0]
         root = self.search(game, d, all_root_options=False)
@@ -231,14 +280,12 @@ class MCTSPolicy(Policy):
                 depth += 1
                 if depth > 60:
                     break
-            # rollout
+            # rollout: a cheap playout policy that develops the board (plays the costliest affordable card,
+            # moves to battlefields) instead of uniform random moves, which mostly pass or waste resources
             steps = 0
             while not g.over and g.pending is not None and steps < self.rollout_depth:
                 dec = g.pending
-                dopts = ai_options(dec, g)
-                o = dopts[0] if dec.kind == "pay" else self.rng.choice(dopts)
-                if dec.kind == "action" and len(dopts) > 1 and self.rng.random() < 0.5:
-                    o = self.rng.choice([x for x in dopts if x[0] not in ("pass", "end_turn")] or dopts)
+                o = rollout_choice(g, dec, self.rng)
                 g.choose(o)
                 g.run()
                 steps += 1
@@ -252,10 +299,52 @@ class MCTSPolicy(Policy):
         return root
 
 
+def rollout_choice(g, dec, rng):
+    opts = ai_options(dec, g)
+    if dec.kind == "pay":
+        return opts[0]
+    if dec.kind == "mulligan":
+        return mulligan_choice(g, dec)
+    if dec.kind != "action" or len(opts) == 1:
+        return rng.choice(opts)
+    plays = [o for o in opts if o[0] == "play"]
+    moves = [o for o in opts if o[0] == "move" and o[2][0] == "bf"]
+    r = rng.random()
+    if plays and r < 0.75:
+        def cost(o):
+            d = g.objects[o[1]].base_defn()
+            return (d.energy or 0) + 2 * (d.power or 0) + rng.random()
+        return max(plays, key=cost)
+    if moves and r < 0.9:
+        return max(moves, key=lambda o: len(o[1]) + rng.random())
+    for x in (("pass",), ("end_turn",)):
+        if x in opts:
+            return x
+    return rng.choice(opts)
+
+
+# Strength levels offered in the play page (Derrick, 2026-11-06). Each level is a real opponent: it plays at every
+# timing it is allowed to (reactions, showdowns, hidden cards); lower levels decide with more noise and sometimes
+# let an opponent's spell resolve without considering a response. Measured strength order: tools/ai_ladder.py.
+LEVELS = {
+    "novice": {"kind": "greedy", "temperature": 12.0, "miss_reactions": 0.6},
+    "intermediate": {"kind": "greedy", "temperature": 4.0, "miss_reactions": 0.25},
+    "advanced": {"kind": "greedy", "temperature": 0.8},
+    "expert": {"kind": "greedy", "samples": 3},
+    "elite": {"kind": "mcts", "iterations": 120},
+}
+
+
 def make_policy(spec, seed=0):
-    """'random' | 'greedy' | 'mcts' | 'mcts:400' -> Policy"""
+    """'random' | 'greedy' | 'mcts' | 'mcts:400' | a level name from LEVELS -> Policy"""
     if isinstance(spec, Policy):
         return spec
+    if spec in LEVELS:
+        cfg = dict(LEVELS[spec])
+        kind = cfg.pop("kind")
+        pol = GreedyPolicy(seed, **cfg) if kind == "greedy" else MCTSPolicy(seed=seed, **cfg)
+        pol.name = spec
+        return pol
     name, _, arg = spec.partition(":")
     if name == "random":
         return RandomPolicy(seed)

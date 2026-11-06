@@ -12,7 +12,7 @@ under the rules as modelled here. Anything listed under *Simplifications* is whe
   second player channels 3 on their first turn), Draw, Main, Ending (end-of-turn cleanup, buffs/mods expire),
   Expiration. Extra turns via a turn queue (Time Warp).
 - The chain with HOT FEPR ordering, priority vs focus, Neutral/Showdown × Open/Closed states, reactions and actions,
-  cleanups per CR 323, triggered abilities ordered turn player first, reflexive and delayed triggers, replacement
+  cleanups per CR 323, simultaneous triggers ordered APNAP with each controller choosing the order of their own (CR 383), mulligan in turn order (CR 117), reflexive and delayed triggers, replacement
   effects, static layers (might, keywords, tags, types, granted abilities, rule flags).
 - Showdowns (CR 345-348) and combat (CR 466-468): designations, attack/defend triggers, lethal-first damage assignment
   with Tank first and Backline last, combat cleanup, result, control and conquer; hold/conquer scoring, the final-point
@@ -53,8 +53,7 @@ The built-in AIs do not float resources outside payments; that is an AI limitati
 
 ## Simplifications (results can differ from paper play) — every item here is a bug to fix (owner rule: no simplifications)
 
-- Simultaneous triggers are ordered automatically (turn player first, then in object order), not by player choice.
-- Optional replacement effects are auto-applied; mulligans are skipped.
+- Optional replacement effects are auto-applied.
 - `[Show Off]` is not implemented: "if you showed off" clauses never fire (The Empyrean, Battle Preparations).
 - Blade of the Exile's alternative Equip cost (exhaust a friendly unit) is not offered; only [A] is.
 - Baron Nashor's Baron Pit battlefield token is not modelled: Baron plays like a normal unit (its other abilities work).
