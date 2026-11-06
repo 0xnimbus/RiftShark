@@ -533,3 +533,88 @@ def test_meticulous_restorationist_replays_from_trash(db, decks):
     g.emit("play", uid=big, player=0, card_type="spell")
     settle(g)
     assert g.objects[m].zone == "board"
+
+
+def test_raging_soul_after_a_discard(db, decks):
+    g = main_phase(db, decks)
+    r = put(g, db, 0, "Raging Soul", ("base", 0))
+    assert not g.has_keyword(r, "ganking")
+    g.do_discard(0, [g.players[0].hand[0]])
+    assert g.has_keyword(r, "ganking") and g.has_keyword(r, "assault")
+
+
+def test_forge_of_the_future_recycles_up_to_four(db, decks):
+    g = main_phase(db, decks)
+    f = put(g, db, 0, "Forge of the Future", ("base", 0))
+    cards = [g.players[1].deck[i] for i in range(5)]
+    for u in cards:
+        g._to_zone(g.objects[u], "trash")
+    g.bump()
+    _fire(g, f, "Kill this: recycle up to 4")
+    settle(g, picks=[(cards[0],), (cards[1],), ()])
+    assert g.objects[cards[0]].zone == "deck" and g.objects[cards[1]].zone == "deck" and g.objects[cards[2]].zone == "trash"
+
+
+def test_reinforce_plays_a_unit_for_five_less(db, decks):
+    g = main_phase(db, decks)
+    top = g.players[0].deck[:5]
+    unit = next(u for u in top if g.objects[u].base_defn().is_unit)
+    _run_spell(g, db, "Reinforce", picks=[(unit,), unit])
+    assert g.objects[unit].zone == "board"
+    assert all(g.objects[u].zone != "deck" or g.players[0].deck.index(u) >= len(g.players[0].deck) - 4 for u in top if u != unit)
+
+
+def test_grand_plaza_and_hallowed_tomb(db, decks):
+    g = main_phase(db, decks)
+    _bf_card(g, db, "The Grand Plaza", 0)
+    g.set_bf_controller(0, 0)
+    us = []
+    for _ in range(7):
+        us.append(put(g, db, 0, "Hunting Dog", ("bf", 0), exclude=tuple(us)))
+    g.emit("hold", player=0, loc=("bf", 0), bf=0, units=tuple(us))
+    settle(g)
+    assert g.over and g.winner == 0
+    g = main_phase(db, decks)
+    _bf_card(g, db, "Hallowed Tomb", 0)
+    g.set_bf_controller(0, 0)
+    ch = g.players[0].chosen_champion
+    g._to_zone(g.objects[ch], "trash"); g.bump()
+    g.emit("hold", player=0, loc=("bf", 0), bf=0, units=())
+    settle(g)
+    assert g.objects[ch].zone == "champion" and g.players[0].champion == ch
+
+
+def test_shakedown_controller_chooses(db, decks):
+    g = main_phase(db, decks)
+    foe = put(g, db, 1, "Elnuk Herd", ("bf", 0))
+    hand = len(g.players[0].hand)
+    _run_spell(g, db, "Shakedown", picks=[1])
+    assert len(g.players[0].hand) == hand + 2 and g.objects[foe].damage == 0
+    _run_spell(g, db, "Shakedown", picks=[0])
+    assert g.objects[foe].damage == 6 or g.objects[foe].zone == "trash"
+
+
+def test_albus_ferros_and_overt_operation(db, decks):
+    g = main_phase(db, decks)
+    a = put(g, db, 0, "Hunting Dog", ("base", 0)); b = put(g, db, 0, "Hunting Dog", ("base", 0), exclude=(a,))
+    g.objects[a].buffs = g.objects[b].buffs = 1
+    g.objects[a].exhausted = True
+    _run_spell(g, db, "Overt Operation", picks=[(a,)])
+    assert not g.objects[a].exhausted and g.objects[a].buffs == 1 and g.objects[b].buffs == 1
+    runes = len(g.players[0].runes)
+    al = put(g, db, 0, "Albus Ferros", ("base", 0), exclude=(a, b))
+    _fire(g, al, "Albus Ferros")
+    settle(g, picks=[tuple(u for u in g.objects if u in (a, b))])
+    assert len(g.players[0].runes) == runes + 2 and g.objects[a].buffs == 0
+
+
+def test_mistfall_readies_a_buffed_unit(db, decks):
+    g = main_phase(db, decks)
+    m = put(g, db, 0, "Mistfall", ("base", 0))
+    u = put(g, db, 0, "Hunting Dog", ("base", 0), exclude=(m,))
+    r = g.players[0].runes[0]
+    g.objects[r].defn = next(c for c in db if c.name == "Body Rune"); g.objects[r].domain = "body"; g.bump()
+    g.objects[u].exhausted = True
+    g.do_buff(u)
+    settle(g)
+    assert not g.objects[u].exhausted and g.objects[m].exhausted

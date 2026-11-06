@@ -1583,3 +1583,160 @@ def zero_point_inflection(defn):
             Triggered(full, [O.Do(discard_all, label="discard your hand"), O.Kill(Ref("self")),
                              O.ChoosePlayer(out="__opp", opponent=True), O.GainPoints(1, player=Ref("__opp"))],
                       label="hand overflow", source_text=defn.text)]
+
+
+# ---------------------------------------------------------------- Origins commons (batch 2026-11-06 15:50)
+@script("Raging Soul")
+def raging_soul(defn):
+    # If you've discarded a card this turn, I have [Assault] and [Ganking].
+    defn.keywords.pop("assault", None); defn.keywords.pop("ganking", None)      # conditional, not printed keywords
+    cond = lambda g, s: g.turn_memo.get(("discarded", g.objects[s].controller), 0) > 0
+    return [Static("self", "keyword", ("assault", True), cond=cond, source_text=defn.text),
+            Static("self", "keyword", ("ganking", True), cond=cond, source_text=defn.text)]
+
+
+def _pick_up_to(options, n, out, label):
+    """'up to N' among many options as N single picks (each may pick nothing), collected in ctx.vars[out]."""
+    def init(g, c):
+        c.vars[out] = []
+    def add(i):
+        def f(g, c):
+            v = c.vars.get(f"{out}_{i}")
+            if v:
+                c.vars[out].extend(v if isinstance(v, (tuple, list)) else [v])
+        return f
+    rest = lambda g, c: [u for u in options(g, c) if u not in c.vars.get(out, [])]
+    tail = []
+    for i in reversed(range(n)):          # stop asking once nothing is picked
+        picked = lambda g, c, i=i: bool(c.vars.get(f"{out}_{i}"))
+        tail = [O.ChooseFromList(rest, out=f"{out}_{i}", n=1, up_to=True, label=label), O.Do(add(i), label=label)] + \
+            ([O.If(picked, tail)] if tail else [])
+    return [O.Do(init, label=label)] + tail
+
+
+@script("Forge of the Future")
+def forge_of_the_future(defn):
+    # When you play this, play a 1 [M] Recruit unit token at your base.  Kill this: Recycle up to 4 cards from trashes.
+    from ..abilities import Activated
+    trashes = lambda g, c: [u for ps in g.players for u in ps.trash]
+    return [Triggered("play_self", [O.PlayToken("Recruit", loc="base")], label=defn.name, source_text=defn.text),
+            Activated({"energy": 0, "power": [], "kill_self": True},
+                      _pick_up_to(trashes, 4, "__rc", "recycle a card from a trash (up to 4)") +
+                      [O.Recycle(lambda g, c: list(c.vars.get("__rc") or ()))],
+                      timing="main", label="Kill this: recycle up to 4", source_text=defn.text)]
+
+
+@script("Reinforce")
+def reinforce(defn):
+    # Look at the top 5 cards of your Main Deck. You may banish a unit from among them, then play it, reducing its cost
+    # by [5]. Recycle the remaining cards.
+    units = lambda g, c: [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck" and g.objects[u].base_defn().is_unit]
+    def cheaper(g, c):
+        e, pw = g.card_cost(c.controller, c.vars["__ru"], "banish", None)
+        return (max(0, e - 5), pw)
+    return [SpellEffect([O.Look(5, out="looked"),
+                         O.ChooseFromList(units, out="__ru", up_to=True, label="banish a unit, then play it for [5] less"),
+                         O.Do(_unwrap("__ru")),
+                         O.If(Ref("__ru"), [O.Banish(Ref("__ru")), O.PlayCard(Ref("__ru"), alt_cost=cheaper)]),
+                         O.Recycle(lambda g, c: [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck"])],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Pack of Wonders")
+def pack_of_wonders(defn):
+    # [T]: Return another friendly gear, unit, or [Hidden] card to its owner's hand.
+    from ..abilities import Activated
+    def opts(g, c):
+        out = []
+        for u, o in g.objects.items():
+            if u == c.source or not g.is_friendly(o.controller, c.controller):
+                continue
+            if o.zone == "board" and o.defn.type != "rune" and ("unit" in g.chars(u).types or "gear" in g.chars(u).types):
+                out.append(u)
+            elif o.zone == "facedown":
+                out.append(u)
+        return out
+    return [Activated({"energy": 0, "power": [], "exhaust": True},
+                      [O.ChooseFromList(opts, out="__pw", label="return to its owner's hand"), O.ToHand(Ref("__pw"))],
+                      timing="main", label=defn.name, source_text=defn.text)]
+
+
+@script("The Grand Plaza")
+def the_grand_plaza(defn):
+    # When you hold here, if you have 7+ units here, you win the game.
+    def win(g, c):
+        p = c.event.get("player")
+        if len([u for u in g.units_at(c.event.get("loc")) if g.objects[u].controller == p]) >= 7:
+            g._end_game(p, "The Grand Plaza")
+    return [Triggered("you_hold_here", [O.Do(win, label="7+ units here: win the game")], controller="event",
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Hallowed Tomb")
+def hallowed_tomb(defn):
+    # When you hold here, you may return your Chosen Champion from your trash to your Champion Zone if it is empty.
+    def can(g, c):
+        ps = g.players[c.controller]
+        u = ps.chosen_champion
+        return ps.champion is None and u is not None and g.objects[u].zone == "trash"
+    def back(g, c):
+        ps = g.players[c.controller]
+        g._to_zone(g.objects[ps.chosen_champion], "champion"); g.bump()
+    return [Triggered("you_hold_here", [O.If(can, [O.May([O.Do(back, label="Chosen Champion to the Champion Zone")],
+                                                         label="return your Chosen Champion from your trash")])],
+                      controller="event", label=defn.name, source_text=defn.text)]
+
+
+@script("Shakedown")
+def shakedown(defn):
+    # [Reaction]  Choose an enemy unit. Deal 6 to it unless its controller has you draw 2.
+    ctl = lambda g, c: g.objects[c.vars["t"]].controller
+    return [SpellEffect([O.Choose(Sel("unit", side="enemy"), out="t"),
+                         O.ChooseMode([("take 6 damage", [O.Deal(6, Ref("t"))]), ("let them draw 2", [O.Draw(2)])],
+                                      player=ctl)],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Albus Ferros")
+def albus_ferros(defn):
+    # When you play me, spend any number of buffs. For each buff spent, channel 1 rune exhausted.
+    buffed = lambda g, c: [u for u, o in g.objects.items() if o.zone == "board" and o.controller == c.controller and o.buffs > 0]
+    def run(g, c):
+        n = 0
+        for u in c.vars.get("__ab") or ():
+            if g.do_spend_buff(u, c):
+                n += 1
+        if n:
+            g.do_channel(c.controller, n, exhausted=True)
+        g.bump()
+    return [Triggered("play_self", [O.ChooseFromList(buffed, out="__ab", n=lambda g, c: len(buffed(g, c)), up_to=True,
+                                                     label="spend buffs: channel 1 rune exhausted for each"),
+                                    O.Do(run, label="spend buffs, channel")], label=defn.name, source_text=defn.text)]
+
+
+@script("Mistfall")
+def mistfall(defn):
+    # When you buff a friendly unit, you may pay [Body] and exhaust this to ready it.
+    def buffed(g, s, ev):
+        return ev.get("kind") == "buff" and ev.get("player") == g.objects[s].controller
+    ready_me = lambda g, c: not g.objects[c.source].exhausted
+    return [Triggered(buffed, [O.If(ready_me, [O.PayResources(0, ["body"], out="__mf"),
+                                               O.If(Ref("__mf"), [O.Exhaust(Ref("self")), O.Ready(lambda g, c: c.event.get("uid"))])])],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Overt Operation")
+def overt_operation(defn):
+    # [Action]  For each friendly unit, you may spend its buff to ready it. Then buff all friendly units.
+    buffed = lambda g, c: [u for u, o in g.objects.items() if o.zone == "board" and g.is_friendly(o.controller, c.controller)
+                           and "unit" in g.chars(u).types and o.buffs > 0]
+    friends = lambda g, c: [u for u, o in g.objects.items() if o.zone == "board" and g.is_friendly(o.controller, c.controller)
+                            and "unit" in g.chars(u).types]
+    def run(g, c):
+        for u in c.vars.get("__oo") or ():
+            if g.do_spend_buff(u, c):
+                g.do_ready(u, c)
+        g.bump()
+    return [SpellEffect([O.ChooseFromList(buffed, out="__oo", n=lambda g, c: len(buffed(g, c)), up_to=True,
+                                          label="spend buffs to ready those units"),
+                         O.Do(run, label="spend buffs, ready"), O.Buff(friends)], label=defn.name, source_text=defn.text)]

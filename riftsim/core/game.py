@@ -101,6 +101,7 @@ class Game(flow.FlowMixin):
             ch = self._new_obj(self.db.card(d.champion), i)
             ch.zone = "champion"
             p.champion = ch.uid
+            p.chosen_champion = ch.uid
             for cid in d.main:
                 o = self._new_obj(self.db.card(cid), i)
                 o.zone = "deck"
@@ -1031,6 +1032,7 @@ class Game(flow.FlowMixin):
                 continue
             self._to_zone(o, "trash")
             self.log("discard", player=p, uid=u)
+            self.turn_memo[("discarded", o.owner)] = self.turn_memo.get(("discarded", o.owner), 0) + 1
             self.emit("discard", uid=u, player=o.owner, ctx=ctx, batch=batch)
 
     def do_recycle(self, uids, ctx=None):

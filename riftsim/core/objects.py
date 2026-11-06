@@ -102,7 +102,7 @@ class GameObject:
 class PlayerState:
     __slots__ = ("idx", "name", "deck_name", "hand", "deck", "trash", "banish", "rune_deck", "runes", "legend",
                  "champion", "battlefield_cards", "points", "xp", "energy", "power", "pool_r", "played_this_turn", "burned_out",
-                 "legend_name", "memo", "passed_showdown", "conceded")
+                 "legend_name", "memo", "passed_showdown", "conceded", "chosen_champion")
 
     def __init__(self, idx):
         self.idx = idx
@@ -111,6 +111,7 @@ class PlayerState:
         self.hand, self.deck, self.trash, self.banish = [], [], [], []
         self.rune_deck, self.runes = [], []
         self.legend, self.champion = None, None
+        self.chosen_champion = None              # uid of the Chosen Champion card (CR 103.2), wherever it is now
         self.battlefield_cards = []
         self.points, self.xp = 0, 0
         self.energy, self.power = 0, []          # rune pool (unrestricted Energy, Power domains / 'any')
