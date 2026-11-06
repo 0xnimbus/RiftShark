@@ -794,3 +794,133 @@ def grim_resolve(defn):
     return [SpellEffect([O.Choose(Sel("unit", side="friendly"), out="t"), O.GiveMight(Ref("t"), 3),
                          O.Delayed(wins, [O.GainXP(2)], filt=won, expires="turn", once=True, label="Grim Resolve: 2 XP")],
                         label=defn.name, source_text=defn.text)]
+
+
+def _kill_cost(sel, out="__k", remember=None):
+    """Mandatory 'As an additional cost to play this, kill a friendly ...' (remember: fn(g, c, uid) before the kill)."""
+    ins = [O.Choose(sel, out=out, targeted=False)]
+    if remember is not None:
+        ins.append(O.Do(lambda g, c: remember(g, c, c.vars.get(out))))
+    return ins + [O.Kill(Ref(out))]
+
+
+@script("Determined Sentry")
+def determined_sentry(defn):
+    # I can't move to base.
+    return [Static("self", "rule", ("i_cant_move_to_base",), label="can't move to base", source_text=defn.text)]
+
+
+@script("Sacrifice")
+def sacrifice(defn):
+    # [Reaction]  As an additional cost to play this, kill a friendly [Mighty] unit.  Draw 2 and channel 1 rune exhausted.
+    mighty = Sel("unit", side="friendly", pred=lambda g, c, u: (g.chars(u).might or 0) >= 5)
+    return [PlayPermission("additional_cost", value=(mighty, _kill_cost(mighty), True), label="kill a friendly Mighty unit",
+                           source_text=defn.text),
+            SpellEffect([O.Draw(2), O.Channel(1, exhausted=True)], label=defn.name, source_text=defn.text)]
+
+
+@script("Heedless Resurrection")
+def heedless_resurrection(defn):
+    # [Reaction]  As an additional cost to play this, kill a friendly unit.  Play a unit from your trash that costs no
+    # more Energy and no more Power than the killed unit, ignoring its cost.
+    friendly = Sel("unit", side="friendly")
+
+    def remember(g, c, u):
+        if u in g.objects:
+            d = g.objects[u].base_defn()
+            c.vars["__ke"], c.vars["__kp"] = d.energy or 0, d.power or 0
+
+    def units(g, c):
+        return [u for u in g.players[c.controller].trash if g.objects[u].base_defn().is_unit
+                and u != c.vars.get("__k")
+                and (g.objects[u].base_defn().energy or 0) <= c.vars.get("__ke", -1)
+                and (g.objects[u].base_defn().power or 0) <= c.vars.get("__kp", -1)]
+    return [PlayPermission("additional_cost", value=(friendly, _kill_cost(friendly, remember=remember), True),
+                           label="kill a friendly unit", source_text=defn.text),
+            SpellEffect([O.ChooseFromList(units, out="__hr", label="play a unit from your trash"),
+                         O.If(Ref("__hr"), [O.PlayCard(Ref("__hr"), ignore="all")])], label=defn.name, source_text=defn.text)]
+
+
+@script("Lilting Lullaby")
+def lilting_lullaby(defn):
+    # [Reaction]  Counter a spell. Its controller can't play spells this turn.
+    spell = Sel("card", zone="chain", pred=lambda g, c, u: any(it.uid == u and it.kind == "spell" for it in g.chain))
+
+    def counter(g, c):
+        u = c.vars.get("__sp")
+        it = next((x for x in g.chain if x.uid == u and x.kind == "spell"), None)
+        if it is None:
+            return
+        who = it.controller
+        g.do_counter(it.id, c)
+        g.add_turn_effect(c, "cant_play_spells", {"players": (who,)})
+    return [SpellEffect([O.Choose(spell, out="__sp"), O.Do(counter, label="counter it")], label=defn.name, source_text=defn.text)]
+
+
+@script("Keeper's Verdict")
+def keepers_verdict(defn):
+    # [Action]  Choose an enemy unit at a battlefield. Its owner places it on the top or bottom of their Main Deck.
+    def place(g, c):
+        t = c.vars.get("t")
+        if t in g.objects and g.objects[t].zone == "board":
+            if c.vars.get("__top"):
+                g.put_on_top(t)
+            else:
+                g.do_recycle([t], c)
+    return [SpellEffect([O.Choose(Sel("unit", side="enemy", where="battlefield"), out="t"),
+                         O.If(Ref("t"), [O.ChooseFromList(lambda g, c: ["top", "bottom"], out="__tb", label="top or bottom",
+                                                          player=lambda g, c: g.objects[c.vars["t"]].owner),
+                                         O.Do(lambda g, c: c.vars.__setitem__("__top", c.vars.get("__tb") == "top")),
+                                         O.Do(place, label="place it")])], label=defn.name, source_text=defn.text)]
+
+
+@script("Ruthless Strike")
+def ruthless_strike(defn):
+    # [Action]  As an additional cost to play this, you may discard 1.  Deal 3 to a unit at a battlefield. If you paid
+    # the additional cost, deal 5 to it instead.
+    ins = [O.SetVar("__addok", False), O.If(lambda g, c: bool(g.players[c.controller].hand),
+                                             [O.Discard(1), O.SetVar("__addok", True)])]
+    return [PlayPermission("additional_cost", value=(None, ins, False), label="discard 1", source_text=defn.text),
+            SpellEffect([O.Choose(Sel("unit", where="battlefield"), out="t"),
+                         O.Deal(lambda g, c: 5 if c.paid.get("add") else 3, Ref("t"))], label=defn.name, source_text=defn.text)]
+
+
+@script("Guttural Roar")
+def guttural_roar(defn):
+    # [Action]  Give a unit +2 [M] this turn. If it's [Empowered], give it +4 [M] this turn instead.
+    amt = lambda g, c: 4 if c.vars.get("t") in g.objects and g.objects[c.vars["t"]].empowered else 2
+    return [SpellEffect([O.Choose(Sel("unit"), out="t"), O.GiveMight(Ref("t"), amt)], label=defn.name, source_text=defn.text)]
+
+
+@script("Ol' Poro")
+def ol_poro(defn):
+    # I can't be played on your first, second, or third turns.
+    def ok(g, u):
+        p = _ctrl(g, u)
+        return not (g.turn_player == p and g.turns_taken.get(p, 0) <= 3)
+    return [PlayPermission("restriction", cond=ok, label="not on your first three turns", source_text=defn.text)]
+
+
+@script("Patched Porobot")
+def patched_porobot(defn):
+    # (I enter exhausted.)  When you play me, if you control 3 or more other gear, draw 1.
+    gear3 = lambda g, s: sum(1 for u, o in g.objects.items() if u != s and o.zone == "board"
+                             and o.controller == g.objects[s].controller and "gear" in g.chars(u).types) >= 3
+    return [Triggered("play_self", [O.If(lambda g, c: gear3(g, c.source), [O.Draw(1)])], filt=lambda g, s, ev: gear3(g, s),
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Death from Below")
+def death_from_below(defn):
+    # Kill a unit at a battlefield. Then, if it had 3 [M] or less, you may play this from your trash for [A].
+    def remember(g, c):
+        t = c.vars.get("t")
+        c.vars["__m"] = g.chars(t).might if t in g.objects else None
+
+    return [SpellEffect([O.Choose(Sel("unit", where="battlefield"), out="t"), O.Do(remember), O.Kill(Ref("t")),
+                         O.If(lambda g, c: c.vars.get("__m") is not None and c.vars["__m"] <= 3,
+                              [O.SetVar("__may_replay", True)])], label=defn.name, source_text=defn.text),
+            Triggered(lambda g, s, ev: ev.get("kind") == "resolve" and ev.get("uid") == s and ev.get("card_type") == "spell",
+                      [O.If(lambda g, c: g.objects[c.source].zone == "trash" and c.event.get("may_replay"),
+                            [O.May([O.PlayCard(Ref("self"), alt_cost=(0, ["any"]))], label="play this from your trash for [A]")])],
+                      zone="trash", label="replay from trash", source_text=defn.text)]

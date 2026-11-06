@@ -244,3 +244,61 @@ def test_wily_newtfish_after_gaining_xp(db, decks):
     assert g.chars(w).might == 4 and not g.chars(w).keywords.get("ganking")
     g.gain_xp(0, 1)
     assert g.chars(w).might == 5 and g.chars(w).keywords.get("ganking")
+
+
+def _run_spell(g, db, name, controller=0, picks=(), yes=True):
+    from riftsim.core.vm import Context, Frame, relocate
+    s = next(c for c in db if c.name == name)
+    ab = s.abilities[-1] if type(s.abilities[-1]).__name__ == "SpellEffect" else \
+        next(a for a in s.abilities if type(a).__name__ == "SpellEffect")
+    ctx = Context(controller, None)
+    tc = list(ab.target_code or [])
+    g.vm_frames.append(Frame(tc + relocate(ab.code, len(tc)), ctx))
+    settle(g, yes=yes, picks=list(picks))
+    return ctx
+
+
+def test_determined_sentry_cannot_move_to_base(db, decks):
+    g = main_phase(db, decks)
+    s = put(g, db, 0, "Determined Sentry", ("bf", 0))
+    assert not g.valid_destination(s, ("base", 0))
+    assert g.valid_destination(s, ("bf", 1))
+
+
+def test_lilting_lullaby_counters_and_locks_spells(db, decks):
+    from riftsim.core.objects import ChainItem
+    g = main_phase(db, decks)
+    sp = _card_in(g, db, 1, "Get Excited!", "hand")
+    g._to_zone(g.objects[sp], "chain"); g.bump()
+    it = ChainItem(900, "spell", 1, uid=sp, label="Get Excited!")
+    g.chain.append(it)
+    _run_spell(g, db, "Lilting Lullaby", picks=[sp])
+    assert it not in g.chain and g.objects[sp].zone == "trash"
+    later = _card_in(g, db, 1, "Get Excited!", "hand")
+    assert not g._play_restrictions_ok(1, later, "hand")
+
+
+def test_ol_poro_not_on_your_first_three_turns(db, decks):
+    g = main_phase(db, decks)
+    u = _card_in(g, db, 0, "Ol' Poro", "hand")
+    g.turns_taken[0] = 3
+    assert not g._play_restrictions_ok(0, u, "hand")
+    g.turns_taken[0] = 4
+    assert g._play_restrictions_ok(0, u, "hand")
+
+
+def test_keepers_verdict_owner_chooses_top_or_bottom(db, decks):
+    g = main_phase(db, decks)
+    foe = put(g, db, 1, "Rell, Magnetic", ("bf", 0))
+    _run_spell(g, db, "Keeper's Verdict", picks=[foe, "top"])
+    assert g.players[1].deck[0] == foe
+
+
+def test_guttural_roar_empowered(db, decks):
+    g = main_phase(db, decks)
+    u = put(g, db, 0, "Rell, Magnetic", ("bf", 0))
+    b = g.chars(u).might
+    _run_spell(g, db, "Guttural Roar", picks=[u])
+    g.objects[u].empowered = 1; g.bump()
+    _run_spell(g, db, "Guttural Roar", picks=[u])
+    assert g.chars(u).might == b + 6

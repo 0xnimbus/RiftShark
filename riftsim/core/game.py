@@ -1107,6 +1107,8 @@ class Game(flow.FlowMixin):
         if dest[0] == "base":
             if any(self.objects[src].place == o.location for src, _ in self.rules("cant_move_to_base")):
                 return False          # "Units can't move from here to base"
+            if any(src == uid for src, _ in self.rules("i_cant_move_to_base")):
+                return False          # Determined Sentry
             return dest[1] == o.controller
         if dest[0] != "bf":
             return False

@@ -1184,7 +1184,8 @@ class FlowMixin:
                     self._to_zone(o, "banish")
                 else:
                     self._to_zone(o, "trash")
-            self.emit("resolve", uid=it.uid, player=it.controller, card_type="spell", item=it.id, energy=self._energy_spent(it))
+            self.emit("resolve", uid=it.uid, player=it.controller, card_type="spell", item=it.id, energy=self._energy_spent(it),
+                      may_replay=bool(it.ctx.vars.get("__may_replay")))     # "you may play this from your trash"
         if it.kind == "trigger" and it.ability is not None and getattr(it.ability, "keyword", None) == "deathknell":
             pass
         self.dirty = True
@@ -1587,6 +1588,9 @@ class FlowMixin:
         if "spell" in o.base_defn().types:
             for src, v in self.rules("cant_play_spells"):
                 if self.objects[src].controller != p and v is True:
+                    return False
+            for t in self.turn_effects:          # "Its controller can't play spells this turn" (Lilting Lullaby)
+                if t["kind"] == "cant_play_spells" and p in t["data"].get("players", ()):
                     return False
         return True
 
