@@ -551,6 +551,7 @@ class FlowMixin:
                     self.dirty = True
         self._check_static_might_reductions()
         self._end_control_durations()
+        self._end_bound_legends()
         # 5. recalls
         for u, o in list(self.objects.items()):
             if o.zone != "board" or o.location is None:

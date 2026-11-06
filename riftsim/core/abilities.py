@@ -220,7 +220,7 @@ class Static(Ability):
     def __init__(self, sel="self", mod_kind="might", value=1, cond=None, zone="board", label="", source_text=""):
         super().__init__(label, zone, cond, source_text)
         self.sel, self.mod_kind, self.value = sel, mod_kind, value
-        self.layer = {"type": 1, "tag": 1, "keyword": 2, "ability": 2, "rule": 2, "might": 3, "base_might": 3}.get(mod_kind, 3)
+        self.layer = {"type": 1, "tag": 1, "keyword": 2, "ability": 2, "abilities": 2, "rule": 2, "might": 3, "base_might": 3}.get(mod_kind, 3)
 
     def applies_to(self, g, src, uid):
         if self.sel == "self":

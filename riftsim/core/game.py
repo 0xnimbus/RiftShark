@@ -68,6 +68,7 @@ class Game(flow.FlowMixin):
         self.reason = ""
         self.dirty = False             # a cleanup is needed
         self.combat_result_memo = {}
+        self.extra_legends = {}
         self.decision_count = 0
         self.history = []              # (decision kind, choice label) for replay
         self.action_count = 0
@@ -96,6 +97,7 @@ class Game(flow.FlowMixin):
             leg.zone, leg.location = "board", ("legend", i)
             p.legend = leg.uid
             p.legend_name = leg.defn.name
+            self.extra_legends[i] = tuple(d.extra_legends)      # Neeko, Blending In (read-only after setup)
             ch = self._new_obj(self.db.card(d.champion), i)
             ch.zone = "champion"
             p.champion = ch.uid
@@ -349,6 +351,8 @@ class Game(flow.FlowMixin):
             c.add_keyword(*v) if isinstance(v, tuple) else c.add_keyword(v, True)
         elif k == "ability":
             c.abilities.append(v)
+        elif k == "abilities":
+            c.abilities.extend(v or ())
         elif k == "tag":
             c.tags.add(v)
         elif k == "type":
@@ -1381,6 +1385,18 @@ class Game(flow.FlowMixin):
             o.mods.append(Mod("control", o.owner, duration, ctx.source if ctx else None, self.tick()))
         self.bump()
         self.dirty = True
+
+    def _end_bound_legends(self):
+        """A legend added by Neeko, Blending In exists only while that Neeko is on the board."""
+        for o in self.objects.values():
+            b = o.temp.get("bound_to") if o.zone == "board" else None
+            if b is None:
+                continue
+            so = self.objects.get(b[0])
+            if so is None or so.zone != "board" or so.entered_stamp != b[1]:
+                self.log("cease", uid=o.uid, name=o.defn.name)
+                self._to_zone(o, "gone")
+                self.dirty = True
 
     def _end_control_durations(self):
         """'You control it until I leave the board' (Akshan, Mischievous): duration ("until_leaves", src, stamp)."""

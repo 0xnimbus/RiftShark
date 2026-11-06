@@ -12,11 +12,12 @@ class DeckError(Exception):
 
 
 class Deck:
-    def __init__(self, name, legend, champion, main, runes, battlefields):
+    def __init__(self, name, legend, champion, main, runes, battlefields, extra_legends=()):
         self.name, self.legend, self.champion = name, legend, champion
         self.main = list(main)
         self.runes = list(runes)
         self.battlefields = list(battlefields)
+        self.extra_legends = list(extra_legends)    # additional deckbuilding choice (Neeko, Blending In)
 
     @classmethod
     def from_dict(cls, d, db=None):
@@ -33,7 +34,7 @@ class Deck:
                 runes += [dom.lower()] * n
         else:
             runes = [x.lower() for x in r]
-        return cls(d["name"], d["legend"], d["champion"], main, runes, d["battlefields"])
+        return cls(d["name"], d["legend"], d["champion"], main, runes, d["battlefields"], d.get("extra_legends", ()))
 
     @classmethod
     def load(cls, path, db=None):
@@ -47,7 +48,8 @@ class Deck:
         for r in self.runes:
             rc[r] = rc.get(r, 0) + 1
         return {"name": self.name, "legend": self.legend, "champion": self.champion,
-                "main": [{"id": k, "count": v} for k, v in counts.items()], "runes": rc, "battlefields": self.battlefields}
+                "main": [{"id": k, "count": v} for k, v in counts.items()], "runes": rc, "battlefields": self.battlefields,
+                **({"extra_legends": self.extra_legends} if self.extra_legends else {})}
 
     def validate(self, db, raise_on_error=False, strict=True):
         errs = []
@@ -90,6 +92,24 @@ class Deck:
             limit = 1 if cd.keywords.get("unique") else 3
             if k > limit:
                 errs.append(f"{n}: {k} copies (max {limit})")
+        # Neeko, Blending In (errata): choose up to 3 different legends in addition to your starting legend
+        if self.extra_legends:
+            names = []
+            for x in self.extra_legends:
+                try:
+                    lx = db.card(x)
+                except KeyError:
+                    errs.append(f"unknown extra legend {x}")
+                    continue
+                if lx.type != "legend":
+                    errs.append(f"extra legend {x} is not a legend")
+                names.append(lx.name)
+            if len(names) > 3:
+                errs.append("more than 3 extra legends")
+            if len(set(names)) != len(names) or (leg is not None and leg.name in names):
+                errs.append("extra legends must have different names from each other and the starting legend")
+            if "Neeko, Blending In" not in counts:
+                errs.append("extra legends are only chosen when Neeko, Blending In is in the deck")
         if len(self.runes) != 12:
             errs.append(f"rune deck has {len(self.runes)} runes, expected 12")
         for r in self.runes:

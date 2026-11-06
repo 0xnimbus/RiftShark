@@ -1533,3 +1533,70 @@ def akshan_mischievous(defn):
     return {"abilities": [Triggered("play_self", [O.Choose(Sel("gear", side="enemy"), out="t"), O.Do(steal, label="take the gear")],
                                     filt=lambda g, s, ev: bool((ev.get("paid") or {}).get("add")),
                                     label=defn.name, source_text=defn.text)], "replace": False}
+
+
+@script("Heimerdinger, Inventor")
+def heimerdinger_inventor(defn):
+    # I have all [T] abilities of all friendly legends, units, and gear.
+    # (printed/scripted abilities of the other objects: reading their granted abilities would recurse through layers)
+    def tap_abilities(g, s, u):
+        me = g.objects[s]
+        out = []
+        for x, o in g.objects.items():
+            if x == s or o.zone != "board" or o.controller != me.controller:
+                continue
+            d = o.base_defn()
+            if not (d.type in ("legend", "unit", "gear") or d.is_unit or d.is_gear):
+                continue
+            if d.name == defn.name:
+                continue
+            for ab in d.abilities:
+                if isinstance(ab, Activated) and ab.cost.get("exhaust") and ab not in out:
+                    out.append(ab)
+        return out
+    return {"abilities": [Static("self", "abilities", tap_abilities, label="all friendly [T] abilities",
+                                 source_text=defn.text)], "replace": True}
+
+
+@script("Nocturne, Horrifying")
+def nocturne_horrifying(defn):
+    # [Ganking]   (keyword)
+    # Errata: As you look at or reveal me from the top of your deck, you may banish me. If you do, you may play me
+    # for [A].   (ops._nocturne_step, asked from Look/Predict as the cards are seen)
+    return {"abilities": [PlayPermission("as_seen_from_deck", zone="deck", label="banish me and play me for [A]",
+                                         source_text=defn.text)], "replace": True}
+
+
+@script("Neeko, Blending In")
+def neeko_blending_in(defn):
+    # Errata: If Neeko is in your deck, choose up to 3 different legends in addition to your starting legend.
+    #   (Deck.extra_legends, chosen at deckbuilding)
+    # When you play me, choose one of those Legends and add it to your Legend Zone while I'm on the board.
+    # Ruling: the legends enter ready; at most one of each on the board; they cease to exist when Neeko leaves.
+    def options(g, c):
+        names = g.extra_legends.get(c.controller, ())
+        on_board = {o.defn.name for o in g.objects.values() if o.zone == "board" and o.controller == c.controller}
+        out = []
+        for n in names:
+            d = g.db.card(n)
+            if d.name not in on_board:
+                out.append(d.name)
+        return out
+
+    def add(g, c):
+        n = c.vars.get("__nl")
+        me = g.objects.get(c.source)
+        if n is None or me is None or me.zone != "board":
+            return
+        o = g._new_obj(g.db.card(n), c.controller)
+        o.zone, o.location, o.controller = "board", ("legend", c.controller), c.controller
+        o.exhausted = False
+        o.entered_stamp = g.tick()
+        o.temp["bound_to"] = (c.source, me.entered_stamp)
+        g.bump()
+        g.log("legend_added", uid=o.uid, name=n, player=c.controller)
+        g.dirty = True
+    return {"abilities": [Triggered("play_self", [
+        O.ChooseFromList(options, out="__nl", label="add a legend to your Legend Zone"),
+        O.Do(_unwrap("__nl")), O.Do(add, label="add the legend")], label=defn.name, source_text=defn.text)],
+        "replace": True}

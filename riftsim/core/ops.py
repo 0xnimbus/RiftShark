@@ -1073,6 +1073,35 @@ class SpendXP(Instr):
         return None
 
 
+def _nocturne_step(game, ctx, cards):
+    """Nocturne, Horrifying (errata): "As you look at or reveal me from the top of your deck, you may banish me. If
+    you do, you may play me for [A]." A replacement in a secret zone (CR 370.1.c.1): asked as the cards are seen."""
+    from .abilities import PlayPermission
+    done = ctx.vars.setdefault("__noct_done", [])
+    for u in cards:
+        o = game.objects.get(u)
+        if u in done or o is None or o.zone != "deck" or o.owner != ctx.controller:
+            continue
+        if not any(isinstance(ab, PlayPermission) and ab.perm == "as_seen_from_deck" for ab in game._abilities_of(u, o)):
+            continue
+        done.append(u)
+        ctx.vars["__noct"] = u
+        nm = game.label(u)
+        return Decision(ctx.controller, "seen_from_deck", ["keep", "banish_play", "banish"], out="__noct_ans",
+                        labels=[f"leave {nm} in the deck", f"banish {nm} and play it for [A]", f"banish {nm}"],
+                        info={"uid": u, "label": "As you look at or reveal me: you may banish me, then play me for [A]"})
+    return None
+
+
+def _nocturne_apply(game, ctx, choice):
+    u = ctx.vars.get("__noct")
+    if u is None or choice == "keep":
+        return
+    game.do_banish([u], ctx)
+    if choice == "banish_play" and game.objects[u].zone == "banish":
+        game.limited_play(ctx.controller, u, ctx, alt_cost=(0, ["any"]))
+
+
 class Look(Instr):
     """Look at top n cards of your deck; stores list of uids in out (they stay in the deck)."""
 
@@ -1084,9 +1113,16 @@ class Look(Instr):
         n = val(game, ctx, self.n)
         cards = game.players[p].deck[:n]
         ctx.vars[self.out] = list(cards)
+        ctx.vars["__noct_done"] = []
         if self.reveal:
             game.emit("reveal", player=p, cards=list(cards), ctx=ctx)
-        return None
+        return _nocturne_step(game, ctx, cards)
+
+    def resume(self, game, ctx, choice):
+        _nocturne_apply(game, ctx, choice)
+        cards = ctx.vars.get(self.out) or []
+        ctx.vars[self.out] = [u for u in cards if game.objects[u].zone == "deck"]
+        return _nocturne_step(game, ctx, cards)
 
 
 class Mill(Instr):
@@ -1161,12 +1197,25 @@ class Predict(Instr):
         cards = game.players[p].deck[:n]
         if not cards:
             return None
+        if "__pred_cards" not in ctx.vars:
+            ctx.vars["__pred_cards"] = list(cards)
+            ctx.vars["__noct_done"] = []
+        d = _nocturne_step(game, ctx, ctx.vars["__pred_cards"])
+        if d is not None:
+            ctx.vars["__pred_wait"] = True
+            return d
+        cards = [u for u in ctx.vars.pop("__pred_cards") if game.objects[u].zone == "deck"]
+        if not cards:
+            return None
         opts = []
         for k in range(len(cards) + 1):
             opts += [tuple(c) for c in itertools.combinations(cards, k)]
         return Decision(p, "predict", opts, out="__predict", labels=["recycle: " + (", ".join(game.label(u) for u in o) or "nothing") for o in opts])
 
     def resume(self, game, ctx, choice):
+        if ctx.vars.pop("__pred_wait", False):
+            _nocturne_apply(game, ctx, choice)
+            return self.run(game, ctx)
         if choice:
             game.do_recycle(list(choice), ctx)
         return None

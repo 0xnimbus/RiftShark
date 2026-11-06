@@ -871,3 +871,74 @@ def test_nami_headstrong_paid_additional_cost_triggers_the_stun(db, decks):
         g.choose(("pass",) if ("pass",) in d.options else d.options[0])
     assert g.objects[nami].zone == "board"
     assert g.objects[foe].stunned
+
+
+def test_heimerdinger_inventor_has_friendly_tap_abilities(db, decks):
+    g = main_phase(db, decks)
+    hm = put(g, db, 0, "Heimerdinger, Inventor", ("base", 0))
+    ball = put(g, db, 0, "Iron Ballista", ("base", 0), exclude=(hm,))
+    g.objects[ball].exhausted = True
+    foe = put(g, db, 1, "Rell, Magnetic", ("bf", 0))
+    labels = [a.source_text for a in g.abilities(hm)]
+    assert any("Deal 2" in t for t in labels)
+    d = g.run()
+    act = next(o for o in d.options if o[0] == "activate" and o[1] == hm)
+    g.choose(act)
+    for _ in range(40):
+        d = g.run()
+        if d.kind == "choose" and foe in d.options:
+            g.choose(foe); continue
+        if d.kind == "action" and not g.chain:
+            break
+        g.choose(("pass",) if ("pass",) in d.options else d.options[0])
+    assert g.objects[hm].exhausted and g.objects[ball].exhausted
+    assert any(e["kind"] == "damage" and e.get("uid") == foe and e.get("source") == hm for e in g.events)
+
+
+def test_nocturne_can_be_banished_and_played_for_any_power_when_looked_at(db, decks):
+    from riftsim.core.vm import Context, Frame, compile_effect
+    from riftsim.core import ops as O
+    g = main_phase(db, decks)
+    deck = g.players[0].deck
+    noc = deck[1]
+    g.objects[noc].defn = next(c for c in db if c.name == "Nocturne, Horrifying")
+    g.bump()
+    other = deck[0]
+    ctx = Context(0, None)
+    g.vm_frames.append(Frame(compile_effect([O.Look(3, out="looked")]), ctx))
+    asked = []
+    for _ in range(40):
+        d = g.run()
+        if d.kind == "seen_from_deck":
+            asked.append(d.info["uid"]); g.choose("banish_play"); continue
+        if d.kind == "action" and not g.chain:
+            break
+        g.choose(("pass",) if ("pass",) in d.options else d.options[0])
+    assert asked == [noc]
+    assert g.objects[noc].zone == "board"
+    assert noc not in ctx.vars["looked"] and other in ctx.vars["looked"]
+    pays = [e for e in g.events if e["kind"] == "pay" and e.get("power")]
+    assert pays and pays[-1]["energy"] == 0 and len(pays[-1]["power"]) == 1
+
+
+def test_neeko_adds_a_chosen_legend_while_on_board(db, decks):
+    from riftsim.core.deck import Deck
+    legs = [c.name for c in db if c.type == "legend" and c.script_status in ("auto", "manual", "vanilla")]
+    d0 = Deck.from_dict(decks[0].to_dict())
+    d0.main[0] = "Neeko, Blending In"
+    d0.extra_legends = [n for n in legs if n != db.card(d0.legend).name][:3]
+    errs = d0.validate(db)
+    assert not [e for e in (errs or []) if "extra legend" in e or "different names" in e]
+    bad = Deck.from_dict(d0.to_dict()); bad.extra_legends = [d0.extra_legends[0]] * 2
+    assert any("different names" in e for e in (bad.validate(db) or []))
+    g = main_phase(db, [d0, decks[1]])
+    g.extra_legends[0] = tuple(d0.extra_legends)
+    nk = put(g, db, 0, "Neeko, Blending In", ("base", 0))
+    pick = d0.extra_legends[1]
+    g.emit("play", uid=nk, player=0, card_type="unit")
+    settle(g, picks=[pick])
+    added = [u for u, o in g.objects.items() if o.zone == "board" and o.defn.name == pick and o.location == ("legend", 0)]
+    assert len(added) == 1 and not g.objects[added[0]].exhausted
+    g.do_kill([nk])
+    settle(g)
+    assert g.objects[added[0]].zone == "gone"
