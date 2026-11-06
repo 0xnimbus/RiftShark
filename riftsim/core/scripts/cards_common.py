@@ -2699,3 +2699,18 @@ def commander_ledros(defn):
                                and "unit" in g.chars(u).types and u != uid]
     return [PlayPermission("variable_reduce", value=(cands, "order", lambda g, c, u: g.do_kill([u], c, by="cost")),
                            label="kill friendly units: [Order] less each", source_text=defn.text)]
+
+
+@script("Crescent Guardian")
+def crescent_guardian(defn):
+    # If you've played a spell this turn, you may pay [Chaos] as an additional cost to play me. If you do, I enter ready.
+    from ..abilities import Replacement
+
+    def spell_this_turn(g, uid):
+        p = g.objects[uid].controller if g.objects[uid].controller is not None else g.objects[uid].owner
+        return any(u in g.objects and "spell" in g.objects[u].base_defn().types for u in g.players[p].played_this_turn)
+    return [PlayPermission("additional_cost", value=(None, [O.PayResources(0, ["chaos"], out="__cg", optional=False)], False),
+                           cond=spell_this_turn, label="pay [Chaos]", source_text=defn.text),
+            Replacement("enter_ready", lambda g, s, ev: ev.get("uid") == s and ev.get("add_paid"),
+                        lambda g, s, ev: dict(ev, ready=True), label="enter ready if [Chaos] was paid", zone="any",
+                        source_text=defn.text)]

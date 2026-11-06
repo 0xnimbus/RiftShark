@@ -1014,7 +1014,7 @@ class FlowMixin:
             for ab in self._abilities_of(it.uid, self.objects[it.uid]):
                 if isinstance(ab, PlayPermission) and ab.perm == "as_play":
                     show = show + relocate(compile_effect(ab.value), len(show))
-                if isinstance(ab, PlayPermission) and ab.perm == "additional_cost":
+                if isinstance(ab, PlayPermission) and ab.perm == "additional_cost" and (ab.cond is None or ab.cond(self, it.uid)):
                     req, ins, mandatory = ab.value
                     if mandatory:
                         pre += list(ins) + [SetVar("__add", True), Do(lambda g, c: c.paid.__setitem__("add", True))]
@@ -1353,7 +1353,8 @@ class FlowMixin:
             ready = bool(ctx.paid.get("accelerate", False))
             if self.consume_turn_effects("enter_ready", player=p):
                 ready = True
-            ev = self.replace_event({"kind": "enter_ready", "uid": it.uid, "player": p, "ready": ready, "loc": loc})
+            ev = self.replace_event({"kind": "enter_ready", "uid": it.uid, "player": p, "ready": ready, "loc": loc,
+                                     "add_paid": bool(ctx.paid.get("add"))})
             if ev is not None:
                 ready = bool(ev.get("ready"))
             o.exhausted = not ready

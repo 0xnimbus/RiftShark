@@ -1194,3 +1194,25 @@ def test_commander_ledros_kills_friendly_units_to_reduce_order(db, decks):
     from riftsim.core import payment
     need = g._variable_reduce_min(0, led, e, pw, payment.purpose_of_card(g, led))
     assert need == 1
+
+
+def test_crescent_guardian_pays_chaos_after_a_spell_to_enter_ready(db, decks):
+    g = main_phase(db, decks)
+    cg = _card_in(g, db, 0, "Crescent Guardian", "hand")
+    _rune_setup(g, db, 0, ["chaos"] * 6)
+    ab = next(a for a in g.objects[cg].defn.abilities if getattr(a, "perm", "") == "additional_cost")
+    assert not ab.cond(g, cg)
+    sp = _card_in(g, db, 0, "Get Excited!", "trash")
+    g.players[0].played_this_turn.append(sp)
+    assert ab.cond(g, cg)
+    it = g._play(0, cg, ("base", 0))
+    g.pending = None
+    asked = False
+    for _ in range(40):
+        d = g.run()
+        if d.kind == "yesno":
+            asked = True; g.choose(True); continue
+        if d.kind == "action" and not g.chain:
+            break
+        g.choose(("pass",) if ("pass",) in d.options else d.options[0])
+    assert asked and g.objects[cg].zone == "board" and not g.objects[cg].exhausted
