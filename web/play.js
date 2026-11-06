@@ -55,7 +55,7 @@
   let lastTurnLogged = null;
   const chainOpen = new Set();  // chain items currently waiting to resolve (for the log's indentation)
 
-  function gradeTag(g) { if (!g) return ""; const cls = g === "only move" ? "only" : g; return `<span class="grade ${cls}">${g}</span>`; }
+  function gradeTag(g) { if (!g) return ""; const cls = (g === "only move" || g === "resource") ? "only" : g; return `<span class="grade ${cls}">${g}</span>`; }
 
   function addEvents(evs, human) {
     for (const e of evs || []) {
@@ -185,9 +185,12 @@
     let html = `${gradeTag(r.grade)} ${B.say(r.label)}`;
     if (r.win_pct != null) {
       html += `<div class="alt">Your line: <b>${r.win_pct}%</b> to win. Best line: <b>${r.best_win_pct}%</b> (${B.say(r.best_label)}). ` +
-        (r.loss_pct > 0 ? `You gave up <b>${r.loss_pct}</b> points of win chance.` : "That was the engine's top choice.") + ` Rank ${r.rank} of ${r.of}.</div>`;
-      html += `<div class="alt alts">${(r.alternatives || []).map(a => `<div><span class="pct">${a.win_pct}%</span> ${B.say(a.label)}</div>`).join("")}</div>`;
-    } else html += `<div class="alt">Only one legal option, nothing to grade.</div>`;
+        (r.loss_pct > 0 ? `You gave up <b>${r.loss_pct}</b> points of win chance.` :
+          (r.raw_loss_pct > 0 ? `The gap (${r.raw_loss_pct} points) is within the search's margin of error (±${r.noise_pct}), so it isn't counted.` : "That was the engine's top choice.")) +
+        ` Rank ${r.rank} of ${r.of}.</div>`;
+      html += `<div class="alt alts">${(r.alternatives || []).filter(a => a.win_pct != null).map(a => `<div><span class="pct">${a.win_pct}%</span> ${B.say(a.label)}</div>`).join("")}</div>`;
+    } else if (r.grade === "resource") html += `<div class="alt">${r.note || "Floating resources isn't graded on its own."}</div>`;
+    else html += `<div class="alt">Only one legal option, nothing to grade.</div>`;
     $("#review").innerHTML = html;
   }
   function drawSummary(s) {

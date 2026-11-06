@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import random
 
-from .policies import MCTSPolicy, GreedyPolicy, _advance_default, heuristic
+import math
+
+from .policies import MCTSPolicy, GreedyPolicy, _advance_default, heuristic, ai_options
 
 GRADES = [(1.0, "best"), (3.0, "good"), (7.0, "inaccuracy"), (15.0, "mistake"), (1e9, "blunder")]
 
@@ -27,8 +29,11 @@ def analyze(game, d, iterations=300, seed=0, max_branch=40):
     if len(opts) == 1:
         out.append({"index": 0, "label": d.labels[0], "option": opts[0], "win_pct": None, "visits": 0})
         return {"options": out, "best": out[0], "iterations": 0}
+    # Floating resources (exhausting/recycling a rune for Energy/Power, Add abilities) is not a move by itself:
+    # it changes nothing until something is paid with it. Only real moves are searched and ranked.
+    real = set(ai_options(d, game))
     pol = MCTSPolicy(iterations=iterations, seed=seed, max_branch=max_branch)
-    root = pol.search(game, d)
+    root = pol.search(game, d, all_root_options=False)
     stats = {}
     for ch in root.children:
         if ch.visits:
@@ -36,18 +41,25 @@ def analyze(game, d, iterations=300, seed=0, max_branch=40):
     # options the search never visited get a one-ply greedy estimate so every move has a number
     rng = random.Random(seed)
     for i, o in enumerate(opts):
+        if o not in real:
+            out.append({"index": i, "label": d.labels[i], "option": o, "win_pct": None, "visits": 0, "resource": True})
+            continue
         if o in stats:
             visits, v = stats[o]
         else:
             g = game.clone()
             g.choose(o)
             _advance_default(g, d.player, rollout_rng=rng)
-            import math
             visits, v = 0, math.tanh(heuristic(g, d.player) / 150.0)
-        out.append({"index": i, "label": d.labels[i], "option": o, "win_pct": round(50.0 * (v + 1.0), 1), "visits": visits})
-    # rank by win% but break near-ties by visit count (more visits = more reliable)
-    out.sort(key=lambda x: (-(x["win_pct"] or 0), -x["visits"]))
-    return {"options": out, "best": out[0], "iterations": iterations}
+        # standard error of the estimate in win-% points (values are in [-1, 1]); one-ply guesses count as very uncertain
+        se = 50.0 / math.sqrt(visits) if visits else 25.0
+        out.append({"index": i, "label": d.labels[i], "option": o, "win_pct": round(50.0 * (v + 1.0), 1), "visits": visits,
+                    "se": round(se, 1)})
+    # rank by win% but break near-ties by visit count (more visits = more reliable); resource floats go last
+    out.sort(key=lambda x: (x["win_pct"] is None, -(x["win_pct"] or 0), -x["visits"]))
+    best = max((o for o in out if o["win_pct"] is not None), key=lambda x: (x["visits"], x["win_pct"]), default=out[0])
+    # the recommendation is the most-searched move (as MCTS picks), not a lucky estimate with few visits
+    return {"options": out, "best": best, "iterations": iterations}
 
 
 def grade_choice(analysis, chosen_option):
@@ -55,13 +67,22 @@ def grade_choice(analysis, chosen_option):
     opts = analysis["options"]
     best = analysis["best"]
     mine = next((o for o in opts if o["option"] == chosen_option), None)
+    if mine is not None and mine.get("resource"):
+        return {"grade": "resource", "loss_pct": 0.0, "win_pct": None, "best_label": best["label"],
+                "best_win_pct": best["win_pct"], "rank": None, "of": len(opts),
+                "note": "Floating Energy or Power isn't graded on its own; the move that uses it is."}
     if mine is None or mine["win_pct"] is None or best["win_pct"] is None:
         return {"grade": "only move", "loss_pct": 0.0, "win_pct": mine["win_pct"] if mine else None,
                 "best_label": best["label"], "best_win_pct": best["win_pct"], "rank": 1, "of": len(opts)}
-    loss = max(0.0, best["win_pct"] - mine["win_pct"])
-    rank = opts.index(mine) + 1
-    return {"grade": grade_for(loss), "loss_pct": round(loss, 1), "win_pct": mine["win_pct"], "best_label": best["label"],
-            "best_win_pct": best["win_pct"], "rank": rank, "of": len(opts)}
+    raw = max(0.0, best["win_pct"] - mine["win_pct"])
+    # only the part of the gap the search is confident about counts (one standard error of the difference)
+    noise = math.sqrt(best.get("se", 0) ** 2 + mine.get("se", 0) ** 2) if mine is not best else 0.0
+    loss = max(0.0, raw - noise)
+    ranked = [o for o in opts if o["win_pct"] is not None]
+    rank = ranked.index(mine) + 1
+    return {"grade": grade_for(loss), "loss_pct": round(loss, 1), "raw_loss_pct": round(raw, 1), "noise_pct": round(noise, 1),
+            "win_pct": mine["win_pct"], "best_label": best["label"], "best_win_pct": best["win_pct"], "rank": rank,
+            "of": len(ranked)}
 
 
 def review_replay(db, rep, player, iterations=200, decks=None):

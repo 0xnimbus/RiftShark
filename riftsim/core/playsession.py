@@ -115,7 +115,7 @@ class PlaySession:
         return out[:6]
 
     def summary(self):
-        rs = [r for r in self.reviews if r.get("grade") not in (None, "only move")]
+        rs = [r for r in self.reviews if r.get("grade") not in (None, "only move", "resource")]
         if not rs:
             return {"moves": 0}
         counts = {}
