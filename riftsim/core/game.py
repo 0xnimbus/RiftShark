@@ -294,6 +294,8 @@ class Game(flow.FlowMixin):
                 if lay != layer:
                     continue
                 self._apply_static(c, ab, src, uid)
+        if c.keywords.get("temporary") and not any(getattr(a, "keyword", None) == "temporary" for a in c.abilities):
+            c.abilities.append(_temporary_ability())     # granted [Temporary] (CR: kill me at the start of my Beginning Phase)
         if c.might is not None:
             c.might += o.buffs
             # keywords that modify might by designation
@@ -1525,3 +1527,15 @@ class Game(flow.FlowMixin):
                                                 "finalized": it.finalized, "card": self.objects[it.uid].defn.id if it.uid else None} for it in self.chain],
                 "showdown": self.showdown, "combat": self.combat, "winner": self.winner, "over": self.over,
                 "priority": self.priority, "focus": self.focus}
+
+
+_TEMPORARY = []
+
+
+def _temporary_ability():
+    if not _TEMPORARY:
+        from .abilities import Triggered
+        from . import ops as O
+        from .vm import Ref
+        _TEMPORARY.append(Triggered("start_beginning", [O.Kill(Ref("self"))], label="Temporary", keyword="temporary"))
+    return _TEMPORARY[0]

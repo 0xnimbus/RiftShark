@@ -332,3 +332,27 @@ def test_lady_of_clockwork_animates_one_gear_at_a_time(db, decks):
         c = g.chars(pick)
         assert "unit" in c.types and "gear" in c.types and c.might == g.objects[pick].defn.energy
     assert "unit" not in g.chars(a).types                   # a stopped being a unit when b was chosen
+
+
+def test_deceiver_plays_a_temporary_reflection_copy_when_you_conquer(db, decks):
+    g = main_phase(db, decks)
+    lg = legend(g, db, "UNL-199")
+    model = unit_at(g, 0, ("bf", 0))
+    hand0 = len(g.players[0].hand)
+    assert hand0 >= 1
+    g.emit("conquer", player=0, loc=("bf", 0), bf=0, units=(model,))
+    g.dirty = True
+    g.pending = None
+    for _ in range(40):
+        d = g.run()
+        if d.kind == "action" and not g.chain:
+            break
+        g.choose(True if d.kind == "yesno" else (("pass",) if ("pass",) in d.options else d.options[0]))
+    toks = [u for u, o in g.objects.items() if o.zone == "board" and o.defn.name == "Reflection"]
+    assert len(toks) == 1
+    t = toks[0]
+    o = g.objects[t]
+    assert o.location == ("bf", 0) and not o.exhausted and g.objects[lg].exhausted
+    assert len(g.players[0].hand) == hand0 - 1
+    assert o.base_defn() is g.objects[model].base_defn() and g.chars(t).might == g.chars(model).might
+    assert any(getattr(a, "keyword", None) == "temporary" for a in g.abilities(t))
