@@ -98,7 +98,8 @@ def _selfplay_game(args):
     from riftsim.core.deck import Deck
     from riftsim.core.game import Game
     from riftsim.core.learn.features import encode
-    from riftsim.core.policies import ai_options, make_policy
+    from riftsim.core.learn.policy import to_turn_end
+    from riftsim.core.policies import GreedyPolicy, ai_options, determinize, make_policy
     db = _db()
     decks = [Deck.load(p, db) for p in paths]
     pols = [make_policy(spec, seed=seed * 7 + i) for i in range(2)]
@@ -106,18 +107,26 @@ def _selfplay_game(args):
     g = Game(db, decks, seed=seed, log=False)
     g.max_turns = 60
     xs, seats = [], []
-    n = 0
+    last_turn = None
+    helper = GreedyPolicy(seed + 991, samples=1)
     t = time.time()
     while True:
         d = g.run()
         if d is None:
             break
-        if d.kind != "mulligan":
-            # every kind of decision point, both seats: greedy and MCTS evaluate positions at all of them
-            n += 1
-            if n % every == 0:
+        if g.turn != last_turn:
+            # a real turn boundary: the moment the learned greedy AI judges its options at
+            last_turn = g.turn
+            for s in (0, 1):
+                xs.append(encode(g, s))
+                seats.append(s)
+        elif d.kind == "action" and rng.random() < 1.0 / every:
+            # what-if boundary: the deciding player ends the turn here; teaches the net the positions it is asked about
+            h = determinize(g, d.player, rng)
+            to_turn_end(h, d.player, helper)
+            if not h.over:
                 for s in (0, 1):
-                    xs.append(encode(g, s))
+                    xs.append(encode(h, s))
                     seats.append(s)
         if d.kind == "action" and epsilon and rng.random() < epsilon:
             choice = rng.choice(ai_options(d, g))       # exploration: positions the best line would never reach
@@ -130,7 +139,7 @@ def _selfplay_game(args):
             "secs": time.time() - t}
 
 
-def selfplay(games, spec, out, workers, seed, every=4, epsilon=0.03):
+def selfplay(games, spec, out, workers, seed, every=3, epsilon=0.03):
     import numpy as np
     rng = random.Random(seed)
     jobs = []
