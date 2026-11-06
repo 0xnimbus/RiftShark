@@ -34,11 +34,11 @@ def list_decks():
         for f in sorted(os.listdir(p)):
             if f.endswith(".json"):
                 try:
-                    name = json.load(open(os.path.join(p, f), encoding="utf-8"))["name"]
+                    data = json.load(open(os.path.join(p, f), encoding="utf-8"))
                 except Exception:
                     continue
-                out.append({"path": d + "/" + f, "name": name})
-    return out
+                out.append({"path": d + "/" + f, "name": data.get("name", f), "data": data})
+    return SESSION.playable(out)
 
 
 class H(SimpleHTTPRequestHandler):

@@ -20,6 +20,9 @@ def call(cmd, args_json):
     elif cmd == "state": r = S.payload()
     elif cmd == "choose": r = S.choose(a["index"])
     elif cmd == "hint": r = S.hint()
+    elif cmd == "decks":
+        ds = [dict(d, data=json.load(open("/app/" + d["path"], encoding="utf-8"))) for d in a["decks"]]
+        r = {"ok": True, "decks": S.playable(ds), "server": False}
     else: r = {"ok": False, "error": "unknown command " + cmd}
     return json.dumps(r)
 `;
@@ -53,8 +56,8 @@ onmessage = async e => {
   try {
     if (!ready) ready = boot();
     const call = await ready;
-    if (cmd === "decks") return postMessage({ id, result: { ok: true, decks: manifest.decks, server: false } });
-    const out = call(cmd, JSON.stringify(args || {}));
+    const a = cmd === "decks" ? { decks: manifest.decks } : (args || {});
+    const out = call(cmd, JSON.stringify(a));
     postMessage({ id, result: JSON.parse(out) });
   } catch (err) {
     postMessage({ id, error: String(err && err.message || err) });

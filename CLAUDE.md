@@ -41,7 +41,9 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   `/api/decks` does not answer. Measured in headless Chromium: ~6 s to start, 5-11 s per move at mcts:60/analysis 60.
   Derrick's PC has only Python 3.10 and Claude's auto-mode there refused to run the cloned server; the browser build is the
   way for him to play. Hosting: Vercel (`vercel.json`: build `python3 tools/build_web_engine.py`, output `web/`),
-  imported from the GitHub repo through Derrick's Vercel account in Chrome on 2026-11-06. GitHub Pages stays as a fallback.
+  imported from the GitHub repo through Derrick's Vercel account in Chrome on 2026-11-06; live at https://riftshark.vercel.app/play.html
+  (auto-deploys on push to main; verified in Derrick's Chrome). The deck lists on the page only show decks that pass
+  Deck.validate (fully scripted). GitHub Pages stays as a fallback.
 - Main deck = 39 cards + chosen champion (CR 103.3). `When you play me` triggers fire from the chain.
 - `riftsim/` top level still holds the v1 simplified engine (engine.py, policies.py, replay.py, runner.py, cli.py).
   It will be replaced by v2 equivalents.

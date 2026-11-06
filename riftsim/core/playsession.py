@@ -20,6 +20,18 @@ class PlaySession:
         self.reviews = []
         self.log = []
 
+    def playable(self, decks):
+        """Keep only decks the engine can run exactly as printed (deck entries: {path, name, data})."""
+        out = []
+        for d in decks:
+            try:
+                errs = Deck.from_dict(d["data"], self.db).validate(self.db)
+            except Exception as e:  # malformed deck file
+                errs = [str(e)]
+            if not errs:
+                out.append({"path": d["path"], "name": d["name"]})
+        return out
+
     # ------------------------------------------------------------------ lifecycle
     def new(self, deck0, deck1, human=0, seed=0, ai="mcts:100", analysis=150):
         decks = [Deck.from_dict(deck0, self.db) if isinstance(deck0, dict) else deck0,
