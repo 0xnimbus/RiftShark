@@ -1128,3 +1128,20 @@ def test_needlessly_large_yordle_cheaper_per_hold_point(db, decks):
     g._score(0, 0, "hold")
     e2, pw2 = g.card_cost(0, y, "hand")
     assert e2 == max(0, e - 2) and pw2.count("calm") == max(0, pw.count("calm") - 1)
+
+
+def test_mageseeker_warden_locks_play_locations_and_readying(db, decks):
+    from riftsim.core.vm import Context
+    g = main_phase(db, decks)
+    g.set_bf_controller(1, 1); g.bump()
+    u = _card_in(g, db, 1, "Rell, Magnetic", "hand")
+    assert ("bf", 1) in g._play_locations(1, u, "hand")
+    w = put(g, db, 0, "Mageseeker Warden", ("base", 0))
+    assert ("bf", 1) in g._play_locations(1, u, "hand")          # only while it's at a battlefield
+    g.objects[w].location = ("bf", 0); g.bump()
+    assert g._play_locations(1, u, "hand") == [("base", 1)]
+    foe = put(g, db, 1, "Hunting Dog", ("base", 1)); g.objects[foe].exhausted = True
+    mine = put(g, db, 0, "Hunting Dog", ("base", 0), exclude=(foe,)); g.objects[mine].exhausted = True
+    g.bump()
+    assert not g.do_ready(foe, Context(1, None))
+    assert g.do_ready(mine, Context(0, None))

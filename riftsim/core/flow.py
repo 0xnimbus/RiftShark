@@ -1531,6 +1531,9 @@ class FlowMixin:
                 loc = ("bf", bf.idx)
                 if bf.controller is None and not self.units_at(loc) and loc not in locs:
                     locs.append(loc)
+        if "unit" in d.types and any(self.objects[src].controller != p and (self.objects[src].location or ("",))[0] == "bf"
+                                     for src, _ in self.rules("opp_units_base_only")):
+            locs = [l for l in locs if l[0] == "base"]       # Mageseeker Warden
         for ab in self._abilities_of(uid, o):
             if isinstance(ab, PlayPermission) and ab.perm == "only_to" and ab.value is not None:
                 locs = [l for l in locs if ab.value(self, p, l)]     # Perched Grimwyrm: "Play me only to ..."

@@ -878,6 +878,10 @@ class Game(flow.FlowMixin):
             return False
         if any(src == uid for src, _ in self.rules("cant_ready")):
             return False
+        if ctx is not None and (o.defn.is_unit or o.defn.is_gear) and any(
+                self.objects[src].controller != o.controller and (self.objects[src].location or ("",))[0] == "bf"
+                for src, _ in self.rules("no_ready_enemies")):
+            return False        # Mageseeker Warden: "spells and abilities can't ready enemy units and gear"
         o.exhausted = False
         self.bump()
         self.emit("ready", uid=uid, player=o.controller, loc=o.location, ctx=ctx)

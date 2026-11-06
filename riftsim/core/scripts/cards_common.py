@@ -2673,3 +2673,12 @@ def needlessly_large_yordle(defn):
         return max(0, e - 2 * n), pw
     return [PlayPermission("cost", cost_mod=mod, label="costs [2][Calm] less per point scored from holding this turn",
                            source_text=defn.text)]
+
+
+@script("Mageseeker Warden")
+def mageseeker_warden(defn):
+    # While I'm at a battlefield, opponents can only play units to their base.
+    # While I'm at a battlefield, spells and abilities can't ready enemy units and gear.
+    return [Static("self", "rule", ("opp_units_base_only",), label="opponents play units only to their base", source_text=defn.text),
+            Static("self", "rule", ("no_ready_enemies",), label="spells and abilities can't ready enemy units and gear",
+                   source_text=defn.text)]
