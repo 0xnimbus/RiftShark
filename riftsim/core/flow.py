@@ -1217,7 +1217,7 @@ class FlowMixin:
             c = self.chars(it.uid)
             granted = ctx.played_from not in ("hand", None) and \
                 bool(self.rules("accelerate_if_not_from_hand", player=it.controller))      # Rek'Sai, Breacher
-            if c.keywords.get("accelerate") or granted:
+            if c.keywords.get("accelerate") or granted or ctx.vars.get("__granted_accel"):
                 dom = [c.domains[0]] if len(c.domains) == 1 else (["any"] if not c.domains else [c.domains[0]])
                 out.append(("accelerate", (1, dom, "Accelerate [1][C]")))
         rc = getattr(it.ability, "repeat_cost", None) if it.ability is not None else None
@@ -1358,7 +1358,7 @@ class FlowMixin:
             if self.consume_turn_effects("enter_ready", player=p):
                 ready = True
             ev = self.replace_event({"kind": "enter_ready", "uid": it.uid, "player": p, "ready": ready, "loc": loc,
-                                     "add_paid": bool(ctx.paid.get("add"))})
+                                     "add_paid": bool(ctx.paid.get("add")), "opt_ready": bool(ctx.vars.get("__opt_ready"))})
             if ev is not None:
                 ready = bool(ev.get("ready"))
             o.exhausted = not ready
@@ -1473,6 +1473,15 @@ class FlowMixin:
             return
 
     # ------------------------------------------------------------------ playing cards (CR 349-359)
+    @staticmethod
+    def _printed_power(d):
+        doms, n = list(d.domains), d.power or 0
+        if n == 0:
+            return []
+        if len(doms) <= 1:
+            return (doms or ["any"]) * n
+        return list(doms[:n]) + [doms[0]] * max(0, n - len(doms))
+
     def card_cost(self, p, uid, from_zone, loc=None):
         """(energy, power list) to play card uid from zone (to location loc, if known), after reductions."""
         o = self.objects[uid]
@@ -1900,7 +1909,8 @@ class FlowMixin:
         self._use_play_effects(p, uid)
         if loc is not None and kind in ("unit", "gear"):
             self.turn_memo.setdefault("played_at", []).append((p, loc))
-        grant_repeat = kind == "spell" and bool(self.consume_turn_effects("grant_repeat", player=p))
+        grant_repeat = self.consume_turn_effects("grant_repeat", player=p) if kind == "spell" else []
+        grant_accel = kind == "unit" and bool(self.consume_turn_effects("grant_accelerate", player=p))   # Firelights' Hideout
         if kind == "gear" and not d.is_token:
             self.turn_memo[("gear_played", p)] = self.turn_memo.get(("gear_played", p), 0) + 1     # Ornn's Forge
         ctx = Context(p, uid, here=loc)
@@ -1911,7 +1921,13 @@ class FlowMixin:
             ctx.vars["__loc"] = loc
         ctx.vars["self"] = uid
         if grant_repeat:
-            ctx.vars["__granted_repeat"] = (e, tuple(pw))
+            if grant_repeat[0].get("base"):      # The Academy: "equal to its base cost" (printed)
+                be, bpw = d.energy or 0, self._printed_power(d)
+                ctx.vars["__granted_repeat"] = (be, tuple(bpw))
+            else:                                 # Temporal Portal: "equal to its cost"
+                ctx.vars["__granted_repeat"] = (e, tuple(pw))
+        if grant_accel:
+            ctx.vars["__granted_accel"] = True
         self._to_zone(o, "chain")
         o.controller = p
         # the card's own play abilities: spells have one 'effect' ability; permanents resolve by entering

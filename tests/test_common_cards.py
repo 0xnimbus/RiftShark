@@ -1240,3 +1240,48 @@ def test_temporal_portal_gives_next_spell_repeat_equal_to_its_cost(db, decks):
     sp2 = _card_in(g, db, 0, "Get Excited!", "hand")
     it2 = g._play(0, sp2, None)                       # only the next spell
     assert "repeat_granted" not in dict(g._optional_costs(it2, it2.ctx))
+
+
+def test_the_academy_grants_repeat_equal_to_base_cost(db, decks):
+    from riftsim.core.vm import Context
+    g = main_phase(db, decks)
+    sp = _card_in(g, db, 0, "Get Excited!", "hand")
+    d = g.objects[sp].base_defn()
+    _bf_card(g, db, "The Academy", 0)
+    g.set_bf_controller(0, 0); g.bump()
+    g.emit("hold", player=0, loc=("bf", 0), bf=0, units=()); settle(g)
+    it = g._play(0, sp, None)
+    rep = dict(g._optional_costs(it, it.ctx))["repeat_granted"]
+    assert rep[0] == (d.energy or 0) and len(rep[1]) == (d.power or 0)
+
+
+def test_firelights_hideout_next_unit_has_accelerate(db, decks):
+    g = main_phase(db, decks)
+    _bf_card(g, db, "Firelights' Hideout", 0)
+    g.set_bf_controller(0, 0); g.bump()
+    g.emit("conquer", player=0, loc=("bf", 0), bf=0, units=()); settle(g)
+    u = next(c.name for c in db if c.is_unit and not c.keywords.get("accelerate") and c.domains)
+    a = _card_in(g, db, 0, u, "hand")
+    it = g._play(0, a, ("base", 0))
+    assert "accelerate" in dict(g._optional_costs(it, it.ctx))
+
+
+def _play_and_settle(g, p, uid, loc, yes):
+    g._play(p, uid, loc)
+    g.pending = None
+    for _ in range(40):
+        d = g.run()
+        if d.kind == "yesno":
+            g.choose(yes); continue
+        if d.kind == "action" and not g.chain:
+            return
+        g.choose(("pass",) if ("pass",) in d.options else d.options[0])
+
+
+def test_entrenched_boar_may_enter_ready_but_then_cannot_move(db, decks):
+    for yes in (True, False):
+        g = main_phase(db, decks)
+        b = _card_in(g, db, 0, "Entrenched Boar", "hand")
+        _play_and_settle(g, 0, b, ("base", 0), yes)
+        assert g.objects[b].zone == "board"
+        assert g.objects[b].exhausted is (not yes) and g.cant_move(b) is yes

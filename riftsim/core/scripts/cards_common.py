@@ -2749,3 +2749,33 @@ def temporal_portal(defn):
                       [O.Do(lambda g, c: g.add_turn_effect(c, "grant_repeat", {}, uses=1),
                             label="your next spell this turn gets [Repeat] equal to its cost")],
                       label="next spell gets [Repeat]", source_text=defn.text)]
+
+
+@script("The Academy")
+def the_academy(defn):
+    # When you hold here, give your next spell this turn [Repeat] equal to its base cost.
+    return [Triggered("you_hold_here", [O.Do(lambda g, c: g.add_turn_effect(c, "grant_repeat", {"base": True}, uses=1),
+                                             label="your next spell this turn gets [Repeat] equal to its base cost")],
+                      controller="event", label=defn.name, source_text=defn.text)]
+
+
+@script("Firelights' Hideout")
+def firelights_hideout(defn):
+    # When you conquer here, the next unit you play this turn has [Accelerate].
+    return [Triggered("you_conquer_here", [O.Do(lambda g, c: g.add_turn_effect(c, "grant_accelerate", {}, uses=1),
+                                                label="your next unit this turn has [Accelerate]")],
+                      controller="event", label=defn.name, source_text=defn.text)]
+
+
+@script("Entrenched Boar")
+def entrenched_boar(defn):
+    # You may have me enter ready. If you do, I can't move this turn.
+    # (A unit resolves as soon as it is played, so the choice is made as it is played.)
+    from ..abilities import Replacement
+
+    def ready(g, s, ev):
+        g.add_mod(s, "keyword", ("cant_move", True), duration="turn", source=s)
+        return dict(ev, ready=True)
+    return [PlayPermission("as_play", value=[O.AskYesNo(out="__opt_ready", label="enter ready (then I can't move this turn)")]),
+            Replacement("enter_ready", lambda g, s, ev: ev.get("uid") == s and ev.get("opt_ready"), ready,
+                        label="enter ready; can't move this turn", zone="any", source_text=defn.text)]
