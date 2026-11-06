@@ -2649,3 +2649,27 @@ def spirit_wheel(defn):
             O.PayResources(1, [], out="__sw", optional=False),
             O.If(O.has_var("__sw"), [O.Exhaust(Ref("self")), O.Draw(1)])])],
         label="pay [1] and exhaust Spirit Wheel to draw 1")], label="Spirit Wheel: draw", source_text=defn.text)]
+
+
+@script("Gearhead")
+def gearhead(defn):
+    # Each Equipment attached to me gives double its base Might bonus: add each one's printed bonus once more.
+    def extra(g, src, uid):
+        return sum((g.objects[a].base_defn().might or 0) for a in g.objects[src].attachments
+                   if a in g.objects and g.objects[a].base_defn().is_equipment)
+    return [Static("self", "might", extra, label="Equipment give double their base Might bonus", source_text=defn.text)]
+
+
+@script("Needlessly Large Yordle")
+def needlessly_large_yordle(defn):
+    # I cost [2][Calm] less for each point you scored from holding this turn.
+    def mod(g, u, e, pw):
+        o = g.objects[u]
+        n = g.turn_memo.get(("hold_points", o.controller if o.controller is not None else o.owner), 0)
+        pw = list(pw)
+        for _ in range(n):
+            if "calm" in pw:
+                pw.remove("calm")
+        return max(0, e - 2 * n), pw
+    return [PlayPermission("cost", cost_mod=mod, label="costs [2][Calm] less per point scored from holding this turn",
+                           source_text=defn.text)]

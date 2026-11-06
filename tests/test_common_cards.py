@@ -1108,3 +1108,23 @@ def test_spirit_wheel_pays_one_and_exhausts_to_draw(db, decks):
     hand = len(g.players[0].hand)
     g.emit("target", targets=(foe,), player=0, item=None); settle(g, yes=True)     # an enemy unit: no trigger
     assert not g.objects[w].exhausted and len(g.players[0].hand) == hand
+
+
+def test_gearhead_doubles_equipment_base_might(db, decks):
+    g = main_phase(db, decks)
+    u = put(g, db, 0, "Gearhead", ("base", 0))
+    eq = next(c.name for c in db if c.is_equipment and (c.might or 0) >= 1 and "Equip" in (c.text or ""))
+    e = put(g, db, 0, eq, ("base", 0))
+    base = g.chars(u).might
+    g.do_attach(e, u); g.bump()
+    assert g.chars(u).might == base + 2 * g.objects[e].defn.might
+
+
+def test_needlessly_large_yordle_cheaper_per_hold_point(db, decks):
+    g = main_phase(db, decks)
+    y = _card_in(g, db, 0, "Needlessly Large Yordle", "hand")
+    e, pw = g.card_cost(0, y, "hand")
+    g.scored.discard((0, 0))
+    g._score(0, 0, "hold")
+    e2, pw2 = g.card_cost(0, y, "hand")
+    assert e2 == max(0, e - 2) and pw2.count("calm") == max(0, pw.count("calm") - 1)

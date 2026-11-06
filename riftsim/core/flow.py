@@ -748,7 +748,10 @@ class FlowMixin:
                 self.log("final_point_draw", player=p)
                 self.do_draw(p, 1)
         else:
+            before = ps.points
             self.gain_points(p, 1, how)
+            if how == "hold" and ps.points > before:     # Needlessly Large Yordle: "points you scored from holding"
+                self.turn_memo[("hold_points", p)] = self.turn_memo.get(("hold_points", p), 0) + ps.points - before
         self.log("score", player=p, bf=i, how=how)
         self.emit(how, player=p, loc=loc, bf=i, units=units)
         self.emit("score", player=p, loc=loc, bf=i, units=units, how=how)
