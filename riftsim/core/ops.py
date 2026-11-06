@@ -517,6 +517,18 @@ class Banish(Instr):
         return None
 
 
+def _distinct_combos(game, pool, n):
+    """Every way to pick n cards from pool, once per distinct outcome: copies of the same card that nobody can
+    tell apart (same card, same revealed state) give the same result, so only one of them is offered."""
+    seen, out = set(), []
+    for c in itertools.combinations(pool, n):
+        key = tuple(sorted((game.objects[u].defn.id, tuple(sorted(q for q, m in game.known.items() if u in m))) for u in c))
+        if key not in seen:
+            seen.add(key)
+            out.append(tuple(c))
+    return out
+
+
 class Discard(Instr):
     """Discard n cards chosen by the player (asks when there is a choice)."""
 
@@ -531,7 +543,7 @@ class Discard(Instr):
             ctx.vars[self.out] = tuple(hand)
             game.do_discard(p, list(hand), ctx)
             return None
-        opts = [tuple(c) for c in itertools.combinations(hand, n)]
+        opts = _distinct_combos(game, hand, n)
         if len(opts) == 1:
             return self.resume(game, ctx, opts[0])
         return Decision(p, "discard", opts, out=self.out, labels=[", ".join(game.label(u) for u in o) for o in opts])
@@ -570,9 +582,9 @@ class Recycle(Instr):
         if len(pool) <= n:
             game.do_recycle(pool, ctx)
             return None
-        opts = [tuple(c) for c in itertools.combinations(pool, n)]
-        if len(opts) > 60:   # keep branching sane: recycle the "least useful" automatically
-            opts = opts[:60]
+        opts = _distinct_combos(game, pool, n)
+        if len(opts) == 1:
+            return self.resume(game, ctx, opts[0])
         return Decision(p, "recycle", opts, out=self.out, labels=[", ".join(game.label(u) for u in o) for o in opts])
 
     def resume(self, game, ctx, choice):

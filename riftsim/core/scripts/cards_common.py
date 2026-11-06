@@ -1897,8 +1897,9 @@ def call_to_battle(defn):
     # Move a unit you control to a battlefield you control. Then, choose an opponent. They move a unit they control to
     # the same battlefield.
     mine = lambda g, c, l: g.battlefields[l[1]].controller == c.controller
-    theirs = lambda g, c: [u for u, o in g.objects.items() if o.zone == "board" and o.controller == c.vars.get("__opp")
-                           and "unit" in g.chars(u).types and o.location != c.vars["loc"] and g.valid_destination(u, c.vars["loc"])]
+    theirs = lambda g, c: [u for u, o in g.objects.items() if c.vars.get("loc") is not None and o.zone == "board"
+                           and o.controller == c.vars.get("__opp") and "unit" in g.chars(u).types and o.location != c.vars["loc"]
+                           and g.valid_destination(u, c.vars["loc"])]
     return [SpellEffect([O.Choose(Sel("unit", side="friendly", pred=lambda g, c, u: g.objects[u].controller == c.controller), out="t"),
                          O.ChooseLocation(out="loc", pred=mine, label="a battlefield you control"),
                          O.Move(Ref("t"), Ref("loc")),

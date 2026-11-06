@@ -685,9 +685,10 @@ class Game(flow.FlowMixin):
                     self.turn_effects.remove(t)
         return out
 
-    def replace_event(self, ev):
+    def replace_event(self, ev, dry=False):
         """Apply replacement effects to an event (CR 367-375). Returns the (possibly modified) event or
-        None if it was prevented entirely. Optional replacements cannot be created (see abilities.Replacement)."""
+        None if it was prevented entirely. Optional replacements cannot be created (see abilities.Replacement).
+        dry=True previews the result without using up once-per-turn or limited-use replacements."""
         applied = set()
         changed = True
         guard = 0
@@ -712,9 +713,10 @@ class Game(flow.FlowMixin):
                     except (KeyError, AttributeError, TypeError):
                         continue
                     applied.add(key)
-                    if ab.once_per_turn:
-                        o.temp[("rpt", id(ab))] = self.turn
-                    self.log("replace", source=uid, event=ev["kind"], label=ab.label)
+                    if not dry:
+                        if ab.once_per_turn:
+                            o.temp[("rpt", id(ab))] = self.turn
+                        self.log("replace", source=uid, event=ev["kind"], label=ab.label)
                     ev = ab.replace(self, uid, ev)
                     changed = True
                     if ev is None:
@@ -734,7 +736,7 @@ class Game(flow.FlowMixin):
                     continue
                 applied.add(key)
                 ev = t["data"]["replace"](self, t["ctx"], ev)
-                if t["uses"] is not None:
+                if t["uses"] is not None and not dry:
                     t["uses"] -= 1
                     if t["uses"] <= 0:
                         self.turn_effects.remove(t)
@@ -971,6 +973,27 @@ class Game(flow.FlowMixin):
             self.emit("damage", uid=u, amount=amt, source=src, player=o.controller, loc=o.location, by=by, combat=combat, ctx=ctx)
             self.dirty = True
 
+    def preview_damage(self, u, amount, by, combat=True):
+        """How much damage unit u would actually take from `amount` damage dealt by player `by` (replacement
+        effects, Lotus Trap doubling, Counter Strike and prevention), without changing anything."""
+        o = self.objects.get(u)
+        if o is None or o.zone != "board":
+            return 0
+        ev = self.replace_event({"kind": "damage", "uid": u, "amount": amount, "source": None, "player": o.controller,
+                                 "loc": o.location, "by": by, "combat": combat}, dry=True)
+        if ev is None or ev.get("amount", 0) <= 0:
+            return 0
+        amt = ev["amount"]
+        for m in o.mods:
+            if m.kind == "double_damage":
+                amt *= 2
+        if any(m.kind == "prevent_next" for m in o.mods):
+            return 0
+        for m in o.mods:
+            if m.kind == "prevent" and m.value > 0 and amt > 0:
+                amt -= min(m.value, amt)
+        return max(0, amt)
+
     def do_deal_split(self, uids, amount, ctx):
         """Split damage among targets: greedy lethal-first then dump the rest on the biggest (AI default)."""
         us = [u for u in uids if u in self.objects and self.objects[u].zone == "board"]
@@ -1103,6 +1126,8 @@ class Game(flow.FlowMixin):
         made = []
         extra = len(self.rules("channel_plus_one", player=p)) if n > 0 else 0     # Seraphic Wyvern: "+1 exhausted rune"
         plan = [bool(exhausted)] * n + [True] * extra
+        if extra:
+            self.log("channel_extra", player=p, n=extra)
         for k, exh in enumerate(plan):
             if not ps.rune_deck:
                 self.log("channel_short", player=p, missing=len(plan) - k)     # rune deck empty: nothing to channel

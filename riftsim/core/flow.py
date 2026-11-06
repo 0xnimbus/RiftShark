@@ -233,6 +233,13 @@ class _FinalizeCosts(Instr):
                         info={"item": it.id, "for": it.label, "energy": e, "power": list(p)})
 
 
+def _weak_compositions(n, k):
+    """Ways to write n as an ordered sum of k non-negative parts."""
+    if k == 1:
+        return [(n,)]
+    return [(a,) + rest for a in range(n + 1) for rest in _weak_compositions(n - a, k - 1)]
+
+
 class FlowMixin:
     # ------------------------------------------------------------------ driver
     def run(self):
@@ -250,14 +257,16 @@ class FlowMixin:
                 if d is not None:
                     return d
                 continue
+            if self.dirty:
+                # CR 320.1 / 323.1: a pending cleanup (victory first) happens before the new pending
+                # items are ordered and finalized
+                self.dirty = False
+                self._cleanup()
+                continue
             if self.reorder_requests:
                 d = self._ask_trigger_order()
                 if d is not None:
                     return d
-                continue
-            if self.dirty:
-                self.dirty = False
-                self._cleanup()
                 continue
             if self.chain:
                 self._advance_chain()
@@ -417,12 +426,13 @@ class FlowMixin:
             self.dirty = True
         elif ph == "channel":
             n = 2
-            if self.turn == 2 and self.cfg["players"] == 2:
-                n = 3     # CR 487.7: player going second channels an extra rune on their first turn
+            if self.cfg["players"] == 2 and self.turn_player != self.first_player and self.turns_taken.get(self.turn_player) == 1:
+                n = 3     # CR 487.7: the player going second channels an extra rune in their first Channel Phase
             if any(self.objects[src].location is not None and self.objects[src].location[0] == "bf"
                    for src, _ in self.rules("channel_only_one")):
                 n = 1     # Sandstone Chimera: "players only channel 1 rune at the start of their Channel Phase"
-            self.do_channel(self.turn_player, n)
+            made = self.do_channel(self.turn_player, n)
+            self.log("channel_phase", player=self.turn_player, n=n, made=len(made))
             self.phase = "draw"
             self.dirty = True
         elif ph == "draw":
@@ -472,8 +482,6 @@ class FlowMixin:
         p = self.turn_player
         for u, o in list(self.objects.items()):
             if o.zone == "board" and o.controller == p and o.exhausted:
-                if o.stunned:
-                    continue
                 if any(src == u for src, _ in self.rules("cant_ready")):
                     continue
                 o.exhausted = False
@@ -763,7 +771,8 @@ class FlowMixin:
         targets = [u for u in targets if u in self.objects and self.objects[u].zone == "board"]
         if total <= 0 or not targets:
             return
-        plans = self._damage_plans(targets, total)
+        plans = self._damage_plans(targets, total, player)
+        self.combat["assign_targets_" + str(player)] = tuple(targets)
         if len(plans) == 1:
             self.combat["assign"][player] = plans[0]
             return
@@ -774,36 +783,79 @@ class FlowMixin:
         self.combat["assign"][d.player] = choice
         self.combat["assign_targets_" + str(d.player)] = d.info["targets"]
 
-    def _damage_plans(self, targets, total):
-        """Enumerate legal combat damage assignments (CR 467.2.c): lethal first, Tank first, Backline last."""
+    def _lethal_need(self, u, total, by):
+        """CR 467.2.c.4.a / 467.2.c.5: the least assigned amount that would be lethal once replacement effects and
+        prevention apply to it. None when no amount would be lethal (e.g. 'I don't take damage')."""
+        o = self.objects[u]
+        might = self.chars(u).might or 0
+        prevent = sum(m.value for m in o.mods if m.kind == "prevent" and m.value > 0)
+        bound = max(total, might - o.damage) + prevent + 1 + (1 if any(m.kind == "prevent_next" for m in o.mods) else 0)
+        for a in range(1, bound + 1):
+            dealt = self.preview_damage(u, a, by, combat=True)
+            if dealt > 0 and (o.damage + dealt >= might or self._any_damage_kills(u, by)):
+                return a
+        return None
+
+    def _any_damage_kills(self, u, by):
+        o = self.objects[u]
+        return any(not self.is_friendly(self.objects[src].controller, o.controller) and self.objects[src].controller == by
+                   for src, _ in self.rules("any_damage_kills_enemies"))
+
+    def _damage_plans(self, targets, total, player=None):
+        """Every legal combat damage assignment (CR 467.2.c): units in priority order (Tank first, then units
+        without a requirement, then Backline / "assigned last", CR 467.2.c.6-7, any order inside a priority) each
+        get lethal damage in full before the next one gets any (467.2.c.3); the unit reached when damage runs out
+        gets the rest; no unit gets more than lethal while another can still receive damage (467.2.c.4); once
+        every unit has lethal assigned, the excess may go to any of them in any split."""
         last = {src for src, _ in self.rules("assigned_damage_last")}
-        info = []
+        info = {}
         for u in targets:
             c = self.chars(u)
-            need = max(1, (c.might or 0) - self.objects[u].damage)
-            prio = 0 if c.keywords.get("tank") else (2 if c.keywords.get("backline") else 1)
-            if u in last:
-                prio = 3            # Soraka, Wanderer: "I must be assigned combat damage last"
-            info.append((u, need, prio))
-        groups = [[t for t in info if t[2] == k] for k in (0, 1, 2, 3)]
+            need = self._lethal_need(u, total, player)
+            if need is None:
+                # no amount is lethal (CR 467.2.c.6 "if able"): the unit may absorb any part of the damage
+                need = float("inf")
+            prio = 0 if c.keywords.get("tank") else (2 if (c.keywords.get("backline") or u in last) else 1)
+            info[u] = (need, prio)
+        idx = {u: k for k, u in enumerate(targets)}
         plans = set()
-        for perm0 in itertools.permutations(groups[0]):
-            for perm1 in itertools.permutations(groups[1]):
-                for perm2 in itertools.permutations(groups[2] + groups[3]):
-                    if groups[3] and any(t[2] == 3 for t in perm2[:len(groups[2])]):
+        memo = {}
+
+        def rec(left, rem):
+            key = (left, rem)
+            if key in memo:
+                return memo[key]
+            out = set()
+            if rem == 0:
+                out.add(())
+            elif not left:
+                # everything has lethal: split the excess among all targets in any way
+                for comp in _weak_compositions(rem, len(targets)):
+                    out.add(tuple((targets[k], a) for k, a in enumerate(comp) if a))
+            else:
+                p = min(info[u][1] for u in left)
+                for u in left:
+                    if info[u][1] != p:
                         continue
-                    order = list(perm0) + list(perm1) + list(perm2)
-                    plan = {u: 0 for u in targets}
-                    rem = total
-                    for u, need, _ in order:
-                        take = min(need, rem)
-                        plan[u] = take
-                        rem -= take
-                    if rem > 0:
-                        plan[order[-1][0]] += rem
-                    plans.add(tuple(plan[u] for u in targets))
-                    if len(plans) > 60:
-                        break
+                    need = info[u][0]
+                    if need > rem:
+                        if need == float("inf"):      # cannot be made lethal: any amount it absorbs before moving on
+                            for a in range(0, rem + 1):
+                                for sub in (rec(left - {u}, rem - a) if a < rem else {()}):
+                                    out.add((((u, a),) if a else ()) + sub)
+                        else:
+                            out.add(((u, rem),))
+                    else:
+                        for sub in rec(left - {u}, rem - need):
+                            out.add(((u, need),) + sub)
+            memo[key] = out
+            return out
+
+        for combo in rec(frozenset(targets), total):
+            plan = [0] * len(targets)
+            for u, a in combo:
+                plan[idx[u]] += a
+            plans.add(tuple(plan))
         return sorted(plans, reverse=True)
 
     def _task_combat_deal(self):
@@ -1274,6 +1326,8 @@ class FlowMixin:
             return f"play {self.label(a[1])}" + (f" to {self.loc_name(loc)}" if loc else "")
         if k == "move":
             return "move " + ", ".join(self.label(u) for u in a[1]) + " to " + self.loc_name(a[2])
+        if k == "move_select":
+            return "move units to " + self.loc_name(a[1]) + " (choose which)"
         if k == "rune":
             d = (self.objects[a[2]].domain or "?").capitalize()
             return f"exhaust a {d} rune: add 1 energy" if a[1] == "exhaust" else f"recycle a {d} rune: add {d} power"
@@ -1296,12 +1350,9 @@ class FlowMixin:
         elif k == "play":
             self._play(self.priority if self.priority is not None else self.turn_player, a[1], a[2] if len(a) > 2 else None)
         elif k == "move":
-            p = self.turn_player
-            b = self.tick()
-            for u in a[1]:
-                self.do_exhaust(u, batch=b)
-            self.do_move(list(a[1]), a[2], Context(p), standard=True)
-            self.dirty = True
+            self._do_standard_move(self.turn_player, a[1], a[2])
+        elif k == "move_select":
+            self._move_select_step(self.turn_player, a[1], [])
         elif k == "hide":
             p = self.turn_player
             plans = []
@@ -1682,25 +1733,52 @@ class FlowMixin:
                         return False
         return True
 
+    MOVE_COMBO_LIMIT = 6          # up to this many movable units: one action per group; more: pick the group unit by unit
+
     def _move_actions(self, p):
+        """CR 144: a Standard Move exhausts any number of the player's units and moves them to one destination; the
+        origins need not be the same (144.3.b). Stunned units may move (stun only stops combat damage, CR 424.1.b)."""
         acts = []
-        by_loc = {}
-        for u, o in self.objects.items():
-            if o.zone == "board" and o.controller == p and not o.exhausted and not o.stunned and "unit" in self.chars(u).types:
-                by_loc.setdefault(o.location, []).append(u)
+        ready = [u for u, o in self.objects.items() if o.zone == "board" and o.controller == p and not o.exhausted
+                 and o.location is not None and "unit" in self.chars(u).types]
         dests = [("bf", b.idx) for b in self.battlefields] + [("base", p)]
-        for loc, units in by_loc.items():
-            units = units[:8]
-            for dest in dests:
-                if dest == loc:
-                    continue
-                movable = [u for u in units if self.valid_destination(u, dest, standard=True)]
-                if not movable:
-                    continue
+        for dest in dests:
+            movable = [u for u in ready if self.valid_destination(u, dest, standard=True)]
+            if not movable:
+                continue
+            if len(movable) <= self.MOVE_COMBO_LIMIT:
                 for k in range(1, len(movable) + 1):
                     for combo in itertools.combinations(movable, k):
                         acts.append(("move", tuple(combo), dest))
+            else:
+                acts.append(("move_select", dest))
         return acts
+
+    def _move_select_step(self, p, dest, chosen):
+        movable = [u for u, o in self.objects.items() if o.zone == "board" and o.controller == p and not o.exhausted
+                   and o.location is not None and "unit" in self.chars(u).types and u not in chosen
+                   and self.valid_destination(u, dest, standard=True)]
+        opts = movable + (["done"] if chosen else [])
+        if not movable:
+            self._do_standard_move(p, tuple(chosen), dest)
+            return
+        self.ask(p, "pick", opts, [self.label(u) for u in movable] + (["move them"] if chosen else []), "_move_select_pick",
+                 dest=dest, chosen=tuple(chosen), label=f"Move which units to {self.loc_name(dest)}?")
+
+    def _move_select_pick(self, choice, d):
+        p, dest, chosen = d.player, d.info["dest"], list(d.info["chosen"])
+        if choice == "done":
+            self._do_standard_move(p, tuple(chosen), dest)
+            return
+        chosen.append(choice)
+        self._move_select_step(p, dest, chosen)
+
+    def _do_standard_move(self, p, units, dest):
+        b = self.tick()
+        for u in units:
+            self.do_exhaust(u, batch=b)
+        self.do_move(list(units), dest, Context(p), standard=True)
+        self.dirty = True
 
     def _hide_actions(self, p):
         acts = []
