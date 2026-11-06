@@ -118,6 +118,7 @@ def baron_nashor(defn):
         if any(g.objects[bf.uid].defn.name == "Baron Pit" for bf in g.battlefields):
             return
         idx = g.add_battlefield_token(c.controller, "Baron Pit", c)
+        c.vars["__play_loc"] = c.vars.get("__loc")      # where he was played to (The Exile reads this)
         c.vars["__loc"] = ("bf", idx)
         c.target_bf = None
     return [PlayPermission("as_play", value=[O.Do(as_play, label="add the Baron Pit")],

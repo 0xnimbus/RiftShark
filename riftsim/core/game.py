@@ -1357,6 +1357,10 @@ class Game(flow.FlowMixin):
         defn = self.db.tokens[name]
         from .scripts import attach_scripts
         attach_scripts(self.db, defn)
+        if defn.is_unit and loc is not None and loc[0] == "bf" \
+                and loc in {self.objects[src].place for src, v in self.rules("cant_play_here")}:
+            self.log("token_blocked", name=name, loc=loc, player=p)    # Rockfall Path: token units are played too (CR 185.2.a)
+            return None
         o = self._new_obj(defn, p)
         if defn.type == "battlefield":
             return self._create_battlefield_token(o, loc, ctx)

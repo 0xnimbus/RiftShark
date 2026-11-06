@@ -1360,6 +1360,7 @@ class FlowMixin:
             if self.consume_turn_effects("enter_ready", player=p):
                 ready = True
             ev = self.replace_event({"kind": "enter_ready", "uid": it.uid, "player": p, "ready": ready, "loc": loc,
+                                     "play_loc": ctx.vars.get("__play_loc") or loc,
                                      "add_paid": bool(ctx.paid.get("add")), "opt_ready": bool(ctx.vars.get("__opt_ready"))})
             if ev is not None:
                 ready = bool(ev.get("ready"))
@@ -1563,6 +1564,8 @@ class FlowMixin:
         if "spell" in d.types:
             return [None]
         if from_zone == "facedown":
+            if "unit" in d.types and o.hidden_at in {self.objects[src].place for src, v in self.rules("cant_play_here")}:
+                return []                    # a unit hidden at Rockfall Path can't be played there
             return [o.hidden_at]
         locs = [("base", p)]
         if "unit" in d.types:
@@ -1732,9 +1735,8 @@ class FlowMixin:
                 return False
         if z == "hand" and self.rules("cant_play_from_hand", player=p):
             return False
-        for t in self.turn_effects:
-            if t["kind"] == "cant_play" and p in t["data"].get("players", ()):
-                return False
+        if not self._play_locks_ok(p, uid):
+            return False
         for ab in self._abilities_of(uid, o):
             if isinstance(ab, PlayPermission) and ab.perm == "additional_cost":
                 req, ins, mandatory = ab.value
@@ -1742,7 +1744,14 @@ class FlowMixin:
                     ctx = Context(p, uid, here=None)
                     if not req.candidates(self, ctx):
                         return False
-        if "spell" in o.base_defn().types:
+        return True
+
+    def _play_locks_ok(self, p, uid):
+        """Effects that stop a player playing cards, which also apply to plays made by effects (CR 420.3.b)."""
+        for t in self.turn_effects:
+            if t["kind"] == "cant_play" and p in t["data"].get("players", ()):
+                return False                 # Brynhir Thundersong: "opponents can't play cards this turn"
+        if "spell" in self.objects[uid].base_defn().types:
             for src, v in self.rules("cant_play_spells"):
                 if self.objects[src].controller != p and v is True:
                     return False
@@ -1991,6 +2000,13 @@ class FlowMixin:
         if alt_cost is not None:
             e, pw = alt_cost
         if not self.can_pay(p, e, pw, purpose=payment.purpose_of_card(self, uid)):
+            return False
+        # CR 420.3.b: a limited play follows every normal step, so "can't play" locks (Brynhir Thundersong, spell
+        # locks) and "Units can't be played here" (Rockfall Path) stop it; the card stays where it is (CR 420.3.c).
+        if not self._play_locks_ok(p, uid):
+            return False
+        if kind == "unit" and loc is not None and loc[0] == "bf" \
+                and loc in {self.objects[src].place for src, v in self.rules("cant_play_here")}:
             return False
         kind = "spell" if "spell" in d.types else ("unit" if "unit" in d.types else "gear")
         if loc is None and kind != "spell":
