@@ -194,3 +194,32 @@ def test_rockfall_path_stops_unit_tokens_and_hidden_units(db):
     g.objects[fae].facedown_turn = g.turn - 1
     g.bump()
     assert g._play_locations(0, fae, "facedown") == []
+
+
+def test_big_combat_damage_is_assigned_one_unit_at_a_time_and_every_option_completes(db):
+    # Self-play hung for 15+ minutes listing every split of a big excess over many units. The same legal set is now
+    # offered one unit at a time once there are more than ASSIGN_FLAT_LIMIT assignments.
+    from riftsim.core.flow import DamageAssignments
+    big = DamageAssignments([(2, 1)] * 10, 60)
+    assert big.count() > 10 ** 9 and big.amounts(()) == list(range(2, 43))
+    g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "riven_exile")])
+    foes = [put(g, db, 1, "Stellacorn Herder", ("bf", 0), exclude=()) for _ in range(1)]
+    for _ in range(4):
+        foes.append(put(g, db, 1, "Stellacorn Herder", ("bf", 0), exclude=tuple(foes)))
+    g.combat = {"bf": 0, "attacker": 0, "defender": 1, "step": "damage", "assign": {}}
+    g._task_assign(0, tuple(foes), 40)
+    dp = g._assign_dp(foes, 40, 0)
+    assert dp.count() > g.ASSIGN_FLAT_LIMIT
+    rnd = __import__("random").Random(3)
+    steps = 0
+    while 0 not in g.combat["assign"]:
+        if g.tasks and g.tasks[-1][0] == "assign_step":
+            g._task(*g.tasks.pop())
+            continue
+        d = g.pending
+        assert d is not None and d.kind == "assign_damage_step"
+        assert all(dp.count(d.info["prefix"] + (a,)) for a in d.options)
+        g.choose(rnd.choice(d.options))
+        steps += 1
+    plan = g.combat["assign"][0]
+    assert steps >= 1 and sum(plan) == 40 and plan in set(dp.plans())
