@@ -90,6 +90,14 @@ class GameObject:
     def base_defn(self):
         return self.copy_of or self.defn
 
+    @property
+    def place(self):
+        """Location used for 'here': a battlefield card sits at ('bfcard', i) but its 'here' is ('bf', i)."""
+        loc = self.location
+        if loc is not None and loc[0] == "bfcard":
+            return ("bf", loc[1])
+        return loc
+
 
 class PlayerState:
     __slots__ = ("idx", "name", "deck_name", "hand", "deck", "trash", "banish", "rune_deck", "runes", "legend",

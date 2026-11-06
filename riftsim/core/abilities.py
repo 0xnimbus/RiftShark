@@ -23,7 +23,7 @@ def _ev_is(ev, kind):
 
 def _at_source(g, src, ev):
     o = g.objects.get(src)
-    return o is not None and o.location is not None and ev.get("loc") == o.location
+    return o is not None and o.location is not None and ev.get("loc") == o.place
 
 
 def _friendly_unit(g, src, uid):
@@ -228,7 +228,7 @@ class Static(Ability):
             return g.objects[src].attached_to == uid
         from .vm import Context
         o = g.objects[src]
-        ctx = Context(o.controller, src, here=o.location)
+        ctx = Context(o.controller, src, here=o.place)
         return self.sel.matches(g, ctx, uid)
 
 

@@ -33,14 +33,20 @@ class PlaySession:
         return out
 
     # ------------------------------------------------------------------ lifecycle
-    def new(self, deck0, deck1, human=0, seed=0, ai="mcts:100", analysis=150):
-        decks = [Deck.from_dict(deck0, self.db) if isinstance(deck0, dict) else deck0,
-                 Deck.from_dict(deck1, self.db) if isinstance(deck1, dict) else deck1]
+    def new(self, deck0, deck1, human=0, seed=None, ai="mcts:100", analysis=150):
+        # deck0 is the human's deck and deck1 the AI's; the human sits in seat `human` and seat 0 goes first
+        mine = Deck.from_dict(deck0, self.db) if isinstance(deck0, dict) else deck0
+        theirs = Deck.from_dict(deck1, self.db) if isinstance(deck1, dict) else deck1
+        decks = [mine, theirs] if int(human) == 0 else [theirs, mine]
         for d in decks:
             d.validate(self.db, raise_on_error=True)
+        if seed is None or seed == "" or seed == "random":
+            import random as _random
+            seed = _random.SystemRandom().randrange(2**31)   # a fresh shuffle every game
+        self.seed = int(seed)
         self.human, self.ai_spec, self.analysis = int(human), ai, int(analysis)
         self.ai = make_policy(ai, seed=int(seed) + 1)
-        g = Game(self.db, decks, seed=int(seed), log=True)
+        g = Game(self.db, decks, seed=int(seed), log=True, first_player=0)
         g.max_turns = 60
         self.game, self.reviews, self.log = g, [], []
         moves = self._run_ai()
@@ -77,7 +83,7 @@ class PlaySession:
 
     def payload(self, extra=None):
         g = self.game
-        out = {"ok": True, "started": g is not None}
+        out = {"ok": True, "started": g is not None, "seed": getattr(self, "seed", None)}
         if g is not None:
             d = g.run()
             dv = None if d is None else {"player": d.player, "kind": d.kind, "labels": list(d.labels), "n": len(d.options)}

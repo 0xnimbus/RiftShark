@@ -350,7 +350,7 @@ class FlowMixin:
                     if self._showdown_at(bf.idx):
                         continue
                     self.log("lose_control", bf=bf.idx, player=bf.controller)
-                    bf.controller = None
+                    self.set_bf_controller(bf.idx, None)
                     self.dirty = True
         # 5. recalls
         for u, o in list(self.objects.items()):
@@ -497,7 +497,7 @@ class FlowMixin:
     def _establish_control(self, i, p):
         bf = self.battlefields[i]
         prev = bf.controller
-        bf.controller = p
+        self.set_bf_controller(i, p)
         self.log("control", bf=i, player=p, prev=prev)
         self.bump()
         self._score(p, i, "conquer")
@@ -668,7 +668,7 @@ class FlowMixin:
             if bf.controller != p:
                 self._establish_control(i, p)
         elif not players:
-            bf.controller = None
+            self.set_bf_controller(i, None)
         bf.contested_by = None
         self.dirty = True
 
@@ -1047,7 +1047,7 @@ class FlowMixin:
             if isinstance(ab, PlayPermission) and (ab.cond is None or ab.cond(self, uid)):
                 if ab.perm in ("any_battlefield", "any_location"):
                     anywhere = True
-        blocked = {self.objects[src].location for src, v in self.rules("cant_play_here")}
+        blocked = {self.objects[src].place for src, v in self.rules("cant_play_here")}
         if "unit" in d.types:
             if kws.get("ambush") or anywhere:
                 for bf in self.battlefields:
@@ -1208,7 +1208,7 @@ class FlowMixin:
         if cost.get("discard", 0) > len(self.players[p].hand):
             return False
         if cost.get("sacrifice") is not None:
-            ctx = Context(p, uid, here=o.location)
+            ctx = Context(p, uid, here=o.place)
             if not cost["sacrifice"].candidates(self, ctx):
                 return False
         if cost.get("kill_self") and o.zone != "board":
@@ -1219,7 +1219,7 @@ class FlowMixin:
         if not self.can_pay(p, e, pw, purpose={"kind": "ability", "types": set(self.chars(uid).types), "uid": uid}):
             return False
         if ab.targets:
-            ctx = Context(p, uid, here=o.location)
+            ctx = Context(p, uid, here=o.place)
             for ins in ab.target_code:
                 if isinstance(ins, Choose) and not ins.up_to and not ins.allow_none:
                     if not self.choice_candidates(ctx, ins.sel, targeted=ins.targeted):
@@ -1332,7 +1332,7 @@ class FlowMixin:
     def _activate(self, p, uid, idx):
         o = self.objects[uid]
         ab = self.abilities(uid)[idx]
-        ctx = Context(p, uid, here=o.location)
+        ctx = Context(p, uid, here=o.place)
         ctx.vars["self"] = uid
         cost = ab.cost
         pw = [o.base_defn().domains[0] if (d == "C" and o.base_defn().domains) else ("any" if d == "C" else d) for d in cost.get("power", ())]

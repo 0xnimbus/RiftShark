@@ -23,8 +23,9 @@ class RulesError(Exception):
 
 
 class Game(flow.FlowMixin):
-    def __init__(self, db: CardDB, decks, seed=0, mode="1v1", log=True, strict=True):
+    def __init__(self, db: CardDB, decks, seed=0, mode="1v1", log=True, strict=True, first_player=None):
         self.db = db
+        self._first_choice = first_player   # None: random (CR: players determine who goes first randomly)
         self.strict = strict  # False: allow decks with unscripted cards (dev smoke tests only)
         self.mode = mode
         self.cfg = MODES[mode]
@@ -113,9 +114,12 @@ class Game(flow.FlowMixin):
             for u in picks:
                 bf = BattlefieldState(len(self.battlefields), u, i)
                 self.objects[u].zone, self.objects[u].location = "board", ("bfcard", len(self.battlefields))
+                self.objects[u].controller = None      # battlefields start uncontrolled (CR 190.6.d)
                 self.battlefields.append(bf)
         # who goes first: random; second player channels an extra rune in 1v1? (CR 486: second player draws? )
         first = self.rng.randrange(len(self.players))
+        if self._first_choice is not None:
+            first = int(self._first_choice)
         self.turn_queue = [(first + k) % len(self.players) for k in range(len(self.players))]
         for i, p in enumerate(self.players):
             for _ in range(self.cfg["hand"]):
@@ -125,6 +129,14 @@ class Game(flow.FlowMixin):
         self.first_player = first
         for i, p in enumerate(self.players):
             p.conceded = False
+        self.bump()
+
+    def set_bf_controller(self, i, p):
+        """A battlefield's controller is also the controller of its card, so 'you' in its abilities means that
+        player (CR 190.6.d); with no controller, 'you' refers to no one."""
+        bf = self.battlefields[i]
+        bf.controller = p
+        self.objects[bf.uid].controller = p
         self.bump()
 
     # ------------------------------------------------------------------ basics
@@ -507,7 +519,7 @@ class Game(flow.FlowMixin):
         def order(t):
             uid, ab, _ = t
             o = self.objects.get(uid)
-            ctrl = o.controller if o is not None else self.turn_player
+            ctrl = o.controller if (o is not None and o.controller is not None) else self.turn_player
             return ((ctrl - self.turn_player) % len(self.players), getattr(ab, "priority", 0))
         pend.sort(key=order)
         for uid, ab, _ in pend:
@@ -528,13 +540,15 @@ class Game(flow.FlowMixin):
             return
         if ab.controller == "self":
             ctrl = o.controller
+            if ctrl is None:
+                ctrl = self.turn_player      # CR 190.6.b: an uncontrolled battlefield's ability is the turn player's
         elif ab.controller == "owner":
             ctrl = o.owner
         elif ab.controller == "event" and ev.get("player") is not None:
             ctrl = ev["player"]          # "they": the player the event is about (battlefield abilities)
         else:
             ctrl = self.turn_player
-        ctx = Context(ctrl, uid, here=o.location)
+        ctx = Context(ctrl, uid, here=o.place)
         ctx.event = ev
         ctx.vars["ev"] = ev
         ctx.vars["self"] = uid
@@ -777,7 +791,7 @@ class Game(flow.FlowMixin):
         here_bonus = {}
         if ctx is not None and not combat:
             for src_r, v in self.rules("bonus_damage_here"):
-                here_bonus[self.objects[src_r].location] = here_bonus.get(self.objects[src_r].location, 0) + v
+                here_bonus[self.objects[src_r].place] = here_bonus.get(self.objects[src_r].place, 0) + v
         for u in list(uids):
             o = self.objects.get(u)
             if o is None or o.zone != "board":
