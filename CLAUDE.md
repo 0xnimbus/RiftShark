@@ -100,6 +100,15 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   and `plans` per pay option (runes exhausted/recycled). Runes are drawn with their card art: on your turn a click offers
   exhaust/recycle, during a payment a click cycles tap -> recycle -> undo and "Pay" picks the matching plan (same-domain runes are
   interchangeable). Score is a big number plus a numbered 1..8 track; hand is a fan; round End turn / Pass button on the mat.
+- Learning (Derrick 2026-11-06 20:55: "the main focus of this project", the AI must get stronger with practice):
+  `riftsim/core/learn/` (features from one seat only, tested against determinize; value net with a pure-Python forward
+  pass; `learned[:gen]` / `learned-mcts:N[:gen]` policies) and `tools/train_loop.py generation` (self-play with the best
+  AI -> train -> gate head to head -> promote at 55%+). Models, `models/ladder.md`, history and control matches are in
+  `models/`; self-play data goes to /mnt/project-files/riftshark/learn (not git). Key finding: judging every option at the
+  start of the next turn (`learn.policy.to_turn_end`) is what makes the AI strong: with the hand-written score it beats
+  expert 87-13 (`learned:heuristic`, the current best and the play page's "Learned" level). Plain nets lost to it;
+  net v2 learns a correction on top of the score and tied it on expert data; gen 2 self-plays with the lookahead AI.
+  The 5-hourly "RiftShark round-robin training" routine should run a generation and then a round-robin with `--policy learned`.
 - Main deck = 39 cards + chosen champion (CR 103.3). `When you play me` triggers fire from the chain.
 - `riftsim/` top level still holds the v1 simplified engine (engine.py, policies.py, replay.py, runner.py, cli.py).
   It will be replaced by v2 equivalents.
@@ -141,7 +150,7 @@ Bugs Derrick reported 2026-11-06 03:35 (do first next session, before item 2):
    `riftsim/core/scripts/cards_manual.py`.
 2. Port policies (greedy, MCTS with determinisation), replay save/verify and the batch runner to v2.
 3. GitHub Pages frontend (stats + visual replay viewer with card images) and Supabase upload.
-4. Self-play training (policy/value net) on top of MCTS.
+4. Self-play training: value net in place (see Learning above); next a policy head / learned MCTS priors.
 
 ## Conventions
 
