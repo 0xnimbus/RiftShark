@@ -1145,3 +1145,52 @@ def test_mageseeker_warden_locks_play_locations_and_readying(db, decks):
     g.bump()
     assert not g.do_ready(foe, Context(1, None))
     assert g.do_ready(mine, Context(0, None))
+
+
+def _rune_setup(g, db, p, domains):
+    """Leave player p with ready runes of exactly these domains."""
+    rdefs = {c.domains[0]: c for c in db if c.type == "rune" and len(c.domains) == 1}
+    for i, r in enumerate(g.players[p].runes):
+        o = g.objects[r]
+        if i < len(domains):
+            o.defn, o.domain, o.exhausted = rdefs[domains[i]], domains[i], False
+        else:
+            o.exhausted = True
+    g.bump()
+
+
+def test_kraken_hunter_spends_buffs_to_reduce_body(db, decks):
+    g = main_phase(db, decks)
+    a = put(g, db, 0, "Rell, Magnetic", ("base", 0)); g.objects[a].buffs = 1
+    b = put(g, db, 0, "Hunting Dog", ("base", 0)); g.objects[b].buffs = 1
+    k = _card_in(g, db, 0, "Kraken Hunter", "hand")
+    _rune_setup(g, db, 0, ["body", "chaos", "chaos", "chaos"])
+    assert not g.can_pay(0, *g.card_cost(0, k, "hand"))
+    assert ("play", k, ("base", 0)) in g.legal_actions(0)       # playable only by spending at least one buff
+    it = g._play(0, k, ("base", 0))
+    g.pending = None
+    seen = None
+    for _ in range(40):
+        d = g.run()
+        if d.kind == "pick_many":
+            seen = [set(o) for o in d.options]
+            g.choose(next(o for o in d.options if set(o) == {a, b})); continue
+        if it.cost.get("paid") is not None or (d.kind == "action" and not g.chain):
+            break
+        g.choose(d.options[0])
+    assert seen is not None and set() not in seen and {a, b} in seen       # spending none is not legal here
+    assert g.objects[a].buffs == 0 and g.objects[b].buffs == 0
+    assert it.cost.get("paid") is not None and "body" not in it.cost["power"]
+
+
+def test_commander_ledros_kills_friendly_units_to_reduce_order(db, decks):
+    g = main_phase(db, decks)
+    a = put(g, db, 0, "Hunting Dog", ("base", 0))
+    led = _card_in(g, db, 0, "Commander Ledros", "hand")
+    _rune_setup(g, db, 0, ["order"] * 3 + ["chaos"] * 5)
+    ab = g._variable_reduce_perm(led)
+    assert ab is not None and ab.value[0](g, 0, led) == [a] or a in ab.value[0](g, 0, led)
+    e, pw = g.card_cost(0, led, "hand")
+    from riftsim.core import payment
+    need = g._variable_reduce_min(0, led, e, pw, payment.purpose_of_card(g, led))
+    assert need == 1

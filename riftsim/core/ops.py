@@ -341,8 +341,9 @@ class ChoosePlayer(Instr):
 class ChooseFromList(Instr):
     """Generic choice among explicit options (e.g. cards looked at). `options` -> list."""
 
-    def __init__(self, options, out, n=1, up_to=False, player=None, labels=None, label=""):
+    def __init__(self, options, out, n=1, up_to=False, player=None, labels=None, label="", min_n=0):
         self.options, self.out, self.n, self.up_to, self.player, self.labels, self.label = options, out, n, up_to, player, labels, label
+        self.min_n = min_n
 
     def run(self, game, ctx):
         p = _player(game, ctx, self.player)
@@ -356,7 +357,8 @@ class ChooseFromList(Instr):
             return Decision(p, "pick", opts, out=self.out, labels=[game.label(o) for o in opts], info={"label": self.label})
         maxn = min(n, len(opts))
         combos = []
-        for k in range(0 if self.up_to else maxn, maxn + 1):
+        lo = min(val(game, ctx, self.min_n) or 0, maxn) if self.up_to else maxn
+        for k in range(lo, maxn + 1):
             combos += [tuple(c) for c in itertools.combinations(opts, k)]
         if len(combos) <= 1:
             ctx.vars[self.out] = combos[0] if combos else ()

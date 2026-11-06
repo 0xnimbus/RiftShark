@@ -1025,6 +1025,8 @@ class FlowMixin:
                                         Do(lambda g, c, outs=tuple(outs): c.paid.__setitem__(
                                             "add", all(c.vars.get(o) for o in outs) and c.vars.get("__addok", True)))],
                                        label="pay the additional cost", out="__addq"))
+                if isinstance(ab, PlayPermission) and ab.perm == "variable_reduce":
+                    pre += self._variable_reduce_code(it, ab)
                 if isinstance(ab, PlayPermission) and ab.perm == "free_with_cost":
                     # "As you play this, you may <cost> as an additional cost. If you do, ignore this spell's cost."
                     can, ins = ab.value
@@ -1045,6 +1047,57 @@ class FlowMixin:
             code = code + [_SnapChoices(0), _SkipUnlessRepeat(len(code) + 3 + len(tcode))]
             code = code + relocate(tcode, len(code)) + [_SnapChoices(1)]
         self.vm_frames.append(Frame(code, ctx, tag=("finalize", it.id)))
+
+    # "As you play me, you may <do X> any number of times as an additional cost. Reduce my cost by [D] for each."
+    # (Kraken Hunter, Commander Ledros). value = (candidates(g, p, uid) -> uids, domain, act(g, ctx, uid)).
+    def _variable_reduce_perm(self, uid):
+        for ab in self._abilities_of(uid, self.objects[uid]):
+            if isinstance(ab, PlayPermission) and ab.perm == "variable_reduce":
+                return ab
+        return None
+
+    @staticmethod
+    def _reduce_power(pw, dom, k):
+        pw = list(pw)
+        for _ in range(k):
+            if dom in pw:
+                pw.remove(dom)
+        return pw
+
+    def _variable_reduce_min(self, p, uid, e, pw, purpose):
+        """Fewest cost actions that make the play affordable (None if even all of them don't)."""
+        ab = self._variable_reduce_perm(uid)
+        if ab is None:
+            return 0 if self.can_pay(p, e, pw, purpose=purpose) else None
+        cands, dom, _ = ab.value
+        n = len(cands(self, p, uid))
+        for k in range(0, n + 1):
+            if self.can_pay(p, e, self._reduce_power(pw, dom, k), purpose=purpose):
+                return k
+        return None
+
+    def _variable_reduce_code(self, it, ab):
+        from .ops import ChooseFromList
+        cands, dom, act = ab.value
+        p, uid = it.controller, it.uid
+        opts = lambda g, c: list(cands(g, p, uid))
+
+        def need(g, c):
+            cost = it.cost or {"energy": 0, "power": []}
+            k = g._variable_reduce_min(p, uid, cost["energy"], cost["power"], g.item_purpose(it))
+            return k or 0
+
+        def apply(g, c):
+            chosen = [u for u in (c.vars.get("__vr") or ()) if u in g.objects]
+            for u in chosen:
+                act(g, c, u)
+            if it.cost is not None and chosen:
+                it.cost = dict(it.cost, power=g._reduce_power(it.cost["power"], dom, len(chosen)))
+            if chosen:
+                c.paid["add"] = True
+        return [ChooseFromList(opts, out="__vr", n=lambda g, c: len(opts(g, c)), up_to=True, min_n=need,
+                               label=ab.label or "additional cost"),
+                Do(apply, label="pay the additional cost")]
 
     def _trash_play_perm(self, uid):
         """'You may play me from your trash for COST' (PlayPermission 'from_trash', alt_cost, cond)."""
@@ -1582,7 +1635,8 @@ class FlowMixin:
                 e, pw = self.card_cost(p, u, z, loc)
                 if not self.can_pay(p, e, pw, purpose=purpose):
                     if not (loc is None and self._exhaust_reducers(p) and self.can_pay(p, max(0, e - 2), pw, purpose=purpose)) \
-                            and not self._free_with_cost(p, u):
+                            and not self._free_with_cost(p, u) \
+                            and self._variable_reduce_min(p, u, e, pw, purpose) is None:
                         continue
                 if loc is None:
                     if not self._spell_has_targets(p, u, z):

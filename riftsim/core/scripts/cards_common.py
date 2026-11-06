@@ -2682,3 +2682,20 @@ def mageseeker_warden(defn):
     return [Static("self", "rule", ("opp_units_base_only",), label="opponents play units only to their base", source_text=defn.text),
             Static("self", "rule", ("no_ready_enemies",), label="spells and abilities can't ready enemy units and gear",
                    source_text=defn.text)]
+
+
+@script("Kraken Hunter")
+def kraken_hunter(defn):
+    # As you play me, you may spend any number of buffs as an additional cost. Reduce my cost by [Body] for each buff you spend.
+    cands = lambda g, p, uid: [u for u, o in g.objects.items() if o.zone == "board" and o.controller == p and o.buffs > 0]
+    return [PlayPermission("variable_reduce", value=(cands, "body", lambda g, c, u: g.do_spend_buff(u, c)),
+                           label="spend buffs: [Body] less each", source_text=defn.text)]
+
+
+@script("Commander Ledros")
+def commander_ledros(defn):
+    # As you play me, you may kill any number of friendly units as an additional cost. Reduce my cost by [Order] for each.
+    cands = lambda g, p, uid: [u for u, o in g.objects.items() if o.zone == "board" and o.controller == p
+                               and "unit" in g.chars(u).types and u != uid]
+    return [PlayPermission("variable_reduce", value=(cands, "order", lambda g, c, u: g.do_kill([u], c, by="cost")),
+                           label="kill friendly units: [Order] less each", source_text=defn.text)]
