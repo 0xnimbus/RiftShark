@@ -996,6 +996,9 @@ class Game(flow.FlowMixin):
                                      "batch": batch})
             if ev is None:
                 continue
+            if ev.get("replaced_with") == "banish":         # "if it would die this turn, banish it instead" (Smite)
+                self.do_banish([u], ctx)
+                continue
             if ev.get("replaced_with") == "recall":
                 self.do_recall(u, ctx, heal=True, exhaust=ev.get("exhaust", False))
                 continue

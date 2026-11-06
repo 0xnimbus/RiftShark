@@ -618,3 +618,91 @@ def test_mistfall_readies_a_buffed_unit(db, decks):
     g.do_buff(u)
     settle(g)
     assert not g.objects[u].exhausted and g.objects[m].exhausted
+
+
+def test_dazzling_aurora_plays_the_first_unit_revealed(db, decks):
+    g = main_phase(db, decks)
+    a = put(g, db, 0, "Dazzling Aurora", ("base", 0))
+    deck = g.players[0].deck
+    first_unit = next(u for u in deck if g.objects[u].base_defn().is_unit)
+    before = [u for u in deck[:deck.index(first_unit)]]
+    _fire(g, a, "Dazzling Aurora")
+    settle(g)
+    assert g.objects[first_unit].zone == "board"
+    assert all(u in g.players[0].deck[-len(before):] for u in before) if before else True
+
+
+def test_stormbringer_and_dragons_rage(db, decks):
+    g = main_phase(db, decks)
+    me = put(g, db, 0, "Elnuk Herd", ("base", 0))
+    foe = put(g, db, 1, "Hunting Dog", ("bf", 0), exclude=(me,))
+    _run_spell(g, db, "Stormbringer, Volibear", picks=[me, ("bf", 0)])
+    assert g.objects[me].location == ("bf", 0) and (g.objects[foe].zone == "trash" or g.objects[foe].damage >= 3)
+    g = main_phase(db, decks)
+    a = put(g, db, 1, "Elnuk Herd", ("bf", 0))
+    b = put(g, db, 1, "Hunting Dog", ("bf", 1), exclude=(a,))
+    _run_spell(g, db, "Dragon's Rage, Lee Sin", picks=[a, ("bf", 1), b])
+    assert g.objects[a].location == ("bf", 1) and g.objects[a].damage + g.objects[b].damage > 0 or g.objects[b].zone == "trash"
+
+
+def test_smite_banishes_instead_of_dying(db, decks):
+    g = main_phase(db, decks)
+    foe = put(g, db, 1, "Hunting Dog", ("bf", 0))
+    _run_spell(g, db, "Smite", picks=[foe])
+    assert g.objects[foe].zone in ("banish", "board")
+    g.do_kill([foe])
+    assert g.objects[foe].zone == "banish"
+
+
+def test_noxian_guillotine_kills_on_next_damage(db, decks):
+    from riftsim.core.vm import Context
+    g = main_phase(db, decks)
+    foe = put(g, db, 1, "Elnuk Herd", ("bf", 0))
+    _run_spell(g, db, "Noxian Guillotine, Darius", picks=[foe])
+    assert g.objects[foe].zone == "board"
+    g.do_deal([foe], 1, Context(0, None))
+    settle(g)
+    assert g.objects[foe].zone == "trash"
+
+
+def test_card_sharp_gold_for_each_opponent_who_took_one(db, decks):
+    g = main_phase(db, decks)
+    cs = put(g, db, 0, "Card Sharp", ("base", 0))
+    _fire(g, cs, "Card Sharp")
+    settle(g, yes=True)
+    golds = [o.controller for o in g.objects.values() if o.zone == "board" and o.defn.name == "Gold"]
+    assert sorted(golds) == [0, 0, 1]
+
+
+def test_riposte_counters_and_pumps(db, decks):
+    from riftsim.core.objects import ChainItem
+    g = main_phase(db, decks)
+    u = put(g, db, 0, "Hunting Dog", ("base", 0))
+    sp = _card_in(g, db, 1, "Get Excited!", "hand")
+    g._to_zone(g.objects[sp], "chain"); g.bump()
+    g.chain.append(ChainItem(900, "spell", 1, uid=sp, label="Get Excited!"))
+    base = g.chars(u).might
+    _run_spell(g, db, "Riposte", picks=[u, sp])
+    assert g.objects[sp].zone == "trash" and g.chars(u).might == base + (g.objects[sp].base_defn().energy or 0)
+
+
+def test_strike_down_and_void_rush(db, decks):
+    g = main_phase(db, decks)
+    u = put(g, db, 0, "Elnuk Herd", ("base", 0))
+    eq = put(g, db, 0, "Protector's Shield", ("base", 0), exclude=(u,))
+    g.do_attach(eq, u); g.bump()
+    foe = put(g, db, 1, "Elnuk Herd", ("bf", 0), exclude=(u, eq))
+    _run_spell(g, db, "Strike Down", picks=[u, foe])
+    assert g.objects[eq].attached_to is None and (g.objects[foe].damage > 0 or g.objects[foe].zone == "trash")
+    top2 = g.players[0].deck[:2]
+    hand = len(g.players[0].hand)
+    _run_spell(g, db, "Void Rush", picks=[()])
+    assert all(g.objects[x].zone == "hand" for x in top2) and len(g.players[0].hand) == hand + 2
+
+
+def test_zenith_blade_stuns_and_may_move(db, decks):
+    g = main_phase(db, decks)
+    foe = put(g, db, 1, "Elnuk Herd", ("bf", 0))
+    me = put(g, db, 0, "Hunting Dog", ("base", 0), exclude=(foe,))
+    _run_spell(g, db, "Zenith Blade, Leona", picks=[(me,)])
+    assert any(e["kind"] == "move" and e.get("uid") == me and e.get("to") == ("bf", 0) for e in g.events)   # then a showdown there

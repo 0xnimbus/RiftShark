@@ -1740,3 +1740,141 @@ def overt_operation(defn):
     return [SpellEffect([O.ChooseFromList(buffed, out="__oo", n=lambda g, c: len(buffed(g, c)), up_to=True,
                                           label="spend buffs to ready those units"),
                          O.Do(run, label="spend buffs, ready"), O.Buff(friends)], label=defn.name, source_text=defn.text)]
+
+
+# ---------------------------------------------------------------- batch 2026-11-06 16:00
+@script("Dazzling Aurora")
+def dazzling_aurora(defn):
+    # At the end of your turn, reveal cards from the top of your Main Deck until you reveal a unit. Play it, ignoring its
+    # cost, and recycle the rest.
+    def reveal(g, c):
+        deck = g.players[c.controller].deck
+        i = next((k for k, u in enumerate(deck) if g.objects[u].base_defn().is_unit), None)
+        shown = list(deck[: (i + 1) if i is not None else len(deck)])
+        if shown:
+            g.emit("reveal", cards=tuple(shown), player=c.controller, ctx=c)
+        c.vars["__du"] = deck[i] if i is not None else None
+        c.vars["__dr"] = [u for u in shown if u != c.vars["__du"]]
+    return [Triggered("end_turn", [O.Do(reveal, label="reveal until a unit"),
+                                   O.If(Ref("__du"), [O.PlayCard(Ref("__du"), ignore="all")]),
+                                   O.Recycle(lambda g, c: [u for u in c.vars.get("__dr", []) if g.objects[u].zone == "deck"])],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Stormbringer, Volibear")
+def stormbringer(defn):
+    # Choose a friendly unit in your base. Deal damage equal to its Might to all enemy units at a battlefield, then move
+    # your unit there.
+    foes = lambda g, c: [u for u in g.units_at(c.vars["loc"]) if _enemy(g, c, u)]
+    might = lambda g, c: g.chars(c.vars["t"]).might or 0
+    return [SpellEffect([O.Choose(Sel("unit", side="friendly", where="own_base"), out="t"), O.ChooseLocation(out="loc"),
+                         O.Deal(might, foes), O.Move(Ref("t"), Ref("loc"))], label=defn.name, source_text=defn.text)]
+
+
+@script("Dragon's Rage, Lee Sin")
+def dragons_rage(defn):
+    # Move an enemy unit. Then choose another enemy unit at its destination. They deal damage equal to their Mights to
+    # each other.
+    dests = lambda g, c, l: c.vars.get("t") is not None and l != g.objects[c.vars["t"]].location and g.valid_destination(c.vars["t"], l)
+    there = lambda g, c: [u for u in g.units_at(g.objects[c.vars["t"]].location) if u != c.vars["t"] and _enemy(g, c, u)] \
+        if c.vars.get("t") in g.objects and g.objects[c.vars["t"]].zone == "board" else []
+    return [SpellEffect([O.Choose(Sel("unit", side="enemy"), out="t"),
+                         O.ChooseLocation(out="loc", pred=dests, include_bases=True, label="move it where?"),
+                         O.Move(Ref("t"), Ref("loc")),
+                         O.ChooseFromList(there, out="t2", label="choose another enemy unit there"),
+                         O.Do(lambda g, c: _fight(g, c, c.vars.get("t"), c.vars.get("t2")) if c.vars.get("t2") else None,
+                              label="they deal damage to each other")], label=defn.name, source_text=defn.text)]
+
+
+@script("Zenith Blade, Leona")
+def zenith_blade(defn):
+    # [Action]  Stun an enemy unit at a battlefield. You may move a friendly unit to that enemy unit's battlefield.
+    bf = lambda g, c: g.objects[c.vars["t"]].location
+    movers = lambda g, c: [u for u, o in g.objects.items() if o.zone == "board" and g.is_friendly(o.controller, c.controller)
+                           and "unit" in g.chars(u).types and o.location != bf(g, c) and g.valid_destination(u, bf(g, c))]
+    return [SpellEffect([O.Choose(Sel("unit", side="enemy", where="battlefield"), out="t"), O.Stun(Ref("t")),
+                         O.ChooseFromList(movers, out="__zm", up_to=True, label="you may move a friendly unit there"),
+                         O.Move(lambda g, c: list(c.vars.get("__zm") or ()), bf)],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Strike Down")
+def strike_down(defn):
+    # Choose an equipped friendly unit. It deals damage equal to its Might to an enemy unit. Then detach an Equipment
+    # from it.
+    equipped = Sel("unit", side="friendly", pred=lambda g, c, u: bool(g.objects[u].attachments))
+    gear = lambda g, c: list(g.objects[c.vars["t"]].attachments) if c.vars.get("t") in g.objects else []
+    return [SpellEffect([O.Choose(equipped, out="t"), O.Choose(Sel("unit", side="enemy"), out="t2"),
+                         O.Deal(lambda g, c: g.chars(c.vars["t"]).might or 0, Ref("t2")),
+                         O.ChooseFromList(gear, out="__sd", label="detach an Equipment"),
+                         O.If(Ref("__sd"), [O.Detach(Ref("__sd"))])], label=defn.name, source_text=defn.text)]
+
+
+@script("Smite")
+def smite(defn):
+    # [Action]  Deal 3 to a unit at a battlefield. If it would die this turn, banish it instead.
+    applies = lambda g, ctx, ev: ev.get("uid") == ctx.vars.get("t")
+    rep = lambda g, ctx, ev: dict(ev, replaced_with="banish")
+    return [SpellEffect([O.Choose(Sel("unit", where="battlefield"), out="t"),
+                         O.DelayedPassive("replace:die", {"applies": applies, "replace": rep}),
+                         O.Deal(3, Ref("t"))], label=defn.name, source_text=defn.text)]
+
+
+@script("Noxian Guillotine, Darius")
+def noxian_guillotine(defn):
+    # [Action]  Choose a unit. Kill it the next time it takes damage this turn.  [Legion] — Kill it now instead.
+    legion = lambda g, c: g.legion_active(c.controller, c.source)
+    dmg = lambda g, s, ev: ev.get("kind") == "damage"
+    it = lambda g, c, ev: ev.get("uid") == c.vars.get("t")
+    return [SpellEffect([O.Choose(Sel("unit"), out="t"),
+                         O.If(legion, [O.Kill(Ref("t"))],
+                              [O.Delayed(dmg, [O.Kill(Ref("t"))], filt=it, expires="turn", once=True, label="Noxian Guillotine")])],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Card Sharp")
+def card_sharp(defn):
+    # When you play me, you and each opponent may play a Gold gear token exhausted. For each opponent who did, you play a
+    # Gold gear token exhausted.
+    def gold(p):
+        return lambda g, c: g.play_token(p(g, c), "Gold", ("base", p(g, c)), exhausted_gear=True, ctx=c)
+    me = lambda g, c: c.controller
+    opp = lambda g, c: g.opponent(c.controller)
+    return [Triggered("play_self", [O.May([O.Do(gold(me), label="play a Gold")], label="play a Gold gear token exhausted"),
+                                    O.May([O.Do(gold(opp), label="play a Gold"), O.Do(gold(me), label="they did: you play a Gold")],
+                                          label="play a Gold gear token exhausted", player=opp)],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Riposte")
+def riposte(defn):
+    # [Reaction]  Choose a friendly unit and a spell. Counter that spell and give that unit +[M] equal to that spell's
+    # Energy cost this turn.
+    spell = Sel("card", zone="chain", pred=lambda g, c, u: any(it.uid == u and it.kind == "spell" for it in g.chain))
+    def counter(g, c):
+        u = c.vars.get("__sp")
+        it = next((x for x in g.chain if x.uid == u and x.kind == "spell"), None)
+        c.vars["__spc"] = g.objects[u].base_defn().energy or 0 if u in g.objects else 0
+        if it is not None:
+            g.do_counter(it.id, c)
+    return [SpellEffect([O.Choose(Sel("unit", side="friendly"), out="t"), O.Choose(spell, out="__sp"),
+                         O.Do(counter, label="counter it"), O.GiveMight(Ref("t"), Ref("__spc"))], label=defn.name, source_text=defn.text)]
+
+
+@script("Void Rush")
+def void_rush(defn):
+    # Reveal the top 2 cards of your Main Deck. You may play one of them, reducing its cost by [2]. Draw any you did not
+    # play this way.
+    cards = lambda g, c: [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck"]
+    def cheaper(g, c):
+        e, pw = g.card_cost(c.controller, c.vars["__vr"], "deck", None)
+        return (max(0, e - 2), pw)
+    def draw_rest(g, c):
+        ps = g.players[c.controller]
+        for u in [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck"]:
+            ps.deck.remove(u); ps.deck.insert(0, u)
+            g.do_draw(c.controller, 1, c)
+    return [SpellEffect([O.Look(2, out="looked", reveal=True),
+                         O.ChooseFromList(cards, out="__vr", up_to=True, label="play one, [2] less"), O.Do(_unwrap("__vr")),
+                         O.If(Ref("__vr"), [O.PlayCard(Ref("__vr"), alt_cost=cheaper)]),
+                         O.Do(draw_rest, label="draw the rest")], label=defn.name, source_text=defn.text)]
