@@ -1268,6 +1268,8 @@ class FlowMixin:
         if from_zone == "hand" and c.is_equipment and self.rules("hand_equipment_quick_draw", player=p):
             reaction = True                       # Jax, Unmatched: "Each Equipment in your hand has [Quick-Draw]."
         action = bool(kws.get("action"))
+        if c.type == "gear" and kws.get("deploy") and self.rules("deploy_gear_action", player=p):
+            action = True                         # Jarvan IV, Martial Paragon: "Your gear with [Deploy] have [Action]."
         for ab in self._abilities_of(uid, o):
             if isinstance(ab, PlayPermission) and (ab.cond is None or ab.cond(self, uid)):
                 if ab.perm == "reaction":

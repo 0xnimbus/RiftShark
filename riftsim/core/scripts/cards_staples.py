@@ -1200,3 +1200,16 @@ def ziggs(defn):
     # (line 1 auto-scripted) Abilities of friendly gear deal 1 Bonus Damage.
     return {"abilities": [Static("self", "rule", ("bonus_damage_gear_abilities", 1), label=defn.name, source_text=defn.text)],
             "replace": False}
+
+
+@script("Jarvan IV, Martial Paragon")
+def jarvan_paragon(defn):
+    # Your gear with [Deploy] have [Action].
+    # When I conquer, if there is a friendly gear with [Deploy] here, channel 1 rune exhausted.
+    def deploy_gear_here(g, c):
+        me = g.objects[c.source]
+        return any(o.zone == "board" and o.location == me.location and o.controller == c.controller and
+                   "gear" in g.chars(u).types and o.base_defn().keywords.get("deploy") for u, o in g.objects.items())
+    return {"abilities": [Static("self", "rule", ("deploy_gear_action",), label="your [Deploy] gear have [Action]", source_text=defn.text),
+                          Triggered("conquer_self", [O.If(deploy_gear_here, [O.Channel(1, exhausted=True)])],
+                                    label=defn.name, source_text=defn.text)], "replace": True}
