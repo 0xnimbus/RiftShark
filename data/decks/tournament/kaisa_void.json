@@ -1,0 +1,149 @@
+{
+ "name": "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+ "legend": "OPP-247",
+ "champion": "OGN-039",
+ "main": [
+  {
+   "id": "SFD-065",
+   "name": "Forecaster",
+   "count": 3
+  },
+  {
+   "id": "OGN-096",
+   "name": "Watchful Sentry",
+   "count": 1
+  },
+  {
+   "id": "RAD-003",
+   "name": "Bilgewater Tracker",
+   "count": 3
+  },
+  {
+   "id": "OGN-087",
+   "name": "Lecturing Yordle",
+   "count": 2
+  },
+  {
+   "id": "OGN-039",
+   "name": "Kai'Sa, Survivor",
+   "count": 1
+  },
+  {
+   "id": "OGN-012",
+   "name": "Noxus Hopeful",
+   "count": 3
+  },
+  {
+   "id": "OGN-026",
+   "name": "Brynhir Thundersong",
+   "count": 3
+  },
+  {
+   "id": "OGN-116",
+   "name": "Thousand-Tailed Watcher",
+   "count": 3
+  },
+  {
+   "id": "RAD-060",
+   "name": "The Empyrean",
+   "count": 2
+  },
+  {
+   "id": "OGN-090",
+   "name": "Orb of Regret",
+   "count": 1
+  },
+  {
+   "id": "SFD-080",
+   "name": "Bellows Breath",
+   "count": 1
+  },
+  {
+   "id": "OGN-009",
+   "name": "Hextech Ray",
+   "count": 2
+  },
+  {
+   "id": "OGN-095",
+   "name": "Stupefy",
+   "count": 3
+  },
+  {
+   "id": "OGN-029",
+   "name": "Falling Star",
+   "count": 3
+  },
+  {
+   "id": "OGN-093",
+   "name": "Smoke Screen",
+   "count": 2
+  },
+  {
+   "id": "VEN-066",
+   "name": "Temporal Breach",
+   "count": 3
+  },
+  {
+   "id": "RAD-013",
+   "name": "Lost to the Sands",
+   "count": 1
+  },
+  {
+   "id": "OGN-122",
+   "name": "Time Warp",
+   "count": 2
+  }
+ ],
+ "runes": {
+  "fury": 7,
+  "mind": 5
+ },
+ "battlefields": [
+  "UNL-212",
+  "SFD-216",
+  "OGN-296"
+ ],
+ "source": {
+  "url": "https://riftdecks.com/riftbound-metagame/deck-kai-sa-daughter-of-the-void-341751",
+  "player": "Dan Bridges",
+  "placement": 3,
+  "tournament": "Convergence IV",
+  "players": 272,
+  "date": "2026-10-31",
+  "set": "Radiance",
+  "sideboard": [
+   [
+    "Decree of Rage",
+    3
+   ],
+   [
+    "Retreat",
+    1
+   ],
+   [
+    "Brittle Steel",
+    1
+   ],
+   [
+    "Sprite Fountain",
+    1
+   ],
+   [
+    "Lecturing Yordle",
+    1
+   ],
+   [
+    "Thermo Beam",
+    1
+   ],
+   [
+    "Ferrous Forerunner",
+    1
+   ],
+   [
+    "Icathian Rain",
+    1
+   ]
+  ]
+ }
+}

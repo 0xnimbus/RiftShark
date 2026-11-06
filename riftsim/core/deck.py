@@ -67,8 +67,10 @@ class Deck:
         except KeyError:
             errs.append(f"unknown champion {self.champion}")
             ch = None
-        if len(self.main) != 40:
-            errs.append(f"main deck has {len(self.main)} cards, expected 40")
+        # CR 103.3: the 40-card Main Deck includes the Chosen Champion, which starts in the Champion Zone,
+        # so `main` lists the other 39 cards.
+        if len(self.main) != 39:
+            errs.append(f"main deck has {len(self.main) + 1} cards including the champion, expected 40")
         counts = {}
         for c in self.main:
             try:

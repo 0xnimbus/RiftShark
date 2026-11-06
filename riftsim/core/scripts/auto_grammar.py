@@ -418,6 +418,12 @@ def parse_effect(text, state=None):
     text = text.strip()
     if not text:
         return []
+    m = re.match(r"choose one( that hasn't been chosen this turn)?\s*[-—:]\s*(.+)$", text, re.I | re.S)
+    if m:
+        modes = []
+        for sent in [x.strip() for x in re.split(r"(?<=[.!])\s*(?=[A-Z\[])", m.group(2)) if x.strip()]:
+            modes.append((sent.rstrip(".")[:40], parse_sentence(sent, state)))
+        return [O.ChooseMode(modes, exclude_used=bool(m.group(1)))]
     # split into sentences; keep "If you do," attached to the next sentence
     sents = [s.strip() for s in re.split(r"(?<=[.!])\s+(?=[A-Z\[])", text) if s.strip()]
     out = []
@@ -651,6 +657,54 @@ def parse_sentence(s, state):
             return [O.If(cond, parse_sentence(m.group(1), state))]
         except ParseError:
             pass
+    m = re.match(r"opponents can't play cards this turn$", sl)
+    if m:
+        return [O.Do(lambda g, c: g.add_turn_effect(c, "cant_play", {"players": [q for q in range(len(g.players)) if q != c.controller]}), label="opponents can't play")]
+    m = re.match(r"your next card costs ((?:\[[^\]]+\])+) less(?: this turn)?$", sl)
+    if m:
+        from . import parse_cost
+        c = parse_cost(m.group(1).upper().replace("[A]", "[A]"))
+        return [O.DelayedPassive("cost_reduce", {"energy": c["energy"], "power": len(c["power"])}, uses=1)]
+    m = re.match(r"predict equal to its power cost$", sl)
+    if m:
+        return [O.Predict(lambda g, c: len(g.objects[c.shown_off].base_defn().power) if getattr(c, "shown_off", None) in g.objects else 0)]
+    m = re.match(r"take a turn after this one$", sl)
+    if m:
+        return [O.Do(lambda g, c: g.turn_queue.insert(0, c.controller), label="extra turn")]
+    m = re.match(r"you can look at their facedown cards this turn$", sl)
+    if m:
+        return []       # information only: the AI already sees the full state (documented simplification)
+    m = re.match(r"return a friendly unit and an enemy unit to their owners' hands$", sl)
+    if m:
+        return [O.Choose(Sel("unit", side="friendly"), out="__f"), O.Choose(Sel("unit", side="enemy"), out="__e"), O.ToHand(Ref("__f")), O.ToHand(Ref("__e"))]
+    m = re.match(r"counter an enemy spell or ability that chooses a friendly (?:unit or gear|unit|gear)$", sl)
+    if m:
+        def _enemy_item_targeting_mine(g, c, u):
+            for it in g.chain:
+                if it.uid == u and it.controller != c.controller and it.ctx is not None:
+                    for v in it.ctx.vars.values():
+                        for x in (v if isinstance(v, (tuple, list)) else [v]):
+                            o = g.objects.get(x) if isinstance(x, str) else None
+                            if o is not None and o.controller == c.controller and o.zone == "board":
+                                return True
+            return False
+        return [O.Choose(Sel("card", zone="any", pred=_enemy_item_targeting_mine), out="__sp", targeted=True),
+                O.CounterItem(lambda g, c: next((it.id for it in g.chain if it.uid == c.vars.get("__sp") and it.controller != c.controller), None))]
+    m = re.match(r"swap the mights of two units at the same battlefield this turn$", sl)
+    if m:
+        def _swap(g, c):
+            a, b = c.vars.get("__a"), c.vars.get("__b")
+            if a is None or b is None or a == b:
+                return
+            ma, mb = g.chars(a).might or 0, g.chars(b).might or 0
+            g.add_mod(a, "might", mb - ma, "turn", c.source)
+            g.add_mod(b, "might", ma - mb, "turn", c.source)
+        return [O.Choose(Sel("unit", where="battlefield"), out="__a"),
+                O.Choose(Sel("unit", where="battlefield", pred=lambda g, c, u: c.vars.get("__a") is not None and u != c.vars["__a"] and g.objects[u].location == g.objects[c.vars["__a"]].location), out="__b"),
+                O.Do(_swap, label="swap mights")]
+    m = re.match(r"move me to its location and it to my original location$", sl)
+    if m:
+        return [O.SwapLocations(Ref("self"), Ref("t"))]
     # ---- "exhaust me [and COST] to EFFECT": optional self-cost (the "you may" wrapper makes it a choice)
     m = re.match(r"exhaust me(?: and (.+?))? to (.+)$", sl)
     if m:
@@ -990,6 +1044,8 @@ def parse_sentence(s, state):
 
 
 def parse_condition(c):
+    if re.fullmatch(r"you showed off(?: a card| a gear| a unit| a spell)?", c.strip().lower()):
+        return lambda g, ctx: bool(getattr(ctx, "shown_off", None))
     c = c.strip().rstrip(".").lower()
     if c in ("you do", "you did"):
         return O.has_var("__did")
@@ -1357,6 +1413,14 @@ def _ev_fn(ev):
 
 # ---------------------------------------------------------------------------- static abilities
 def parse_static(line):
+    bl = line.strip().lower().rstrip(".")
+    if bl == "units can't be played here":
+        return [Static("self", "rule", ("cant_play_here",), source_text=line)]
+    if bl == "units you play to battlefields you control enter ready":
+        return [Replacement("enter_ready", lambda g, s, ev: ev.get("player") == g.objects[s].controller and ev.get("loc") is not None and ev["loc"][0] == "bf" and g.battlefields[ev["loc"][1]].controller == ev["player"],
+                            lambda g, s, ev: dict(ev, ready=True), label=line)]
+    if bl == "spells and abilities affecting units here each deal 1 bonus damage":
+        return [Static("self", "rule", ("bonus_damage_here", 1), source_text=line)]
     """Returns list of Static abilities or raises."""
     l = line.lower().rstrip(".")
     cond = None

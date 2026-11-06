@@ -474,7 +474,10 @@ class Game(flow.FlowMixin):
                 if not isinstance(ab, Triggered):
                     continue
                 if not ab.active(self, uid):
-                    continue
+                    # "When you play me" abilities work while the card is still on the chain (CR 340: the
+                    # play event happens before the object enters the board).
+                    if not (ev.get("kind") == "play" and ev.get("uid") == uid and o.zone == "chain" and ab.zone == "board"):
+                        continue
                 if ab.once_per_turn and o.temp.get(("opt", id(ab))) == self.turn:
                     continue
                 try:
@@ -521,7 +524,14 @@ class Game(flow.FlowMixin):
             self.log("trigger", item=item.id, source=uid, label=item.label)
             self.dirty = True
             return
-        ctrl = o.controller if ab.controller == "self" else (o.owner if ab.controller == "owner" else self.turn_player)
+        if ab.controller == "self":
+            ctrl = o.controller
+        elif ab.controller == "owner":
+            ctrl = o.owner
+        elif ab.controller == "event" and ev.get("player") is not None:
+            ctrl = ev["player"]          # "they": the player the event is about (battlefield abilities)
+        else:
+            ctrl = self.turn_player
         ctx = Context(ctrl, uid, here=o.location)
         ctx.event = ev
         ctx.vars["ev"] = ev
@@ -762,11 +772,16 @@ class Game(flow.FlowMixin):
                 if t.get("spell_only") and not (ctx.item is not None and self._item_is_spell(ctx.item)):
                     continue
                 bonus += t.get("amount", 0)
+        here_bonus = {}
+        if ctx is not None and not combat:
+            for src_r, v in self.rules("bonus_damage_here"):
+                here_bonus[self.objects[src_r].location] = here_bonus.get(self.objects[src_r].location, 0) + v
         for u in list(uids):
             o = self.objects.get(u)
             if o is None or o.zone != "board":
                 continue
-            amt = amount + bonus
+            bonus_u = bonus + here_bonus.get(o.location, 0)
+            amt = amount + bonus_u
             ev = self.replace_event({"kind": "damage", "uid": u, "amount": amt, "source": src, "player": o.controller,
                                      "loc": o.location, "by": by, "combat": combat})
             if ev is None or ev.get("amount", 0) <= 0:

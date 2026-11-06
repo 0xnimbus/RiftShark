@@ -628,8 +628,8 @@ class PlayCard(Instr):
     """Play a card (uid in Ref) from a non-hand zone as a limited action.
     ignore: 'all' | 'energy' | 'power' | None ; alt_cost: (energy, power_list) ; loc override."""
 
-    def __init__(self, card, ignore=None, alt_cost=None, loc=None, may=True, out="played"):
-        self.card, self.ignore, self.alt_cost, self.loc, self.may, self.out = card, ignore, alt_cost, loc, may, out
+    def __init__(self, card, ignore=None, alt_cost=None, loc=None, may=True, out="played", player=None):
+        self.card, self.ignore, self.alt_cost, self.loc, self.may, self.out, self.player = card, ignore, alt_cost, loc, may, out, player
 
     def run(self, game, ctx):
         u = val(game, ctx, self.card)
@@ -637,7 +637,7 @@ class PlayCard(Instr):
             ctx.vars[self.out] = None
             return None
         loc = val(game, ctx, self.loc) if self.loc is not None else None
-        ok = game.limited_play(ctx.controller, u, ctx, ignore=self.ignore, alt_cost=self.alt_cost, loc=loc)
+        ok = game.limited_play(_player(game, ctx, self.player), u, ctx, ignore=self.ignore, alt_cost=self.alt_cost, loc=loc)
         ctx.vars[self.out] = u if ok else None
         return None
 

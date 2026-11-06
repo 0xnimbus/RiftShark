@@ -1,0 +1,149 @@
+{
+ "name": "Riven, The Exile (MERC Koopastar, 1st CoolStuffCon Orlando $25k)",
+ "legend": "RAD-149",
+ "champion": "RAD-043",
+ "main": [
+  {
+   "id": "RAD-107",
+   "name": "Bedeviling Stranger",
+   "count": 3
+  },
+  {
+   "id": "UNL-053",
+   "name": "Scuttle Crab",
+   "count": 2
+  },
+  {
+   "id": "OGN-199",
+   "name": "Tideturner",
+   "count": 3
+  },
+  {
+   "id": "RAD-105",
+   "name": "Reckless Innovator",
+   "count": 3
+  },
+  {
+   "id": "SFD-048",
+   "name": "Stellacorn Herder",
+   "count": 3
+  },
+  {
+   "id": "OGN-067",
+   "name": "Blitzcrank, Impassive",
+   "count": 2
+  },
+  {
+   "id": "VEN-044",
+   "name": "Astral Heron",
+   "count": 3
+  },
+  {
+   "id": "UNL-147",
+   "name": "Baron Nashor",
+   "count": 1
+  },
+  {
+   "id": "OGN-077",
+   "name": "Zhonya's Hourglass",
+   "count": 3
+  },
+  {
+   "id": "RAD-150",
+   "name": "Blade of the Exile",
+   "count": 3
+  },
+  {
+   "id": "OGN-045",
+   "name": "Defy",
+   "count": 2
+  },
+  {
+   "id": "OGN-169",
+   "name": "Gust",
+   "count": 2
+  },
+  {
+   "id": "RAD-032",
+   "name": "Battle Preparations",
+   "count": 1
+  },
+  {
+   "id": "OGN-058",
+   "name": "Discipline",
+   "count": 3
+  },
+  {
+   "id": "SFD-045",
+   "name": "Not So Fast",
+   "count": 1
+  },
+  {
+   "id": "OGN-172",
+   "name": "Rebuke",
+   "count": 2
+  },
+  {
+   "id": "SFD-145",
+   "name": "Switcheroo",
+   "count": 1
+  },
+  {
+   "id": "UNL-128",
+   "name": "Star-Crossed",
+   "count": 1
+  }
+ ],
+ "runes": {
+  "calm": 5,
+  "chaos": 7
+ },
+ "battlefields": [
+  "SFD-207",
+  "RAD-165",
+  "UNL-215"
+ ],
+ "source": {
+  "url": "https://riftdecks.com/riftbound-metagame/deck-riven-the-exile-341143",
+  "player": "MERC Koopastar",
+  "placement": 1,
+  "tournament": "Riftbound Showdown Series $25k - CoolStuffCon Orlando 2026",
+  "players": 556,
+  "date": "2026-11-01",
+  "set": "Radiance",
+  "sideboard": [
+   [
+    "Decree of Focus",
+    2
+   ],
+   [
+    "Defy",
+    1
+   ],
+   [
+    "Hush",
+    1
+   ],
+   [
+    "An Offer You Can't Refuse",
+    2
+   ],
+   [
+    "Not So Fast",
+    1
+   ],
+   [
+    "Star-Crossed",
+    1
+   ],
+   [
+    "Akali, Silent",
+    1
+   ],
+   [
+    "Vex, Apathetic",
+    1
+   ]
+  ]
+ }
+}

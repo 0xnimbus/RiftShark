@@ -1007,13 +1007,14 @@ class FlowMixin:
             if isinstance(ab, PlayPermission) and (ab.cond is None or ab.cond(self, uid)):
                 if ab.perm in ("any_battlefield", "any_location"):
                     anywhere = True
+        blocked = {self.objects[src].location for src, v in self.rules("cant_play_here")}
         if "unit" in d.types:
             if kws.get("ambush") or anywhere:
                 for bf in self.battlefields:
                     loc = ("bf", bf.idx)
                     if anywhere or self.units_at(loc, p):
                         players = {self.objects[u].controller for u in self.units_at(loc)}
-                        if p in players or len(players) < 2:
+                        if (p in players or len(players) < 2) and loc not in blocked:
                             locs.append(loc)
         elif "gear" in d.types:
             if kws.get("deploy") or anywhere:
@@ -1075,6 +1076,9 @@ class FlowMixin:
                 return False
         if z == "hand" and self.rules("cant_play_from_hand", player=p):
             return False
+        for t in self.turn_effects:
+            if t["kind"] == "cant_play" and p in t["data"].get("players", ()):
+                return False
         for ab in self._abilities_of(uid, o):
             if isinstance(ab, PlayPermission) and ab.perm == "additional_cost":
                 req, ins, mandatory = ab.value

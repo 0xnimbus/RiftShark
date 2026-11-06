@@ -92,7 +92,7 @@ def build_deck(db, legend, champion, rng, name=None, only_scripted=True):
     want = {"unit": 24, "spell": 12, "gear": 4}
     got = {"unit": 0, "spell": 0, "gear": 0}
     for c in pool:
-        if len(main) >= 40:
+        if len(main) >= 39:
             break
         if got[c.type] >= want[c.type]:
             continue
@@ -102,7 +102,7 @@ def build_deck(db, legend, champion, rng, name=None, only_scripted=True):
         counts[c.name] = counts.get(c.name, 0) + 1
         got[c.type] += 1
     for c in pool:
-        if len(main) >= 40:
+        if len(main) >= 39:
             break
         if counts.get(c.name, 0) < 3 and not c.keywords.get("unique"):
             main.append(c.id)

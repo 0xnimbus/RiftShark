@@ -15,7 +15,7 @@ def make_deck(legend_name, champ_name, seed):
     rng.shuffle(pool)
     main, counts = [], collections.Counter()
     for c in pool:
-        if len(main) >= 40: break
+        if len(main) >= 39: break
         if counts[c.name] < 3 and not c.keywords.get("unique"):
             main.append(c.id); counts[c.name] += 1
     runes = [leg.domains[0]] * 6 + [leg.domains[1]] * 6
