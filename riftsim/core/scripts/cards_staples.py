@@ -633,3 +633,156 @@ def mordekaiser_dominating(defn):
         O.May([O.Discard(1), O.Kill(Ref("t"))], label="discard 1 to kill it")])]
     return {"abilities": [Triggered(ev, list(eff), targets=[O.Choose(sel, out="t")], label=defn.name, source_text=defn.text)
                           for ev in ("play_self", "attack_self")], "replace": True}
+
+
+def _unwrap(var):
+    """ChooseFromList(up_to=True) stores a tuple; turn a 0/1-element pick into a uid or None."""
+    def f(g, c):
+        v = c.vars.get(var)
+        if isinstance(v, tuple):
+            c.vars[var] = v[0] if v else None
+    return f
+
+
+def _look_reveal_draw(n, kind):
+    """Look at the top n cards of your Main Deck. You may reveal a <kind> from among them and draw it. Recycle the rest."""
+    def pick_ok(g, c, u):
+        d = g.objects[u].base_defn()
+        return kind in d.types or (kind == "gear" and d.type == "gear") or (kind == "unit" and d.is_unit)
+    return [O.Look(n, out="looked"),
+            O.ChooseFromList(lambda g, c: [u for u in c.vars.get("looked", []) if pick_ok(g, c, u)], out="__pick", up_to=True,
+                             label=f"reveal a {kind} and draw it"),
+            O.Do(_unwrap("__pick")),
+            O.Do(lambda g, c: g.emit("reveal", player=c.controller, cards=[c.vars["__pick"]], ctx=c) if c.vars.get("__pick") else None),
+            O.ToHand(Ref("__pick")),
+            O.Recycle(lambda g, c: [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck"])]
+
+
+@script("Ornn, Blacksmith")
+def ornn_blacksmith(defn):
+    # When you play me or when I hold, look at the top 4 cards of your Main Deck. You may reveal a gear from among
+    # them and draw it. Then recycle the rest.
+    return {"abilities": [Triggered(ev, _look_reveal_draw(4, "gear"), label=defn.name, source_text=defn.text)
+                          for ev in ("play_self", "hold_self")], "replace": True}
+
+
+@script("Fiora, Peerless")
+def fiora_peerless(defn):
+    # When I attack or defend one on one, double my Might this combat.
+    def one_on_one(g, c):
+        me = g.objects[c.source]
+        if me.zone != "board" or g.combat is None:
+            return False
+        here = [u for u, o in g.objects.items() if o.zone == "board" and o.location == me.location and "unit" in g.chars(u).types]
+        mine = [u for u in here if g.objects[u].controller == me.controller]
+        theirs = [u for u in here if g.objects[u].controller != me.controller]
+        return len(mine) == 1 and len(theirs) == 1
+    return {"abilities": [Triggered(ev, [O.If(one_on_one, [O.DoubleMight(Ref("self"), duration="combat")])],
+                                    label=defn.name, source_text=defn.text) for ev in ("attack_self", "defend_self")],
+            "replace": True}
+
+
+@script("Janna, Savior")
+def janna_savior(defn):
+    # [Reaction]   (keyword)
+    # When you play me, heal your units here, then move an enemy unit from here to its base.
+    return {"abilities": [Triggered("play_self", [
+        O.Heal(Sel("unit", side="friendly", where="here")),
+        O.Move(Ref("t"), "base")], targets=[O.Choose(Sel("unit", side="enemy", where="here"), out="t")],
+        label=defn.name, source_text=defn.text)], "replace": True}
+
+
+def _opponent_near_victory(g, c):
+    v = g.cfg["victory"]
+    return any(ps.points >= v - 3 for ps in g.players if not g.is_friendly(ps.idx, c.controller))
+
+
+@script("Poppy, Paragon")
+def poppy_paragon(defn):
+    # [Deflect]   (keyword)
+    # When you play me, if an opponent's score is within 3 points of the Victory Score, ready me and gain 3 XP.
+    return {"abilities": [Triggered("play_self", [O.If(_opponent_near_victory, [O.Ready(Ref("self")), O.GainXP(3)])],
+                                    label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Pyke, Returned")
+def pyke_returned(defn):
+    # [Hidden] [Backline]   (keywords)
+    # Once each turn, when an enemy unit dies while I'm at a battlefield, play a Gold gear token exhausted.
+    def enemy_dies(g, s, ev):
+        me = g.objects[s]
+        return ev.get("kind") == "die" and ev.get("card_type") == "unit" and ev.get("player") is not None and \
+            not g.is_friendly(ev["player"], me.controller) and _at_bf(g, s)
+    return {"abilities": [Triggered(enemy_dies, [O.PlayToken("Gold", loc="base", exhausted=True)], once_per_turn=True,
+                                    label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Ivern, Nurturer")
+def ivern_nurturer(defn):
+    # When you play me or when I hold, look at the top 3 cards of your Main Deck. You may reveal a unit from among them
+    # and draw it. Recycle the rest. Then if you revealed a Bird, Cat, Dog, or Poro, do this: [Buff] a friendly unit.
+    pets = {"Bird", "Cat", "Dog", "Poro"}
+    eff = _look_reveal_draw(3, "unit") + [
+        O.If(lambda g, c: c.vars.get("__pick") in g.objects and bool(pets & set(g.objects[c.vars["__pick"]].base_defn().tags)),
+             [O.Reflexive([O.Choose(Sel("unit", side="friendly"), out="t"), O.Buff(Ref("t"))], label="buff a friendly unit")])]
+    return {"abilities": [Triggered(ev, list(eff), label=defn.name, source_text=defn.text) for ev in ("play_self", "hold_self")],
+            "replace": True}
+
+
+@script("Diana, Lunari")
+def diana_lunari(defn):
+    # When a showdown begins here, you may pay [1]. If you do, [Predict], then reveal the top card of your Main Deck.
+    # If it's a spell, draw it.
+    def reveal_top(g, c):
+        deck = g.players[c.controller].deck
+        c.vars["__top"] = deck[0] if deck else None
+        if deck:
+            g.emit("reveal", player=c.controller, cards=[deck[0]], ctx=c)
+    return {"abilities": [Triggered("showdown_start_here", [
+        O.PayResources(1, out="__dp"),
+        O.If(Ref("__dp"), [O.Predict(1), O.Do(reveal_top),
+                           O.If(lambda g, c: c.vars.get("__top") in g.objects and g.objects[c.vars["__top"]].base_defn().type == "spell",
+                                [O.ToHand(Ref("__top"))])])], label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Lulu, Whimsical")
+def lulu_whimsical(defn):
+    # When I move, you may have another unit's base Might become 4 this turn.
+    return {"abilities": [Triggered("move_self", [O.May([O.Choose(Sel("unit", other=True), out="t"),
+                                                         O.SetMight(Ref("t"), 4, duration="turn", base=True)],
+                                                        label="have another unit's base Might become 4 this turn")],
+                                    label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Fizz, Trickster")
+def fizz_trickster(defn):
+    # When you play me, you may play a spell from your trash with Energy cost no more than [3], ignoring its Energy
+    # cost. Recycle that spell after you play it.
+    def options(g, c):
+        return [u for u in g.players[c.controller].trash if g.objects[u].base_defn().type == "spell"
+                and (g.objects[u].base_defn().energy or 0) <= 3]
+
+    def mark(g, c):
+        u = c.vars.get("played")
+        for it in g.chain:
+            if it.uid == u and it.kind == "spell":
+                it.ctx.vars["__recycle_after"] = True
+    return {"abilities": [Triggered("play_self", [
+        O.ChooseFromList(options, out="__fz", up_to=True, label="play a spell from your trash"),
+        O.Do(_unwrap("__fz")),
+        O.If(Ref("__fz"), [O.PlayCard(Ref("__fz"), ignore="energy"), O.Do(mark)])], label=defn.name, source_text=defn.text)],
+        "replace": True}
+
+
+@script("Jayce, Man of Progress")
+def jayce_progress(defn):
+    # When you play me, you may kill a friendly gear. If you do, you may play a gear with Energy cost no more than [7]
+    # from hand this turn, ignoring its Energy cost.
+    def gear7(g, u):
+        d = g.objects[u].base_defn()
+        return d.type == "gear" and (d.energy or 0) <= 7 and g.objects[u].zone == "hand"
+    return {"abilities": [Triggered("play_self", [
+        O.If(lambda g, c: bool(Sel("gear", side="friendly").candidates(g, c)), [
+            O.May([O.Choose(Sel("gear", side="friendly"), out="t", targeted=False), O.Kill(Ref("t")),
+                   O.DelayedPassive("cost_reduce", {"energy": 99, "filter": gear7}, uses=1)],
+                  label="kill a friendly gear")])], label=defn.name, source_text=defn.text)], "replace": True}

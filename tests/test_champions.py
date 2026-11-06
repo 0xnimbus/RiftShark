@@ -191,3 +191,88 @@ def test_swain_scores_after_unit_gear_and_spell(db, decks):
     g.emit("conquer", player=0, loc=("bf", 0), bf=0, units=(sw,))
     settle(g)
     assert g.players[0].points == pts + 1
+
+
+def _card_in(g, db, p, name, zone):
+    u = next(u for u in g.players[p].deck if g.objects[u].zone == "deck")
+    g.objects[u].defn = next(c for c in db if c.name == name)
+    g._to_zone(g.objects[u], zone)
+    g.bump()
+    return u
+
+
+def _fire(g, uid, label, ctx_vars=None, here=None):
+    from riftsim.core.vm import Context, Frame
+    ab = next(a for a in g.abilities(uid) if a.label == label)
+    ctx = Context(g.objects[uid].controller, uid, here=here or g.objects[uid].place)
+    ctx.vars["self"] = uid
+    ctx.vars.update(ctx_vars or {})
+    g.vm_frames.append(Frame(list(ab.target_code or []) + list(ab.code), ctx))
+    return ctx
+
+
+def test_ornn_draws_a_gear_from_the_top_4(db, decks):
+    g = main_phase(db, decks)
+    ornn = put(g, db, 0, "Ornn, Blacksmith", ("base", 0))
+    deck = g.players[0].deck
+    gear = next(c for c in db if c.type == "gear" and not c.is_token)
+    g.objects[deck[2]].defn = gear
+    target = deck[2]
+    hand = len(g.players[0].hand)
+    _fire(g, ornn, "Ornn, Blacksmith")
+    settle(g, picks=[(target,)])
+    assert g.objects[target].zone == "hand" and len(g.players[0].hand) == hand + 1
+
+
+def test_fiora_doubles_only_one_on_one(db, decks):
+    g = main_phase(db, decks)
+    fi = put(g, db, 0, "Fiora, Peerless", ("bf", 0))
+    foe = put(g, db, 1, "Sett, Kingpin", ("bf", 0))
+    g.combat = {"bf": 0, "attacker": 0, "defender": 1, "step": "showdown"}
+    m = g.chars(fi).might
+    _fire(g, fi, "Fiora, Peerless")
+    g.dirty = True; g.pending = None
+    for _ in range(10):
+        d = g.run()
+        if not g.vm_frames:
+            break
+        g.choose(d.options[0])
+    assert g.chars(fi).might == 2 * m
+
+
+def test_poppy_readies_and_gains_xp_when_an_opponent_is_close(db, decks):
+    g = main_phase(db, decks)
+    pop = put(g, db, 0, "Poppy, Paragon", ("base", 0))
+    g.objects[pop].exhausted = True
+    g.players[1].points = g.cfg["victory"] - 3
+    xp = g.players[0].xp
+    _fire(g, pop, "Poppy, Paragon")
+    settle(g)
+    assert not g.objects[pop].exhausted and g.players[0].xp == xp + 3
+
+
+def test_fizz_replays_a_cheap_spell_from_trash_and_recycles_it(db, decks):
+    g = main_phase(db, decks)
+    fz = put(g, db, 0, "Fizz, Trickster", ("base", 0))
+    have = {g.objects[r].defn.domains[0] for r in g.players[0].runes if g.objects[r].defn.domains}
+    cheap = next(c for c in db if c.type == "spell" and (c.energy or 0) <= 3 and "draw" in (c.text or "").lower()
+                 and not any(w in c.text.lower() for w in ("unit", "choose", "gear", "discard", "hidden", "spell"))
+                 and set(c.domains) <= have)
+    u = next(u for u in g.players[0].deck if g.objects[u].zone == "deck")
+    g.objects[u].defn = cheap
+    g._to_zone(g.objects[u], "trash"); g.bump()
+    _fire(g, fz, "Fizz, Trickster")
+    settle(g, picks=[(u,)])
+    assert g.objects[u].zone == "deck" and g.players[0].deck[-1] == u
+
+
+def test_jayce_man_of_progress_makes_next_gear_free(db, decks):
+    g = main_phase(db, decks)
+    jc = put(g, db, 0, "Jayce, Man of Progress", ("base", 0))
+    old = put(g, db, 0, next(c.name for c in db if c.type == "gear" and not c.is_token), ("base", 0), exclude=(jc,))
+    big = next(c for c in db if c.type == "gear" and 4 <= (c.energy or 0) <= 7 and not c.is_token)
+    h = _card_in(g, db, 0, big.name, "hand")
+    _fire(g, jc, "Jayce, Man of Progress")
+    settle(g, yes=True, picks=[old])
+    assert g.objects[old].zone == "trash"
+    assert g.card_cost(0, h, "hand", ("base", 0))[0] == 0

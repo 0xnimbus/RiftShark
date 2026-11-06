@@ -1053,7 +1053,9 @@ class FlowMixin:
         if it.kind == "spell":
             o = self.objects[it.uid]
             if o.zone == "chain":
-                if it.ctx.played_from == "trash" or it.ctx.vars.get("__banish_after"):
+                if it.ctx.vars.get("__recycle_after"):         # Fizz, Trickster
+                    self.do_recycle([it.uid], it.ctx)
+                elif it.ctx.played_from == "trash" or it.ctx.vars.get("__banish_after"):
                     self._to_zone(o, "banish")
                 else:
                     self._to_zone(o, "trash")
