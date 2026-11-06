@@ -257,4 +257,11 @@ button.opt img.th { width: 26px; border-radius: 3px; }
   #replay-list { max-height: 30vh; }
   #tooltip { width: 220px; }
 }
+.mull { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; margin: 6px 0 10px; }
+.mull-card { position: relative; padding: 3px; display: flex; flex-direction: column; gap: 3px; align-items: stretch; font-size: 10px; background: var(--panel2); }
+.mull-card img { width: 100%; border-radius: 4px; }
+.mull-card.sel { border-color: var(--warn); box-shadow: 0 0 0 2px var(--warn); }
+.mull-card.sel img { filter: brightness(.5); }
+.mull-tag { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); font-style: normal; font-weight: 800; font-size: 9px; background: #000d; color: var(--warn); padding: 2px 4px; border-radius: 3px; white-space: nowrap; }
+button.opt.primary { justify-content: center; font-weight: 700; }
 [hidden] { display: none !important; }

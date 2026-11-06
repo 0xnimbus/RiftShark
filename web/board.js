@@ -86,8 +86,9 @@ window.RiftBoard = (function () {
       case "recycle": return ["Recycle", `${src}: choose what to put on the bottom of its deck.`];
       case "predict": return ["Predict", `${src}: look at the top of your deck and choose what to recycle (send to the bottom).`];
       case "pay": return ["Pay with runes", "Choose which runes pay. Exhausting a rune adds 1 energy; recycling a rune adds 1 power of its domain."];
-      case "order_triggers": return ["Order your triggers", "Several of your abilities triggered at the same time. Choose the order they go on the chain; the last one added resolves first."];
-      case "mulligan": return ["Mulligan", "Choose cards from your opening hand to send back; you draw the same number of replacements."];
+      case "order_triggers": return ["Order your triggers", "Several of your abilities triggered at the same time (CR 383). Pick " +
+        (/next/i.test(d.prompt || "") ? "which of the rest resolves next." : "which one resolves first; you'll then order the rest one at a time.")];
+      case "mulligan": return ["Mulligan", "Your opening hand. Click up to two cards to set aside, then confirm: you draw that many new cards and the set-aside cards go to the bottom of your deck (CR 117). Or keep your hand."];
       default: return [esc(d.kind), pr || ""];
     }
   }
@@ -101,6 +102,8 @@ window.RiftBoard = (function () {
       case "draw": return e.uid != null && (p === ME || NEUTRAL) ? `${whoS(p, "draw")} <b>${esc(nameOf(e.uid))}</b>.` : `${whoS(p, "draw")} a card.`;
       case "play": return `${whoS(p, "play")} <b>${esc(n)}</b>${e.loc ? " to " + locName(e.loc) : ""}.`;
       case "pay": return (e.energy || (e.power && e.power.length)) ? `${whoS(p, "pay")} ${e.energy || 0} energy${e.power && e.power.length ? " and " + e.power.length + " power" : ""}.` : null;
+      case "mulligan": return e.count ? `${whoS(p, "mulligan")} ${e.count} card${e.count === 1 ? "" : "s"}.` : `${whoS(p, "keep")} their opening hand.`.replace("You keep their", "You keep your");
+      case "trigger_order": return `${whoS(p, "order")} simultaneous triggers.`;
       case "rune": return e.how === "recycle" ? `${whoS(p, "recycle")} a ${esc(nameOf(e.uid))} for power.` : `${whoS(p, "exhaust")} a ${esc(nameOf(e.uid))} for energy.`;
       case "trigger": return `<b>${chips(e.label)}</b> triggers.`;
       case "resolve": return `<b>${chips(e.label)}</b> resolves.`;
@@ -239,7 +242,7 @@ window.RiftBoard = (function () {
   function turnBar(st, o) {
     const cur = (PHASES.find(x => x[0] === st.phase) || [null, ""])[1];
     const steps = PHASE_STEPS.map(s => `<span class="ph${s === cur ? " on" : ""}">${s}</span>`).join("");
-    const special = st.combat ? `<span class="tag hot">Combat at ${esc(bfName(st.combat.bf))}</span>` :
+    const special = st.phase === "mulligan" ? `<span class="tag hot">Mulligan</span>` : st.combat ? `<span class="tag hot">Combat at ${esc(bfName(st.combat.bf))}</span>` :
       st.showdown ? `<span class="tag hot">Showdown at ${esc(bfName(st.showdown.bf))}</span>` : "";
     const whose = NEUTRAL ? `P${st.turn_player}'s turn` : st.turn_player === ME ? "Your turn" : "Opponent's turn";
     return `<div class="turnbar"><span class="tn">Turn ${st.turn}</span><span class="whose ${st.turn_player === ME ? "me" : "op"}">${whose}</span>

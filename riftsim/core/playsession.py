@@ -129,6 +129,8 @@ class PlaySession:
         g, info = self.game, d.info or {}
         dv = {"player": d.player, "kind": d.kind, "labels": list(d.labels), "n": len(d.options), "prompt": self._prompt(d),
               "showdown": bool(info.get("showdown")), "chain": bool(info.get("chain"))}
+        if d.kind == "mulligan":   # which hand cards each option sets aside, so the page can show a pick-up-to-two hand
+            dv["option_uids"] = [list(o) for o in d.options]
         src = None
         if not info.get("handler") and getattr(g, "vm_frames", None):
             src = g.vm_frames[-1].ctx.source

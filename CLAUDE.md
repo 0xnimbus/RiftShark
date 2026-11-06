@@ -58,7 +58,8 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   Chain lane (06:10): the chain shows in the middle of the board, oldest left, "resolves next" right, with kind, controller,
   targets (PlaySession reads chosen uids from each item's ctx.vars) and trigger cause; who has priority; log lines indent by
   chain depth (`RiftBoard.chainStep`). The page sends a fresh random seed per game unless one is typed in, and shows it.
-  Left to do: check order_triggers/mulligan labels once the engine thread lands them.
+  Mulligan (06:50): hand view, click up to two cards then confirm (`decision.option_uids` from PlaySession); order_triggers
+  explained one pick at a time.
 - Main deck = 39 cards + chosen champion (CR 103.3). `When you play me` triggers fire from the chain.
 - `riftsim/` top level still holds the v1 simplified engine (engine.py, policies.py, replay.py, runner.py, cli.py).
   It will be replaced by v2 equivalents.

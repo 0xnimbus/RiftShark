@@ -61,10 +61,10 @@
     for (const e of evs || []) {
       if (e.turn !== lastTurnLogged && e.turn != null) {
         lastTurnLogged = e.turn;
-        logLines.push({ cls: "turn", html: `Turn ${e.turn}` });
+        logLines.push({ cls: "turn", html: e.turn ? `Turn ${e.turn}` : "Before the game" });
       }
       if (e.kind === "decision") {
-        if (e.dkind === "action") continue;  // actions show up as play/move/... entries
+        if (e.dkind === "action" || (e.dkind === "mulligan" && e.player !== human)) continue;  // shown by their own entries
         logLines.push({ cls: e.player === human ? "me" : "op", html: `${e.player === human ? "You choose" : "Opponent chooses"}: ${B.say(e.choice)}` });
         continue;
       }
@@ -131,6 +131,7 @@
       const f = idx.filter(i => B.uidsIn(d.labels[i])[0] === filterUid);
       if (f.length) idx = f; else filterUid = null;
     }
+    if (d.kind === "mulligan" && d.option_uids) { drawMulligan(j, d); return; }
     let html = "";
     if (filterUid != null) html += `<button class="link" id="clear-filter">← show all options</button>`;
     if (d.kind === "action") {
@@ -151,6 +152,31 @@
     opts.querySelectorAll("button.opt").forEach(b => b.addEventListener("click", () => choose(+b.dataset.i)));
     const cf = $("#clear-filter");
     if (cf) cf.addEventListener("click", () => { filterUid = null; drawDecision(cur); });
+    $("#btn-hint").disabled = d.n < 2;
+  }
+
+  /* Mulligan: your hand as big cards; click up to two to set aside, then confirm (the matching engine option is chosen). */
+  let mullSel = [];
+  function drawMulligan(j, d) {
+    const me = j.state.players.find(p => p.idx === j.human);
+    const key = a => a.slice().sort((x, y) => x - y).join(",");
+    const idxOf = sel => d.option_uids.findIndex(o => key(o) === key(sel));
+    mullSel = mullSel.filter(u => me.hand.some(c => c.uid === u));
+    const cards = me.hand.map(c => `<button class="mull-card${mullSel.includes(c.uid) ? " sel" : ""}" data-uid="${c.uid}">
+        <img src="${esc(c.image || "")}" alt=""><span>${esc(c.name)}</span>${mullSel.includes(c.uid) ? '<i class="mull-tag">SET ASIDE</i>' : ""}</button>`).join("");
+    const n = mullSel.length;
+    $("#options").innerHTML = `<div class="mull">${cards}</div>
+      <button class="opt primary" id="mull-go">${n ? `Mulligan ${n} card${n === 1 ? "" : "s"} (draw ${n} new)` : "Keep this hand"}</button>`;
+    $("#options").querySelectorAll(".mull-card").forEach(b => b.addEventListener("click", () => {
+      const u = +b.dataset.uid;
+      if (mullSel.includes(u)) mullSel = mullSel.filter(x => x !== u);
+      else if (mullSel.length < 2) mullSel.push(u);
+      drawMulligan(cur, cur.decision);
+    }));
+    $("#mull-go").addEventListener("click", () => {
+      const i = idxOf(mullSel);
+      if (i >= 0) { mullSel = []; choose(i); }
+    });
     $("#btn-hint").disabled = d.n < 2;
   }
 
