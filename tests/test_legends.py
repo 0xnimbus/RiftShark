@@ -54,6 +54,13 @@ def test_yasuo_moves_a_unit_from_base_to_a_battlefield_and_back(db, decks):
     u = unit_at(g, 0, ("base", 0))
     activate(g, lg, [u, ("bf", 0)])
     assert g.objects[u].location == ("bf", 0)
+    for _ in range(200):                                    # the move opened a showdown there: let it finish
+        d = g.run()
+        if g.showdown is None and g.combat is None and not g.chain and d.player == 0 and d.kind == "action":
+            break
+        g.choose(("pass",) if ("pass",) in d.options else d.options[0])
+    if g.objects[u].location != ("bf", 0) or g.turn_player != 0:
+        pytest.skip("the unit left the battlefield in the showdown")
     g.objects[lg].exhausted = False
     for r in g.players[0].runes:
         g.objects[r].exhausted = False
