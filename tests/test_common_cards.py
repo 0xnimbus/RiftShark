@@ -359,3 +359,52 @@ def test_lingering_animus_and_hold_em_turn_memory(db, decks):
     g.do_kill([gear])
     ev = g.replace_event({"kind": "enter_ready", "uid": la, "player": 0, "ready": False, "loc": ("base", 0)})
     assert ev["ready"]
+
+
+def _bf_card(g, db, name, i=0):
+    """Turn battlefield i into `name` (re-using its object)."""
+    bf = g.battlefields[i]
+    g.objects[bf.uid].defn = next(c for c in db if c.name == name)
+    g.bump()
+    return bf.uid
+
+
+def test_aspirants_climb_and_otterpus(db, decks):
+    g = main_phase(db, decks)
+    v = g.victory_score()
+    _bf_card(g, db, "Aspirant's Climb")
+    assert g.victory_score() == v + 1
+    put(g, db, 1, "Otterpus", ("base", 1))
+    g.turns_taken[0] = 1
+    pts, hand = g.players[0].points, len(g.players[0].hand)
+    g.gain_points(0, 1, "conquer")
+    assert g.players[0].points == pts and len(g.players[0].hand) == hand + 1
+    g.turns_taken[0] = 3
+    g.gain_points(0, 1, "conquer")
+    assert g.players[0].points == pts + 1
+
+
+def test_esteemed_hierophant_and_sacred_protector(db, decks):
+    from riftsim.core.vm import Context
+    g = main_phase(db, decks)
+    h = put(g, db, 0, "Esteemed Hierophant", ("bf", 0))
+    while len(g.players[0].runes) < 7:
+        g.do_channel(0, 1)
+    g.do_deal([h], 2, Context(1, None))
+    assert g.objects[h].damage == 0
+    g.do_deal([h], 2, Context(0, None))
+    assert g.objects[h].damage == 2
+    sp = put(g, db, 0, "Sacred Protector", ("bf", 1), exclude=(h,))
+    assert g.no_combat_damage(sp)
+    put(g, db, 0, "Spiderling", ("bf", 1), exclude=(h, sp))
+    assert not g.no_combat_damage(sp)
+
+
+def test_tactical_retreat_saves_the_unit_once(db, decks):
+    g = main_phase(db, decks)
+    u = put(g, db, 0, "Rell, Magnetic", ("bf", 0))
+    _run_spell(g, db, "Tactical Retreat", picks=[u])
+    g.do_kill([u])
+    assert g.objects[u].zone == "board" and g.objects[u].location == ("base", 0) and g.objects[u].exhausted
+    g.do_kill([u])
+    assert g.objects[u].zone == "trash"

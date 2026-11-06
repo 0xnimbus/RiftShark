@@ -233,7 +233,7 @@ def renata_legend(defn):
     # While your score is within 3 points of the Victory Score, your Gold [Add] an additional [1].
     def close_to_win(g, s):
         p = g.objects[s].controller
-        return g.players[p].points >= g.cfg["victory"] - 3
+        return g.players[p].points >= g.victory_score() - 3
     return {"abilities": [
         Triggered("you_hold", [_may_exhaust_me([O.PlayToken("Gold", loc="base", exhausted=True)],
                                                "exhaust me to play a Gold gear token exhausted")],
@@ -693,7 +693,7 @@ def janna_savior(defn):
 
 
 def _opponent_near_victory(g, c):
-    v = g.cfg["victory"]
+    v = g.victory_score()
     return any(ps.points >= v - 3 for ps in g.players if not g.is_friendly(ps.idx, c.controller))
 
 
@@ -897,7 +897,7 @@ def leona_zealot(defn):
     def near(g, s, ev):
         if ev.get("uid") != s:
             return False
-        v = g.cfg["victory"]
+        v = g.victory_score()
         me = g.objects[s].controller if g.objects[s].controller is not None else g.objects[s].owner
         return any(ps.points >= v - 3 for ps in g.players if not g.is_friendly(ps.idx, me))
     # the -8 [M] static line is parsed by the auto-scripter (kept: replace=False)

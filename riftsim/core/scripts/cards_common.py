@@ -1257,3 +1257,214 @@ def dominus(defn):
                          source_text="[A][A]: Ready me.")
     return [SpellEffect([O.Choose(Sel("unit"), out="t"), O.DoubleMight(Ref("t")), O.GiveAbility(Ref("t"), ready_me)],
                         label=defn.name, source_text=defn.text)]
+
+
+def _at_a_bf(g, s):
+    o = g.objects[s]
+    return o.zone == "board" and o.location is not None and o.location[0] == "bf"
+
+
+def _bf_controller(g, s):
+    o = g.objects[s]
+    i = o.location[1] if o.location is not None else None
+    return g.battlefields[i].controller if i is not None else None
+
+
+@script("Aspirant's Climb")
+def aspirants_climb(defn):
+    # Increase the points needed to win the game by 1.
+    return [Static("self", "rule", ("victory_plus", 1), label="+1 point needed to win", source_text=defn.text)]
+
+
+@script("Sandstone Chimera")
+def sandstone_chimera(defn):
+    # While I'm at a battlefield, players only channel 1 rune at the start of their Channel Phase.
+    return [Static("self", "rule", ("channel_only_one",), label="players channel only 1 rune", source_text=defn.text)]
+
+
+@script("Sacred Protector")
+def sacred_protector(defn):
+    # I don't deal combat damage unless I'm at a battlefield with exactly one other unit you control.
+    def not_paired(g, s):
+        o = g.objects[s]
+        return not (_at_a_bf(g, s) and len([x for x in g.units_at(o.location, o.controller) if x != s]) == 1)
+    return [Static("self", "rule", ("no_combat_damage",), cond=not_paired, label="no combat damage unless paired",
+                   source_text=defn.text)]
+
+
+@script("Otterpus")
+def otterpus(defn):
+    # If a player would score 1 point from conquering or holding during their first or second turn, they draw 1 instead.
+    from ..abilities import Replacement
+
+    def early(g, s, ev):
+        p = ev.get("player")
+        return ev.get("reason") in ("conquer", "hold") and p == g.turn_player and g.turns_taken.get(p, 0) <= 2
+
+    def draw_instead(g, s, ev):
+        g.do_draw(ev["player"], 1)
+        return None
+    return [Replacement("gain_points", early, draw_instead, label="draw 1 instead of an early point", source_text=defn.text)]
+
+
+@script("Threshold of the Gray")
+def threshold_of_the_gray(defn):
+    # When combat starts here, the attacker and defender each [Add] [1].
+    def add(g, c):
+        ev = c.event or {}
+        for q in (ev.get("attacker"), ev.get("defender")):
+            if q is not None:
+                g.players[q].energy += 1
+                g.emit("add", player=q, energy=1, power=[], ctx=c)
+        g.bump()
+    return [Triggered("combat_start_here", [O.Do(add, label="attacker and defender add [1]")], label=defn.name,
+                      source_text=defn.text)]
+
+
+@script("Valley of Idols")
+def valley_of_idols(defn):
+    # When a player plays a unit here, they may pay [1] to [Buff] it.
+    here = lambda g, s, ev: ev.get("kind") == "play" and ev.get("card_type") == "unit" and ev.get("loc") == g.objects[s].place
+    return [Triggered(here, [O.PayResources(1, out="__vi"), O.If(Ref("__vi"), [O.Buff(lambda g, c: c.event.get("uid"))])],
+                      controller="event", label=defn.name, source_text=defn.text)]
+
+
+@script("Gardens of Becoming")
+def gardens_of_becoming(defn):
+    # Units here have "[T]: Gain 1 XP."
+    from ..abilities import Activated
+    xp = Activated({"energy": 0, "power": [], "exhaust": True}, [O.GainXP(1)], label="[T]: Gain 1 XP.",
+                   source_text="[T]: Gain 1 XP.")
+    here = Sel("unit", pred=lambda g, c, u: g.objects[u].location == g.objects[c.source].place)
+    return [Static(here, "ability", xp, label="units here: [T]: Gain 1 XP", source_text=defn.text)]
+
+
+@script("Forgotten Library")
+def forgotten_library(defn):
+    # While you control this battlefield, when you play a spell, if you spent [4] or more, [Predict].
+    def big_spell(g, s, ev):
+        ctrl = _bf_controller(g, s) if g.objects[s].location and g.objects[s].location[0] == "bfcard" else None
+        return (ev.get("kind") == "play" and ev.get("card_type") == "spell" and ctrl is not None
+                and ev.get("player") == ctrl and (ev.get("energy") or 0) >= 4)
+    return [Triggered(big_spell, [O.Predict(1)], controller="event", label=defn.name, source_text=defn.text)]
+
+
+@script("Esteemed Hierophant")
+def esteemed_hierophant(defn):
+    # While you control 7 or more runes, prevent all damage that enemy spells and abilities would deal to me.
+    from ..abilities import Replacement
+
+    def applies(g, s, ev):
+        o = g.objects[s]
+        return (ev.get("uid") == s and not ev.get("combat") and ev.get("by") is not None
+                and not g.is_friendly(ev["by"], o.controller) and len(g.players[o.controller].runes) >= 7)
+    return [Replacement("damage", applies, lambda g, s, ev: None, label="prevent enemy spell damage", source_text=defn.text)]
+
+
+def _fewer_runes_at_beginning(defn, gain, keyword=None):
+    def fewer(g, s, ev):
+        me = g.objects[s].controller
+        return any(len(g.players[me].runes) < len(q.runes) for i, q in enumerate(g.players) if not g.is_friendly(i, me))
+    eff = [O.GiveMight(Ref("self"), gain)] + ([O.GiveKeyword(Ref("self"), keyword)] if keyword else [])
+    return [Triggered("start_beginning", eff, filt=fewer, label=defn.name, source_text=defn.text)]
+
+
+@script("Forsaken Baccai")
+def forsaken_baccai(defn):
+    # If you control fewer runes than an opponent at the start of your Beginning Phase, give me +1 [M] this turn.
+    return _fewer_runes_at_beginning(defn, 1)
+
+
+@script("Oasis Raider")
+def oasis_raider(defn):
+    # If you control fewer runes than an opponent at the start of your Beginning Phase, give me +2 [M] and [Ganking].
+    return _fewer_runes_at_beginning(defn, 2, "ganking")
+
+
+@script("Shadow")
+def shadow_unit(defn):
+    # If you play me to a battlefield, I enter ready.  [Action][>] [1][A], [T]: [Stun] an enemy unit attacking here.
+    from ..abilities import Activated
+    att_here = Sel("unit", side="enemy", pred=lambda g, c, u: g.objects[u].designation == "attacker"
+                   and g.objects[u].location == g.objects[c.source].location)
+    from ..abilities import Replacement
+    return [Replacement("enter_ready", lambda g, s, ev: ev.get("uid") == s and (ev.get("loc") or ("",))[0] == "bf",
+                        lambda g, s, ev: dict(ev, ready=True), label="enter ready at a battlefield", zone="any", source_text=defn.text),
+            Activated({"energy": 1, "power": ["any"], "exhaust": True}, [O.Stun(Ref("t"))], targets=[O.Choose(att_here, out="t")],
+                      timing="action", label="stun an enemy attacking here", source_text=defn.text)]
+
+
+@script("Tactical Retreat")
+def tactical_retreat(defn):
+    # [Reaction]  Choose a friendly unit. The next time it would die this turn, heal it, exhaust it, and recall it instead.
+    def applies(g, ctx, ev):
+        return ev.get("uid") == ctx.vars.get("t")
+    rep = lambda g, ctx, ev: dict(ev, replaced_with="recall", exhaust=True)
+    return [SpellEffect([O.Choose(Sel("unit", side="friendly"), out="t"),
+                         O.DelayedPassive("replace:die", {"applies": applies, "replace": rep}, uses=1)],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Thrill of the Hunt")
+def thrill_of_the_hunt(defn):
+    # [Reaction]  Banish a friendly unit, then its owner plays it to any battlefield, ignoring its cost.
+    return [SpellEffect([O.Choose(Sel("unit", side="friendly"), out="t"), O.Banish(Ref("t")),
+                         O.If(lambda g, c: c.vars.get("t") in g.objects and g.objects[c.vars["t"]].zone == "banish", [
+                             O.ChooseLocation(out="__tl", player=lambda g, c: g.objects[c.vars["t"]].owner),
+                             O.PlayCard(Ref("t"), ignore="all", loc=Ref("__tl"), player=lambda g, c: g.objects[c.vars["t"]].owner)])],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Moonfall")
+def moonfall(defn):
+    # [Action]  Choose a battlefield where you have units. You may move up to one enemy unit to that battlefield. Then
+    # give enemy units there -2 [M] this turn.
+    where = lambda g, c, l: bool(g.units_at(l, c.controller))
+    foes_there = lambda g, c: [u for u in g.units_at(c.vars["loc"]) if _enemy(g, c, u)]
+    elsewhere = Sel("unit", side="enemy", pred=lambda g, c, u: g.objects[u].location != c.vars.get("loc"))
+    return [SpellEffect([O.ChooseLocation(out="loc", pred=where),
+                         O.Choose(elsewhere, out="__mv", n=1, up_to=True),
+                         O.Move(lambda g, c: list(c.vars.get("__mv") or ()), Ref("loc")),
+                         O.GiveMight(foes_there, -2)], label=defn.name, source_text=defn.text)]
+
+
+@script("Rally for War")
+def rally_for_war(defn):
+    # Choose an occupied enemy battlefield. Play three 1 [M] Recruit unit tokens there.
+    occ = lambda g, c, l: g.battlefields[l[1]].controller is not None and not g.is_friendly(g.battlefields[l[1]].controller, c.controller) \
+        and bool(g.units_at(l))
+    return [Triggered("play_self", [O.ChooseLocation(out="loc", pred=occ), O.PlayToken("Recruit", loc=Ref("loc"), count=3)],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Siphoning Strike")
+def siphoning_strike(defn):
+    # Deal 4 to a unit at a battlefield. If you control 7 or more runes, deal 7 to it instead. When it dies this turn,
+    # channel 1 rune exhausted.
+    dies = lambda g, s, ev: ev.get("kind") == "die"
+    it_died = lambda g, c, ev: ev.get("uid") == c.vars.get("t")
+    return [SpellEffect([O.Choose(Sel("unit", where="battlefield"), out="t"),
+                         O.Delayed(dies, [O.Channel(1, exhausted=True)], filt=it_died, expires="turn", once=True,
+                                   label="Siphoning Strike: channel 1"),
+                         O.Deal(lambda g, c: 7 if len(g.players[c.controller].runes) >= 7 else 4, Ref("t"))],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Corrupted Dragon")
+def corrupted_dragon(defn):
+    # If your score is not within 3 points of the Victory Score, I enter ready.  When I attack, you may move any number
+    # of enemy units here each with 5 [M] or less to their base.
+    far = lambda g, s: g.players[_ctrl(g, s)].points < g.victory_score() - 3
+    small_here = lambda g, c: [u for u in g.units_at(g.objects[c.source].location) if _enemy(g, c, u)
+                               and (g.chars(u).might or 0) <= 5]
+    return [_enter_ready_if(defn, far, "enter ready when not close to winning"),
+            Triggered("attack_self", [O.ChooseFromList(small_here, out="__cd", n=99, up_to=True, label="move enemy units to base"),
+                                      O.Move(lambda g, c: list(c.vars.get("__cd") or ()), "base")],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Affectionate Poro")
+def affectionate_poro(defn):
+    # When a combat that I was in ends, if I haven't been dealt damage this turn, draw 1.
+    unhurt = lambda g, s, ev: not g.objects[s].temp.get(("dealt_damage", g.turn))
+    return [Triggered("survive_combat_self", [O.Draw(1)], filt=unhurt, label=defn.name, source_text=defn.text)]

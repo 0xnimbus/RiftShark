@@ -60,7 +60,7 @@ def audit_game(args):
     names = [d.name for d in decks]
     use = [collections.Counter(), collections.Counter()]
     problems = []
-    victory = g.cfg["victory"]
+    victory = g.victory_score() if hasattr(g, "victory_score") else g.cfg["victory"]
 
     # ---- per turn invariants: Channel 2 (3 for the second player's first turn), Draw 1
     turns = collections.defaultdict(list)

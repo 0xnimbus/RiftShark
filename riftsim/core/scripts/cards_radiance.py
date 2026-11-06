@@ -478,7 +478,7 @@ def find_your_center(defn):
     # Draw 1 and channel 1 rune exhausted.
     def close(g, u):
         p = g.objects[u].owner
-        return any(q.points >= g.cfg["victory"] - 3 for i, q in enumerate(g.players) if i != p)
+        return any(q.points >= g.victory_score() - 3 for i, q in enumerate(g.players) if i != p)
     return [SpellEffect([O.Draw(1), O.Channel(1, exhausted=True)], label=defn.name, source_text=defn.text),
             PlayPermission("cost", cost_mod=lambda g, u, e, p: (max(0, e - 2), p) if close(g, u) else (e, p),
                            label="costs [2] less near victory")]

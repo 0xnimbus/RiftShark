@@ -165,6 +165,10 @@ class Game(flow.FlowMixin):
     def is_friendly(self, a, b):
         return a == b
 
+    def victory_score(self):
+        """Points needed to win: the configured Victory Score plus 'Increase the points needed to win' (Aspirant's Climb)."""
+        return self.cfg["victory"] + sum(v for _, v in self.rules("victory_plus"))
+
     def cant_move(self, uid):
         """'I can't move' statics on the unit, or a 'can't move this turn' effect on it."""
         if self.has_keyword(uid, "cant_move"):
@@ -940,6 +944,7 @@ class Game(flow.FlowMixin):
                 continue
             o.damage += amt
             o.temp["dmg_item"] = ctx.item if ctx is not None else None
+            o.temp[("dealt_damage", self.turn)] = True          # "if I haven't been dealt damage this turn"
             self.bump()
             self.log("damage", uid=u, amount=amt, source=src, combat=combat)
             self.emit("damage", uid=u, amount=amt, source=src, player=o.controller, loc=o.location, by=by, combat=combat, ctx=ctx)

@@ -419,6 +419,9 @@ class FlowMixin:
             n = 2
             if self.turn == 2 and self.cfg["players"] == 2:
                 n = 3     # CR 487.7: player going second channels an extra rune on their first turn
+            if any(self.objects[src].location is not None and self.objects[src].location[0] == "bf"
+                   for src, _ in self.rules("channel_only_one")):
+                n = 1     # Sandstone Chimera: "players only channel 1 rune at the start of their Channel Phase"
             self.do_channel(self.turn_player, n)
             self.phase = "draw"
             self.dirty = True
@@ -514,7 +517,7 @@ class FlowMixin:
         self.dirty = False
 
     def _cleanup_once(self):
-        v = self.cfg["victory"]
+        v = self.victory_score()
         # 1. victory
         for p in self.players:
             if p.points >= v and all(p.points > q.points for q in self.players if q is not p):
@@ -717,7 +720,7 @@ class FlowMixin:
                 return          # e.g. Forgotten Monument: no point and no conquer/hold event
         self.scored.add((p, i))
         ps = self.players[p]
-        v = self.cfg["victory"]
+        v = self.victory_score()
         loc = ("bf", i)
         units = tuple(self.units_at(loc, p))
         if how == "conquer" and ps.points >= v - 1:
