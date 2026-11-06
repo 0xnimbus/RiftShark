@@ -84,3 +84,63 @@ def test_get_excited_deals_the_discarded_cards_energy_cost(db, decks):
     _play(g, s, lambda d: foe if d.kind == "choose" and foe in d.options else None)
     dmg = [e["amount"] for e in g.events if e["kind"] == "damage" and e.get("uid") == foe]
     assert g.objects[junk].zone == "trash" and dmg and dmg[0] >= g.objects[junk].defn.energy
+
+
+def test_carnivorous_snapvine_fights_an_enemy_at_a_battlefield(db, decks):
+    g = main_phase(db, decks)
+    sv = put(g, db, 0, "Carnivorous Snapvine", ("base", 0))
+    foe = put(g, db, 1, "Gangplank, Naval", ("bf", 0))
+    g.emit("play", uid=sv, player=0, card_type="unit")
+    settle(g)
+    hits = {e["uid"]: e["amount"] for e in g.events if e["kind"] == "damage"}
+    assert hits.get(foe, 0) >= 6 and hits.get(sv, 0) >= 6
+
+
+def test_rhasa_and_battering_ram_and_void_drone_costs(db, decks):
+    g = main_phase(db, decks)
+    rh = _card_in(g, db, 0, "Rhasa the Sunderer", "hand")
+    n = len(g.players[0].trash)
+    assert g.card_cost(0, rh, "hand")[0] == max(0, 10 - n)
+    ram = _card_in(g, db, 0, "Battering Ram", "hand")
+    g.players[0].played_this_turn = [1, 2, 3, 4, 5, 6]
+    assert g.card_cost(0, ram, "hand")[0] == 1
+    vd = _card_in(g, db, 0, "Void Drone", "trash")
+    assert g.card_cost(0, vd, "trash")[0] == 1
+
+
+def test_invert_timelines_discards_hands_and_draws_four(db, decks):
+    g = main_phase(db, decks)
+    s = give(g, 0, "Invert Timelines", db)
+    old1 = list(g.players[1].hand)
+    _play(g, s, lambda d: None)
+    assert len(g.players[0].hand) == 4 and len(g.players[1].hand) == 4
+    assert all(g.objects[u].zone == "trash" for u in old1)
+
+
+def test_super_mega_death_rocket_returns_from_trash_on_conquer(db, decks):
+    g = main_phase(db, decks)
+    r = _card_in(g, db, 0, "Super Mega Death Rocket!, Jinx", "trash")
+    g.emit("conquer", player=0, loc=("bf", 0), bf=0, units=())
+    settle(g)
+    assert g.objects[r].zone == "hand"
+
+
+def test_trusty_ramhound_and_convergent_mutation(db, decks):
+    g = main_phase(db, decks)
+    rh = put(g, db, 0, "Trusty Ramhound", ("bf", 0))
+    assert g.chars(rh).might == 2
+    big = put(g, db, 0, "Gangplank, Naval", ("bf", 0), exclude=(rh,))
+    assert g.chars(rh).might == 3
+    from riftsim.core.vm import Context, Frame
+    s = next(c for c in db if c.name == "Convergent Mutation")
+    ctx = Context(0, None)
+    ab = s.abilities[-1]
+    g.vm_frames.append(Frame(list(ab.target_code or []) + list(ab.code), ctx))
+    for _ in range(20):
+        d = g.run()
+        if d.kind == "choose" and rh in d.options and ctx.vars.get("t") is None:
+            g.choose(rh); continue
+        if d.kind == "choose" and big in d.options:
+            g.choose(big); continue
+        break
+    assert g.chars(rh).might == g.chars(big).might

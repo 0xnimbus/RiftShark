@@ -195,3 +195,207 @@ def solari_shrine(defn):
     ready = lambda g, c: c.source in g.objects and not g.objects[c.source].exhausted
     return [Triggered(kill_stunned, [O.If(ready, [O.May([O.Exhaust(Ref("self")), O.Draw(1)], label="exhaust this to draw 1")])],
                       label=defn.name, source_text=defn.text)]
+
+
+def _ctrl(g, u):
+    o = g.objects[u]
+    return o.controller if o.controller is not None else o.owner
+
+
+def _fight(g, c, a, b):
+    """'We deal damage equal to our Mights to each other' (both amounts read before either is dealt)."""
+    if a not in g.objects or b not in g.objects or g.objects[a].zone != "board" or g.objects[b].zone != "board":
+        return
+    ma, mb = g.chars(a).might or 0, g.chars(b).might or 0
+    g.do_deal([b], ma, c, source_uid=a)
+    g.do_deal([a], mb, c, source_uid=b)
+
+
+@script("Carnivorous Snapvine")
+def carnivorous_snapvine(defn):
+    # When you play me, choose an enemy unit at a battlefield. We deal damage equal to our Mights to each other.
+    return [Triggered("play_self", [O.Choose(Sel("unit", side="enemy", where="battlefield"), out="t"),
+                                    O.Do(lambda g, c: _fight(g, c, c.source, c.vars.get("t")), label="fight")],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Maddened Marauder")
+def maddened_marauder(defn):
+    # [Tank]  When you play me, move a unit from a battlefield to its base.
+    return [Triggered("play_self", [O.Choose(Sel("unit", where="battlefield"), out="t"), O.Move(Ref("t"), "base")],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Mindsplitter")
+def mindsplitter(defn):
+    # When you play me, choose an opponent. They reveal their hand. Choose a card from it, and they discard that card.
+    def reveal(g, c):
+        p = c.vars.get("__opp")
+        if p is not None:
+            g.emit("reveal", player=p, cards=list(g.players[p].hand), ctx=c)
+    return [Triggered("play_self", [
+        O.ChoosePlayer(out="__opp", opponent=True), O.Do(reveal, label="reveal hand"),
+        O.Choose(lambda g, c: list(g.players[c.vars["__opp"]].hand) if c.vars.get("__opp") is not None else [],
+                 out="__md", targeted=False),
+        O.If(Ref("__md"), [O.DiscardChosen(Ref("__md"), player=lambda g, c: c.vars["__opp"])])],
+        label=defn.name, source_text=defn.text)]
+
+
+@script("Rhasa the Sunderer")
+def rhasa(defn):
+    # I cost [1] less for each card in your trash.
+    return [PlayPermission("cost", cost_mod=lambda g, u, e, p: (max(0, e - len(g.players[_ctrl(g, u)].trash)), p),
+                           label="[1] less per card in your trash", source_text=defn.text)]
+
+
+def _play_unit_from_trash(label):
+    units = lambda g, c: [u for u in g.players[c.controller].trash if g.objects[u].base_defn().is_unit]
+    return [O.ChooseFromList(units, out="__ut", up_to=True, label=label), O.Do(_unwrap("__ut")),
+            O.If(Ref("__ut"), [O.PlayCard(Ref("__ut"), ignore="energy")])]
+
+
+@script("Soulgorger")
+def soulgorger(defn):
+    # When you play me, you may play a unit from your trash, ignoring its Energy cost.
+    return [Triggered("play_self", _play_unit_from_trash("play a unit from your trash"), label=defn.name, source_text=defn.text)]
+
+
+@script("The Harrowing")
+def the_harrowing(defn):
+    # Play a unit from your trash, ignoring its Energy cost.
+    units = lambda g, c: [u for u in g.players[c.controller].trash if g.objects[u].base_defn().is_unit]
+    return [SpellEffect([O.ChooseFromList(units, out="__ut", label="play a unit from your trash"),
+                         O.If(Ref("__ut"), [O.PlayCard(Ref("__ut"), ignore="energy")])], label=defn.name, source_text=defn.text)]
+
+
+@script("Invert Timelines")
+def invert_timelines(defn):
+    # Each player discards their hand, then draws 4.
+    def run(g, c):
+        for q in range(len(g.players)):
+            g.do_discard(q, list(g.players[q].hand), c)
+        for q in range(len(g.players)):
+            g.do_draw(q, 4, c)
+    return [SpellEffect([O.Do(run, label="discard hands, draw 4")], label=defn.name, source_text=defn.text)]
+
+
+@script("Super Mega Death Rocket!, Jinx")
+def super_mega_death_rocket(defn):
+    # Deal 5 to a unit.  When you conquer, you may discard 1 to return this from your trash to your hand.
+    has_hand = lambda g, c: bool(g.players[c.controller].hand)
+    return [SpellEffect([O.Choose(Sel("unit"), out="t"), O.Deal(5, Ref("t"))], label=defn.name, source_text=defn.text),
+            Triggered(lambda g, s, ev: ev.get("kind") == "conquer" and ev.get("player") == g.objects[s].owner, [O.If(has_hand, [O.May([O.Discard(1), O.ToHand(Ref("self"))],
+                                                            label="discard 1 to return this to your hand")])],
+                      zone="trash", label="return from trash", source_text=defn.text)]
+
+
+@script("Siphon Power, Viktor")
+def siphon_power(defn):
+    # [Reaction]  Choose a battlefield. Give friendly units there +1 [M] this turn and enemy units there -1 [M] this
+    # turn, to a minimum of 1 [M].
+    friends = lambda g, c: [u for u in g.units_at(c.vars["loc"]) if g.is_friendly(g.objects[u].controller, c.controller)]
+    foes = lambda g, c: [u for u in g.units_at(c.vars["loc"]) if not g.is_friendly(g.objects[u].controller, c.controller)]
+    return [SpellEffect([O.ChooseLocation(out="loc"), O.GiveMight(friends, 1), O.GiveMight(foes, -1, min_value=1)],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Flash")
+def flash(defn):
+    # [Reaction]  Move up to 2 friendly units to base.
+    return [SpellEffect([O.Choose(Sel("unit", side="friendly", where="battlefield"), out="t", n=2, up_to=True),
+                         O.Move(Ref("t"), "base")], label=defn.name, source_text=defn.text)]
+
+
+@script("Against the Odds")
+def against_the_odds(defn):
+    # [Reaction]  Give a friendly unit at a battlefield +2 [M] this turn for each enemy unit there.
+    def amount(g, c):
+        t = c.vars.get("t")
+        if t not in g.objects or g.objects[t].zone != "board":
+            return 0
+        return 2 * sum(1 for u in g.units_at(g.objects[t].location) if not g.is_friendly(g.objects[u].controller, c.controller))
+    return [SpellEffect([O.Choose(Sel("unit", side="friendly", where="battlefield"), out="t"), O.GiveMight(Ref("t"), amount)],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Blood Rush")
+def blood_rush(defn):
+    # [Action] [Repeat] [1]  Give a unit [Assault 2].
+    return [SpellEffect([O.Choose(Sel("unit"), out="t"), O.GiveKeyword(Ref("t"), "assault", 2)],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Void Drone")
+def void_drone(defn):
+    # I cost [2] less to play from anywhere other than your hand.
+    return [PlayPermission("cost", cost_mod=lambda g, u, e, p: (max(0, e - 2), p) if g.objects[u].zone != "hand" else (e, p),
+                           label="[2] less from anywhere but your hand", source_text=defn.text)]
+
+
+@script("Battering Ram")
+def battering_ram(defn):
+    # I cost [1] less for each card you've played this turn, to a minimum of [1].
+    def reduce(g, u, e, p):
+        n = len(g.players[_ctrl(g, u)].played_this_turn)
+        return (max(min(e, 1), e - n), p)
+    return [PlayPermission("cost", cost_mod=reduce, label="[1] less per card played this turn", source_text=defn.text)]
+
+
+@script("Buhru Captain")
+def buhru_captain(defn):
+    # When you play me, you may draw 1 or buff me.
+    return [Triggered("play_self", [O.ChooseMode([("draw 1", [O.Draw(1)]), ("buff me", [O.Buff(Ref("self"))]),
+                                                  ("neither", [])])], label=defn.name, source_text=defn.text)]
+
+
+@script("Called Shot")
+def called_shot(defn):
+    # [Action] [Repeat] [Chaos]  Look at the top 2 cards of your Main Deck. Draw one and recycle the other.
+    return [SpellEffect([O.Look(2, out="looked"),
+                         O.ChooseFromList(lambda g, c: list(c.vars.get("looked", [])), out="__cs", label="draw one"),
+                         O.ToHand(Ref("__cs")),
+                         O.Recycle(lambda g, c: [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck"])],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Overzealous Fan")
+def overzealous_fan(defn):
+    # When I defend, you may kill me to move an attacking unit to its base.
+    attackers = Sel("unit", pred=lambda g, c, u: g.objects[u].designation == "attacker")
+    return [Triggered("defend_self", [O.May([O.Kill(Ref("self")), O.Choose(attackers, out="t"), O.Move(Ref("t"), "base")],
+                                            label="kill me to move an attacking unit to its base")],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Bonds of Strength")
+def bonds_of_strength(defn):
+    # [Reaction] [Repeat] [2]  Give two friendly units each +1 [M] this turn.
+    return [SpellEffect([O.Choose(Sel("unit", side="friendly"), out="t", n=2), O.GiveMight(Ref("t"), 1)],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Trusty Ramhound")
+def trusty_ramhound(defn):
+    # While you have another unit here, I have +1 [M].
+    def other_here(g, s):
+        o = g.objects[s]
+        return o.location is not None and any(u != s for u in g.units_at(o.location, o.controller))
+    return [Static("self", "might", 1, cond=other_here, label="+1 [M] with another unit here", source_text=defn.text)]
+
+
+@script("Convergent Mutation")
+def convergent_mutation(defn):
+    # [Reaction]  Choose a friendly unit. This turn, increase its Might to the Might of another friendly unit.
+    other = Sel("unit", side="friendly", pred=lambda g, c, u: u != c.vars.get("t"))
+    return [SpellEffect([O.Choose(Sel("unit", side="friendly"), out="t"), O.Choose(other, out="__o"),
+                         O.SetMight(Ref("t"), lambda g, c: g.chars(c.vars["__o"]).might if c.vars.get("__o") in g.objects else 0)],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Yordle Explorer")
+def yordle_explorer(defn):
+    # When you play a card with Power cost [A][A] or more, draw 1.
+    def big(g, s, ev):
+        return (ev.get("kind") == "play" and ev.get("player") == g.objects[s].controller and ev.get("uid") in g.objects
+                and (g.objects[ev["uid"]].base_defn().power or 0) >= 2 and not ev.get("token"))
+    return [Triggered(big, [O.Draw(1)], label=defn.name, source_text=defn.text)]
