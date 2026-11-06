@@ -1,7 +1,8 @@
 # Round-robin, 2026-11-06 (expert AI both sides, 6 games per pair, seats swapped, 216 games)
 
-Row deck's wins-losses against the column deck. No rule invariant problems in any game; first player won 136/216 (63%).
-Provisional: remaining unscripted cards are excluded from all decks (every list here is fully scripted), and the AI is a 1-ply searcher.
+Row deck's wins-losses against the column deck. No rule invariant problems; first player won 136/216 (63%); 0 games hit the turn cap.
+Run on the engine after the lookahead-isolation fix (commit e8f5689); every deck list is fully scripted.
+Provisional: the expert AI searches one move ahead with 3 determinised samples.
 
 | deck | overall | Azir | Curator of the Sands | Gloomist | Irelia | Kai'Sa | Master Yi | Riven | Rogue Assassin | Viktor |
 |---|---|---|---|---|---|---|---|---|---|---|
