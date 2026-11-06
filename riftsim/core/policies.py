@@ -191,22 +191,36 @@ class _Node:
 
 
 def determinize(game, player, rng):
-    """Hidden information: shuffle what `player` cannot see (opponent hand + deck, own deck order,
-    rune decks, facedown cards) on a clone and return it."""
+    """Hidden information: shuffle what `player` cannot see (opponent hand + deck + facedown cards, own deck order,
+    rune decks) on a clone and return it. Cards revealed to `player` (Scuttle Crab, reveals) are kept."""
     g = game.clone()
     for q, ps in enumerate(g.players):
         if q == player:
             rng.shuffle(ps.deck)
             rng.shuffle(ps.rune_deck)
             continue
-        pool = list(ps.hand) + list(ps.deck)
+        # cards `player` knows stay where they are: revealed hand cards, facedown cards they may look at
+        known_hand = [u for u in ps.hand if g.knows(player, u)]
+        hidden_hand = [u for u in ps.hand if u not in known_hand]
+        fd_slots = [(bf, k, u) for bf in g.battlefields for k, u in bf.facedown.items()
+                    if g.objects[u].controller == q and not g.knows(player, u)]
+        pool = hidden_hand + list(ps.deck) + [u for _, _, u in fd_slots]
         rng.shuffle(pool)
-        nh = len(ps.hand)
-        ps.hand, ps.deck = pool[:nh], pool[nh:]
+        nh = len(hidden_hand)
+        new_hand, rest = pool[:nh], pool[nh:]
+        new_fd, new_deck = rest[:len(fd_slots)], rest[len(fd_slots):]
+        olds = {u: (g.objects[u].location, g.objects[u].entered_stamp, getattr(g.objects[u], "hidden_at", None),
+                    getattr(g.objects[u], "facedown_turn", None)) for _, _, u in fd_slots}
+        for (bf, k, old), u in zip(fd_slots, new_fd):
+            o = g.objects[u]
+            o.zone, o.controller = "facedown", q
+            o.location, o.entered_stamp, o.hidden_at, o.facedown_turn = olds[old]
+            bf.facedown[k] = u
+        ps.hand, ps.deck = known_hand + new_hand, new_deck
         for u in ps.hand:
-            g.objects[u].zone = "hand"
+            g.objects[u].zone, g.objects[u].location = "hand", None
         for u in ps.deck:
-            g.objects[u].zone = "deck"
+            g.objects[u].zone, g.objects[u].location = "deck", None
         rng.shuffle(ps.rune_deck)
     g.bump()
     return g

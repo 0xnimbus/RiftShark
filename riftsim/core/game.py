@@ -56,6 +56,9 @@ class Game(flow.FlowMixin):
         self.scored = set()            # (player, bf idx) scored this turn
         self.turn_memo = {}            # per-turn memory (cleared at end of turn)
         self.turns_taken = {}          # player -> number of turns they have started (Forgotten Monument)
+        self.known = {}                # viewer -> {uid: entered_stamp} of hidden cards revealed to them (hand reveals)
+        self.peek_facedown = {}        # viewer -> turn in which they can look at opponents' facedown cards (Scuttle Crab)
+        self.shown_off = {}            # played card uid -> locked-in info of what it showed off (CR 832), or None
         self.reorder_requests = []     # simultaneous triggers a player still has to order (CR 383)
         self.events = []               # structured log of everything that happened
         self.log_enabled = log
@@ -488,6 +491,11 @@ class Game(flow.FlowMixin):
         abilities fire. Returns the event dict."""
         ev = dict(data)
         ev["kind"] = kind
+        if kind == "reveal":            # a revealed card is known to everyone until it changes zones
+            for u in data.get("cards") or ():
+                if u in self.objects:
+                    for q in range(len(self.players)):
+                        self.known.setdefault(q, {})[u] = self.objects[u].entered_stamp
         self.log("event:" + kind, **{k: v for k, v in data.items() if k != "ctx"})
         self._collect_triggers(ev)
         return ev
@@ -574,6 +582,8 @@ class Game(flow.FlowMixin):
         ctx.event = ev
         ctx.vars["ev"] = ev
         ctx.vars["self"] = uid
+        if ev.get("kind") == "play" and ev.get("uid") == uid:
+            ctx.shown_off = self.shown_off.get(uid)      # "When you play me, if you showed off" (CR 832.1.c.1)
         for k, v in ab.store.items():
             ctx.vars[v] = ev.get(k)
         if ev.get("kind") == "die":
@@ -623,7 +633,7 @@ class Game(flow.FlowMixin):
 
     def replace_event(self, ev):
         """Apply replacement effects to an event (CR 367-375). Returns the (possibly modified) event or
-        None if it was prevented entirely. Optional replacements are applied automatically (simplification)."""
+        None if it was prevented entirely. Optional replacements cannot be created (see abilities.Replacement)."""
         applied = set()
         changed = True
         guard = 0
@@ -1006,7 +1016,8 @@ class Game(flow.FlowMixin):
         if standard:
             if o.location is None:
                 return False
-            if o.location[0] == "bf" and not self.has_keyword(uid, "ganking") and not self.rules("can_move_bf_to_bf", player=o.controller):
+            if o.location[0] == "bf" and not self.has_keyword(uid, "ganking") \
+                    and not any(self.objects[src].place == dest for src, _ in self.rules("move_here_from_anywhere")):
                 return False
             for src, v in self.rules("cant_move_here"):
                 if self.objects[src].location == dest and v is True:
@@ -1122,6 +1133,32 @@ class Game(flow.FlowMixin):
                 self._apply_contested(o.location, p)
         self.dirty = True
         return o.uid
+
+    def knows(self, viewer, uid):
+        """Can `viewer` see this card? Own cards, public zones, cards revealed to them since they last changed
+        zones, and opponents' facedown cards during a turn they may look at them."""
+        o = self.objects[uid]
+        if o.controller == viewer and o.zone in ("hand", "facedown"):
+            return True
+        if o.zone == "facedown":
+            return self.peek_facedown.get(viewer) == self.turn
+        if o.zone in ("hand", "deck", "rune_deck"):
+            return self.known.get(viewer, {}).get(uid) == o.entered_stamp and o.zone == "hand"
+        return True
+
+    def add_battlefield_token(self, p, name, ctx=None):
+        """'Add the X battlefield token to the board' (Baron Pit): a new, uncontrolled battlefield. Returns its index."""
+        defn = self.db.tokens[name]
+        from .scripts import attach_scripts
+        attach_scripts(self.db, defn)
+        o = self._new_obj(defn, p)
+        idx = len(self.battlefields)
+        o.zone, o.location, o.controller = "board", ("bfcard", idx), None
+        o.entered_stamp = self.tick()
+        self.battlefields.append(BattlefieldState(idx, o.uid, p))
+        self.log("battlefield_token", uid=o.uid, name=name, idx=idx, player=p)
+        self.bump()
+        return idx
 
     def _create_battlefield_token(self, o, loc, ctx):
         if loc is None or loc[0] != "bf":
@@ -1364,6 +1401,9 @@ class Game(flow.FlowMixin):
         g.scored = set(self.scored)
         g.turn_memo = dict(self.turn_memo)
         g.turns_taken = dict(self.turns_taken)
+        g.shown_off = dict(self.shown_off)
+        g.known = {k: dict(v) for k, v in self.known.items()}
+        g.peek_facedown = dict(self.peek_facedown)
         g.mulligan_queue = list(getattr(self, "mulligan_queue", []))
         g.reorder_requests = [dict(r, items=list(r["items"]), order=list(r["order"])) for r in self.reorder_requests]
         g.turn_queue = list(self.turn_queue)

@@ -100,12 +100,27 @@ def time_warp(defn):
 
 @script("Blade of the Exile")
 def blade_of_the_exile(defn):
-    # [Equip] — [A] or exhaust a friendly unit.  Simplification: the exhaust alternative is not offered (documented in RULES.md).
-    return {"abilities": [], "replace": False}
+    # [Equip] — [A] or exhaust a friendly unit. The keyword ability pays [A]; this second Equip ability is the
+    # alternative cost (exhaust a ready friendly unit, which may be the unit being equipped).
+    alt = Activated({"energy": 0, "power": [], "exhaust_unit": Sel("unit", side="friendly", pred=lambda g, c, u: not g.objects[u].exhausted)},
+                    [O.Attach(Ref("self"), Ref("t"))],
+                    targets=[O.Choose(Sel("unit", side="friendly", pred=lambda g, c, u: g.objects[c.source].attached_to != u), targeted=True)],
+                    label="Equip (exhaust a friendly unit)", is_equip=True, keyword="equip",
+                    source_text="[Equip] — exhaust a friendly unit")
+    return {"abilities": [alt], "replace": False}
 
 
 @script("Baron Nashor")
 def baron_nashor(defn):
-    # Baron Pit token battlefield is not modelled (documented simplification); Baron plays to base like a normal unit.
-    return [Static("self", "keyword", ("untargetable", True), source_text="I can't be chosen by enemy spells and abilities."),
+    # "As you play me, add the Baron Pit battlefield token to the board if it's not there already. If you do, I enter
+    # there." (CR 187.9, 369.3): done while finalizing; the entry location is replaced.
+    def as_play(g, c):
+        if any(g.objects[bf.uid].defn.name == "Baron Pit" for bf in g.battlefields):
+            return
+        idx = g.add_battlefield_token(c.controller, "Baron Pit", c)
+        c.vars["__loc"] = ("bf", idx)
+        c.target_bf = None
+    return [PlayPermission("as_play", value=[O.Do(as_play, label="add the Baron Pit")],
+                           source_text="As you play me, add the Baron Pit battlefield token to the board if it's not there already. If you do, I enter there."),
+            Static("self", "keyword", ("untargetable", True), source_text="I can't be chosen by enemy spells and abilities."),
             Static(Sel("unit", side="friendly", other=True), "might", 2, source_text="Other friendly units have +2 [M].")]

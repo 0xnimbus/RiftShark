@@ -691,13 +691,13 @@ def parse_sentence(s, state):
         return [O.DelayedPassive("cost_reduce", {"energy": c["energy"], "power": len(c["power"])}, uses=1)]
     m = re.match(r"predict equal to its power cost$", sl)
     if m:
-        return [O.Predict(lambda g, c: len(g.objects[c.shown_off].base_defn().power) if getattr(c, "shown_off", None) in g.objects else 0)]
+        return [O.Predict(lambda g, c: (c.shown_off or {}).get("power", 0))]
     m = re.match(r"take a turn after this one$", sl)
     if m:
         return [O.Do(lambda g, c: g.turn_queue.insert(0, c.controller), label="extra turn")]
     m = re.match(r"you can look at their facedown cards this turn$", sl)
     if m:
-        return []       # information only: the AI already sees the full state (documented simplification)
+        return [O.Do(lambda g, c: g.peek_facedown.__setitem__(c.controller, g.turn), label="look at their facedown cards")]
     m = re.match(r"return a friendly unit and an enemy unit to their owners' hands$", sl)
     if m:
         return [O.Choose(Sel("unit", side="friendly"), out="__f"), O.Choose(Sel("unit", side="enemy"), out="__e"), O.ToHand(Ref("__f")), O.ToHand(Ref("__e"))]
@@ -1579,7 +1579,7 @@ def parse_static(line):
         return [Static("self", "rule", ("no_combat_damage",), cond=cond, source_text=line)]
     m = re.match(r"units can move here from anywhere$", l)
     if m:
-        return [Static("self", "rule", ("can_move_bf_to_bf",), cond=cond, source_text=line)]
+        return [Static("self", "rule", ("move_here_from_anywhere",), cond=cond, source_text=line)]
     m = re.match(r"(?:your |friendly )?units cost \[(\d+)\] less$", l)
     if m:
         n = int(m.group(1))
@@ -1928,7 +1928,9 @@ def script_line(defn, line):
 def _cond_from_src(g, s, c2):
     from ..vm import Context
     o = g.objects[s]
-    return bool(c2(g, Context(o.controller, s, here=o.location)))
+    ctx = Context(o.controller, s, here=o.location)
+    ctx.shown_off = g.shown_off.get(s)
+    return bool(c2(g, ctx))
 
 
 def script_card(defn):

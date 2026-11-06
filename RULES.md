@@ -39,6 +39,19 @@ are enforced. Paying Energy/Power in effects is always optional (CR 445.2). The 
 recycling a ready rune without exhausting it first, which is strictly dominated (the extra [1] can never hurt).
 The built-in AIs do not float resources outside payments; that is an AI limitation, not a rule.
 
+## Show Off, alternative costs, battlefield tokens, information (exact since 2026-11-06)
+
+- `[Show Off]` (CR 832): while finalizing, the controller may reveal a matching card from hand or pick a matching
+  friendly object on the board (decision `show_off`). The shown-off card's characteristics are locked in
+  (The Empyrean predicts its Power cost; Battle Preparations readies up to 2 runes).
+- Blade of the Exile offers both Equip costs: [A], or exhaust a ready friendly unit (it may be the unit equipped).
+  Weaponmaster reduces the [A] cost.
+- Baron Nashor adds the Baron Pit battlefield token as he is played (if there is none) and enters there. Units can move
+  to the Pit from any location without Ganking.
+- Reveals are information: revealed hand cards stay known to the other player until they change zones, Scuttle Crab
+  lets its controller look at facedown cards for the turn. The AIs' determinisation keeps what they know and shuffles
+  only what they cannot see (including facedown cards); the play page shows the human what they know.
+
 ## Choices and targets (exact since 2026-11-06)
 
 - Spells, triggered and activated abilities make their choices while being finalized on the chain (CR 355.3-355.5,
@@ -53,12 +66,11 @@ The built-in AIs do not float resources outside payments; that is an AI limitati
 
 ## Simplifications (results can differ from paper play) — every item here is a bug to fix (owner rule: no simplifications)
 
-- Optional replacement effects are auto-applied.
-- `[Show Off]` is not implemented: "if you showed off" clauses never fire (The Empyrean, Battle Preparations).
-- Blade of the Exile's alternative Equip cost (exhaust a friendly unit) is not offered; only [A] is.
-- Baron Nashor's Baron Pit battlefield token is not modelled: Baron plays like a normal unit (its other abilities work).
-- Scuttle Crab's "look at their facedown cards" is a no-op (the AI already sees the full state).
+- Optional ("you may ... instead") replacement effects are not built yet. The engine refuses to create one, so the four
+  cards that need it (Mordekaiser, Twice Slain; Zilean, Time Mage; Heimerdinger, Academy Instructor; Sett, The Boss)
+  stay unscripted and no deck containing them is legal; nothing is auto-applied.
 - Card text the grammar could not parse is skipped for that card (see coverage); the long tail is being hand-scripted,
   competitive staples first. Since 2026-11-06 a deck containing such a card is illegal (`Deck.validate` rejects it when
   scripts are attached), so no simulated or coached game can use a simplified card without a loud error.
-- A safety cap of 60 turns per game counts as a draw.
+- A safety cap of 60 turns stops a simulated game. It is not a rule: such games are reported as unfinished with a
+  warning and left out of win rates (never counted as draws). Play sessions use the same cap.

@@ -29,7 +29,7 @@ def _one(args):
     pols = [make_policy(s, seed=seed * 11 + i) for i, s in enumerate(specs)]
     t = time.time()
     g, _ = play_game(_DB, decks, seed, pols, record=False)
-    return {"specs": specs, "winner": g.winner, "turns": g.turn, "secs": time.time() - t, "decks": [d.name for d in decks]}
+    return {"specs": specs, "winner": g.winner, "reason": g.reason, "turns": g.turn, "secs": time.time() - t, "decks": [d.name for d in decks]}
 
 
 def main():
@@ -49,18 +49,20 @@ def main():
         jobs.append((pair, seed, [a.a, a.b]))
         jobs.append((pair, seed, [a.b, a.a]))       # same decks and shuffle, levels swap seats
     wins = {a.a: 0, a.b: 0}
-    draws, secs, turns = 0, 0.0, 0
+    draws, unfinished, secs, turns = 0, 0, 0.0, 0
     with ProcessPoolExecutor(max_workers=a.workers) as ex:
         for r in ex.map(_one, jobs):
             secs += r["secs"]
             turns += r["turns"]
-            if r["winner"] is None:
+            if r["reason"] == "turn limit":
+                unfinished += 1
+            elif r["winner"] is None:
                 draws += 1
             else:
                 wins[r["specs"][r["winner"]]] += 1
     n = len(jobs)
-    print(f"{a.a} {wins[a.a]} - {wins[a.b]} {a.b}  (draws {draws}, {n} games, {secs / n:.1f}s/game, {turns / n:.1f} turns)")
-    print(f"{a.a} win rate {wins[a.a] / max(1, n - draws):.2f}")
+    print(f"{a.a} {wins[a.a]} - {wins[a.b]} {a.b}  (draws {draws}, unfinished at the turn cap {unfinished}, {n} games, {secs / n:.1f}s/game, {turns / n:.1f} turns)")
+    print(f"{a.a} win rate {wins[a.a] / max(1, n - draws - unfinished):.2f}")
 
 
 if __name__ == "__main__":
