@@ -276,3 +276,49 @@ def test_jayce_man_of_progress_makes_next_gear_free(db, decks):
     settle(g, yes=True, picks=[old])
     assert g.objects[old].zone == "trash"
     assert g.card_cost(0, h, "hand", ("base", 0))[0] == 0
+
+
+def test_yasuo_windrider_scores_on_third_move(db, decks):
+    g = main_phase(db, decks)
+    y = put(g, db, 0, "Yasuo, Windrider", ("base", 0))
+    fired = lambda: [e for e in g.events if e.get("kind") == "trigger" and e.get("label") == "Yasuo, Windrider"]
+    for dest in [("bf", 0), ("base", 0)]:
+        g.do_move([y], dest); settle(g)
+    assert not fired()
+    g.do_move([y], ("bf", 1)); settle(g)
+    assert len(fired()) == 1
+
+
+def test_kayn_takes_no_damage_after_moving_twice(db, decks):
+    g = main_phase(db, decks)
+    k = put(g, db, 0, "Kayn, Unleashed", ("base", 0))
+    g.do_move([k], ("bf", 0)); settle(g)
+    g.do_move([k], ("base", 0)); settle(g)
+    assert g.replace_event({"kind": "damage", "uid": k, "amount": 3}) is None
+
+
+def test_ambessa_empowered_ignores_damage_outside_combat(db, decks):
+    g = main_phase(db, decks)
+    a = put(g, db, 0, "Ambessa, The Wolf", ("base", 0))
+    m = g.chars(a).might
+    assert g.replace_event({"kind": "damage", "uid": a, "amount": 3}) is not None
+    g.objects[a].empowered = 1; g.bump()
+    assert g.chars(a).might == m + 3
+    assert g.replace_event({"kind": "damage", "uid": a, "amount": 3}) is None
+
+
+def test_sona_readies_four_runes_at_end_of_turn_at_a_battlefield(db, decks):
+    g = main_phase(db, decks)
+    put(g, db, 0, "Sona, Harmonious", ("bf", 0))
+    for r in g.players[0].runes:
+        g.objects[r].exhausted = True
+    g.bump()
+    g.pending = None
+    g.run()
+    g.choose(("end_turn",))
+    for _ in range(60):
+        d = g.run()
+        if g.turn_player == 1:
+            break
+        g.choose(("pass",) if ("pass",) in d.options else d.options[0])
+    assert sum(not g.objects[r].exhausted for r in g.players[0].runes) == min(4, len(g.players[0].runes))

@@ -786,3 +786,120 @@ def jayce_progress(defn):
             O.May([O.Choose(Sel("gear", side="friendly"), out="t", targeted=False), O.Kill(Ref("t")),
                    O.DelayedPassive("cost_reduce", {"energy": 99, "filter": gear7}, uses=1)],
                   label="kill a friendly gear")])], label=defn.name, source_text=defn.text)], "replace": True}
+
+
+def _moves_this_turn(g, u):
+    return g.objects[u].temp.get(("moves", g.turn), 0)
+
+
+def _in_combat(g, u):
+    o = g.objects[u]
+    return g.combat is not None and o.zone == "board" and o.location == ("bf", g.combat["bf"])
+
+
+@script("Sona, Harmonious")
+def sona_harmonious(defn):
+    # While I'm at a battlefield, ready 4 friendly runes at the end of your turn.
+    exhausted_runes = lambda g, c: [r for r in g.players[c.controller].runes if g.objects[r].exhausted]
+    return {"abilities": [Triggered("end_turn", [O.ChooseFromList(exhausted_runes, out="__rr", n=4, label="ready 4 runes"),
+                                                 O.Ready(Ref("__rr"))],
+                                    cond=lambda g, s: _at_bf(g, s), label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Volibear, Furious")
+def volibear_furious(defn):
+    # [Deflect 2]   (keyword)
+    # When I attack, deal 5 damage split among any number of enemy units here.
+    return {"abilities": [Triggered("attack_self", [O.Split(5, Ref("t"))],
+                                    targets=[O.Choose(Sel("unit", side="enemy", where="here"), out="t", n=5, up_to=True)],
+                                    label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Yasuo, Windrider")
+def yasuo_windrider(defn):
+    # [Ganking]   (keyword)
+    # The third time I move in a turn, you score 1 point.
+    return {"abilities": [Triggered("move_self", [O.GainPoints(1)], filt=lambda g, s, ev: _moves_this_turn(g, s) == 3,
+                                    label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Kayn, Unleashed")
+def kayn_unleashed(defn):
+    # [Ganking]   (keyword)
+    # If I have moved twice this turn, I don't take damage.
+    from ..abilities import Replacement
+    return {"abilities": [Replacement("damage", lambda g, s, ev: ev.get("uid") == s and _moves_this_turn(g, s) >= 2,
+                                      lambda g, s, ev: None, label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Ambessa, The Wolf")
+def ambessa_wolf(defn):
+    # [Empower] [3][Body]   (keyword)
+    # [Empowered][>] I have +3 [M] and can't be dealt damage unless I'm in combat.
+    from ..abilities import Replacement
+    emp = lambda g, s: bool(g.objects[s].empowered)
+    return {"abilities": [Static("self", "might", 3, cond=emp, label="Empowered: +3 [M]", source_text=defn.text),
+                          Replacement("damage", lambda g, s, ev: ev.get("uid") == s and emp(g, s) and not _in_combat(g, s),
+                                      lambda g, s, ev: None, label="Empowered: no damage outside combat", source_text=defn.text)],
+            "replace": True}
+
+
+@script("Kai'Sa, Evolutionary")
+def kaisa_evolutionary(defn):
+    # [Ganking]   (keyword)
+    # When I conquer, you may play a spell from your trash with Energy cost less than your points without paying its
+    # Energy cost. Then recycle it.
+    def options(g, c):
+        pts = g.players[c.controller].points
+        return [u for u in g.players[c.controller].trash if g.objects[u].base_defn().type == "spell"
+                and (g.objects[u].base_defn().energy or 0) < pts]
+
+    def mark(g, c):
+        for it in g.chain:
+            if it.uid == c.vars.get("played") and it.kind == "spell":
+                it.ctx.vars["__recycle_after"] = True
+    return {"abilities": [Triggered("conquer_self", [
+        O.ChooseFromList(options, out="__ks", up_to=True, label="play a spell from your trash"),
+        O.Do(_unwrap("__ks")),
+        O.If(Ref("__ks"), [O.PlayCard(Ref("__ks"), ignore="energy"), O.Do(mark)])], label=defn.name, source_text=defn.text)],
+        "replace": True}
+
+
+@script("Udyr, Wildman")
+def udyr_wildman(defn):
+    # Spend my buff: Choose one you've not chosen this turn — Deal 2 to a unit at a battlefield. / Stun a unit at a
+    # battlefield. / Ready me. / Give me [Ganking] this turn.
+    at_bf = Sel("unit", where="battlefield")
+    modes = [("Deal 2 to a unit at a battlefield", [O.Choose(at_bf, out="t"), O.Deal(2, Ref("t"))]),
+             ("Stun a unit at a battlefield", [O.Choose(at_bf, out="t"), O.Stun(Ref("t"))]),
+             ("Ready me", [O.Ready(Ref("self"))]),
+             ("Give me [Ganking] this turn", [O.GiveKeyword(Ref("self"), "ganking", True, duration="turn")])]
+    return {"abilities": [Activated({"energy": 0, "power": [], "spend_buff": True}, [O.ChooseMode(modes, exclude_used=True)],
+                                    timing="main", label="spend my buff: choose one", source_text=defn.text)], "replace": True}
+
+
+@script("Sett, Brawler")
+def sett_brawler(defn):
+    # When I'm played and when I conquer, buff me.
+    # Spend my buff: Give me +4 [M] this turn.
+    return {"abilities": [Triggered("play_self", [O.Buff(Ref("self"))], label=defn.name, source_text=defn.text),
+                          Triggered("conquer_self", [O.Buff(Ref("self"))], label=defn.name, source_text=defn.text),
+                          Activated({"energy": 0, "power": [], "spend_buff": True}, [O.GiveMight(Ref("self"), 4, duration="turn")],
+                                    timing="main", label="spend my buff: +4 [M] this turn", source_text=defn.text)], "replace": True}
+
+
+@script("Leona, Zealot")
+def leona_zealot(defn):
+    # If an opponent's score is within 3 points of the Victory Score, I enter ready.
+    # Stunned enemy units here have -8 [M], to a minimum of 1 [M].
+    from ..abilities import Replacement
+
+    def near(g, s, ev):
+        if ev.get("uid") != s:
+            return False
+        v = g.cfg["victory"]
+        me = g.objects[s].controller if g.objects[s].controller is not None else g.objects[s].owner
+        return any(ps.points >= v - 3 for ps in g.players if not g.is_friendly(ps.idx, me))
+    # the -8 [M] static line is parsed by the auto-scripter (kept: replace=False)
+    return {"abilities": [Replacement("enter_ready", near, lambda g, s, ev: dict(ev, ready=True), label=defn.name, zone="any")],
+            "replace": False}

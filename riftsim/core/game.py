@@ -1053,6 +1053,7 @@ class Game(flow.FlowMixin):
             o.location = dest_u
             self._on_change_location(o)
             moved.append(u)
+            o.temp[("moves", self.turn)] = o.temp.get(("moves", self.turn), 0) + 1    # "the third time I move in a turn"
             self.log("move", uid=u, name=o.defn.name, frm=frm, to=dest_u, standard=standard)
             self.emit("leave_loc", uid=u, player=o.controller, **{"from": frm}, to=dest_u, ctx=ctx)
         if not moved:
