@@ -1676,6 +1676,8 @@ def parse_cost_phrase(text, defn):
             continue
         if pl in ("discard a card", "discard a gear", "discard a unit", "discard a spell"):
             cost["discard"] = 1
+            if pl != "discard a card":
+                cost["discard_type"] = pl.split()[-1]
             continue
         if pl in ("kill me", "kill this"):
             cost["kill_self"] = True

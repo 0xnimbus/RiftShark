@@ -1441,7 +1441,10 @@ class FlowMixin:
             return False
         if cost.get("xp", 0) > self.players[p].xp:
             return False
-        if cost.get("discard", 0) > len(self.players[p].hand):
+        if cost.get("discard", 0) > len([h for h in self.players[p].hand if h != uid and (
+                cost.get("discard_type") is None or cost["discard_type"] in self.chars(h).types)]):
+            return False
+        if cost.get("disempower_self") and not o.empowered:     # you can't disempower something that isn't empowered
             return False
         if cost.get("sacrifice") is not None:
             ctx = Context(p, uid, here=o.place)
@@ -1523,6 +1526,7 @@ class FlowMixin:
         d = o.base_defn()
         kind = "spell" if "spell" in d.types else ("unit" if "unit" in d.types else "gear")
         e, pw = self.card_cost(p, uid, z, loc)
+        self._use_play_effects(p, uid)
         if loc is not None and kind in ("unit", "gear"):
             self.turn_memo.setdefault("played_at", []).append((p, loc))
         ctx = Context(p, uid, here=loc)
@@ -1554,6 +1558,21 @@ class FlowMixin:
         self.priority = p
         self.dirty = True
         return item
+
+    def _use_play_effects(self, p, uid):
+        """'The next <card> you play this turn costs less / gets X': playing a matching card uses the effect up."""
+        for t in list(self.turn_effects):
+            if t["kind"] != "cost_reduce" or t["player"] != p or t["uses"] is None:
+                continue
+            f = t["data"].get("filter")
+            if f is not None and not f(self, uid):
+                continue
+            on_play = t["data"].get("on_play")
+            if on_play is not None:
+                on_play(self, uid, t["ctx"])
+            t["uses"] -= 1
+            if t["uses"] <= 0:
+                self.turn_effects.remove(t)
 
     def limited_play(self, p, uid, ctx, ignore=None, alt_cost=None, loc=None):
         """Play a card as part of an effect (CR 420). Cost may be ignored. Returns True if put on the chain."""
@@ -1638,7 +1657,7 @@ class FlowMixin:
         out = []
         cost = ab.cost
         if cost.get("discard"):
-            out.append(_C(Sel_hand(), out="__discard", n=cost["discard"], targeted=False))
+            out.append(_C(Sel_hand(cost.get("discard_type")), out="__discard", n=cost["discard"], targeted=False))
             out.append(Do(lambda g, c: g.do_discard(c.controller, list(c.vars["__discard"]) if isinstance(c.vars["__discard"], tuple) else [c.vars["__discard"]], c)))
         if cost.get("sacrifice") is not None:
             out.append(_C(cost["sacrifice"], out="__sac", targeted=False))
@@ -1652,6 +1671,7 @@ class FlowMixin:
         return out
 
 
-def Sel_hand():
+def Sel_hand(card_type=None):
     from .selectors import Sel
-    return Sel("card", zone="hand", pred=lambda g, c, u: g.objects[u].owner == c.controller and u != c.source)
+    return Sel("card", zone="hand", pred=lambda g, c, u: g.objects[u].owner == c.controller and u != c.source and (
+        card_type is None or card_type in g.chars(u).types))

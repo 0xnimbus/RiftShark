@@ -310,3 +310,21 @@ def teemo_legend(defn):
         Activated({"energy": 1, "exhaust": True}, [O.ToHand(Ref("t"))],
                   targets=[O.Choose(Sel("card", zone="any", pred=teemo_unit), out="t", targeted=False)], timing="main",
                   label="put a Teemo unit you own into your hand", source_text=defn.text)], "replace": True}
+
+
+@script("Boy Who Shattered Time", "Ekko, Boy Who Shattered Time")
+def boy_who_shattered_time(defn):
+    # [Empower] — [1], [T]   (keyword)
+    # Disempower me, [T]: Reduce the cost of the next unit you play this turn by [2][A] and give it
+    # "Kill me at end of turn."
+    kill_eot = Triggered("end_turn", [O.Kill(Ref("self"))], label="Kill me at end of turn", source_text="Kill me at end of turn.")
+
+    def grant(g, uid, ctx):
+        g.add_mod(uid, "ability", kill_eot, duration="permanent", source=ctx.source)
+
+    reduce = O.DelayedPassive("cost_reduce", {"energy": 2, "power": 1, "on_play": grant,
+                                              "filter": lambda g, u: g.objects[u].base_defn().is_unit}, uses=1)
+    return {"abilities": [Activated({"energy": 0, "power": [], "exhaust": True, "disempower_self": True,
+                                     "custom": [O.Disempower(Ref("self"))]}, [reduce], timing="main",
+                                    label="next unit costs [2][A] less and dies at end of turn", source_text=defn.text)],
+            "replace": True}

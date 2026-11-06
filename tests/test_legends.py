@@ -160,3 +160,78 @@ def test_teemo_lets_you_hide_for_1_energy_instead_of_any_power(db, decks):
     legend(g, db, "OGN-263")
     costs = g._hide_costs(0)
     assert (1, []) in costs and (0, ["any"]) in costs
+
+
+def _hand_unit(g, db, p=0, min_cost=3):
+    ps = g.players[p]
+    u = next(u for u in ps.deck if g.objects[u].defn.is_unit and not g.objects[u].defn.is_champion
+             and (g.objects[u].defn.energy or 0) >= min_cost and g.objects[u].zone == "deck")
+    g._to_zone(g.objects[u], "hand")
+    g.bump()
+    return u
+
+
+def test_boy_who_shattered_time_empower_costs_1_and_exhausts(db, decks):
+    g = main_phase(db, decks)
+    lg = legend(g, db, "RAD-139")
+    emp = [a for a in g.abilities(lg) if getattr(a, "is_empower", False)]
+    assert len(emp) == 1 and emp[0].cost["energy"] == 1 and emp[0].cost.get("exhaust")
+    # the disempower ability needs the legend to be empowered first
+    d = g.run()
+    acts = [o for o in d.options if o[0] == "activate" and o[1] == lg]
+    assert len(acts) == 1                       # only Empower is offered
+
+
+def test_boy_who_shattered_time_next_unit_costs_less_and_dies_at_end_of_turn(db, decks):
+    g = main_phase(db, decks)
+    lg = legend(g, db, "RAD-139")
+    g.objects[lg].empowered = 1
+    g.bump()
+    u = _hand_unit(g, db)
+    u2 = _hand_unit(g, db)
+    e0, p0 = g.card_cost(0, u, "hand", ("base", 0))
+    d = g.run()
+    acts = [o for o in d.options if o[0] == "activate" and o[1] == lg]
+    dis = [o for o in acts if not g.abilities(lg)[o[2]].is_empower]
+    assert dis, "disempower ability not offered"
+    g.choose(dis[0])
+    for _ in range(50):
+        d = g.run()
+        if d.kind == "action" and not g.chain:
+            break
+        g.choose(("pass",) if ("pass",) in d.options else d.options[0])
+    assert not g.objects[lg].empowered and g.objects[lg].exhausted
+    e1, p1 = g.card_cost(0, u, "hand", ("base", 0))
+    assert e1 == max(0, e0 - 2) and len(p1) == max(0, len(p0) - 1)
+    it = g._play(0, u, ("base", 0))
+    it.cost = {"energy": 0, "power": []}                # payment is tested elsewhere
+    g.pending = None
+    for _ in range(50):
+        d = g.run()
+        if d.kind == "action" and not g.chain:
+            break
+        g.choose(("pass",) if ("pass",) in d.options else d.options[0])
+    assert g.objects[u].zone == "board"
+    assert g.card_cost(0, u2, "hand", ("base", 0)) == g.card_cost(0, u2, "hand", None)  # used up
+    g.choose(("end_turn",))
+    for _ in range(100):
+        if g.objects[u].zone != "board":
+            break
+        d = g.run()
+        if g.turn_player == 1 and not g.chain:
+            break
+        g.choose(("pass",) if ("pass",) in d.options else d.options[0])
+    assert g.objects[u].zone == "trash"
+
+
+def test_empower_dash_costs_parse(db):
+    by = {c.id: c for c in db}
+    def emp(cid):
+        return [a.cost for a in by[cid].abilities if getattr(a, "is_empower", False)]
+    assert [(c["energy"], c["power"]) for c in emp("VEN-074")] == [(1, []), (0, ["body"])]   # [1] or [Body]
+    assert emp("VEN-007")[0].get("discard") == 1                                              # Discard 1
+    assert emp("VEN-110")[0].get("discard_type") == "spell"                                   # Discard a spell
+    assert emp("VEN-124")[0].get("sacrifice") is not None                                     # Kill a friendly unit
+    assert emp("VEN-054")[0].get("exhaust") and emp("VEN-054")[0]["energy"] == 0             # [T]
+    assert emp("VEN-001")[0]["energy"] == 5                                                   # [5]. This ability...
+    assert emp("VEN-163") == []                                                               # Risen Altar: not the keyword

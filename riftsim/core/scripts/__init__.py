@@ -94,9 +94,8 @@ def keyword_abilities(defn):
         if m:
             c = parse_cost(m.group(1)); defn.keywords["repeat_cost"] = (c["energy"], tuple(c["power"]))
     if kws.get("empower") is not None:
-        m = re.search(r"\[Empower\]\s*((?:\[[^\]]+\]\s*)+)", defn.text)
-        cost = parse_cost(m.group(1)) if m else {"energy": 1}
-        out.append(Activated(cost, [O.Empower(Ref("self"))], timing="main", label="Empower", is_empower=True, keyword="empower"))
+        for cost in empower_costs(defn):
+            out.append(Activated(cost, [O.Empower(Ref("self"))], timing="main", label="Empower", is_empower=True, keyword="empower"))
     return out
 
 
@@ -114,6 +113,21 @@ def _equip_cost_text(defn):
 
 
 COST_TOKEN = re.compile(r"\[(\d+|A|C|T|Fury|Calm|Mind|Body|Chaos|Order)\]")
+
+
+def empower_costs(defn):
+    """CR 1169 example: "[Empower] — [1] or [C]" is short for "[1] or [C]: Empower me. Play only if not empowered."
+    One Activated per alternative cost. "[Empower] costs ..." (Risen Altar) is not the keyword ability."""
+    text = defn.text or ""
+    m = re.search(r"^\s*\[Empower\]\s*(?:[-—]\s*)?([^\n]+)$", text, re.M)
+    if not m or not re.match(r"\s*[-—]|\s*\[", text[m.start():].split("]", 1)[1]):
+        return []
+    body = re.split(r"\s*\(|\.\s", m.group(1).strip() + " ", maxsplit=1)[0].strip().rstrip(".")   # drop reminder text / later sentences
+    from .auto_grammar import parse_cost_phrase
+    out = []
+    for alt in re.split(r"\s+or\s+", body):
+        out.append(parse_cost_phrase(alt, defn))
+    return out
 
 
 def parse_cost(text):
