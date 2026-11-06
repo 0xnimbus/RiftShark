@@ -62,6 +62,8 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
 - `tests/test_core_v2.py` is the v2 regression suite (pytest -q tests/). `tests/test_rules_audit.py` covers the 2026-11-06 audit.
   `tests/test_deep_audit.py` covers niche interactions (deep rules audit routine, every 5 h): effect plays obey "can't play"
   locks and Rockfall Path (CR 420.3.b), Baron Nashor + The Exile enters the Pit ready.
+  Combat damage: `flow.DamageAssignments` counts legal assignments without listing them; over `ASSIGN_FLAT_LIMIT` (64) the
+  player assigns one unit at a time (`assign_damage_step`, every offered amount still completes legally).
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
