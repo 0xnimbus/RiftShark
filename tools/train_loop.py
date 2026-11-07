@@ -94,7 +94,8 @@ GAME_LIMIT = 300
 
 # ------------------------------------------------------------------------------------------------ self-play
 def _selfplay_game(args):
-    paths, seed, spec, every, epsilon = args
+    paths, seed, spec, every, epsilon = args[:5]
+    labels = args[5] if len(args) > 5 else "td"
     from riftsim.core.deck import Deck
     from riftsim.core.game import Game
     from riftsim.core.learn.features import encode
@@ -133,12 +134,13 @@ def _selfplay_game(args):
             to_turn_end(h, d.player, helper)
             if not h.over:
                 x0 = [encode(h, s) for s in (0, 1)]
-                opponent_turn(h, d.player, helper)
+                if labels == "td":
+                    opponent_turn(h, d.player, helper)
                 for s in (0, 1):
                     xs.append(x0[s])
                     seats.append(s)
                     kinds.append(1)
-                    tds.append(net.predict(h, s))
+                    tds.append(net.predict(h, s) if labels == "td" else -1.0)
         if d.kind == "action" and epsilon and rng.random() < epsilon:
             choice = rng.choice(ai_options(d, g))       # exploration: positions the best line would never reach
         else:
@@ -150,14 +152,14 @@ def _selfplay_game(args):
             "winner": g.winner, "turns": g.turn, "secs": time.time() - t}
 
 
-def selfplay(games, spec, out, workers, seed, every=3, epsilon=0.03):
+def selfplay(games, spec, out, workers, seed, every=3, epsilon=0.03, labels="td"):
     import numpy as np
     rng = random.Random(seed)
     jobs = []
     for i in range(games // 2):
         pair = rng.sample(DECKS, 2)
-        jobs.append((pair, seed + 2 * i, spec, every, epsilon))
-        jobs.append((pair[::-1], seed + 2 * i + 1, spec, every, epsilon))
+        jobs.append((pair, seed + 2 * i, spec, every, epsilon, labels))
+        jobs.append((pair[::-1], seed + 2 * i + 1, spec, every, epsilon, labels))
     X, Y, G, S, K, T = [], [], [], [], [], []
     timeouts = []
     part = out + ".partial.npz"          # container restarts kill runs: resume from the last checkpoint
@@ -197,12 +199,19 @@ def selfplay(games, spec, out, workers, seed, every=3, epsilon=0.03):
 
 
 # ------------------------------------------------------------------------------------------------ training
-def train(files, out, hidden=48, epochs=40, lr=2e-3, l2=1e-3, seed=0, warm=None, meta=None):
+def train(files, out, hidden=48, epochs=40, lr=2e-3, l2=1e-3, seed=0, warm=None, meta=None, wide=None):
+    """MLP residual on a base logit. Without `wide` the base is the hand-written score's logit; with `wide` (a model
+    dict from train_linear on the same data) the base is that linear model's logit, so the hidden units only learn
+    what the linear model misses (wide-and-deep). The result is saved as one model in the same JSON format."""
     import numpy as np
+    from riftsim.core.learn.features import size
     xs, ys, gs = [], [], []
     off = 0
     for f in files:
         d = np.load(f)
+        if d["x"].shape[1] != size():
+            print(f"  skipping {os.path.basename(f)}: {d['x'].shape[1]} features, current version has {size()}")
+            continue
         xs.append(d["x"])
         ys.append(d["y"])
         gs.append(d["game"] + off)
@@ -211,16 +220,24 @@ def train(files, out, hidden=48, epochs=40, lr=2e-3, l2=1e-3, seed=0, warm=None,
     rs = np.random.RandomState(seed)
     games = np.unique(G)
     val_games = set(rs.choice(games, size=max(1, len(games) // 10), replace=False).tolist())
-    vmask = np.array([g in val_games for g in G])
+    vmask = np.isin(G, np.array(sorted(val_games)))
     Xt, Yt, Xv, Yv = X[~vmask], Y[~vmask], X[vmask], Y[vmask]
-    mean = Xt.mean(0)
-    std = Xt.std(0) + 1e-3
+    if wide:
+        mean, std = np.array(wide["mean"]), np.array(wide["std"])
+    else:
+        mean = Xt.mean(0)
+        std = Xt.std(0) + 1e-3
     Zt, Zv = (Xt - mean) / std, (Xv - mean) / std
     n_in = X.shape[1]
     from riftsim.core.learn.features import H_INDEX
-    # residual base: the hand-written score's logit; the MLP learns a correction (starts near zero)
+    # residual base: the hand-written score's logit (or the wide model's); the MLP learns a correction (starts near 0)
     Ot = np.arctanh(np.clip(Xt[:, H_INDEX], -0.999999, 0.999999))
     Ov = np.arctanh(np.clip(Xv[:, H_INDEX], -0.999999, 0.999999))
+    if wide:
+        wl, whs, wb = np.array(wide["lin"]), float(wide["h_scale"]), float(wide["b2"])
+        Ot = Zt @ wl + whs * Ot + wb
+        Ov = Zv @ wl + whs * Ov + wb
+        warm = None
     hs = float(warm.get("h_scale", 1.0)) if warm and "h_scale" in warm else 1.0
     if warm and "h_scale" in warm and len(warm["mean"]) == n_in and len(warm["b1"]) == hidden:
         W1, b1 = np.array(warm["w1"]), np.array(warm["b1"])
@@ -288,10 +305,18 @@ def train(files, out, hidden=48, epochs=40, lr=2e-3, l2=1e-3, seed=0, warm=None,
     info = {"positions": int(len(Y)), "games": int(len(games)), "train_loss": round(tl, 4), "val_loss": round(vl, 4),
             "val_acc": round(va, 4), "val_loss_constant": round(base_loss, 4), "val_loss_heuristic": round(hl, 4),
             "h_scale": round(float(params[4]), 4), "hidden": hidden,
-            "warm_start": bool(warm and len(warm["mean"]) == n_in)}
+            "warm_start": bool(warm and len(warm["mean"]) == n_in), "kind": "wide" if wide else "mlp"}
     d = {"meta": dict(meta or {}, **info), "mean": mean.tolist(), "std": std.tolist(), "w1": params[0].tolist(),
          "b1": params[1].tolist(), "w2": params[2].tolist(), "b2": float(params[3]),
          "h_index": H_INDEX, "h_scale": float(params[4])}
+    if wide:                                   # fold the scaled linear base into the saved model
+        a_ = float(params[4])
+        info["val_loss_wide"] = round(loss(Zv, Ov, Yv, [params[0], params[1], params[2] * 0, np.array(0.0),
+                                                        np.array(1.0)])[0], 4)
+        d["meta"]["val_loss_wide"] = info["val_loss_wide"]
+        d["h_scale"] = a_ * whs
+        d["lin"] = (a_ * wl).tolist()
+        d["b2"] = float(params[3]) + a_ * wb
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     with open(out, "w") as f:
         json.dump(d, f, separators=(",", ":"))
@@ -308,7 +333,7 @@ def td_targets(d, net, lam=0.7):
     X, Y, G, S, K, T = d["x"], d["y"], d["game"], d["seat"], d["kind"], d["td"]
     V = np.array([net.predict_x(x.tolist()) for x in X]) if net is not None else None
     out = Y.astype(np.float64).copy()
-    wi = K == 1
+    wi = (K == 1) & (T >= 0)          # what-if positions recorded with --labels outcome keep the game result
     out[wi] = T[wi]
     for gid in np.unique(G):
         for s in (0, 1):
@@ -338,17 +363,23 @@ def train_linear(files, out, l2=1e-2, seed=0, meta=None, target="outcome", net=N
             print(f"  {os.path.basename(f)}: recorded before TD targets, uses game results")
         xs.append(d["x"]); ys.append(td_targets(d, net, lam) if use_td else d["y"]); gs.append(d["game"] + off)
         off = int(gs[-1].max()) + 1 if len(gs[-1]) else off
-    X, Y, G = np.concatenate(xs).astype(np.float64), np.concatenate(ys), np.concatenate(gs)
+    # float32 keeps a 10k-game buffer (about a million positions) inside a 7 GB Actions runner
+    X, Y, G = np.concatenate(xs).astype(np.float32), np.concatenate(ys), np.concatenate(gs)
+    del xs
     rs = np.random.RandomState(seed)
     games = np.unique(G)
     val = set(rs.choice(games, size=max(1, len(games) // 10), replace=False).tolist())
-    vm = np.array([g in val for g in G])
-    mean, std = X[~vm].mean(0), X[~vm].std(0) + 1e-3
-    Z = (X - mean) / std
-    O = np.arctanh(np.clip(X[:, H_INDEX], -0.999999, 0.999999))
-    A = np.hstack([Z, O[:, None], np.ones((len(Z), 1))])
+    vm = np.isin(G, np.array(sorted(val)))
+    mean = X[~vm].mean(0, dtype=np.float64)
+    std = X[~vm].std(0, dtype=np.float64) + 1e-3
+    A = np.empty((len(X), X.shape[1] + 2), dtype=np.float32)
+    A[:, :-2] = (X - mean.astype(np.float32)) / std.astype(np.float32)
+    A[:, -2] = np.arctanh(np.clip(X[:, H_INDEX], -0.999999, 0.999999))
+    A[:, -1] = 1.0
+    del X
     w = np.zeros(A.shape[1]); w[-2] = 1.0
     At, Yt, Av, Yv = A[~vm], Y[~vm], A[vm], Y[vm]
+    del A
 
     def loss(Am, Ym, w):
         p = np.clip(1 / (1 + np.exp(-np.clip(Am @ w, -30, 30))), 1e-6, 1 - 1e-6)
@@ -357,7 +388,7 @@ def train_linear(files, out, l2=1e-2, seed=0, meta=None, target="outcome", net=N
     for _ in range(25):                         # Newton steps (IRLS) with L2 on the feature weights
         p = 1 / (1 + np.exp(-np.clip(At @ w, -30, 30)))
         g = At.T @ (p - Yt) / len(Yt) + reg * w
-        H = (At * (p * (1 - p))[:, None]).T @ At / len(Yt) + np.diag(reg + 1e-9)
+        H = (At * (p * (1 - p))[:, None].astype(np.float32)).T.astype(np.float64) @ At / len(Yt) + np.diag(reg + 1e-9)
         step = np.linalg.solve(H, g)
         w -= step
         if np.abs(step).max() < 1e-6:
@@ -529,11 +560,15 @@ def main():
     s.add_argument("--games", type=int, default=600)
     s.add_argument("--policy", default=None)
     s.add_argument("--out", required=True)
+    s.add_argument("--labels", choices=("td", "outcome"), default="td",
+                   help="outcome: skip the one-turn-ahead what-if labels (about 3x faster; for big Actions runs)")
     t = sub.add_parser("train")
     t.add_argument("files", nargs="+")
     t.add_argument("--out", required=True)
     t.add_argument("--hidden", type=int, default=48)
     t.add_argument("--linear", action="store_true", help="logistic regression instead of the MLP")
+    t.add_argument("--wide", metavar="LINEAR_JSON", help="MLP that corrects this linear model (wide-and-deep)")
+    t.add_argument("--epochs", type=int, default=40)
     q = sub.add_parser("gate")
     q.add_argument("candidate")
     q.add_argument("best")
@@ -546,9 +581,13 @@ def main():
     if a.cmd == "generation":
         generation(a)
     elif a.cmd == "selfplay":
-        print(selfplay(a.games, a.policy or best_spec(), a.out, a.workers, a.seed))
+        print(selfplay(a.games, a.policy or best_spec(), a.out, a.workers, a.seed, labels=a.labels))
     elif a.cmd == "train":
-        print(train_linear(a.files, a.out) if a.linear else train(a.files, a.out, hidden=a.hidden))
+        if a.linear:
+            print(train_linear(a.files, a.out))
+        else:
+            wide = json.load(open(a.wide)) if a.wide else None
+            print(train(a.files, a.out, hidden=a.hidden, epochs=a.epochs, wide=wide))
     elif a.cmd == "gate":
         res = gate(a.candidate, a.best, a.games, a.workers, a.seed)
         print(json.dumps(res, indent=1))
