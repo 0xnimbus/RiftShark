@@ -16,6 +16,7 @@ import traceback
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from riftsim.core import CardDB, Deck, Game          # noqa: E402
 from riftsim.core.scripts import script_all          # noqa: E402
+from riftsim.core import payment                     # noqa: E402
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 
@@ -25,10 +26,14 @@ class Audit:
         self.problems = collections.Counter()
         self.examples = {}
         self.notes = collections.Counter()
+        self.samples = {}
 
     def bad(self, kind, msg):
         self.problems[kind] += 1
         self.examples.setdefault(kind, msg)
+        self.samples.setdefault(kind, set())
+        if len(self.samples[kind]) < 12:
+            self.samples[kind].add(msg.split(": ", 1)[1])
 
     def note(self, kind, msg):
         self.notes[kind] += 1
@@ -142,13 +147,115 @@ def check_action(g, d, a, seed):
                     a.bad("play location", f"{where}: unit {g.label(u)} offered without a location")
                 elif loc[0] == "base" and loc != ("base", p):
                     a.bad("play location", f"{where}: {g.label(u)} offered to another player's base")
-    # hides (CR 815: Hidden — main phase, open, a battlefield you control, pay [A])
+    check_missing(g, d, a, where, main_open, played)
+
+
+def has_priority(g, p):
+    """CR 312-313: who may take Discretionary Actions now."""
+    if g.closed:
+        return p == g.priority
+    if g.showdown is not None or g.combat is not None:
+        return p == g.focus
+    return p == g.turn_player and g.phase == "main"
+
+
+def check_missing(g, d, a, where, main_open, played):
+    """Options the rules give the player that must be on the list (and a few that must not)."""
+    p = d.player
+    opts = d.options
+    # the decision goes to the player with Priority (CR 312.2), Focus in a showdown (313.2)
+    if not has_priority(g, p):
+        a.bad("decision holder", f"{where}: action decision given to P{p} who has no priority/focus")
+        return
+    # CR 164.2 + 312: every rune's '[Reaction] [E]: Add' / '[Reaction] Recycle this: Add' at every window with
+    # priority, i.e. the player may always float, or leave runes untapped and pass
+    rune_keys = {(g.objects[o[2]].domain, g.objects[o[2]].exhausted, o[1]) for o in opts if o[0] == "rune"}
+    for u in g.players[p].runes:
+        ro = g.objects[u]
+        need = [("recycle")] + ([] if ro.exhausted else ["exhaust"])
+        for k in need:
+            if (ro.domain, ro.exhausted, k) not in rune_keys:
+                a.bad("rune action missing", f"{where}: rune {g.label(u)} has no '{k}' action (CR 164.2)")
+    # CR 811.1.b: hide while the card is in hand / champion zone, on your turn, in an Open State (with Focus in a
+    # showdown), at a battlefield you control with no facedown card of yours, paying [A]
+    open_own = (not g.closed) and p == g.turn_player and g.phase == "main"
+    hides = {(o[1], o[2]) for o in opts if o[0] == "hide"}
+    for u, b in hides:
+        if not open_own:
+            a.bad("hide timing", f"{where}: hide offered outside your turn's open state (CR 811.1.b)")
+        if g.battlefields[b].controller != p:
+            a.bad("hide location", f"{where}: hide offered at a battlefield P{p} doesn't control")
+    if open_own:
+        ps = g.players[p]
+        cards = list(ps.hand) + ([ps.champion] if ps.champion is not None else [])
+        bfs = [b.idx for b in g.battlefields if b.controller == p and g.can_hide_at(p, b.idx)]
+        payable = g.can_pay(p, 0, ["any"], purpose={"kind": "hide"}) or (
+            g.rules("hide_for_1_energy", player=p) and g.can_pay(p, 1, [], purpose={"kind": "hide"}))
+        if bfs and payable:
+            for u in cards:
+                if g.objects[u].defn.keywords.get("hidden"):
+                    for b in bfs:
+                        if (u, b) not in hides:
+                            a.bad("hide missing", f"{where}: hiding {g.label(u)} at battlefield {b} not offered (CR 811.1.b) [{g._state_name()}]")
+    # plays: a card with legal timing, a legal location and a payable cost must be offered
+    ps = g.players[p]
+    srcs = [(u, "hand") for u in ps.hand] + ([(ps.champion, "champion")] if ps.champion is not None else [])
+    for b in g.battlefields:
+        srcs += [(u, "facedown") for u in g.facedown_cards(b.idx, p)]
+    for u, z in srcs:
+        o = g.objects[u]
+        dd = o.base_defn()
+        state, ok = card_timing(g, p, u, z)
+        if z == "facedown" and not (o.facedown_turn is not None and g.turn > o.facedown_turn):
+            continue                          # CR 811.1.b: playable from facedown beginning on the next turn
+        if state is None or not ok or not g._play_restrictions_ok(p, u, z):
+            continue
+        locs = expected_locations(g, p, u, z)
+        offered = played.get(u, set())
+        for loc in locs:
+            e, pw = g.card_cost(p, u, z, loc)
+            if not g.can_pay(p, e, pw, purpose=payment.purpose_of_card(g, u)):
+                continue
+            if loc is None and not g._spell_has_targets(p, u, z):
+                continue
+            if loc not in offered:
+                a.bad("play missing", f"{where}: {g.label(u)} from {z} to {loc} not offered ({state})")
+        for loc in offered:
+            if "gear" in dd.types and "unit" not in dd.types and dd.keywords.get("deploy") and loc is not None and loc[0] == "base":
+                a.bad("play location", f"{where}: Deploy gear {g.label(u)} offered to base (CR 830.1.b: only to a battlefield)")
+    # activated abilities: timing per CR 376 / 806 / 813 (Equip has no timing keyword of its own, CR 818.1.c.2)
     for o in opts:
-        if o[0] == "hide":
-            if not main_open:
-                a.bad("hide timing", f"{where}: hide offered outside the neutral open main phase")
-            if g.battlefields[o[2]].controller != p:
-                a.bad("hide location", f"{where}: hide offered at a battlefield P{p} doesn't control")
+        if o[0] != "activate":
+            continue
+        ab = g.abilities(o[1])[o[2]]
+        if getattr(ab, "is_equip", False) and ab.timing == "reaction" and not main_open:
+            a.bad("equip timing", f"{where}: Equip of {g.label(o[1])} offered at reaction timing (CR 818.1.c.2, 819.1.d)")
+        if ab.timing == "main" and not main_open:
+            a.bad("activate timing", f"{where}: {g.label(o[1])} ability {o[2]} has no [Action]/[Reaction] but is offered outside the main phase")
+        if ab.timing == "action" and g.closed:
+            a.bad("activate timing", f"{where}: [Action] ability of {g.label(o[1])} offered in a closed state")
+
+
+def expected_locations(g, p, u, z):
+    """CR 355.2 / 811.1.d.1 / 830.1.b / 822: where this card may be played now."""
+    o = g.objects[u]
+    dd = o.base_defn()
+    if "spell" in dd.types:
+        return [None]
+    if z == "facedown":
+        blocked = {g.objects[s].place for s, _ in g.rules("cant_play_here")}
+        return [] if ("unit" in dd.types and o.hidden_at in blocked) else [o.hidden_at]     # Rockfall Path
+    if "unit" in dd.types:
+        locs = [("base", p)] + [("bf", b.idx) for b in g.battlefields if b.controller == p]
+        blocked = {g.objects[s].place for s, _ in g.rules("cant_play_here")}
+        if any(g.objects[s].controller != p and (g.objects[s].location or ("",))[0] == "bf" for s, _ in g.rules("opp_units_base_only")):
+            return [("base", p)]
+        if any(getattr(ab, "perm", None) == "only_to" for ab in g._abilities_of(u, o)):
+            return []                         # "play me only to ...": checked by the card's own tests
+        return [l for l in locs if l[0] == "base" or l not in blocked]
+    if dd.keywords.get("deploy"):
+        return []                             # any battlefield: checked separately
+    return [("base", p)]
 
 
 def check_invariants(g, a, seed, last):
@@ -228,7 +335,7 @@ def run(n, seed0, policy):
     pol = None
     if policy != "random":
         from riftsim.core import policies
-        pol = policies.make(policy) if hasattr(policies, "make") else None
+        pol = policies.make_policy(policy, seed0)          # was policies.make (missing): silently fell back to random
     for s in range(seed0, seed0 + n):
         rng = random.Random(s)
         pa, pb = rng.sample(paths, 2)
@@ -253,7 +360,7 @@ def run(n, seed0, policy):
                 check_invariants(g, a, s, last)
                 last = [ps.points for ps in g.players]
                 if pol is not None:
-                    ch = pol(g, d)
+                    ch = pol.choose(g, d)
                 else:
                     opts = d.options
                     if d.kind == "action" and len(opts) > 1 and rng.random() < 0.6:
@@ -268,6 +375,9 @@ def run(n, seed0, policy):
     print("\n== problems ==")
     for k, v in a.problems.most_common():
         print(f"{k}: {v}  e.g. {a.examples[k]}")
+        if os.environ.get("AUDIT_VERBOSE"):
+            for m in sorted(a.samples.get(k, ())):
+                print("    ", m)
     return len(a.problems)
 
 

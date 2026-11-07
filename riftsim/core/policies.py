@@ -82,6 +82,31 @@ def ai_options(dec, game=None):
     return list(dec.options)
 
 
+def prune_options(opts, cap, rng):
+    """Cut a long option list down to `cap` for a search without losing whole kinds of play. Passing / ending the
+    turn, every card play, ability, hide and payment stay; only Standard Move groups (which grow as 2^units per
+    destination, CR 144.3) are thinned: single-unit moves and the all-units group for each destination are kept
+    first, the remaining groups are sampled. Random sampling of the whole list used to drop 'end turn' or a play."""
+    if len(opts) <= cap:
+        return list(opts)
+    moves = [o for o in opts if isinstance(o, tuple) and o and o[0] == "move"]
+    if not moves:
+        return list(opts)
+    keep = [o for o in opts if not (isinstance(o, tuple) and o and o[0] == "move")]
+    room = max(0, cap - len(keep))
+    biggest = {}
+    for o in moves:
+        if len(o[1]) > len(biggest.get(o[2], ((), ()))[1]):
+            biggest[o[2]] = o
+    first = [o for o in moves if len(o[1]) == 1] + [o for o in biggest.values() if len(o[1]) > 1]
+    rest = [o for o in moves if o not in first]
+    if len(first) >= room:
+        chosen = set(rng.sample(first, room)) if room else set()
+    else:
+        chosen = set(first) | set(rng.sample(rest, min(len(rest), room - len(first))))
+    return keep + [o for o in moves if o in chosen]
+
+
 def mulligan_choice(game, d):
     """Mulligan heuristic shared by the built-in AIs (CR 117): set aside the costliest cards (energy + power
     of 5 or more), up to two, keeping the cheapest early plays. Ties go to the card with the higher cost."""
@@ -183,8 +208,7 @@ class GreedyPolicy(Policy):
         if self.miss_reactions and d.kind == "action" and ("pass",) in opts and game.chain \
                 and game.chain[-1].controller != d.player and self.rng.random() < self.miss_reactions:
             return ("pass",)
-        if len(opts) > self.max_options:
-            opts = self.rng.sample(opts, self.max_options)
+        opts = prune_options(opts, self.max_options, self.rng)
         vals = self.evaluate(game, d, opts)
         if self.temperature <= 0:
             return opts[max(range(len(opts)), key=lambda i: vals[i])]
@@ -287,7 +311,7 @@ class MCTSPolicy(Policy):
         all_root_options: evaluate every legal option at the root (the coach grades any move a human makes)."""
         opts = list(d.options) if all_root_options else ai_options(d, game)
         root = _Node(player=d.player)
-        root.untried = list(opts) if len(opts) <= self.max_branch else self.rng.sample(opts, self.max_branch)
+        root.untried = prune_options(opts, self.max_branch, self.rng)
         me = d.player
         for _ in range(iterations or self.iterations):
             g = determinize(game, me, self.rng)
@@ -300,7 +324,7 @@ class MCTSPolicy(Policy):
                     break
                 if node.untried is None:
                     dopts = ai_options(dec, g)
-                    node.untried = dopts if len(dopts) <= self.max_branch else self.rng.sample(dopts, self.max_branch)
+                    node.untried = prune_options(dopts, self.max_branch, self.rng)
                     node.player = dec.player
                 if node.untried:
                     o = node.untried.pop(self.rng.randrange(len(node.untried)))
