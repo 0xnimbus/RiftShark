@@ -1674,6 +1674,19 @@ class FlowMixin:
             if kws.get("deploy") or anywhere:
                 for bf in self.battlefields:
                     locs.append(("bf", bf.idx))
+        if "unit" in d.types:
+            perms = {ab.perm for ab in self._abilities_of(uid, o) if isinstance(ab, PlayPermission)
+                     and ab.perm in ("open_bf", "attacking_bf", "occupied_enemy_bf") and (ab.cond is None or ab.cond(self, uid))}
+            for bf in self.battlefields if perms else ():
+                loc = ("bf", bf.idx)
+                units = self.units_at(loc)
+                ok = ("open_bf" in perms and bf.controller is None and not units) \
+                    or ("attacking_bf" in perms and self.combat is not None and self.combat["bf"] == bf.idx
+                        and self.combat["attacker"] == p) \
+                    or ("occupied_enemy_bf" in perms and bf.controller is not None
+                        and not self.is_friendly(bf.controller, p) and bool(units))
+                if ok and loc not in locs:
+                    locs.append(loc)
         if self.rules("play_open_bf", player=p) and "unit" in d.types:
             for bf in self.battlefields:          # "Friendly units may be played to open battlefields"
                 loc = ("bf", bf.idx)
