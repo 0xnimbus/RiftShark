@@ -1769,12 +1769,9 @@ def split_lead_keywords(line):
     return flags, line
 
 
-def script_line(defn, line):
-    """Parse one line of rules text into abilities. Returns list of abilities."""
-    flags, body = split_lead_keywords(line)
+def _flag_cond(flags):
+    """Condition from lead keyword flags ([Legion], [Empowered], [Level N]), or None."""
     kwflags = set(f.split(" ")[0] for f in flags)
-    if not body:
-        return []        # pure keyword line
     cond = None
     if "legion" in kwflags:
         cond = lambda g, src: g.legion_active(g.objects[src].controller, src)
@@ -1784,6 +1781,34 @@ def script_line(defn, line):
     if lvl:
         n = int(lvl[0].split(" ")[1])
         cond = lambda g, src, n=n: g.players[g.objects[src].controller].xp >= n
+    return cond
+
+
+def script_line(defn, line):
+    """Parse one line of rules text into abilities. Returns list of abilities.
+
+    Every ability parsed from a line led by [Legion] / [Empowered] / [Level N] carries that
+    condition, even where a parser branch forgot to pass it on (Bandle Soldier, Scorchclaw)."""
+    flags, body = split_lead_keywords(line)
+    fc = _flag_cond(flags) if body else None
+    abilities = _script_line(defn, line, fc)
+    if fc is not None:
+        for ab in abilities:
+            inner = getattr(ab, "cond", "missing")
+            if inner == "missing":
+                continue
+            if inner is None:
+                ab.cond = fc
+            elif inner is not fc:
+                ab.cond = lambda g, src, a=inner, b=fc: b(g, src) and a(g, src)
+    return abilities
+
+
+def _script_line(defn, line, cond=None):
+    flags, body = split_lead_keywords(line)
+    kwflags = set(f.split(" ")[0] for f in flags)
+    if not body:
+        return []        # pure keyword line
     timing = "reaction" if "reaction" in kwflags else ("action" if "action" in kwflags else "main")
     bl = body.lower()
     # deathknell
@@ -1878,7 +1903,7 @@ def script_line(defn, line):
         return [Triggered(ev, eff, filt=filt, once_per_turn=once_flag, label=line[:40], source_text=line, store=store, cond=cond, optional=optional)]
     # play permissions
     if bl in ("you may play me to an open battlefield.", "you may play me to an open battlefield"):
-        return [PlayPermission("any_battlefield", cond=(lambda g, src: True), label=line)]
+        return [PlayPermission("open_bf", label=line)]            # CR 170.11.c: unoccupied and uncontrolled
     if bl in ("i enter ready.", "i enter ready"):
         return [Replacement("enter_ready", lambda g, s, ev: ev.get("uid") == s, lambda g, s, ev: dict(ev, ready=True), label=line, zone="any")]
     if bl in ("this enters exhausted.", "this enters exhausted"):
@@ -1886,10 +1911,10 @@ def script_line(defn, line):
     # play permissions, cost modifiers, additional costs, enter-ready replacements
     m = re.match(r"i can be played to a battlefield you'?re attacking\.?$", bl)
     if m:
-        return [PlayPermission("any_battlefield", cond=lambda g, src: True, label=line)]
+        return [PlayPermission("attacking_bf", label=line)]       # only the battlefield of a combat you're attacking in
     m = re.match(r"you may play me to an occupied enemy battlefield\.?$", bl)
     if m:
-        return [PlayPermission("any_battlefield", cond=lambda g, src: True, label=line)]
+        return [PlayPermission("occupied_enemy_bf", label=line)]  # CR 170.11.a: enemy-controlled with a unit there
     m = re.match(r"i cost \[(\d+)\] less\.?$", bl)
     if m:
         n = int(m.group(1))

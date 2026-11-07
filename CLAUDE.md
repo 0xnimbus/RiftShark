@@ -71,10 +71,22 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   cards (The Boss, Unlicensed Armory, Kato, Relentless Pursuit, Ava Achiever) wait for scripting to resume.
   10:20 (Kai'Sa check): the auto-scripter dropped [Legion] on "I cost [2] less" (Noxus Hopeful, 3 in Kai'Sa: always cost [2])
   and on activated abilities (Darius legends, Sun Disc); fixed. Round-robins before 2026-11-07 10:40 overrate Kai'Sa.
+  15:20: the same drop hit [Level N] lines (Bandle Soldier, Scorchclaw always entered ready); `script_line` now puts the
+  lead-flag condition on every ability it parses (test sweeps every [Legion]/[Empowered]/[Level N] line).
+  20:20: "play me to an open battlefield" (Sai Scout, Sneaky Deckhand, Ocean Drake, Miss Fortune), "a battlefield you're
+  attacking" (Rengar, Pouncing) and "an occupied enemy battlefield" (Deadbloom Predator, Dauntless Vanguard) were all
+  "any battlefield"; now exact perms in `flow._play_locations`. Effect plays (PlayCard) use `_play_locations` too, and
+  tokens count for Hunters' Circle.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
   N shards in parallel. Engine caches per state version (`_board_statics`, `_trigger_index`, rules) gave ~25%.
+- Legal-action audit (2026-11-07, Derrick: every option for each player, incl. passing, Ganking, runes left up, gear):
+  `tools/rules_audit.py N SEED [random|greedy|expert]` now also checks missing plays, rune actions, hides, Deploy
+  locations, ability timing and who holds the decision; tests in tests/test_legal_actions.py. Fixed: Deploy gear could
+  be played to base (CR 830.1.b), Quick-Draw gear could Equip at Reaction speed (Equip has no timing keyword, 818.1.c.2),
+  hiding during your own showdown with Focus was missing (811.1.b 'Open State'), and the AIs' option cap sampled the
+  list at random (could drop 'end turn' or a play); `policies.prune_options` now thins only move groups.
 - AIs and the coach never see hidden information: every lookahead uses `policies.determinize` (see memory).
 - Play & coach (Derrick's request 2026-11-06): `tools/play_server.py` + `web/play.html` + `riftsim/core/analysis.py`.
   Grades use MCTS win% loss vs best option; thresholds in analysis.GRADES. `riftsim/core/playsession.py` is shared by the
