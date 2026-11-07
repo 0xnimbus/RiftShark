@@ -73,6 +73,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   and on activated abilities (Darius legends, Sun Disc); fixed. Round-robins before 2026-11-07 10:40 overrate Kai'Sa.
   15:20: the same drop hit [Level N] lines (Bandle Soldier, Scorchclaw always entered ready); `script_line` now puts the
   lead-flag condition on every ability it parses (test sweeps every [Legion]/[Empowered]/[Level N] line).
+  20:20: "play me to an open battlefield" (Sai Scout, Sneaky Deckhand, Ocean Drake, Miss Fortune), "a battlefield you're
+  attacking" (Rengar, Pouncing) and "an occupied enemy battlefield" (Deadbloom Predator, Dauntless Vanguard) were all
+  "any battlefield"; now exact perms in `flow._play_locations`. Effect plays (PlayCard) use `_play_locations` too, and
+  tokens count for Hunters' Circle.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

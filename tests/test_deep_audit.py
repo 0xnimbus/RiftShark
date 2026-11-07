@@ -414,3 +414,100 @@ def test_every_flagged_line_carries_its_condition(db):
                 continue
             missing += [(c.name, line) for a in abs_ if hasattr(a, "cond") and a.cond is None]
     assert not missing, missing[:10]
+
+
+# ----------------------------------------------------------------------------- 2026-11-07 20:20 run: play locations
+def _clear_bfs(g, db=None):
+    for bf in g.battlefields if db is not None else ():
+        g.objects[bf.uid].defn = _card(db, "Windswept Hillock")      # no "can't play here" battlefield in the way
+    for u, o in g.objects.items():
+        if o.zone == "board" and o.location is not None and o.location[0] == "bf":
+            o.zone, o.location = "trash", None
+    for bf in g.battlefields:
+        bf.controller = None
+    g.pending = None
+    g.bump()
+
+
+def _locs(g, p, uid):
+    return [l for l in g._play_locations(p, uid, g.objects[uid].zone) if l[0] == "bf"]
+
+
+def test_play_location_permissions_follow_the_printed_text(db):
+    # "You may play me to an open battlefield", "I can be played to a battlefield you're attacking" and "You may play
+    # me to an occupied enemy battlefield" were all read as "any battlefield".
+    g = main_phase(db, [_deck(db, "reksai_void_burrower"), _deck(db, "viktor_herald")])
+    _clear_bfs(g, db)
+    g.battlefields[1].controller = 1                         # bf 0 open, bf 1 enemy-controlled and empty
+    scout, dog, rengar = (give(g, 0, n, db) for n in ("Sai Scout", "Deadbloom Predator", "Rengar, Pouncing"))
+    g.bump()
+    assert _locs(g, 0, scout) == [("bf", 0)]                 # open = unoccupied and uncontrolled (CR 170.11.c)
+    assert _locs(g, 0, dog) == [] and _locs(g, 0, rengar) == []
+    enemy = put(g, db, 1, "Forecaster", ("bf", 1))
+    put(g, db, 1, "Forecaster", ("bf", 0))                   # bf 0 occupied, so no longer open
+    g.bump()
+    assert _locs(g, 0, scout) == []
+    assert _locs(g, 0, dog) == [("bf", 1)]                   # occupied enemy battlefield only
+    assert _locs(g, 0, rengar) == []
+    g.combat = {"bf": 1, "attacker": 0, "defender": 1, "step": "showdown"}
+    g.bump()
+    assert _locs(g, 0, rengar) == [("bf", 1)]                # the battlefield you're attacking
+    g.combat = {"bf": 1, "attacker": 1, "defender": 0, "step": "showdown"}
+    g.bump()
+    assert _locs(g, 0, rengar) == []                         # not while defending
+    assert enemy in g.units_at(("bf", 1))
+
+
+def test_hunters_circle_counts_a_token_as_the_first_unit_played_there(db):
+    # "For each player, the first unit or gear they play here on their turn costs [1] less." Playing a token is
+    # playing a unit (CR 185.2.a), so a token played there first uses up the discount.
+    g = main_phase(db, [_deck(db, "reksai_void_burrower"), _deck(db, "viktor_herald")])
+    _clear_bfs(g)
+    circle = next(i for i, bf in enumerate(g.battlefields) if g.objects[bf.uid].defn.name == "Hunters' Circle") \
+        if any(g.objects[bf.uid].defn.name == "Hunters' Circle" for bf in g.battlefields) else None
+    if circle is None:
+        circle = 0
+        g.objects[g.battlefields[0].uid].defn = _card(db, "Hunters' Circle")
+    loc = ("bf", circle)
+    g.battlefields[circle].controller = 0
+    u = give(g, 0, "Hunting Dog", db)
+    g.bump()
+    full = _card(db, "Hunting Dog").energy
+    assert g.card_cost(0, u, "hand", loc)[0] == full - 1
+    g.play_token(0, "Recruit", loc, Context(0))
+    g.bump()
+    assert g.card_cost(0, u, "hand", loc)[0] == full
+
+
+def test_effect_plays_offer_the_cards_own_locations_and_skip_rockfall_path(db):
+    # Void Burrower "banish one, then play it": the location choice used only base + controlled battlefields, so it
+    # missed "play me to an open battlefield" and offered Rockfall Path (where the play then silently failed).
+    g = main_phase(db, [_deck(db, "reksai_void_burrower"), _deck(db, "viktor_herald")])
+    _clear_bfs(g, db)
+    g.objects[g.battlefields[1].uid].defn = _card(db, "Rockfall Path")
+    g.battlefields[1].controller = 0
+    rs = put(g, db, 0, "Rek'Sai, Breacher", ("base", 0))
+    scout = give(g, 0, "Sai Scout", db)
+    g.players[0].hand.remove(scout)
+    g.objects[scout].zone = "deck"
+    g.players[0].deck.remove(scout) if scout in g.players[0].deck else None
+    g.players[0].deck.insert(0, scout)
+    _ready_runes(g, 0)
+    g.emit("conquer", player=0, loc=("bf", 1), bf=1, units=(rs,))
+    g.dirty = True
+    seen = []
+
+    def pick(d):
+        if d.kind == "order_triggers":
+            return next(o for o, lab in zip(d.options, d.labels) if lab == "Void Burrower")
+        if d.kind == "yesno":
+            return True
+        if d.kind == "pick_many" and (scout,) in d.options:
+            return (scout,)
+        if d.kind == "choose_location":
+            seen.append(list(d.options))
+            return ("bf", 0)
+        return None
+    _drive(g, pick=pick)
+    assert seen == [[("base", 0), ("bf", 0)]]
+    assert g.objects[scout].zone == "board" and g.objects[scout].location == ("bf", 0)
