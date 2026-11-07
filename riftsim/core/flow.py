@@ -1674,6 +1674,8 @@ class FlowMixin:
             if kws.get("deploy") or anywhere:
                 for bf in self.battlefields:
                     locs.append(("bf", bf.idx))
+            if kws.get("deploy"):
+                locs = [l for l in locs if l[0] != "base"]     # CR 830.1.b: "Play or create this only to a battlefield"
         if self.rules("play_open_bf", player=p) and "unit" in d.types:
             for bf in self.battlefields:          # "Friendly units may be played to open battlefields"
                 loc = ("bf", bf.idx)
@@ -1749,6 +1751,7 @@ class FlowMixin:
         acts.extend(self._rune_actions(p))
         if main:
             acts.extend(self._move_actions(p))
+        if self._hide_window(p):
             acts.extend(self._hide_actions(p))
         return acts
 
@@ -1955,6 +1958,15 @@ class FlowMixin:
             self.do_exhaust(u, batch=b)
         self.do_move(list(units), dest, Context(p), standard=True)
         self.dirty = True
+
+    def _hide_window(self, p):
+        """CR 811.1.b: hide 'on your turn during an Open State' (Neutral Open or Showdown Open, CR 307), with
+        Priority (CR 312.1; in a showdown the player with Focus has it, 313.2)."""
+        if self.closed or p != self.turn_player or self.phase != "main":
+            return False
+        if self.showdown is not None or self.combat is not None:
+            return p == self.focus
+        return True
 
     def _hide_actions(self, p):
         acts = []

@@ -73,7 +73,7 @@ def keyword_abilities(defn):
             cost["xp"] = int(mx.group(1))
         out.append(Activated(cost, [O.Attach(Ref("self"), Ref("t"))],
                              targets=[O.Choose(Sel("unit", side="friendly", pred=lambda g, c, u: g.objects[c.source].attached_to != u), targeted=True)],
-                             timing="reaction" if kws.get("quick_draw") else "main", label="Equip", is_equip=True, keyword="equip"))
+                             timing="main", label="Equip", is_equip=True, keyword="equip"))
     if kws.get("quick_draw") and defn.is_gear:
         out.append(Triggered("play_self", [O.Attach(Ref("self"), Ref("t"))], targets=[O.Choose(Sel("unit", side="friendly"), targeted=True)],
                              label="Quick-Draw", keyword="quick_draw"))
