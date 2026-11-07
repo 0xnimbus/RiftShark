@@ -59,6 +59,29 @@ def to_turn_end(g, p, helper, max_steps=400):
         g.choose(o)
 
 
+def opponent_turn(g, p, helper, max_steps=600):
+    """From the start of the opponent's turn in g (a determinised copy from p's view), let the opponent play its whole
+    turn with `helper` while p passes (payments use the standard plan, p's forced choices also come from `helper`).
+    Returns at the start of p's next turn or when the game ends. Used to label what-if positions in self-play."""
+    start = g.turn
+    for _ in range(max_steps):
+        d = g.run()
+        if d is None or g.over or g.turn != start:
+            return
+        opts = ai_options(d, g)
+        if d.kind == "pay":
+            o = opts[0]
+        elif d.kind == "mulligan":
+            o = mulligan_choice(g, d)
+        elif d.player != p:
+            o = helper.choose(g, d)
+        elif d.kind == "action":
+            o = next((x for x in (("pass",), ("end_turn",)) if x in opts), None) or helper.choose(g, d)
+        else:
+            o = helper.choose(g, d)
+        g.choose(o)
+
+
 class LearnedGreedy(GreedyPolicy):
     def __init__(self, net, seed=0, samples=3, **kw):
         super().__init__(seed, samples=samples, **kw)

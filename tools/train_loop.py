@@ -98,7 +98,7 @@ def _selfplay_game(args):
     from riftsim.core.deck import Deck
     from riftsim.core.game import Game
     from riftsim.core.learn.features import encode
-    from riftsim.core.learn.policy import to_turn_end
+    from riftsim.core.learn.policy import opponent_turn, to_turn_end
     from riftsim.core.policies import GreedyPolicy, ai_options, determinize, make_policy
     db = _db()
     decks = [Deck.load(p, db) for p in paths]
@@ -106,9 +106,11 @@ def _selfplay_game(args):
     rng = random.Random(seed * 13 + 5)
     g = Game(db, decks, seed=seed, log=False)
     g.max_turns = 60
-    xs, seats = [], []
+    xs, seats, kinds, tds = [], [], [], []
     last_turn = None
     helper = GreedyPolicy(seed + 991, samples=1)
+    from riftsim.core.learn import model as M
+    net = getattr(pols[0], "net", None) or M.load()      # the best AI's value model labels what-if positions
     t = time.time()
     while True:
         d = g.run()
@@ -120,14 +122,23 @@ def _selfplay_game(args):
             for s in (0, 1):
                 xs.append(encode(g, s))
                 seats.append(s)
+                kinds.append(0)
+                tds.append(-1.0)
         elif d.kind == "action" and rng.random() < 1.0 / every:
-            # what-if boundary: the deciding player ends the turn here; teaches the net the positions it is asked about
+            # what-if boundary: the deciding player ends the turn here; teaches the net the positions it is asked about.
+            # Its bootstrapped label: the opponent then plays its turn (one-sample heuristic AI, on this copy where the
+            # opponent's hand is a sample from the decider's view) and the best value model judges the start of the
+            # decider's next turn, so alternatives from the same position get different labels.
             h = determinize(g, d.player, rng)
             to_turn_end(h, d.player, helper)
             if not h.over:
+                x0 = [encode(h, s) for s in (0, 1)]
+                opponent_turn(h, d.player, helper)
                 for s in (0, 1):
-                    xs.append(encode(h, s))
+                    xs.append(x0[s])
                     seats.append(s)
+                    kinds.append(1)
+                    tds.append(net.predict(h, s))
         if d.kind == "action" and epsilon and rng.random() < epsilon:
             choice = rng.choice(ai_options(d, g))       # exploration: positions the best line would never reach
         else:
@@ -135,8 +146,8 @@ def _selfplay_game(args):
         g.choose(choice)
     if g.winner is None:
         return {"x": [], "y": [], "winner": None, "secs": time.time() - t}
-    return {"x": xs, "y": [1.0 if s == g.winner else 0.0 for s in seats], "winner": g.winner, "turns": g.turn,
-            "secs": time.time() - t}
+    return {"x": xs, "y": [1.0 if s == g.winner else 0.0 for s in seats], "seat": seats, "kind": kinds, "td": tds,
+            "winner": g.winner, "turns": g.turn, "secs": time.time() - t}
 
 
 def selfplay(games, spec, out, workers, seed, every=3, epsilon=0.03):
@@ -147,13 +158,15 @@ def selfplay(games, spec, out, workers, seed, every=3, epsilon=0.03):
         pair = rng.sample(DECKS, 2)
         jobs.append((pair, seed + 2 * i, spec, every, epsilon))
         jobs.append((pair[::-1], seed + 2 * i + 1, spec, every, epsilon))
-    X, Y, G = [], [], []
+    X, Y, G, S, K, T = [], [], [], [], [], []
     timeouts = []
     part = out + ".partial.npz"          # container restarts kill runs: resume from the last checkpoint
     start = 0
     if os.path.exists(part):
         d = np.load(part, allow_pickle=True)
         X, Y, G = d["x"].tolist(), d["y"].tolist(), d["game"].tolist()
+        if "kind" in d:
+            S, K, T = d["seat"].tolist(), d["kind"].tolist(), d["td"].tolist()
         start, timeouts = int(d["done"]), json.loads(str(d["timeouts"]))
         print(f"resuming self-play at game {start}", file=sys.stderr)
     t = time.time()
@@ -166,14 +179,18 @@ def selfplay(games, spec, out, workers, seed, every=3, epsilon=0.03):
                 X += r["x"]
                 Y += r["y"]
                 G += [k] * len(r["y"])
+                S += r.get("seat", []); K += r.get("kind", []); T += r.get("td", [])
             if (k + 1) % 20 == 0:
                 print(f"self-play {k + 1}/{len(jobs)} games, {len(Y)} positions ({time.time() - t:.0f}s)", file=sys.stderr)
             if (k + 1) % 10 == 0:
                 np.savez(part, x=np.array(X, dtype=np.float32), y=np.array(Y, dtype=np.float32),
-                         game=np.array(G, dtype=np.int32), done=k + 1, timeouts=json.dumps(timeouts))
+                         game=np.array(G, dtype=np.int32), seat=np.array(S, dtype=np.int8),
+                         kind=np.array(K, dtype=np.int8), td=np.array(T, dtype=np.float32), done=k + 1,
+                         timeouts=json.dumps(timeouts))
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     np.savez_compressed(out, x=np.array(X, dtype=np.float32), y=np.array(Y, dtype=np.float32),
-                        game=np.array(G, dtype=np.int32))
+                        game=np.array(G, dtype=np.int32), seat=np.array(S, dtype=np.int8),
+                        kind=np.array(K, dtype=np.int8), td=np.array(T, dtype=np.float32))
     if os.path.exists(part):
         os.remove(part)
     return len(jobs), len(Y), timeouts
@@ -281,7 +298,31 @@ def train(files, out, hidden=48, epochs=40, lr=2e-3, l2=1e-3, seed=0, warm=None,
     return info
 
 
-def train_linear(files, out, l2=1e-2, seed=0, meta=None):
+def td_targets(d, net, lam=0.7):
+    """Bootstrapped targets for one self-play file (TD(lambda), as in TD-Gammon): the real turn-boundary positions of
+    each seat, in order, get G_k = (1 - lam) * V(x_k+1) + lam * G_k+1 with G after the last one = the game result, and
+    V = the value model that played the games; what-if positions get their one-turn-ahead label from self-play.
+    The game result alone gives every position of a game the same label (and every alternative at a decision too),
+    which is what stalled the outcome-trained generations; bootstrapping lets each generation learn from the last."""
+    import numpy as np
+    X, Y, G, S, K, T = d["x"], d["y"], d["game"], d["seat"], d["kind"], d["td"]
+    V = np.array([net.predict_x(x.tolist()) for x in X]) if net is not None else None
+    out = Y.astype(np.float64).copy()
+    wi = K == 1
+    out[wi] = T[wi]
+    for gid in np.unique(G):
+        for s in (0, 1):
+            idx = np.where((G == gid) & (S == s) & (K == 0))[0]
+            if not len(idx):
+                continue
+            ret = float(Y[idx[-1]])
+            for j in range(len(idx) - 1, -1, -1):
+                out[idx[j]] = ret
+                ret = (1 - lam) * V[idx[j]] + lam * ret
+    return out
+
+
+def train_linear(files, out, l2=1e-2, seed=0, meta=None, target="outcome", net=None, lam=0.7):
     """Logistic regression on the standardised features plus the hand-written score's logit: about 100 weights, so it
     needs far less data than the MLP and cannot overfit the turn-to-turn noise. Same JSON format (no hidden units)."""
     import numpy as np
@@ -292,7 +333,10 @@ def train_linear(files, out, l2=1e-2, seed=0, meta=None):
         if d["x"].shape[1] != size():           # data recorded with an older feature version
             print(f"  skipping {os.path.basename(f)}: {d['x'].shape[1]} features, current version has {size()}")
             continue
-        xs.append(d["x"]); ys.append(d["y"]); gs.append(d["game"] + off)
+        if target == "td" and "kind" not in d:
+            print(f"  skipping {os.path.basename(f)}: no bootstrapped labels (recorded before TD targets)")
+            continue
+        xs.append(d["x"]); ys.append(td_targets(d, net, lam) if target == "td" else d["y"]); gs.append(d["game"] + off)
         off = int(gs[-1].max()) + 1 if len(gs[-1]) else off
     X, Y, G = np.concatenate(xs).astype(np.float64), np.concatenate(ys), np.concatenate(gs)
     rs = np.random.RandomState(seed)
@@ -408,7 +452,9 @@ def generation(a):
     out = os.path.join(MODELS, f"{name}.json")
     meta = {"generation": gen, "selfplay_policy": best, "data": [os.path.basename(b) for b in buffer]}
     if a.model == "linear":      # gen 3 (2026-11-07): the linear model beat the lookahead baseline, the MLPs did not
-        info = train_linear(buffer, out, seed=gen, meta=meta)
+        from riftsim.core.learn import model as M
+        meta["target"] = a.target
+        info = train_linear(buffer, out, seed=gen, meta=meta, target=a.target, net=M.load(M.best_path()), lam=a.lam)
     else:
         info = train(buffer, out, warm=warm, seed=gen, meta=meta)
     print(f"{name}: trained {info}", file=sys.stderr)
@@ -476,6 +522,9 @@ def main():
     g.add_argument("--buffer", type=int, default=4, help="generations of self-play data to train on")
     g.add_argument("--data")
     g.add_argument("--model", choices=("linear", "mlp"), default="linear")
+    g.add_argument("--target", choices=("td", "outcome"), default="td",
+                   help="td: bootstrapped targets from the best model (default since gen 12); outcome: game result")
+    g.add_argument("--lam", type=float, default=0.7, help="TD(lambda) weight on the later return")
     s = sub.add_parser("selfplay")
     s.add_argument("--games", type=int, default=600)
     s.add_argument("--policy", default=None)
