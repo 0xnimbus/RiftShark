@@ -373,3 +373,44 @@ def test_legion_activated_abilities_need_legion(db, name):
     g.players[0].played_this_turn = [give(g, 0, "Stupefy", db)]
     g.bump()
     assert g._can_activate(0, u, idx, ab)
+
+
+# ----------------------------------------------------------------------------- 2026-11-07 15:20 run: [Level N]
+def test_level_3_enter_ready_needs_level_3(db):
+    # Bandle Soldier "[Level 3][>] I enter ready." and Scorchclaw "[Level 3][>] I have +1 [M] and enter ready."
+    # The auto-scripter dropped the Level condition, so both always entered ready (and Scorchclaw always had +1).
+    for name in ("Bandle Soldier", "Scorchclaw"):
+        defn = _card(db, name)
+        for xp, active in ((0, False), (2, False), (3, True)):
+            g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "riven_exile")])
+            g.players[0].xp = xp
+            u = put(g, db, 0, "Forecaster", ("base", 0))
+            g.objects[u].defn = defn
+            g.bump()
+            flagged = [a for a in g.abilities(u) if "Level 3" in (a.source_text or "") + (a.label or "")]
+            assert flagged, name
+            assert all(a.active(g, u) == active for a in flagged), (name, xp)
+        if name == "Scorchclaw":
+            g.players[0].xp = 0
+            g.bump()
+            base = g.chars(u).might
+            g.players[0].xp = 3
+            g.bump()
+            assert g.chars(u).might == base + 1
+
+
+def test_every_flagged_line_carries_its_condition(db):
+    # Every ability parsed from a [Legion] / [Empowered] / [Level N] line must be conditional.
+    from riftsim.core.scripts.auto_grammar import script_line, split_lead_keywords
+    missing = []
+    for c in db:
+        for line in (c.text or "").split("\n"):
+            flags, body = split_lead_keywords(line)
+            if not body or not any(f.split(" ")[0] in ("legion", "empowered", "level") for f in flags):
+                continue
+            try:
+                abs_ = script_line(c, line)
+            except Exception:
+                continue
+            missing += [(c.name, line) for a in abs_ if hasattr(a, "cond") and a.cond is None]
+    assert not missing, missing[:10]
