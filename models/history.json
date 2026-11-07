@@ -76,5 +76,144 @@
    "train": 0.0,
    "gate": 12.9
   }
+ },
+ {
+  "generation": 2,
+  "model": "gen_002.json",
+  "date": "2026-11-07 02:43 UTC",
+  "selfplay_policy": "learned:heuristic",
+  "selfplay_games": 400,
+  "train": {
+   "positions": 126880,
+   "games": 999,
+   "train_loss": 0.3806,
+   "val_loss": 0.457,
+   "val_acc": 0.782,
+   "val_loss_constant": 0.6931,
+   "val_loss_heuristic": 0.5567,
+   "h_scale": 1.1662,
+   "hidden": 48,
+   "warm_start": false
+  },
+  "gate": {
+   "candidate": "learned:gen_002",
+   "best": "learned:heuristic",
+   "games": 199,
+   "wins": 81,
+   "draws": 0,
+   "score": 0.407,
+   "interval": [
+    0.341,
+    0.476
+   ],
+   "per_deck": {
+    "nasus_curator.json": [
+     9,
+     26
+    ],
+    "viktor_herald.json": [
+     5,
+     21
+    ],
+    "akali_rogue.json": [
+     14,
+     19
+    ],
+    "vex_gloomist.json": [
+     11,
+     21
+    ],
+    "reksai_void_burrower.json": [
+     10,
+     15
+    ],
+    "riven_exile.json": [
+     16,
+     29
+    ],
+    "irelia_blade_dancer.json": [
+     2,
+     16
+    ],
+    "azir_emperor.json": [
+     1,
+     18
+    ],
+    "kaisa_void.json": [
+     9,
+     15
+    ],
+    "master_yi_wuju.json": [
+     4,
+     19
+    ]
+   },
+   "timeouts": [
+    [
+     "vex_gloomist.json",
+     "irelia_blade_dancer.json",
+     9002
+    ]
+   ]
+  },
+  "promoted": false,
+  "minutes": {
+   "selfplay": 87.2,
+   "train": 0.0,
+   "gate": 31.7
+  }
+ },
+ {
+  "generation": 3,
+  "model": "gen_003.json",
+  "date": "2026-11-07 04:20 UTC",
+  "selfplay_policy": "learned:heuristic (reuses gen 1+2 data)",
+  "selfplay_games": 0,
+  "train": {
+   "positions": 126880,
+   "games": 999,
+   "train_loss": 0.4949,
+   "val_loss": 0.5207,
+   "val_acc": 0.7524,
+   "val_loss_constant": 0.6931,
+   "val_loss_heuristic": 0.5884,
+   "h_scale": 1.072,
+   "hidden": 0,
+   "kind": "linear",
+   "generation": 3,
+   "selfplay_policy": "expert (gen 1 data) + learned:heuristic (gen 2 data)"
+  },
+  "gate": {
+   "candidate": "learned:gen_003",
+   "best": "learned:heuristic",
+   "games": 197,
+   "wins": 109,
+   "draws": 0,
+   "score": 0.5533,
+   "interval": [
+    0.484,
+    0.621
+   ],
+   "per_deck": {},
+   "timeouts": [
+    [
+     "riven_exile.json",
+     "vex_gloomist.json",
+     909
+    ],
+    [
+     "vex_gloomist.json",
+     "azir_emperor.json",
+     931
+    ],
+    [
+     "irelia_blade_dancer.json",
+     "azir_emperor.json",
+     1929
+    ]
+   ]
+  },
+  "promoted": true,
+  "note": "linear model (logistic regression on the features + score); two 100-game gates 58-40 and 51-49"
  }
 ]

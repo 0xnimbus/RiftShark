@@ -43,5 +43,52 @@
   "timeouts": [],
   "date": "2026-11-06 23:40 UTC",
   "note": "trained on expert self-play: no gain yet; next generations self-play with the stronger lookahead AI"
+ },
+ {
+  "candidate": "learned:lin_002",
+  "best": "learned:heuristic",
+  "games": 98,
+  "wins": 58,
+  "draws": 0,
+  "score": 0.5918,
+  "interval": [
+   0.493,
+   0.684
+  ],
+  "timeouts": [
+   [
+    "riven_exile.json",
+    "vex_gloomist.json",
+    909
+   ],
+   [
+    "vex_gloomist.json",
+    "azir_emperor.json",
+    931
+   ]
+  ],
+  "date": "2026-11-07 03:35 UTC",
+  "note": "linear value model (logistic regression on the features + score), gen 1+2 self-play data"
+ },
+ {
+  "candidate": "learned:lin_002",
+  "best": "learned:heuristic",
+  "games": 99,
+  "wins": 51,
+  "draws": 0,
+  "score": 0.5152,
+  "interval": [
+   0.418,
+   0.611
+  ],
+  "timeouts": [
+   [
+    "irelia_blade_dancer.json",
+    "azir_emperor.json",
+    1929
+   ]
+  ],
+  "date": "2026-11-07 03:57 UTC",
+  "note": "linear model, confirmation run (new seeds)"
  }
 ]

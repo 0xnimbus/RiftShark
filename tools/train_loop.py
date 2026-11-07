@@ -281,6 +281,53 @@ def train(files, out, hidden=48, epochs=40, lr=2e-3, l2=1e-3, seed=0, warm=None,
     return info
 
 
+def train_linear(files, out, l2=1e-2, seed=0, meta=None):
+    """Logistic regression on the standardised features plus the hand-written score's logit: about 100 weights, so it
+    needs far less data than the MLP and cannot overfit the turn-to-turn noise. Same JSON format (no hidden units)."""
+    import numpy as np
+    from riftsim.core.learn.features import H_INDEX
+    xs, ys, gs, off = [], [], [], 0
+    for f in files:
+        d = np.load(f)
+        xs.append(d["x"]); ys.append(d["y"]); gs.append(d["game"] + off)
+        off = int(gs[-1].max()) + 1 if len(gs[-1]) else off
+    X, Y, G = np.concatenate(xs).astype(np.float64), np.concatenate(ys), np.concatenate(gs)
+    rs = np.random.RandomState(seed)
+    games = np.unique(G)
+    val = set(rs.choice(games, size=max(1, len(games) // 10), replace=False).tolist())
+    vm = np.array([g in val for g in G])
+    mean, std = X[~vm].mean(0), X[~vm].std(0) + 1e-3
+    Z = (X - mean) / std
+    O = np.arctanh(np.clip(X[:, H_INDEX], -0.999999, 0.999999))
+    A = np.hstack([Z, O[:, None], np.ones((len(Z), 1))])
+    w = np.zeros(A.shape[1]); w[-2] = 1.0
+    At, Yt, Av, Yv = A[~vm], Y[~vm], A[vm], Y[vm]
+
+    def loss(Am, Ym, w):
+        p = np.clip(1 / (1 + np.exp(-np.clip(Am @ w, -30, 30))), 1e-6, 1 - 1e-6)
+        return float(-(Ym * np.log(p) + (1 - Ym) * np.log(1 - p)).mean()), float(((p > 0.5) == (Ym > 0.5)).mean())
+    reg = np.full(len(w), l2); reg[-2:] = 0.0
+    for _ in range(25):                         # Newton steps (IRLS) with L2 on the feature weights
+        p = 1 / (1 + np.exp(-np.clip(At @ w, -30, 30)))
+        g = At.T @ (p - Yt) / len(Yt) + reg * w
+        H = (At * (p * (1 - p))[:, None]).T @ At / len(Yt) + np.diag(reg + 1e-9)
+        step = np.linalg.solve(H, g)
+        w -= step
+        if np.abs(step).max() < 1e-6:
+            break
+    vl, va = loss(Av, Yv, w)
+    w0 = np.zeros(len(w)); w0[-2] = 1.0
+    hl, _ = loss(Av, Yv, w0)
+    info = {"positions": int(len(Y)), "games": int(len(games)), "train_loss": round(loss(At, Yt, w)[0], 4),
+            "val_loss": round(vl, 4), "val_acc": round(va, 4), "val_loss_constant": 0.6931,
+            "val_loss_heuristic": round(hl, 4), "h_scale": round(float(w[-2]), 4), "hidden": 0, "kind": "linear"}
+    d = {"meta": dict(meta or {}, **info), "mean": mean.tolist(), "std": std.tolist(), "w1": [], "b1": [], "w2": [],
+         "b2": float(w[-1]), "h_index": H_INDEX, "h_scale": float(w[-2]), "lin": w[:-2].tolist()}
+    with open(out, "w") as f:
+        json.dump(d, f, separators=(",", ":"))
+    return info
+
+
 # ------------------------------------------------------------------------------------------------ gating
 def _gate_game(args):
     paths, seed, specs = args
@@ -356,8 +403,11 @@ def generation(a):
     if os.path.exists(bp) and json.load(open(bp)).get("model"):
         warm = json.load(open(os.path.join(MODELS, json.load(open(bp))["model"])))
     out = os.path.join(MODELS, f"{name}.json")
-    info = train(buffer, out, warm=warm, seed=gen,
-                 meta={"generation": gen, "selfplay_policy": best, "data": [os.path.basename(b) for b in buffer]})
+    meta = {"generation": gen, "selfplay_policy": best, "data": [os.path.basename(b) for b in buffer]}
+    if a.model == "linear":      # gen 3 (2026-11-07): the linear model beat the lookahead baseline, the MLPs did not
+        info = train_linear(buffer, out, seed=gen, meta=meta)
+    else:
+        info = train(buffer, out, warm=warm, seed=gen, meta=meta)
     print(f"{name}: trained {info}", file=sys.stderr)
     t2 = time.time()
     cand = f"learned:{name}"
@@ -422,6 +472,7 @@ def main():
     g.add_argument("--promote", type=float, default=0.55)
     g.add_argument("--buffer", type=int, default=4, help="generations of self-play data to train on")
     g.add_argument("--data")
+    g.add_argument("--model", choices=("linear", "mlp"), default="linear")
     s = sub.add_parser("selfplay")
     s.add_argument("--games", type=int, default=600)
     s.add_argument("--policy", default=None)
@@ -430,6 +481,7 @@ def main():
     t.add_argument("files", nargs="+")
     t.add_argument("--out", required=True)
     t.add_argument("--hidden", type=int, default=48)
+    t.add_argument("--linear", action="store_true", help="logistic regression instead of the MLP")
     q = sub.add_parser("gate")
     q.add_argument("candidate")
     q.add_argument("best")
@@ -444,7 +496,7 @@ def main():
     elif a.cmd == "selfplay":
         print(selfplay(a.games, a.policy or best_spec(), a.out, a.workers, a.seed))
     elif a.cmd == "train":
-        print(train(a.files, a.out, hidden=a.hidden))
+        print(train_linear(a.files, a.out) if a.linear else train(a.files, a.out, hidden=a.hidden))
     elif a.cmd == "gate":
         res = gate(a.candidate, a.best, a.games, a.workers, a.seed)
         print(json.dumps(res, indent=1))

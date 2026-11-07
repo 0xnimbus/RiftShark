@@ -25,6 +25,7 @@ class ValueNet:
         # residual form: logit = h_scale * atanh(x[h_index]) + MLP(x), i.e. the hand-written score is the base and the
         # net learns a correction to it (models without these keys are a plain MLP)
         self.h_index, self.h_scale = d.get("h_index"), d.get("h_scale", 0.0)
+        self.lin = d.get("lin")                    # optional linear term on the standardised inputs
 
     @classmethod
     def load(cls, path):
@@ -36,6 +37,8 @@ class ValueNet:
         out = self.b2
         if self.h_index is not None:
             out += self.h_scale * math.atanh(max(-0.999999, min(0.999999, x[self.h_index])))
+        if self.lin:
+            out += sum(a * c for a, c in zip(self.lin, z))
         for row, b, w in zip(self.w1, self.b1, self.w2):
             h = b
             for a, c in zip(row, z):
