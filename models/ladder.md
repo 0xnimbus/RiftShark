@@ -8,6 +8,8 @@ Written by tools/train_loop.py; the `learned` policy and the play page's Learned
 | 1 | 2026-11-06 23:04 UTC | expert | 79056 | 0.4884 (0.6931) | 0.7733 | 85.0% (79-89) vs expert | 200 | yes |
 | 2 | 2026-11-07 02:43 UTC | learned:heuristic | 126880 | 0.457 (0.6931) | 0.782 | 40.7% (34-48) vs learned:heuristic | 199 | no |
 | 3 | 2026-11-07 04:20 UTC | learned:heuristic (reuses gen 1+2 data) | 126880 | 0.5207 (0.6931) | 0.7524 | 55.3% (48-62) vs learned:heuristic | 197 | yes |
+| 4 | 2026-11-07 05:09 UTC | learned:gen_003 | 168892 | 0.5396 (0.6931) | 0.7184 | 49.0% (42-56) vs learned:gen_003 | 200 | no |
+| 5 | 2026-11-07 06:01 UTC | learned:gen_003 | 62412 | 0.3697 (0.6931) | 0.8078 | 49.5% (43-56) vs learned:gen_003 | 200 | no |
 
 ## Control matches
 

@@ -285,10 +285,13 @@ def train_linear(files, out, l2=1e-2, seed=0, meta=None):
     """Logistic regression on the standardised features plus the hand-written score's logit: about 100 weights, so it
     needs far less data than the MLP and cannot overfit the turn-to-turn noise. Same JSON format (no hidden units)."""
     import numpy as np
-    from riftsim.core.learn.features import H_INDEX
+    from riftsim.core.learn.features import H_INDEX, size
     xs, ys, gs, off = [], [], [], 0
     for f in files:
         d = np.load(f)
+        if d["x"].shape[1] != size():           # data recorded with an older feature version
+            print(f"  skipping {os.path.basename(f)}: {d['x'].shape[1]} features, current version has {size()}")
+            continue
         xs.append(d["x"]); ys.append(d["y"]); gs.append(d["game"] + off)
         off = int(gs[-1].max()) + 1 if len(gs[-1]) else off
     X, Y, G = np.concatenate(xs).astype(np.float64), np.concatenate(ys), np.concatenate(gs)
