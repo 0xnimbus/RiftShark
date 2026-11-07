@@ -39,6 +39,16 @@ def bedeviling_stranger(defn):
     ], label=defn.name, source_text=defn.text)]
 
 
+@script("Tideturner")
+def tideturner(defn):
+    # [Hidden]  When you play me, you may choose a unit you control at another location. Move me to its location and
+    # it to my original location. (errata, Origins: "at another location")
+    other = Sel("unit", side="friendly", pred=lambda g, c, u: g.objects[u].location != g.objects[c.source].location)
+    return [Triggered("play_self", [O.May([O.Choose(other, out="t"), O.SwapLocations(Ref("self"), Ref("t"))],
+                                          label="swap places with a unit you control at another location")],
+                      label=defn.name, source_text=defn.text)]
+
+
 @script("Zhonya's Hourglass")
 def zhonyas(defn):
     # The next time a friendly unit would die, kill this instead. Recall that unit exhausted.
