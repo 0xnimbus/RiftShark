@@ -1167,7 +1167,7 @@ class Game(flow.FlowMixin):
                 self._to_zone(o, "gone")
             else:
                 self._to_zone(o, "deck")
-            self.emit("recycle", uid=u, player=o.owner, from_zone=was, loc=loc, ctx=ctx, batch=batch)
+            self.emit("recycle", uid=u, player=o.owner, from_zone=was, loc=loc, ctx=ctx, batch=batch, to=o.zone)
             if was == "board":
                 self.emit("leave", uid=u, player=o.owner, loc=loc, ctx=ctx)
                 self.dirty = True

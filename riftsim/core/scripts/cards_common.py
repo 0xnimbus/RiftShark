@@ -135,10 +135,11 @@ def poro_herder(defn):
 
 @script("Portal Rescue")
 def portal_rescue(defn):
-    # [Action]  Banish a friendly unit, then play it to base, ignoring its cost.
+    # [Action]  Banish a friendly unit, then its owner plays it to their base, ignoring its cost. (errata, Origins)
+    owner = lambda g, c: g.objects[c.vars["t"]].owner
     return [SpellEffect([O.Choose(Sel("unit", side="friendly"), out="t"), O.Banish(Ref("t")),
                          O.If(lambda g, c: c.vars.get("t") in g.objects and g.objects[c.vars["t"]].zone == "banish",
-                              [O.PlayCard(Ref("t"), ignore="all", loc=lambda g, c: ("base", c.controller))])],
+                              [O.PlayCard(Ref("t"), ignore="all", loc=lambda g, c: ("base", owner(g, c)), player=owner)])],
                         label=defn.name, source_text=defn.text)]
 
 

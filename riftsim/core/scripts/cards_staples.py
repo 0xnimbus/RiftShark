@@ -685,10 +685,10 @@ def fiora_peerless(defn):
 @script("Janna, Savior")
 def janna_savior(defn):
     # [Reaction]   (keyword)
-    # When you play me, heal your units here, then move an enemy unit from here to its base.
+    # When you play me, heal your units here, then move up to one enemy unit from here to its base. (errata, Spiritforged)
     return {"abilities": [Triggered("play_self", [
         O.Heal(Sel("unit", side="friendly", where="here")),
-        O.Move(Ref("t"), "base")], targets=[O.Choose(Sel("unit", side="enemy", where="here"), out="t")],
+        O.Move(Ref("t"), "base")], targets=[O.Choose(Sel("unit", side="enemy", where="here"), out="t", n=1, up_to=True)],
         label=defn.name, source_text=defn.text)], "replace": True}
 
 
@@ -799,9 +799,9 @@ def _in_combat(g, u):
 
 @script("Sona, Harmonious")
 def sona_harmonious(defn):
-    # While I'm at a battlefield, ready 4 friendly runes at the end of your turn.
+    # At the end of your turn, if I'm at a battlefield, ready up to 4 friendly runes. (errata, Origins)
     exhausted_runes = lambda g, c: [r for r in g.players[c.controller].runes if g.objects[r].exhausted]
-    return {"abilities": [Triggered("end_turn", [O.ChooseFromList(exhausted_runes, out="__rr", n=4, label="ready 4 runes"),
+    return {"abilities": [Triggered("end_turn", [O.ChooseFromList(exhausted_runes, out="__rr", n=4, up_to=True, label="ready up to 4 runes"),
                                                  O.Ready(Ref("__rr"))],
                                     cond=lambda g, s: _at_bf(g, s), label=defn.name, source_text=defn.text)], "replace": True}
 
@@ -1028,7 +1028,7 @@ def yone(defn):
     return {"abilities": [Triggered("conquer_self", [O.Deal(lambda g, c: g.chars(c.source).might or 0, Ref("t"))],
                                     targets=[O.Choose(Sel("unit", side="enemy", where="base"), out="t")],
                                     filt=lambda g, s, ev: g.conquered_from is None, label=defn.name, source_text=defn.text)],
-            "replace": False}
+            "replace": True}       # the auto-scripter's unconditional copy of this trigger made it fire twice
 
 
 @script("Zed, Without a Sound")
@@ -1600,3 +1600,38 @@ def neeko_blending_in(defn):
         O.ChooseFromList(options, out="__nl", label="add a legend to your Legend Zone"),
         O.Do(_unwrap("__nl")), O.Do(add, label="add the legend")], label=defn.name, source_text=defn.text)],
         "replace": True}
+
+
+@script("Elnuk Herd")
+def elnuk_herd(defn):
+    # [Hidden]  When you play me, give a friendly unit +3 [M] this turn, then recycle me if I was played from face down.
+    # (errata, Radiance: "a friendly unit", so it may be me.) The auto-scripter read "me if I was played from face
+    # down" as a unit to choose and recycled that unit.
+    return {"abilities": [Triggered("play_self", [
+        O.GiveMight(Ref("t"), 3),
+        O.If(lambda g, c: (c.vars.get("ev") or {}).get("from_zone") == "facedown", [O.Recycle(Ref("self"))])],
+        targets=[O.Choose(Sel("unit", side="friendly"), out="t")], label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Dark Child, Starter")
+def dark_child_starter(defn):
+    # At the end of your turn, ready up to 2 runes. (errata, Origins; your own runes: you can only ready what you control)
+    return {"abilities": [Triggered("end_turn", [
+        O.Choose(Sel("rune", side="friendly", exhausted=True), out="__r", n=2, up_to=True, targeted=False),
+        O.Ready(Ref("__r"))], label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Karma, Channeler")
+def karma_channeler(defn):
+    # [Vision]  When you recycle one or more cards to your Main Deck, buff a friendly unit. (errata, Origins: runes
+    # recycled to the rune deck, e.g. to pay for power, don't count)
+    def to_main(g, s, ev):
+        if ev.get("kind") != "recycle" or ev.get("to") != "deck" or ev.get("player") != g.objects[s].controller:
+            return False
+        seen = g.objects[s].temp.setdefault(("batches", "karma"), set())
+        if ev.get("batch") in seen:
+            return False
+        seen.add(ev.get("batch"))
+        return True
+    return {"abilities": [Triggered(to_main, [O.Buff(Ref("t"))], targets=[O.Choose(Sel("unit", side="friendly"), out="t")],
+                                    label=defn.name, source_text=defn.text)], "replace": True}
