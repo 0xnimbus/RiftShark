@@ -16,6 +16,7 @@ Written by tools/train_loop.py; the `learned` policy and the play page's Learned
 | 9 | 2026-11-07 09:27 UTC | learned:gen_008 | 260414 | 0.5013 (0.6931) | 0.7465 | 43.5% (37-50) vs learned:gen_008 | 200 | no |
 | 10 | 2026-11-07 10:21 UTC | learned:gen_008 | 266440 | 0.5206 (0.6931) | 0.7371 | 48.0% (41-55) vs learned:gen_008 | 200 | no |
 | 11 | 2026-11-07 11:20 UTC | learned:gen_008 | 269132 | 0.494 (0.6931) | 0.7631 | 45.5% (39-52) vs learned:gen_008 | 200 | no |
+| 12 | 2026-11-07 19:54 UTC | learned:gen_008 | 45026 | 0.5214 (0.6931) | 0.8591 | 42.5% (36-49) vs learned:gen_008 | 200 | no |
 
 ## Control matches
 
