@@ -1805,6 +1805,8 @@ def script_line(defn, line):
             timing = "reaction"
         elif "action" in eflags:
             timing = "action"
+        # "[T]: [Reaction], [Legion] — ..." (Darius, Sun Disc): usable only while Legion is active
+        legion_use = "legion" in {f.split(" ")[0] for f in eflags}
         once = False
         is_add = False
         restriction_text = None
@@ -1847,6 +1849,9 @@ def script_line(defn, line):
                         restriction = sc
                     except ParseError:
                         raise ParseError(f"restriction {rt!r}")
+        if legion_use:
+            inner = restriction
+            restriction = lambda g, src, inner=inner: g.legion_active(g.objects[src].controller, src) and (inner is None or inner(g, src))
         return [Activated(cost, eff, timing=timing, once_per_turn=once, is_add=is_add, label=line[:40], source_text=line, cond=cond, restriction=restriction)]
     # triggered: "When ..., effect"
     m = re.match(r"^((?:Once each turn, )?(?:When|Whenever|At (?:the )?start|At (?:the )?end|The first time)[^,]*(?:,[^,]*?(?= if ))?),\s*(.+)$", body)
@@ -1888,7 +1893,7 @@ def script_line(defn, line):
     m = re.match(r"i cost \[(\d+)\] less\.?$", bl)
     if m:
         n = int(m.group(1))
-        return [PlayPermission("cost", cost_mod=lambda g, u, e, p, n=n: (max(0, e - n), p), label=line)]
+        return [PlayPermission("cost", cost_mod=lambda g, u, e, p, n=n: (max(0, e - n), p), cond=cond, label=line)]
     m = re.match(r"(?:i cost|this costs) \[(\d+)\] less for each (.+?)\.?$", bl)
     if m:
         n = int(m.group(1))
