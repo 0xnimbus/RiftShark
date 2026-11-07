@@ -1379,6 +1379,7 @@ class Game(flow.FlowMixin):
         self.bump()
         self.log("token", uid=o.uid, name=name, loc=o.location, player=p)
         ctype = "unit" if defn.is_unit else "gear"
+        self.turn_memo.setdefault("played_at", []).append((p, o.location))   # a token is played too (Hunters' Circle)
         self.emit("play", uid=o.uid, player=p, card_type=ctype, loc=o.location, from_zone=None, token=True, ctx=ctx)
         self.emit("enter", uid=o.uid, player=p, loc=o.location, card_type=ctype, token=True, ctx=ctx)
         if defn.is_unit:

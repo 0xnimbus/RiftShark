@@ -1903,7 +1903,7 @@ def _script_line(defn, line, cond=None):
         return [Triggered(ev, eff, filt=filt, once_per_turn=once_flag, label=line[:40], source_text=line, store=store, cond=cond, optional=optional)]
     # play permissions
     if bl in ("you may play me to an open battlefield.", "you may play me to an open battlefield"):
-        return [PlayPermission("any_battlefield", cond=(lambda g, src: True), label=line)]
+        return [PlayPermission("open_bf", label=line)]            # CR 170.11.c: unoccupied and uncontrolled
     if bl in ("i enter ready.", "i enter ready"):
         return [Replacement("enter_ready", lambda g, s, ev: ev.get("uid") == s, lambda g, s, ev: dict(ev, ready=True), label=line, zone="any")]
     if bl in ("this enters exhausted.", "this enters exhausted"):
@@ -1911,10 +1911,10 @@ def _script_line(defn, line, cond=None):
     # play permissions, cost modifiers, additional costs, enter-ready replacements
     m = re.match(r"i can be played to a battlefield you'?re attacking\.?$", bl)
     if m:
-        return [PlayPermission("any_battlefield", cond=lambda g, src: True, label=line)]
+        return [PlayPermission("attacking_bf", label=line)]       # only the battlefield of a combat you're attacking in
     m = re.match(r"you may play me to an occupied enemy battlefield\.?$", bl)
     if m:
-        return [PlayPermission("any_battlefield", cond=lambda g, src: True, label=line)]
+        return [PlayPermission("occupied_enemy_bf", label=line)]  # CR 170.11.a: enemy-controlled with a unit there
     m = re.match(r"i cost \[(\d+)\] less\.?$", bl)
     if m:
         n = int(m.group(1))

@@ -773,7 +773,9 @@ class PlayCard(Instr):
         loc = val(game, ctx, self.loc) if self.loc is not None else None
         d = game.objects[u].base_defn()
         if loc is None and d.is_unit and ctx.target_bf is None:
-            locs = _unit_play_locations(game, _player(game, ctx, self.player))   # CR 355.2.a
+            pl, z = _player(game, ctx, self.player), game.objects[u].zone
+            # CR 355.2: the usual locations plus the card's own permissions (open battlefield, ...), minus Rockfall Path
+            locs = game._play_locations(pl, u, z) if z != "facedown" else _unit_play_locations(game, pl)
             if len(locs) > 1:
                 return Decision(_player(game, ctx, self.player), "choose_location", locs, out="__playloc",
                                 labels=[game.loc_name(l) for l in locs], info={"label": f"Play {d.name} where?"})
