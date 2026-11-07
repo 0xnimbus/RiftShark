@@ -322,6 +322,9 @@ def test_sona_readies_four_runes_at_end_of_turn_at_a_battlefield(db, decks):
         d = g.run()
         if g.turn_player == 1:
             break
+        if d.kind in ("choose", "choose_many", "pick_many") and all(isinstance(o, tuple) for o in d.options):
+            g.choose(max(d.options, key=len))            # "up to 4" (errata): take all four
+            continue
         g.choose(("pass",) if ("pass",) in d.options else d.options[0])
     assert sum(not g.objects[r].exhausted for r in g.players[0].runes) == min(4, len(g.players[0].runes))
 

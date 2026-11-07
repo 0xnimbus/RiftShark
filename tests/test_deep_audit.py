@@ -267,3 +267,77 @@ def test_arise_readies_up_to_two_soldiers(db):
     ar = next(c for c in db if c.name == "Arise!")
     ch = next(i for i in ar.abilities[0].code if type(i).__name__ == "Choose")
     assert ch.n == 2 and ch.up_to
+
+
+# ----------------------------------------------------------------------------- 2026-11-07 05:20 run: errata, other cards
+def _card(db, name):
+    return next(c for c in db if c.name == name)
+
+
+def _choose_of(ab):
+    return next(i for i in (ab.target_code or []) + list(ab.code) if type(i).__name__ in ("Choose", "ChooseFromList"))
+
+
+def test_up_to_errata_dark_child_sona_janna(db):
+    # Origins/Spiritforged errata: "ready up to 2 runes", "ready up to 4 friendly runes", "move up to one enemy unit"
+    for name, n in (("Dark Child, Starter", 2), ("Sona, Harmonious", 4), ("Janna, Savior", 1)):
+        ch = _choose_of(_card(db, name).abilities[-1])
+        assert ch.n == n and ch.up_to, name
+    sel = _choose_of(_card(db, "Dark Child, Starter").abilities[-1]).sel
+    assert sel.side == "friendly"                      # it used to offer the opponent's runes too
+
+
+def test_yone_conquer_trigger_exists_once(db):
+    yone = _card(db, "Yone, Blademaster")
+    assert sum(1 for a in yone.abilities if getattr(a, "event", None) == "conquer_self") == 1
+
+
+def test_karma_buffs_on_cards_recycled_to_the_main_deck_not_runes(db):
+    g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "riven_exile")])
+    k = put(g, db, 0, "Karma, Channeler", ("base", 0))
+    g.pending = None
+    settle(g)
+    n = len(g.events)
+    g.do_recycle([g.players[0].runes[0]], Context(0, None))           # rune -> rune deck: no trigger
+    assert not [e for e in g.events[n:] if e["kind"] == "trigger" and e["source"] == k]
+    card = g.players[0].hand[0]
+    g.do_recycle([card], Context(0, None))                            # card -> Main Deck: buff
+    assert [e for e in g.events[n:] if e["kind"] == "trigger" and e["source"] == k]
+
+
+def test_elnuk_herd_may_pump_itself_and_recycles_only_itself_from_face_down(db):
+    g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "riven_exile")])
+    other = put(g, db, 0, "Stellacorn Herder", ("bf", 0))
+    g.set_bf_controller(0, 0)
+    el = give(g, 0, "Elnuk Herd", db)
+    assert g.do_hide(0, el, ("bf", 0))
+    g.objects[el].facedown_turn = g.turn - 1
+    g.pending = None
+    g.bump()
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == el))
+    seen = []
+
+    def pick(d):
+        if d.kind in ("choose", "choose_many"):
+            seen.append(set(d.options))
+            return el if el in d.options else None
+        return None
+    _drive(g, pick=pick)
+    assert seen and el in seen[0] and other in seen[0]          # errata: "a friendly unit" (itself included)
+    assert g.objects[el].zone == "deck" and g.objects[other].zone == "board"
+
+
+def test_portal_rescue_returns_a_borrowed_unit_to_its_owners_base(db):
+    # errata: "Banish a friendly unit, then its owner plays it to their base"
+    g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "riven_exile")])
+    stolen = put(g, db, 1, "Stellacorn Herder", ("bf", 0))
+    g.objects[stolen].controller = 0
+    g.bump()
+    pr = give(g, 0, "Portal Rescue", db)
+    _ready_runes(g, 0)
+    g.run()
+    g.choose(("play", pr))
+    _drive(g, pick=lambda d: stolen if d.kind in ("choose", "choose_many") and stolen in d.options else None)
+    assert g.objects[stolen].zone == "board" and g.objects[stolen].location == ("base", 1)
+    assert g.objects[stolen].controller == 1
