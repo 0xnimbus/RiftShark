@@ -69,6 +69,8 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   Elnuk Herd, Dark Child Starter, Sona Harmonious, Janna Savior, Yone (double trigger), Karma Channeler, Portal Rescue (05:20).
   Open: Diana, Lunari (does the reveal still happen if you don't pay? errata wording is ambiguous); unscripted errata
   cards (The Boss, Unlicensed Armory, Kato, Relentless Pursuit, Ava Achiever) wait for scripting to resume.
+  10:20 (Kai'Sa check): the auto-scripter dropped [Legion] on "I cost [2] less" (Noxus Hopeful, 3 in Kai'Sa: always cost [2])
+  and on activated abilities (Darius legends, Sun Disc); fixed. Round-robins before 2026-11-07 10:40 overrate Kai'Sa.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

@@ -341,3 +341,35 @@ def test_portal_rescue_returns_a_borrowed_unit_to_its_owners_base(db):
     _drive(g, pick=lambda d: stolen if d.kind in ("choose", "choose_many") and stolen in d.options else None)
     assert g.objects[stolen].zone == "board" and g.objects[stolen].location == ("base", 1)
     assert g.objects[stolen].controller == 1
+
+
+# ----------------------------------------------------------------------------- 2026-11-07 10:20 run: Legion
+def test_noxus_hopeful_costs_2_less_only_with_legion(db):
+    # "[Legion] — I cost [2] less." The auto-scripter dropped the Legion condition, so Kai'Sa's three Hopefuls always
+    # cost [2] instead of [4].
+    g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "riven_exile")])
+    nh = give(g, 0, "Noxus Hopeful", db)
+    g.players[0].played_this_turn = []
+    g.bump()
+    assert g.card_cost(0, nh, "hand", ("base", 0)) == (4, [])
+    other = give(g, 0, "Stupefy", db)
+    g.players[0].played_this_turn = [other]
+    g.bump()
+    assert g.card_cost(0, nh, "hand", ("base", 0)) == (2, [])
+
+
+@pytest.mark.parametrize("name", ["Darius, Hand of Noxus", "Hand of Noxus", "Sun Disc"])
+def test_legion_activated_abilities_need_legion(db, name):
+    # "[T]: [Reaction], [Legion] — [Add] [1]." / "[T]: [Legion] — ...": usable only once you've played another card
+    g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "riven_exile")])
+    u = put(g, db, 0, "Forecaster", ("base", 0))
+    g.objects[u].defn = _card(db, name)
+    g.bump()
+    idx = next(i for i, a in enumerate(g.abilities(u)) if type(a).__name__ == "Activated")
+    ab = g.abilities(u)[idx]
+    g.players[0].played_this_turn = []
+    g.bump()
+    assert not g._can_activate(0, u, idx, ab)
+    g.players[0].played_this_turn = [give(g, 0, "Stupefy", db)]
+    g.bump()
+    assert g._can_activate(0, u, idx, ab)
