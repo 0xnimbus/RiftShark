@@ -1,5 +1,5 @@
 {
- "model": "gen_006.json",
- "spec": "learned:gen_006",
- "generation": 6
+ "model": "gen_008.json",
+ "spec": "learned:gen_008",
+ "generation": 8
 }
