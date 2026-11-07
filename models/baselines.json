@@ -90,5 +90,83 @@
   ],
   "date": "2026-11-07 03:57 UTC",
   "note": "linear model, confirmation run (new seeds)"
+ },
+ {
+  "candidate": "learned-mcts:60:gen_008",
+  "best": "learned:gen_008",
+  "games": 18,
+  "wins": 5,
+  "draws": 0,
+  "score": 0.2778,
+  "interval": [
+   0.125,
+   0.509
+  ],
+  "timeouts": [
+   [
+    "viktor_herald.json",
+    "reksai_void_burrower.json",
+    41003
+   ],
+   [
+    "viktor_herald.json",
+    "reksai_void_burrower.json",
+    41003
+   ]
+  ],
+  "date": "2026-11-07 22:49 UTC",
+  "note": "MCTS 60 iterations with the gen 8 model as leaf value: much weaker (judges mid-turn positions)"
+ },
+ {
+  "candidate": "learned-deep:gen_008",
+  "best": "learned:gen_008",
+  "games": 99,
+  "wins": 57,
+  "draws": 0,
+  "score": 0.5758,
+  "interval": [
+   0.477,
+   0.668
+  ],
+  "timeouts": [
+   [
+    "azir_emperor.json",
+    "kaisa_void.json",
+    52042
+   ]
+  ],
+  "date": "2026-11-07 22:49 UTC",
+  "note": "deep search: close calls re-checked through the opponent's reply turn (seeds 52000)"
+ },
+ {
+  "candidate": "learned-deep:gen_008",
+  "best": "learned:gen_008",
+  "games": 97,
+  "wins": 46,
+  "draws": 0,
+  "score": 0.4742,
+  "interval": [
+   0.378,
+   0.573
+  ],
+  "timeouts": [
+   [
+    "reksai_void_burrower.json",
+    "irelia_blade_dancer.json",
+    53000
+   ],
+   [
+    "irelia_blade_dancer.json",
+    "nasus_curator.json",
+    53023
+   ],
+   [
+    "reksai_void_burrower.json",
+    "azir_emperor.json",
+    53027
+   ]
+  ],
+  "date": "2026-11-07 22:49 UTC",
+  "note": "deep search, confirmation on new seeds (53000): combined 103/196, no clear gain"
  }
 ]

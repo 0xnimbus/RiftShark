@@ -83,10 +83,19 @@ def opponent_turn(g, p, helper, max_steps=600):
 
 
 class LearnedGreedy(GreedyPolicy):
-    def __init__(self, net, seed=0, samples=3, **kw):
+    """deep=True ('learned-deep'): when the two best options of an action decision are within `margin` win
+    probability of each other, they are compared again one turn deeper: play the option, end the turn, let the
+    opponent play its whole turn with the same one-turn learned AI (on a copy determinised from our view, so its
+    view of our hand is a sample too), and judge the start of our next turn. Only close calls pay for the deeper
+    look, so a game costs a few times a plain one instead of a hundred times."""
+
+    def __init__(self, net, seed=0, samples=3, deep=False, margin=0.04, deep_samples=2, **kw):
         super().__init__(seed, samples=samples, **kw)
         self.net = net
         self.helper = GreedyPolicy(seed + 991, samples=1)
+        self.deep, self.margin, self.deep_samples = deep, margin, deep_samples
+        self.opp = LearnedGreedy(net, seed=seed + 577, samples=1) if deep else None
+        self.deep_calls = 0
 
     def evaluate(self, game, d, opts):
         vals = []
@@ -100,6 +109,25 @@ class LearnedGreedy(GreedyPolicy):
                 v += self.net.predict(g, d.player)
             v = 1000.0 * (v / self.samples - 0.5) + self.rng.random() * self.noise
             vals.append(v)
+        if self.deep and d.kind == "action" and len(opts) >= 2:
+            order = sorted(range(len(opts)), key=lambda i: -vals[i])
+            a, b = order[0], order[1]
+            if vals[a] - vals[b] < 1000.0 * self.margin:
+                self.deep_calls += 1
+                deep = {}
+                for i in (a, b):
+                    v = 0.0
+                    for _ in range(self.deep_samples):
+                        g = determinize(game, d.player, self.rng)
+                        if g.pending is not None and opts[i] in g.pending.options:
+                            g.choose(opts[i])
+                        to_turn_end(g, d.player, self.helper)
+                        if not g.over:
+                            opponent_turn(g, d.player, self.opp)
+                        v += self.net.predict(g, d.player)
+                    deep[i] = v
+                win = a if deep[a] >= deep[b] else b
+                vals[win] = vals[a] + 1.0
         return vals
 
 
@@ -113,10 +141,10 @@ class LearnedMCTS(MCTSPolicy):
 
 
 def make_learned(kind, arg, seed=0):
-    if kind == "learned":
+    if kind in ("learned", "learned-deep"):
         path = _resolve(arg)
-        pol = LearnedGreedy(M.load(path), seed=seed)
-        pol.name = "learned:" + (path if path == "heuristic" else os.path.basename(path)[:-5])
+        pol = LearnedGreedy(M.load(path), seed=seed, deep=kind == "learned-deep")
+        pol.name = kind + ":" + (path if path == "heuristic" else os.path.basename(path)[:-5])
         return pol
     it, _, ref = arg.partition(":")
     path = _resolve(ref)

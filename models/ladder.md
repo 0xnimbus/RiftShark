@@ -30,3 +30,6 @@ Written by tools/train_loop.py; the `learned` policy and the play page's Learned
 | 2026-11-06 23:40 UTC | net v2 (residual on the hand-written score, gen 1 data) | learned:heuristic | 48.0% (38-58) | 100 | trained on expert self-play: no gain yet; next generations self-play with the stronger lookahead AI |
 | 2026-11-07 03:35 UTC | learned:lin_002 | learned:heuristic | 59.2% (49-68) | 98 | linear value model (logistic regression on the features + score), gen 1+2 self-play data |
 | 2026-11-07 03:57 UTC | learned:lin_002 | learned:heuristic | 51.5% (42-61) | 99 | linear model, confirmation run (new seeds) |
+| 2026-11-07 22:49 UTC | learned-mcts:60:gen_008 | learned:gen_008 | 27.8% (12-51) | 18 | MCTS 60 iterations with the gen 8 model as leaf value: much weaker (judges mid-turn positions) |
+| 2026-11-07 22:49 UTC | learned-deep:gen_008 | learned:gen_008 | 57.6% (48-67) | 99 | deep search: close calls re-checked through the opponent's reply turn (seeds 52000) |
+| 2026-11-07 22:49 UTC | learned-deep:gen_008 | learned:gen_008 | 47.4% (38-57) | 97 | deep search, confirmation on new seeds (53000): combined 103/196, no clear gain |
