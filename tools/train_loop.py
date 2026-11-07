@@ -168,7 +168,7 @@ def selfplay(games, spec, out, workers, seed, every=3, epsilon=0.03):
                 G += [k] * len(r["y"])
             if (k + 1) % 20 == 0:
                 print(f"self-play {k + 1}/{len(jobs)} games, {len(Y)} positions ({time.time() - t:.0f}s)", file=sys.stderr)
-            if (k + 1) % 50 == 0:
+            if (k + 1) % 10 == 0:
                 np.savez(part, x=np.array(X, dtype=np.float32), y=np.array(Y, dtype=np.float32),
                          game=np.array(G, dtype=np.int32), done=k + 1, timeouts=json.dumps(timeouts))
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)

@@ -111,6 +111,9 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   start of the next turn (`learn.policy.to_turn_end`) is what makes the AI strong: with the hand-written score it beats
   expert 87-13 (`learned:heuristic`, the current best and the play page's "Learned" level). Plain nets lost to it;
   net v2 learns a correction on top of the score and tied it on expert data; gen 2 self-plays with the lookahead AI.
+  2026-11-07 01:20 round-robin with that AI (Actions, 874 games): docs/results/round_robin_2026-11-07_learned.md (Kai'Sa 79%,
+  Void Burrower 65%, Riven 61%, Viktor 61% ... Gloomist 44%, Irelia 16%; Kai'Sa beats Riven 11-3). The background container
+  is reclaimed when the thread is idle with no Monitor attached: keep a Monitor on long local runs.
   The 5-hourly "RiftShark round-robin training" routine should run a generation and then a round-robin with `--policy learned`.
 - Main deck = 39 cards + chosen champion (CR 103.3). `When you play me` triggers fire from the chain.
 - `riftsim/` top level still holds the v1 simplified engine (engine.py, policies.py, replay.py, runner.py, cli.py).
