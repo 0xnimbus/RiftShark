@@ -333,10 +333,10 @@ def train_linear(files, out, l2=1e-2, seed=0, meta=None, target="outcome", net=N
         if d["x"].shape[1] != size():           # data recorded with an older feature version
             print(f"  skipping {os.path.basename(f)}: {d['x'].shape[1]} features, current version has {size()}")
             continue
-        if target == "td" and "kind" not in d:
-            print(f"  skipping {os.path.basename(f)}: no bootstrapped labels (recorded before TD targets)")
-            continue
-        xs.append(d["x"]); ys.append(td_targets(d, net, lam) if target == "td" else d["y"]); gs.append(d["game"] + off)
+        use_td = target == "td" and "kind" in d
+        if target == "td" and not use_td:
+            print(f"  {os.path.basename(f)}: recorded before TD targets, uses game results")
+        xs.append(d["x"]); ys.append(td_targets(d, net, lam) if use_td else d["y"]); gs.append(d["game"] + off)
         off = int(gs[-1].max()) + 1 if len(gs[-1]) else off
     X, Y, G = np.concatenate(xs).astype(np.float64), np.concatenate(ys), np.concatenate(gs)
     rs = np.random.RandomState(seed)
