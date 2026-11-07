@@ -375,5 +375,85 @@
    "train": 0.0,
    "gate": 11.7
   }
+ },
+ {
+  "generation": 6,
+  "model": "gen_006.json",
+  "date": "2026-11-07 07:04 UTC",
+  "selfplay_policy": "learned:gen_003",
+  "selfplay_games": 600,
+  "train": {
+   "positions": 125122,
+   "games": 1200,
+   "train_loss": 0.3791,
+   "val_loss": 0.3922,
+   "val_acc": 0.8094,
+   "val_loss_constant": 0.6931,
+   "val_loss_heuristic": 0.5928,
+   "h_scale": 1.0702,
+   "hidden": 0,
+   "kind": "linear"
+  },
+  "gate": {
+   "candidate": "learned:gen_006",
+   "best": "learned:gen_003",
+   "games": 200,
+   "wins": 112,
+   "draws": 0,
+   "score": 0.56,
+   "interval": [
+    0.491,
+    0.627
+   ],
+   "per_deck": {
+    "azir_emperor.json": [
+     5,
+     27
+    ],
+    "viktor_herald.json": [
+     8,
+     16
+    ],
+    "nasus_curator.json": [
+     12,
+     22
+    ],
+    "master_yi_wuju.json": [
+     10,
+     18
+    ],
+    "riven_exile.json": [
+     16,
+     23
+    ],
+    "kaisa_void.json": [
+     21,
+     24
+    ],
+    "vex_gloomist.json": [
+     11,
+     18
+    ],
+    "reksai_void_burrower.json": [
+     6,
+     14
+    ],
+    "irelia_blade_dancer.json": [
+     10,
+     19
+    ],
+    "akali_rogue.json": [
+     13,
+     19
+    ]
+   },
+   "timeouts": []
+  },
+  "promoted": true,
+  "minutes": {
+   "selfplay": 37.7,
+   "train": 0.1,
+   "gate": 13.8
+  }
  }
 ]
