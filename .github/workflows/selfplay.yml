@@ -1,0 +1,89 @@
+name: Self-play training (sharded)
+# Started by hand from the Actions tab. Each runner plays self-play games with the current best AI and records
+# positions; the merge job trains a linear model and a wide-and-deep model on all of them and pushes the model
+# files to a new branch selfplay-results-<run id> (artifacts are kept too). Gate them locally before promoting.
+on:
+  workflow_dispatch:
+    inputs:
+      policy:
+        description: "AI that plays the self-play games (learned = current best model)"
+        default: "learned"
+      games_per_shard:
+        description: "Self-play games per runner"
+        default: "850"
+      shards:
+        description: "Number of parallel runners"
+        default: "12"
+      hidden:
+        description: "Hidden units of the wide-and-deep model"
+        default: "32"
+permissions:
+  contents: write
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      shards: ${{ steps.s.outputs.list }}
+    steps:
+      - id: s
+        run: echo "list=$(python3 -c "import json; print(json.dumps(list(range(int('${{ inputs.shards }}')))))")" >> "$GITHUB_OUTPUT"
+  play:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJson(needs.plan.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install numpy
+      - run: >
+          python tools/train_loop.py selfplay --games ${{ inputs.games_per_shard }} --policy ${{ inputs.policy }}
+          --labels outcome --workers $(nproc) --seed $((1000000 + ${{ matrix.shard }} * 100000))
+          --out out/sp_${{ matrix.shard }}.npz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: selfplay-${{ matrix.shard }}
+          path: out/sp_${{ matrix.shard }}.npz
+          retention-days: 14
+  merge:
+    needs: play
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install numpy
+      - uses: actions/download-artifact@v4
+        with:
+          path: shards
+      - name: Train
+        run: |
+          ls -la shards/*/
+          python tools/train_loop.py train shards/*/*.npz --linear --out models/sp_linear.json | tee out_linear.txt
+          python tools/train_loop.py train shards/*/*.npz --wide models/sp_linear.json --hidden ${{ inputs.hidden }} \
+            --out models/sp_wide.json | tee out_wide.txt
+          {
+            echo "## Self-play training"
+            echo "Linear: \`$(tail -1 out_linear.txt)\`"
+            echo
+            echo "Wide-and-deep: \`$(tail -1 out_wide.txt)\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: selfplay-models
+          path: models/sp_*.json
+      - name: Push models to a branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b selfplay-results-${{ github.run_id }}
+          git add -f models/sp_linear.json models/sp_wide.json
+          git commit -m "Self-play models from run ${{ github.run_id }} (${{ inputs.shards }} x ${{ inputs.games_per_shard }} games)"
+          git push origin selfplay-results-${{ github.run_id }}
