@@ -223,3 +223,47 @@ def test_big_combat_damage_is_assigned_one_unit_at_a_time_and_every_option_compl
         steps += 1
     plan = g.combat["assign"][0]
     assert steps >= 1 and sum(plan) == 40 and plan in set(dp.plans())
+
+
+# ----------------------------------------------------------------------------- 2026-11-07 00:20 run: errata wording
+def _resolve(g, pick=None):
+    return _drive(g, pick=lambda d: (True if d.kind == "yesno" else None) if pick is None else pick(d))
+
+
+def test_guards_pays_order_to_ready_the_sand_soldier_it_made(db):
+    # Guards! (errata): "Play a 2 [M] Sand Soldier unit token. Then do this: You may pay [C] to ready it." The
+    # auto-scripter read "it" as a chosen unit, so paying readied nothing.
+    g = main_phase(db, [_deck(db, "azir_emperor"), _deck(db, "kaisa_void")])
+    gu = give(g, 0, "Guards!", db)
+    g.pending = None
+    g.run()
+    g.choose(("play", gu))
+    _resolve(g, pick=lambda d: True if d.kind == "yesno" else (d.options[0] if d.kind == "pay" else None))
+    soldiers = [u for u, o in g.objects.items() if o.defn.name == "Sand Soldier" and o.zone == "board"]
+    assert len(soldiers) == 1 and not g.objects[soldiers[0]].exhausted
+
+
+def test_tideturner_only_swaps_with_a_unit_at_another_location(db):
+    # Tideturner (errata): "you may choose a unit you control at another location"
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "kaisa_void")])
+    here = put(g, db, 0, "Stellacorn Herder", ("bf", 0))
+    home = put(g, db, 0, "Stellacorn Herder", ("base", 0), exclude=(here,))
+    g.set_bf_controller(0, 0)
+    tt = give(g, 0, "Tideturner", db)
+    ab = next(a for a in g.abilities(tt) if type(a).__name__ == "Triggered")
+    ch = next(i for i in (ab.target_code or []) + ab.code if type(i).__name__ == "Choose")
+    g.objects[tt].location = ("bf", 0)            # as if it had entered at the battlefield
+    assert g.choice_candidates(Context(0, tt), ch.sel, targeted=True) == [home]
+    g.objects[tt].location = None
+    g.pending = None
+    g.run()
+    g.choose(("play", tt, ("bf", 0)))
+    _resolve(g)
+    assert g.objects[tt].location == ("base", 0) and g.objects[home].location == ("bf", 0)
+
+
+def test_arise_readies_up_to_two_soldiers(db):
+    # Arise! (errata): "Then do this: Ready up to two of them." -> readying fewer is a legal choice
+    ar = next(c for c in db if c.name == "Arise!")
+    ch = next(i for i in ar.abilities[0].code if type(i).__name__ == "Choose")
+    assert ch.n == 2 and ch.up_to

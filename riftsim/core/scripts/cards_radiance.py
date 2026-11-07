@@ -397,12 +397,25 @@ def alpha_strike(defn):
 
 @script("Arise!")
 def arise(defn):
-    # Play a 2 [M] Sand Soldier unit token for each Equipment you control. Then ready two of them.
+    # Play a 2 [M] Sand Soldier unit token for each Equipment you control. Then do this: Ready up to two of them.
     return [SpellEffect([
         O.PlayToken("Sand Soldier", loc="base", count=lambda g, c: len([u for u in Sel("gear", side="friendly", tags=["Equipment"]).candidates(g, c)]),
                     out="__ss"),
-        O.Choose(lambda g, c: [u for u in c.vars.get("__sss", ()) if g.objects[u].zone == "board"], out="__rd", n=2, targeted=False),
+        # errata (Spiritforged): "Then do this: Ready up to two of them."
+        O.Choose(lambda g, c: [u for u in c.vars.get("__sss", ()) if g.objects[u].zone == "board"], out="__rd", n=2, up_to=True,
+                 targeted=False),
         O.Ready(Ref("__rd")),
+    ], label=defn.name, source_text=defn.text)]
+
+
+@script("Guards!")
+def guards(defn):
+    # [Hidden]  Play a 2 [M] Sand Soldier unit token. Then do this: You may pay [C] to ready it. (errata, Unleashed)
+    # "it" is the token (the auto-scripter read it as a chosen unit, so paying readied nothing).
+    return [SpellEffect([
+        O.PlayToken("Sand Soldier", loc="choose", out="__tok"),
+        O.If(O.has_var("__tok"), [O.May([O.PayResources(0, ["order"], out="__paid", optional=False),
+                                         O.If(O.has_var("__paid"), [O.Ready(Ref("__tok"))])], label="pay [Order] to ready it")]),
     ], label=defn.name, source_text=defn.text)]
 
 

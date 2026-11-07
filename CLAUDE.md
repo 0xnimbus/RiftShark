@@ -64,6 +64,9 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   locks and Rockfall Path (CR 420.3.b), Baron Nashor + The Exile enters the Pit ready.
   Combat damage: `flow.DamageAssignments` counts legal assignments without listing them; over `ASSIGN_FLAT_LIMIT` (64) the
   player assigns one unit at a time (`assign_damage_step`, every offered amount still completes legally).
+  `tools/errata_check.py [--decks]` lists cards whose data text predates the published errata (2026-11-07: 14 in the
+  tournament decks, 56 overall); scripts must follow the errata text. Guards!, Tideturner, Arise! fixed; the rest of the
+  non-deck list is still to check.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
