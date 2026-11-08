@@ -588,3 +588,146 @@ def test_when_you_play_me_here_means_the_battlefield_played_to(db, name):
         # "move an enemy unit to here" (it then fights there)
         assert any(isinstance(e, dict) and e.get("kind") == "move" and e.get("uid") == foe_base for e in g.events)
         assert g.objects[foe_base].location != ("base", 1)
+
+
+# ----------------------------------------------------------------------------- 2026-11-08 05:20 run: misparsed cards
+def _cast(g, db, p, name, pick):
+    """Give `name` to player p, make it affordable, play it and drive with pick."""
+    u = give(g, p, name, db)
+    for r in list(g.players[p].rune_deck)[:6]:
+        g.players[p].rune_deck.remove(r)
+        g.players[p].runes.append(r)
+        g.objects[r].zone = "board"
+    _ready_runes(g, p)
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == u))
+    _drive(g, pick=pick)
+    return u
+
+
+def _fresh(db, deck="vex_gloomist"):
+    g = main_phase(db, [_deck(db, deck), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    return g
+
+
+def test_no_selector_uses_a_tag_no_card_has(db):
+    # The auto-scripter turned phrases like "something else", "it instead" and "an opponent" into unit tags, so the
+    # choice was always empty (Tornado Warrior, Sudden Storm, Possession, Ocean Drake, ...).
+    tags = {t.lower() for c in db for t in (c.tags or [])}
+    bad = []
+    for c in db:
+        if c.script_status == "partial":
+            continue
+        for a in list(c.abilities) + list(getattr(c, "effect_abilities", []) or []):
+            for i in (getattr(a, "target_code", None) or []) + list(getattr(a, "code", None) or []):
+                sel = getattr(i, "sel", None)
+                if sel is not None and any(t.lower() not in tags for t in (getattr(sel, "tags", None) or ())):
+                    bad.append((c.name, str(sel)))
+    assert not bad, bad
+
+
+def test_scuttle_crab_reveals_the_opponents_hand_and_gains_xp(db):
+    g = _fresh(db)
+    sc = put(g, db, 0, "Scuttle Crab", ("base", 0))
+    g.do_kill([sc], Context(0))
+    settle(g)
+    assert g.players[0].xp == 1 and g.peek_facedown.get(0) == g.turn
+    assert g.players[1].hand and all(u in g.known.get(0, {}) for u in g.players[1].hand)
+
+
+def test_sudden_storm_and_monster_harpoon_deal_4_instead(db):
+    for name, setup, want in (("Sudden Storm", "attacker", 4), ("Sudden Storm", None, 2),
+                              ("Monster Harpoon", "facedown", 4), ("Monster Harpoon", None, 2)):
+        g = _fresh(db, "akali_rogue")                             # Fury runes
+        g.set_bf_controller(0, 1)
+        foe = put(g, db, 1, "Thousand-Tailed Watcher", ("bf", 0))   # 7 Might: the damage stays on it
+        if setup == "attacker":
+            g.objects[foe].designation = "attacker"
+        if setup == "facedown":
+            hid = give(g, 0, "Tornado Warrior", db)
+            g.set_bf_controller(1, 0)
+            assert g.do_hide(0, hid, ("bf", 1))
+        g.bump()
+        _cast(g, db, 0, name, lambda d: foe if d.kind in ("choose", "choose_many") and foe in d.options else None)
+        assert g.objects[foe].damage == want, (name, setup)
+
+
+def test_possession_takes_control_and_recalls(db):
+    g = _fresh(db)
+    g.set_bf_controller(0, 1)
+    foe = put(g, db, 1, "Forecaster", ("bf", 0))
+    _cast(g, db, 0, "Possession", lambda d: foe if d.kind in ("choose", "choose_many") and foe in d.options else None)
+    assert g.objects[foe].controller == 0 and g.objects[foe].location == ("base", 0)
+
+
+def test_ekko_recurrent_recycles_itself_to_ready_your_runes(db):
+    g = _fresh(db)
+    ek = put(g, db, 0, "Ekko, Recurrent", ("base", 0))
+    for r in g.players[0].runes:
+        g.objects[r].exhausted = True
+    g.do_kill([ek], Context(0))
+    settle(g)
+    assert g.objects[ek].zone == "deck" and g.players[0].runes
+    assert not any(g.objects[r].exhausted for r in g.players[0].runes)
+
+
+def test_ocean_drake_can_return_any_non_dragon_unit(db):
+    g = _fresh(db)
+    foe = put(g, db, 1, "Forecaster", ("base", 1))
+    offered = []
+
+    def pick(d):
+        if d.kind == "yesno":
+            return True
+        if d.kind in ("choose", "choose_many") and foe in d.options:
+            offered.append(d.options)
+            return foe
+        return None
+    _cast(g, db, 0, "Ocean Drake", pick)
+    assert g.objects[foe].zone == "hand"
+
+
+def test_ravenbloom_prefect_banishes_itself_to_banish_an_opponents_gear(db):
+    g = _fresh(db)
+    pf = put(g, db, 0, "Ravenbloom Prefect", ("base", 0))
+    gold = g.play_token(1, "Gold", ("base", 1), Context(1))
+    _drive(g, pick=lambda d: True if d.kind == "yesno" else None)
+    assert g.objects[pf].zone == "banish" and g.objects[gold].zone != "board"
+
+
+def test_royal_entourage_exhausts_a_legend(db):
+    g = _fresh(db)
+    leg = next(u for u, o in g.objects.items() if o.zone == "board" and o.location == ("legend", 1))
+    g.objects[leg].exhausted = False
+
+    def pick(d):
+        if any(lab.startswith("exhaust a legend") for lab in d.labels):
+            return next(o for o, lab in zip(d.options, d.labels) if lab.startswith("exhaust a legend"))
+        if d.kind in ("choose", "choose_many") and leg in d.options:
+            return leg
+        return None
+    _cast(g, db, 0, "Royal Entourage", pick)
+    assert g.objects[leg].exhausted
+
+
+def test_first_move_triggers_miss_fortune_and_blade_twirler(db):
+    g = _fresh(db)
+    mf = put(g, db, 0, "Miss Fortune, Captain", ("base", 0))
+    bt = put(g, db, 0, "Blade Twirler", ("base", 0))
+    rune = g.players[0].runes[0]
+    g.objects[rune].exhausted = True
+    trash0 = len([o for o in g.objects.values() if o.zone == "trash" and o.owner == 1])
+    g.do_move([mf, bt], ("bf", 0), Context(0))
+    players = []
+
+    def pick(d):
+        if d.kind == "pick_many" and (rune,) in d.options:
+            return (rune,)
+        if d.kind == "choose_player":
+            players.append(list(d.options))
+            return 1
+        return None
+    settle(g, picks=()) if False else _drive(g, pick=pick)
+    assert not g.objects[rune].exhausted
+    assert players == [[0, 1]]                                       # "choose a player": either one
