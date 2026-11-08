@@ -731,3 +731,33 @@ def test_first_move_triggers_miss_fortune_and_blade_twirler(db):
     settle(g, picks=()) if False else _drive(g, pick=pick)
     assert not g.objects[rune].exhausted
     assert players == [[0, 1]]                                       # "choose a player": either one
+
+
+# ----------------------------------------------------------------------------- 2026-11-08 10:20 run: unset variables
+def test_that_player_is_the_player_whose_beginning_phase_it_is(db):
+    # "At the start of each player's first Beginning Phase, that player gains 1 point / channels 1 rune." "That player"
+    # was never stored, so the battlefield's controller got it (P0, if they took it on turn 1, scored on P1's turn).
+    for name in ("The Arena's Greatest", "Obelisk of Power"):
+        g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+        g.objects[g.battlefields[0].uid].defn = _card(db, name)
+        g.set_bf_controller(0, 0)
+        g.bump()
+        pts, runes = [p.points for p in g.players], [len(p.runes) for p in g.players]
+        g.run()
+        g.choose(("end_turn",))
+        _drive(g, stop=lambda d: g.turn_player == 1 and g.phase == "main" and d.kind == "action" and not g.chain)
+        if name == "The Arena's Greatest":
+            assert g.players[0].points == pts[0] and g.players[1].points >= pts[1] + 1
+        else:
+            assert len(g.players[0].runes) == runes[0]
+            assert len(g.players[1].runes) >= runes[1] + 3            # 2 channelled + 1 from Obelisk (3 on their 1st turn: +1)
+
+
+def test_lillia_plays_the_sprite_where_she_moved_from(db):
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    li = put(g, db, 0, "Lillia, Fae Fawn", ("bf", 0))
+    g.do_move([li], ("base", 0), Context(0))
+    settle(g)
+    sprites = [o.location for o in g.objects.values() if o.zone == "board" and o.defn.name == "Sprite"]
+    assert sprites == [("bf", 0)]

@@ -1898,6 +1898,9 @@ def _script_line(defn, line, cond=None):
         if isinstance(ev, str) and ev in STORE_EVENT_TARGET:
             store = {"uid": "t"}
         state = {"tcount": 1 if store else 0}
+        store["player"] = "__p"           # "that player" / "they": the player the event is about (Obelisk of Power)
+        if re.search(r"\bmoves? from\b", prefix, re.I):
+            store["from"] = "__tloc"      # "When I move from a location, ... there" (Lillia, Fae Fawn)
         eff = parse_effect(rest, state)
         once_flag = once or prefix.lower().startswith("the first time")
         return [Triggered(ev, eff, filt=filt, once_per_turn=once_flag, label=line[:40], source_text=line, store=store, cond=cond, optional=optional)]
