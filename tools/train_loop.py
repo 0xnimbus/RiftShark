@@ -163,6 +163,7 @@ def selfplay(games, spec, out, workers, seed, every=3, epsilon=0.03, labels="td"
     X, Y, G, S, K, T = [], [], [], [], [], []
     timeouts = []
     part = out + ".partial.npz"          # container restarts kill runs: resume from the last checkpoint
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     start = 0
     if os.path.exists(part):
         d = np.load(part, allow_pickle=True)
