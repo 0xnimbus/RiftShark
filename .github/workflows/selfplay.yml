@@ -30,7 +30,7 @@ jobs:
   play:
     needs: plan
     runs-on: ubuntu-latest
-    timeout-minutes: 340
+    timeout-minutes: 350
     strategy:
       fail-fast: false
       matrix:
@@ -43,7 +43,7 @@ jobs:
       - run: pip install numpy
       - run: >
           python tools/train_loop.py selfplay --games ${{ inputs.games_per_shard }} --policy ${{ inputs.policy }}
-          --labels outcome --workers $(nproc) --seed $((1000000 + ${{ matrix.shard }} * 100000))
+          --labels outcome --workers $(nproc) --max-minutes 300 --seed $((1000000 + ${{ matrix.shard }} * 100000))
           --out out/sp_${{ matrix.shard }}.npz
       - uses: actions/upload-artifact@v4
         with:
