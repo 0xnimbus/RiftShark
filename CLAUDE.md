@@ -86,6 +86,8 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   auto-scripts ("something else", "it instead", "an opponent" read as tags); hand-scripted in cards_manual.py: Ekko
   Recurrent, Miss Fortune Captain, Royal Entourage, Sudden Storm, Monster Harpoon, Blast Cone, Ravenbloom Prefect,
   Ocean Drake, Possession, Blade Twirler, Scuttle Crab. A scan of 60 games found no trigger resolving without "here".
+  10:20: a scan for variables an ability reads but never sets found Lillia, Fae Fawn ("move from ... there" played the
+  Sprite nowhere); auto triggers now store the event's player as __p and a move's origin as __tloc.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
