@@ -761,3 +761,28 @@ def test_lillia_plays_the_sprite_where_she_moved_from(db):
     settle(g)
     sprites = [o.location for o in g.objects.values() if o.zone == "board" and o.defn.name == "Sprite"]
     assert sprites == [("bf", 0)]
+
+
+def test_attack_triggers_fire_once_per_combat(db):
+    """CR 383.4.e.2.a: a unit that loses and regains the Attacker designation in one combat doesn't attack again;
+    a unit that joins the combat late attacks once (CR 466.2.c.3.a)."""
+    g = _fresh(db)
+    a = put(g, db, 0, "Thousand-Tailed Watcher", ("bf", 0))
+    d = put(g, db, 1, "Thousand-Tailed Watcher", ("bf", 0))
+    seen = []
+    real = g.emit
+    g.emit = lambda kind, **kw: (seen.append((kind, kw.get("uid"))), real(kind, **kw))[1]
+    g.battlefields[0].contested_by = 0
+    g._begin_showdown(0)
+    assert g.combat is not None and g.objects[a].designation == "attacker"
+    assert seen.count(("attack", a)) == 1 and seen.count(("defend", d)) == 1
+    g.objects[a].location = "base"          # leaves the combat ...
+    g._cleanup_once()
+    assert g.objects[a].designation is None
+    g.objects[a].location = ("bf", 0)       # ... and comes back: no new attack trigger
+    g._cleanup_once()
+    assert g.objects[a].designation == "attacker"
+    assert seen.count(("attack", a)) == 1
+    late = put(g, db, 0, "Thousand-Tailed Watcher", ("bf", 0))
+    g._cleanup_once()
+    assert g.objects[late].designation == "attacker" and seen.count(("attack", late)) == 1

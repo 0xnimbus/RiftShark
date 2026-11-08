@@ -617,6 +617,16 @@ class FlowMixin:
                 break
         self.dirty = False
 
+    def _first_designation(self, u, want):
+        """Record that unit u gained `want` in this combat; True only the first time (a unit that left the board
+        and came back is a new object, CR 383.4.e.2.a)."""
+        seen = self.combat.setdefault("designated", set())
+        key = (u, self.objects[u].entered_stamp, want)
+        if key in seen:
+            return False
+        seen.add(key)
+        return True
+
     def _cleanup_once(self):
         v = self.victory_score()
         # 1. victory
@@ -635,10 +645,10 @@ class FlowMixin:
                     if o.designation != want:
                         o.designation = want
                         self.bump()
-                        if want == "attacker":
-                            self.emit("attack", uid=u, player=o.controller, loc=bfl)
-                        elif want == "defender":
-                            self.emit("defend", uid=u, player=o.controller, loc=bfl)
+                        # attack/defend triggers fire only the first time a unit gains the designation in a
+                        # combat (CR 383.4.e.2.a / 383.4.f.2.a)
+                        if want is not None and self._first_designation(u, want):
+                            self.emit("attack" if want == "attacker" else "defend", uid=u, player=o.controller, loc=bfl)
                 elif o.designation is not None:
                     o.designation = None
                     self.bump()
@@ -758,6 +768,7 @@ class FlowMixin:
         for u in self.units_at(loc):
             o = self.objects[u]
             o.designation = "attacker" if o.controller == attacker else "defender"
+            self._first_designation(u, o.designation)
         self.bump()
         # attack / defend triggers: attacker's first (CR 466.2.d.1)
         for u in self.units_at(loc, attacker):

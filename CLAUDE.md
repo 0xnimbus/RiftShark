@@ -88,6 +88,8 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   Ocean Drake, Possession, Blade Twirler, Scuttle Crab. A scan of 60 games found no trigger resolving without "here".
   10:20: a scan for variables an ability reads but never sets found Lillia, Fae Fawn ("move from ... there" played the
   Sprite nowhere); auto triggers now store the event's player as __p and a move's origin as __tloc.
+  20:20: attack/defend triggers re-fired when a unit left a combat and came back (CR 383.4.e.2.a: once per combat);
+  `flow._first_designation` keys them by (uid, entered_stamp). Late arrivals still attack once (CR 466.2.c.3.a).
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
