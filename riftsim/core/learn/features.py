@@ -15,7 +15,10 @@ MAX_BF = 3
 # cards in p's own hand, on p's board and on the opponent's board (public, face-up cards only), so the value model can
 # learn what each card is worth in each place
 CARD_BUCKETS = 64
-FEATURE_VERSION = 2
+# held interaction (feature version 3, appended again): reaction-speed cards in p's own hand and whether p's ready runes
+# can pay for them, so the value model can learn what open energy with a counter or trick in hand is worth on the
+# opponent's turn (self-play labels those positions by playing the opponent's turn while p may respond)
+FEATURE_VERSION = 3
 # turn structure: the same board is worth different amounts before and after the turn player's Awaken/Channel/Draw,
 # so the net must know where in the turn it is (without this, gen 1 rated "end my turn" above every attack because
 # the next own decision came in the opponent's Beginning phase with their runes and units still exhausted)
@@ -125,7 +128,24 @@ def encode(g, p):
         if o.zone == "board" and ("unit" in o.defn.types or "gear" in o.defn.types):
             base = CARD_BUCKETS if o.controller == p else 2 * CARD_BUCKETS
             cards[base + _card_bucket(o.defn.id)] += 0.5
-    return out + cards
+    return out + cards + _interaction(g, p)
+
+
+def _interaction(g, p):
+    """Own hand only: reaction cards held, how many the ready runes pay for now, and how many of those are counters."""
+    ps = g.players[p]
+    ready = sum(1 for u in ps.runes if not g.objects[u].exhausted)
+    held = affordable = counters = 0
+    for u in ps.hand:
+        d = g.objects[u].defn
+        if not d.keywords.get("reaction"):
+            continue
+        held += 1
+        if (d.energy or 0) <= ready:
+            affordable += 1
+            if "counter" in (d.text or "").lower():
+                counters += 1
+    return [held / 3, affordable / 3, counters / 2]
 
 
 def _card_bucket(card_id):
@@ -136,5 +156,9 @@ def size_v1():
     return 11 + len(PHASES) + 1 + 2 * 19 + 5 + 5 * MAX_BF + 2 * LEGEND_BUCKETS
 
 
-def size():
+def size_v2():
     return size_v1() + 3 * CARD_BUCKETS
+
+
+def size():
+    return size_v2() + 3
