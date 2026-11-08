@@ -152,7 +152,7 @@ def _selfplay_game(args):
             "winner": g.winner, "turns": g.turn, "secs": time.time() - t}
 
 
-def selfplay(games, spec, out, workers, seed, every=3, epsilon=0.03, labels="td"):
+def selfplay(games, spec, out, workers, seed, every=3, epsilon=0.03, labels="td", max_seconds=None):
     import numpy as np
     rng = random.Random(seed)
     jobs = []
@@ -173,8 +173,12 @@ def selfplay(games, spec, out, workers, seed, every=3, epsilon=0.03, labels="td"
         start, timeouts = int(d["done"]), json.loads(str(d["timeouts"]))
         print(f"resuming self-play at game {start}", file=sys.stderr)
     t = time.time()
-    with ProcessPoolExecutor(max_workers=workers) as ex:
+    ex = ProcessPoolExecutor(max_workers=workers)
+    try:
         for k, r in enumerate(ex.map(_selfplay_timed, jobs[start:]), start):
+            if max_seconds and time.time() - t > max_seconds:     # time budget (Actions job limit): keep what we have
+                print(f"self-play time budget reached after {k} games", file=sys.stderr)
+                break
             if r.get("timeout"):
                 timeouts.append(r["args"])
                 print(f"self-play game {r['args']} ran out of time, dropped", file=sys.stderr)
@@ -190,7 +194,8 @@ def selfplay(games, spec, out, workers, seed, every=3, epsilon=0.03, labels="td"
                          game=np.array(G, dtype=np.int32), seat=np.array(S, dtype=np.int8),
                          kind=np.array(K, dtype=np.int8), td=np.array(T, dtype=np.float32), done=k + 1,
                          timeouts=json.dumps(timeouts))
-    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+    finally:
+        ex.shutdown(wait=False, cancel_futures=True)
     np.savez_compressed(out, x=np.array(X, dtype=np.float32), y=np.array(Y, dtype=np.float32),
                         game=np.array(G, dtype=np.int32), seat=np.array(S, dtype=np.int8),
                         kind=np.array(K, dtype=np.int8), td=np.array(T, dtype=np.float32))
@@ -561,6 +566,7 @@ def main():
     s.add_argument("--games", type=int, default=600)
     s.add_argument("--policy", default=None)
     s.add_argument("--out", required=True)
+    s.add_argument("--max-minutes", type=float, help="stop starting games after this long and save what is done")
     s.add_argument("--labels", choices=("td", "outcome"), default="td",
                    help="outcome: skip the one-turn-ahead what-if labels (about 3x faster; for big Actions runs)")
     t = sub.add_parser("train")
@@ -582,7 +588,8 @@ def main():
     if a.cmd == "generation":
         generation(a)
     elif a.cmd == "selfplay":
-        print(selfplay(a.games, a.policy or best_spec(), a.out, a.workers, a.seed, labels=a.labels))
+        print(selfplay(a.games, a.policy or best_spec(), a.out, a.workers, a.seed, labels=a.labels,
+                       max_seconds=a.max_minutes * 60 if a.max_minutes else None))
     elif a.cmd == "train":
         if a.linear:
             print(train_linear(a.files, a.out))
