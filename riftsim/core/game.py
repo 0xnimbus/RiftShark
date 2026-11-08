@@ -654,6 +654,9 @@ class Game(flow.FlowMixin):
             ctx = ab.ctx.clone()
             ctx.event = ev
             ctx.vars["ev"] = ev
+            # "it" in a delayed trigger refers back to what the creating effect chose; it is not chosen again, so the
+            # creator's targets are not re-checked against this trigger's event (that dropped them, e.g. Tornado Warrior)
+            ctx.vars.pop("__targets", None)
             item = ChainItem(self.next_item_id, "trigger", ctx.controller, uid, None, ctx, label=ab.label or "delayed", code=ab.code)
             self.next_item_id += 1
             self.chain.append(item)
@@ -678,6 +681,8 @@ class Game(flow.FlowMixin):
         if ev.get("kind") == "play" and ev.get("uid") == uid:
             ctx.shown_off = self.shown_off.get(uid)      # "When you play me, if you showed off" (CR 832.1.c.1)
             ctx.paid = dict(ev.get("paid") or {})          # "When you play me, if you paid the additional cost"
+            if ctx.here is None and ev.get("loc") is not None:
+                ctx.here = ev["loc"]                        # still on the chain: "here" is where I'm played to
             if ev.get("from_zone") == "facedown" and ev.get("loc") is not None and ev["loc"][0] == "bf":
                 ctx.target_bf = ev["loc"]                   # CR 811.1.d.3: play effects target at the battlefield played to
         for k, v in ab.store.items():

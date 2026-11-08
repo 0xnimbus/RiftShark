@@ -511,3 +511,80 @@ def test_effect_plays_offer_the_cards_own_locations_and_skip_rockfall_path(db):
     _drive(g, pick=pick)
     assert seen == [[("base", 0), ("bf", 0)]]
     assert g.objects[scout].zone == "board" and g.objects[scout].location == ("bf", 0)
+
+
+# ----------------------------------------------------------------------------- 2026-11-08 00:20 run: Riven / Vex
+def test_vex_stuns_token_units_an_opponent_plays(db):
+    # "When an opponent plays a unit while I'm at a battlefield, [Stun] it." Token units are played too (CR 185.2.a);
+    # Vex used the "plays a card" trigger, which skips tokens.
+    for vex_loc, stunned in ((("bf", 0), True), (("base", 0), False)):
+        g = main_phase(db, [_deck(db, "vex_gloomist"), _deck(db, "viktor_herald")])
+        put(g, db, 0, "Vex, Apathetic", vex_loc)
+        tok = g.play_token(1, "Recruit", ("base", 1), Context(1))
+        settle(g)
+        assert bool(g.objects[tok].stunned) == stunned
+
+
+def test_tornado_warrior_from_face_down_empowers_something_here_until_end_of_turn(db):
+    # "When you play me from face down, you may empower something here. Disempower it at end of turn." The auto-script
+    # looked for a unit with the tag "Something", so the trigger could never choose anything.
+    g = main_phase(db, [_deck(db, "vex_gloomist"), _deck(db, "riven_exile")])
+    paws = put(g, db, 0, "Steel Paws", ("bf", 0))
+    elsewhere = put(g, db, 0, "Forecaster", ("base", 0))
+    g.set_bf_controller(0, 0)
+    tw = give(g, 0, "Tornado Warrior", db)
+    assert g.do_hide(0, tw, ("bf", 0))
+    g.objects[tw].facedown_turn = g.turn - 1
+    _ready_runes(g, 0)
+    d = g.run()
+    flip = next(o for o in d.options if o[0] == "play" and o[1] == tw)
+    g.choose(flip)
+    offered = []
+
+    def pick(d):
+        if d.kind == "yesno":
+            return True
+        if d.kind in ("choose", "choose_many") and paws in d.options:
+            offered.append(list(d.options))
+            return paws
+        return None
+    _drive(g, pick=pick)
+    assert offered and elsewhere not in offered[0] and tw in offered[0]
+    assert g.objects[paws].empowered and g.chars(paws).might == 7          # [Empowered] — I have +7 [M]
+    g.choose(("end_turn",))
+    _drive(g, stop=lambda d: g.turn_player == 1)
+    assert not g.objects[paws].empowered
+
+
+@pytest.mark.parametrize("name", ["Faithful Manufactor", "Mischievous Marai", "Blitzcrank, Impassive"])
+def test_when_you_play_me_here_means_the_battlefield_played_to(db, name):
+    # "When you play me" triggers go on the chain while the unit is still there, so their "here" was empty: Faithful
+    # Manufactor made no Recruit, Mischievous Marai dealt nothing and Blitzcrank moved nobody.
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    g.set_bf_controller(0, 0)
+    put(g, db, 0, "Forecaster", ("bf", 0))
+    foe_here = put(g, db, 1, "Forecaster", ("bf", 0))
+    foe_base = put(g, db, 1, "Forecaster", ("base", 1))
+    g.set_bf_controller(0, 0)
+    u = give(g, 0, name, db)
+    _ready_runes(g, 0)
+    for r in list(g.players[0].rune_deck)[:4]:
+        g.players[0].rune_deck.remove(r)
+        g.players[0].runes.append(r)
+        g.objects[r].zone, g.objects[r].exhausted = "board", False
+    g.bump()
+    d = g.run()
+    g.choose(("play", u, ("bf", 0)))
+    _drive(g, pick=lambda d: True if d.kind == "yesno" else (foe_base if foe_base in d.options else
+                                                             (foe_here if foe_here in d.options else None)))
+    assert g.objects[u].location == ("bf", 0)
+    if name == "Faithful Manufactor":
+        assert [x for x, o in g.objects.items() if o.zone == "board" and o.defn.name == "Recruit"
+                and o.location == ("bf", 0)]
+    elif name == "Mischievous Marai":
+        assert g.objects[foe_here].zone == "trash"                      # 2 damage kills the 1 Might Forecaster
+    else:
+        # "move an enemy unit to here" (it then fights there)
+        assert any(isinstance(e, dict) and e.get("kind") == "move" and e.get("uid") == foe_base for e in g.events)
+        assert g.objects[foe_base].location != ("base", 1)

@@ -77,6 +77,11 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   attacking" (Rengar, Pouncing) and "an occupied enemy battlefield" (Deadbloom Predator, Dauntless Vanguard) were all
   "any battlefield"; now exact perms in `flow._play_locations`. Effect plays (PlayCard) use `_play_locations` too, and
   tokens count for Hunters' Circle.
+  2026-11-08 00:20: "When you play me/this" triggers go on the chain before the card is on the board, so their "here"
+  was empty: Faithful Manufactor made no Recruit, Mischievous Marai dealt nothing, Blitzcrank/Hunting Blind moved nobody
+  (28 cards; in 7 tournament decks). `_add_trigger` now uses the play location. Also: Vex stuns token units, Tornado
+  Warrior hand-scripted, delayed triggers no longer re-check their creator's targets. Round-robins before this underrate
+  Rek'Sai, Riven, Vex, Akali, Azir, Viktor, Irelia.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
