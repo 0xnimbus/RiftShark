@@ -35,3 +35,4 @@ Written by tools/train_loop.py; the `learned` policy and the play page's Learned
 | 2026-11-07 22:49 UTC | learned-deep:gen_008 | learned:gen_008 | 47.4% (38-57) | 97 | deep search, confirmation on new seeds (53000): combined 103/196, no clear gain |
 | 2026-11-08 17:16 UTC | learned:sp_linear | learned:gen_008 | 48.5% (42-55) | 200 | 3000 new local self-play games + gens 5-13 data (8000 games, outcome labels); not promoted |
 | 2026-11-08 17:16 UTC | learned:sp_wide | learned:gen_008 | 39.0% (33-46) | 200 | 3000 new local self-play games + gens 5-13 data (8000 games, outcome labels); not promoted (wide-and-deep, 32 hidden) |
+| 2026-11-08 19:44 UTC | learned:v3_td | learned:gen_008 | 46.5% (40-53) | 200 | features v3 (held reactions) + TD labels with responses in the opponent turn, 1200 games; held-reaction weights ~0; not promoted |

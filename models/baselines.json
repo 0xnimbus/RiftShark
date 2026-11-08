@@ -198,5 +198,20 @@
   "timeouts": [],
   "date": "2026-11-08 17:16 UTC",
   "note": "3000 new local self-play games + gens 5-13 data (8000 games, outcome labels); not promoted (wide-and-deep, 32 hidden)"
+ },
+ {
+  "candidate": "learned:v3_td",
+  "best": "learned:gen_008",
+  "games": 200,
+  "wins": 93,
+  "draws": 0,
+  "score": 0.465,
+  "interval": [
+   0.3972,
+   0.5341
+  ],
+  "timeouts": [],
+  "date": "2026-11-08 19:44 UTC",
+  "note": "features v3 (held reactions) + TD labels with responses in the opponent turn, 1200 games; held-reaction weights ~0; not promoted"
  }
 ]

@@ -551,6 +551,11 @@ def write_ladder(hist):
         f.write("\n".join(lines) + "\n")
 
 
+def _best_net():
+    from riftsim.core.learn import model as M
+    return M.load(M.best_path())
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -579,6 +584,8 @@ def main():
     t.add_argument("--wide", metavar="LINEAR_JSON", help="MLP that corrects this linear model (wide-and-deep)")
     t.add_argument("--epochs", type=int, default=40)
     t.add_argument("--width", type=int, help="feature count to train on (an older version's prefix); default: current")
+    t.add_argument("--target", choices=("td", "outcome"), default="outcome",
+                   help="td: bootstrapped labels from the best model (files recorded with --labels td)")
     q = sub.add_parser("gate")
     q.add_argument("candidate")
     q.add_argument("best")
@@ -595,7 +602,8 @@ def main():
                        max_seconds=a.max_minutes * 60 if a.max_minutes else None))
     elif a.cmd == "train":
         if a.linear:
-            print(train_linear(a.files, a.out, width=a.width))
+            print(train_linear(a.files, a.out, width=a.width, target=a.target,
+                               net=_best_net() if a.target == "td" else None))
         else:
             wide = json.load(open(a.wide)) if a.wide else None
             print(train(a.files, a.out, hidden=a.hidden, epochs=a.epochs, wide=wide, width=a.width))
