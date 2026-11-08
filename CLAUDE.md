@@ -82,6 +82,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   (28 cards; in 7 tournament decks). `_add_trigger` now uses the play location. Also: Vex stuns token units, Tornado
   Warrior hand-scripted, delayed triggers no longer re-check their creator's targets. Round-robins before this underrate
   Rek'Sai, Riven, Vex, Akali, Azir, Viktor, Irelia.
+  05:20: a scan for selectors with tags no card has (test_no_selector_uses_a_tag_no_card_has) found 11 misparsed
+  auto-scripts ("something else", "it instead", "an opponent" read as tags); hand-scripted in cards_manual.py: Ekko
+  Recurrent, Miss Fortune Captain, Royal Entourage, Sudden Storm, Monster Harpoon, Blast Cone, Ravenbloom Prefect,
+  Ocean Drake, Possession, Blade Twirler, Scuttle Crab. A scan of 60 games found no trigger resolving without "here".
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
