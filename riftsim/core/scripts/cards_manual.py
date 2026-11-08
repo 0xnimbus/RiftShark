@@ -135,3 +135,122 @@ def baron_nashor(defn):
                            source_text="As you play me, add the Baron Pit battlefield token to the board if it's not there already. If you do, I enter there."),
             Static("self", "keyword", ("untargetable", True), source_text="I can't be chosen by enemy spells and abilities."),
             Static(Sel("unit", side="friendly", other=True), "might", 2, source_text="Other friendly units have +2 [M].")]
+
+
+# ----------------------------------------------------------------------------- 2026-11-08: auto-scripter misparses
+# A scan of every selector for tags no card has (e.g. "Something", "It,Instead") found these: each auto-script chose
+# from an empty set, so part of the card did nothing.
+def _evd(c):
+    return c.vars.get("ev") or {}
+
+
+@script("Ekko, Recurrent")
+def ekko_recurrent(defn):
+    # [Accelerate]  [Deathknell] — Recycle me to ready your runes.
+    return [Triggered("die_self", [O.If(lambda g, c: g.objects[c.source].zone == "trash", [
+        O.Recycle(Ref("self")),
+        O.Ready(Sel("rune", side="friendly")),
+    ])], label="Deathknell", source_text=defn.text, keyword="deathknell")]
+
+
+@script("Miss Fortune, Captain")
+def miss_fortune_captain(defn):
+    # [Accelerate] [Ganking]  The first time I move each turn, you may ready something else that's exhausted.
+    def exhausted_others(g, c):
+        return [u for u, o in g.objects.items() if o.zone == "board" and u != c.source and o.exhausted
+                and {"unit", "gear", "rune", "legend"} & set(g.chars(u).types)]
+    return [Triggered("move_self", [
+        O.ChooseFromList(exhausted_others, out="__r", n=1, up_to=True, label="ready something else that's exhausted"),
+        O.Ready(Ref("__r")),
+    ], once_per_turn=True, label=defn.name, source_text=defn.text)]
+
+
+@script("Royal Entourage")
+def royal_entourage(defn):
+    # When you play me, ready or exhaust a legend.
+    leg = Sel("legend")
+    return [Triggered("play_self", [O.ChooseMode([
+        ("ready a legend", [O.Choose(leg, out="__l", targeted=False), O.Ready(Ref("__l"))]),
+        ("exhaust a legend", [O.Choose(leg, out="__l", targeted=False), O.Exhaust(Ref("__l"))]),
+    ])], label=defn.name, source_text=defn.text)]
+
+
+@script("Sudden Storm")
+def sudden_storm(defn):
+    # [Hidden] [Action]  Deal 2 to a unit at a battlefield. If it's attacking, deal 4 to it instead.
+    amt = lambda g, c: 4 if c.vars.get("t") in g.objects and g.objects[c.vars["t"]].designation == "attacker" else 2
+    return [SpellEffect([O.Choose(Sel("unit", where="battlefield"), out="t"), O.Deal(amt, Ref("t"))],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Monster Harpoon")
+def monster_harpoon(defn):
+    # [Action]  Deal 2 to a unit at a battlefield. If you control a facedown card, deal 4 to it instead.
+    def facedown(g, c):
+        return any(o.zone == "facedown" and o.controller == c.controller for o in g.objects.values())
+    return [SpellEffect([O.Choose(Sel("unit", where="battlefield"), out="t"),
+                         O.Deal(lambda g, c: 4 if facedown(g, c) else 2, Ref("t"))],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Blast Cone")
+def blast_cone(defn):
+    # When you play this, you may move an enemy unit.  When you move an enemy unit, you may exhaust this to [Stun] it.
+    moved_enemy = lambda g, s, ev: ev.get("kind") == "move" and ev.get("player") != g.objects[s].controller \
+        and not ev.get("standard")
+    return [Triggered("play_self", [O.May([
+        O.Choose(Sel("unit", side="enemy"), out="t"),
+        O.ChooseLocation(out="__to", include_bases=True,
+                         pred=lambda g, c, l: c.vars.get("t") in g.objects and g.valid_destination(c.vars["t"], l)),
+        O.Move(Ref("t"), Ref("__to"))], label="move an enemy unit")], label=defn.name, source_text=defn.text),
+        Triggered(moved_enemy, [O.If(lambda g, c: not g.objects[c.source].exhausted, [O.May([
+            O.Exhaust(Ref("self")), O.Stun(lambda g, c: _evd(c).get("uid"))], label="exhaust this to stun it")])],
+            label=defn.name, source_text=defn.text)]
+
+
+@script("Ravenbloom Prefect")
+def ravenbloom_prefect(defn):
+    # When an opponent plays a gear, you may banish me to banish it.
+    opp_gear = lambda g, s, ev: ev.get("kind") == "play" and ev.get("player") is not None \
+        and not g.is_friendly(ev["player"], g.objects[s].controller) and ev.get("card_type") == "gear"
+    return [Triggered(opp_gear, [O.If(lambda g, c: g.objects[c.source].zone == "board", [O.May([
+        O.Banish(Ref("self")), O.Banish(lambda g, c: _evd(c).get("uid"))], label="banish me to banish it")])],
+        label=defn.name, source_text=defn.text)]
+
+
+@script("Ocean Drake")
+def ocean_drake(defn):
+    # You may play me to an open battlefield.  When you play me, you may return a non-Dragon unit to its owner's hand.
+    non_dragon = Sel("unit", pred=lambda g, c, u: "Dragon" not in g.chars(u).tags)
+    return [PlayPermission("open_bf", label="You may play me to an open battlefield."),
+            Triggered("play_self", [O.May([O.Choose(non_dragon, out="t"), O.ToHand(Ref("t"))],
+                                          label="return a non-Dragon unit to its owner's hand")],
+                      label=defn.name, source_text=defn.text)]
+
+
+@script("Possession")
+def possession(defn):
+    # [Action]  Choose an enemy unit at a battlefield. Take control of it and recall it.
+    return [SpellEffect([O.Choose(Sel("unit", side="enemy", where="battlefield"), out="t"),
+                         O.TakeControl(Ref("t")), O.Recall(Ref("t"))], label=defn.name, source_text=defn.text)]
+
+
+@script("Blade Twirler")
+def blade_twirler(defn):
+    # The first time I move each turn, choose a player. They [Burn 1].
+    return [Triggered("move_self", [O.ChoosePlayer(out="__p", opponent=False), O.Burn(1, player=Ref("__p"))],
+                      once_per_turn=True, label=defn.name, source_text=defn.text)]
+
+
+@script("Scuttle Crab")
+def scuttle_crab(defn):
+    # When you play me, draw 1.  [Deathknell] — Choose an opponent. They reveal their hand. You can look at their
+    # facedown cards this turn. Gain 1 XP.   (the auto-script chose "a unit with the tag Opponent")
+    return [Triggered("play_self", [O.Draw(1)], label="When you play me, draw 1.", source_text="When you play me, draw 1."),
+            Triggered("die_self", [
+                O.ChoosePlayer(out="__opp", opponent=True),
+                O.Emit("reveal", player=Ref("__opp"),
+                       cards=lambda g, c: list(g.players[c.vars["__opp"]].hand)),
+                O.Do(lambda g, c: g.peek_facedown.__setitem__(c.controller, g.turn), label="look at their facedown cards"),
+                O.GainXP(1),
+            ], label="Deathknell", source_text=defn.text, keyword="deathknell")]
