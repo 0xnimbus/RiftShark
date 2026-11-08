@@ -311,11 +311,28 @@ def trifarian_captain(defn):
     ], label=defn.name, source_text=defn.text)]
 
 
+@script("Tornado Warrior")
+def tornado_warrior(defn):
+    # [Hidden]  When you play me from face down, you may empower something here. Disempower it at end of turn.
+    # The auto-scripter read "something here" as a unit tag, so nothing could ever be chosen.
+    # "here" = the battlefield I was played to ("When you play me" triggers before I'm on the board, so no ctx.here)
+    sel = Sel("permanent", pred=lambda g, c, u: g.objects[u].location == _ev(c).get("loc"))
+    return _replace_auto(defn, [Triggered("play_self", [O.May([
+        O.Choose(sel, out="t"),
+        O.Empower(Ref("t")),
+        O.Delayed("end_turn", [O.Disempower(Ref("t"))], label="Tornado Warrior: disempower it"),
+    ], label="empower something here")],
+        filt=lambda g, s, ev: ev.get("from_zone") == "facedown", label=defn.name, source_text=defn.text)])
+
+
 @script("Vex, Apathetic")
 def vex_apathetic(defn):
     # [Deflect]
     # When an opponent plays a unit while I'm at a battlefield, [Stun] it. They can't move it this turn.
-    return [Triggered("opponent_plays_card", [O.Stun(lambda g, c: _ev(c).get("uid")),
+    # A token unit is played too (CR 185.2.a), so Vex stuns tokens: "opponent_plays_card" skips them.
+    opp_plays = lambda g, s, ev: ev.get("kind") == "play" and ev.get("player") is not None \
+        and not g.is_friendly(ev["player"], g.objects[s].controller)
+    return [Triggered(opp_plays, [O.Stun(lambda g, c: _ev(c).get("uid")),
                                               O.GiveKeyword(lambda g, c: _ev(c).get("uid"), "cant_move", True)],
                       filt=lambda g, s, ev: ev.get("card_type") == "unit" and (g.objects[s].location or ("",))[0] == "bf",
                       label=defn.name, source_text=defn.text)]
