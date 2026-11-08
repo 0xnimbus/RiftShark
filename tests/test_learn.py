@@ -82,3 +82,42 @@ def test_selfplay_train_and_learned_policy(db, decks, tmp_path):
     pols = [make_policy(f"learned:{tmp_path / 'm.json'}", seed=1), make_policy("greedy", seed=2)]
     g, _ = play_game(db, decks, 9, pols, record=False, max_turns=60, log=False)
     assert g.over
+
+
+def test_interaction_features_count_affordable_reactions(db, decks):
+    """Version 3 appends held interaction: reaction cards in hand, how many the ready runes pay for, counters among them."""
+    from riftsim.core.learn.features import size_v2
+    for g in _positions(db, decks, n=40, seed=5):
+        for p in (0, 1):
+            ps = g.players[p]
+            ready = sum(1 for u in ps.runes if not g.objects[u].exhausted)
+            react = [g.objects[u].defn for u in ps.hand if g.objects[u].defn.keywords.get("reaction")]
+            x = encode(g, p)
+            assert len(x) == size_v2() + 3
+            assert x[-3] == len(react) / 3
+            assert x[-2] == sum(1 for d in react if (d.energy or 0) <= ready) / 3
+
+
+def test_opponent_turn_lets_the_waiting_player_respond(db, decks):
+    """In the simulated opponent turn the waiting player may use reactions (held energy has a use there)."""
+    from riftsim.core.learn.policy import opponent_turn, to_turn_end
+    asked = []
+
+    class Spy:
+        def choose(self, g, d):
+            asked.append(d.player)
+            return ("pass",) if ("pass",) in d.options else d.options[0]
+
+    rng = random.Random(1)
+    for g in _positions(db, decks, n=150, seed=7)[20:]:
+        if asked:
+            break
+        d = g.pending
+        if d is None or d.player != g.turn_player or ("end_turn",) not in d.options:
+            continue
+        p = d.player
+        h = determinize(g, p, rng)
+        h.choose(("end_turn",))
+        to_turn_end(h, p, GreedyPolicy(1, samples=1))
+        opponent_turn(h, p, GreedyPolicy(2, samples=1), respond=Spy())
+    assert asked and all(a in (0, 1) for a in asked)

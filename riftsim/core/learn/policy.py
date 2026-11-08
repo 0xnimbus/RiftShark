@@ -59,10 +59,13 @@ def to_turn_end(g, p, helper, max_steps=400):
         g.choose(o)
 
 
-def opponent_turn(g, p, helper, max_steps=600):
+def opponent_turn(g, p, helper, max_steps=600, respond=None):
     """From the start of the opponent's turn in g (a determinised copy from p's view), let the opponent play its whole
-    turn with `helper` while p passes (payments use the standard plan, p's forced choices also come from `helper`).
+    turn with `helper` (payments use the standard plan, p's forced choices also come from `helper`). Whenever p gets
+    priority with something it could play (a counter, a combat trick, a hidden card), `respond` (default `helper`)
+    decides whether to use it: energy held up on p's own turn only has a value if p can spend it here.
     Returns at the start of p's next turn or when the game ends. Used to label what-if positions in self-play."""
+    respond = respond or helper
     start = g.turn
     for _ in range(max_steps):
         d = g.run()
@@ -76,7 +79,10 @@ def opponent_turn(g, p, helper, max_steps=600):
         elif d.player != p:
             o = helper.choose(g, d)
         elif d.kind == "action":
-            o = next((x for x in (("pass",), ("end_turn",)) if x in opts), None) or helper.choose(g, d)
+            if any(x[0] not in ("pass", "end_turn") for x in opts if isinstance(x, tuple)):
+                o = respond.choose(g, d)
+            else:
+                o = next((x for x in (("pass",), ("end_turn",)) if x in opts), None) or helper.choose(g, d)
         else:
             o = helper.choose(g, d)
         g.choose(o)

@@ -205,7 +205,7 @@ def selfplay(games, spec, out, workers, seed, every=3, epsilon=0.03, labels="td"
 
 
 # ------------------------------------------------------------------------------------------------ training
-def train(files, out, hidden=48, epochs=40, lr=2e-3, l2=1e-3, seed=0, warm=None, meta=None, wide=None):
+def train(files, out, hidden=48, epochs=40, lr=2e-3, l2=1e-3, seed=0, warm=None, meta=None, wide=None, width=None):
     """MLP residual on a base logit. Without `wide` the base is the hand-written score's logit; with `wide` (a model
     dict from train_linear on the same data) the base is that linear model's logit, so the hidden units only learn
     what the linear model misses (wide-and-deep). The result is saved as one model in the same JSON format."""
@@ -215,10 +215,11 @@ def train(files, out, hidden=48, epochs=40, lr=2e-3, l2=1e-3, seed=0, warm=None,
     off = 0
     for f in files:
         d = np.load(f)
-        if d["x"].shape[1] != size():
-            print(f"  skipping {os.path.basename(f)}: {d['x'].shape[1]} features, current version has {size()}")
+        w = width or size()
+        if d["x"].shape[1] < w:
+            print(f"  skipping {os.path.basename(f)}: {d['x'].shape[1]} features, training uses {w}")
             continue
-        xs.append(d["x"])
+        xs.append(d["x"][:, :w])     # newer feature versions only append, so their prefix is the older version
         ys.append(d["y"])
         gs.append(d["game"] + off)
         off = int(gs[-1].max()) + 1 if len(gs[-1]) else off
@@ -353,7 +354,7 @@ def td_targets(d, net, lam=0.7):
     return out
 
 
-def train_linear(files, out, l2=1e-2, seed=0, meta=None, target="outcome", net=None, lam=0.7):
+def train_linear(files, out, l2=1e-2, seed=0, meta=None, target="outcome", net=None, lam=0.7, width=None):
     """Logistic regression on the standardised features plus the hand-written score's logit: about 100 weights, so it
     needs far less data than the MLP and cannot overfit the turn-to-turn noise. Same JSON format (no hidden units)."""
     import numpy as np
@@ -361,13 +362,14 @@ def train_linear(files, out, l2=1e-2, seed=0, meta=None, target="outcome", net=N
     xs, ys, gs, off = [], [], [], 0
     for f in files:
         d = np.load(f)
-        if d["x"].shape[1] != size():           # data recorded with an older feature version
-            print(f"  skipping {os.path.basename(f)}: {d['x'].shape[1]} features, current version has {size()}")
+        w = width or size()
+        if d["x"].shape[1] < w:                 # data recorded with an older feature version
+            print(f"  skipping {os.path.basename(f)}: {d['x'].shape[1]} features, training uses {w}")
             continue
         use_td = target == "td" and "kind" in d
         if target == "td" and not use_td:
             print(f"  {os.path.basename(f)}: recorded before TD targets, uses game results")
-        xs.append(d["x"]); ys.append(td_targets(d, net, lam) if use_td else d["y"]); gs.append(d["game"] + off)
+        xs.append(d["x"][:, :w]); ys.append(td_targets(d, net, lam) if use_td else d["y"]); gs.append(d["game"] + off)
         off = int(gs[-1].max()) + 1 if len(gs[-1]) else off
     # float32 keeps a 10k-game buffer (about a million positions) inside a 7 GB Actions runner
     X, Y, G = np.concatenate(xs).astype(np.float32), np.concatenate(ys), np.concatenate(gs)
@@ -549,6 +551,11 @@ def write_ladder(hist):
         f.write("\n".join(lines) + "\n")
 
 
+def _best_net():
+    from riftsim.core.learn import model as M
+    return M.load(M.best_path())
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -576,6 +583,9 @@ def main():
     t.add_argument("--linear", action="store_true", help="logistic regression instead of the MLP")
     t.add_argument("--wide", metavar="LINEAR_JSON", help="MLP that corrects this linear model (wide-and-deep)")
     t.add_argument("--epochs", type=int, default=40)
+    t.add_argument("--width", type=int, help="feature count to train on (an older version's prefix); default: current")
+    t.add_argument("--target", choices=("td", "outcome"), default="outcome",
+                   help="td: bootstrapped labels from the best model (files recorded with --labels td)")
     q = sub.add_parser("gate")
     q.add_argument("candidate")
     q.add_argument("best")
@@ -592,10 +602,11 @@ def main():
                        max_seconds=a.max_minutes * 60 if a.max_minutes else None))
     elif a.cmd == "train":
         if a.linear:
-            print(train_linear(a.files, a.out))
+            print(train_linear(a.files, a.out, width=a.width, target=a.target,
+                               net=_best_net() if a.target == "td" else None))
         else:
             wide = json.load(open(a.wide)) if a.wide else None
-            print(train(a.files, a.out, hidden=a.hidden, epochs=a.epochs, wide=wide))
+            print(train(a.files, a.out, hidden=a.hidden, epochs=a.epochs, wide=wide, width=a.width))
     elif a.cmd == "gate":
         res = gate(a.candidate, a.best, a.games, a.workers, a.seed)
         print(json.dumps(res, indent=1))
