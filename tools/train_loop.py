@@ -427,11 +427,13 @@ def _gate_game(args):
     return {"specs": specs, "winner": g.winner, "decks": [os.path.basename(p) for p in paths]}
 
 
-def gate(cand, best, games, workers, seed):
+def gate(cand, best, games, workers, seed, mirror=False):
+    """mirror=True: both AIs play the same deck (each pair of games swaps seats on the same shuffle), so the
+    matchup between two different decks adds no noise and a smaller skill edge shows up in fewer games."""
     rng = random.Random(seed)
     jobs = []
     for i in range(games // 2):
-        pair = rng.sample(DECKS, 2)
+        pair = [rng.choice(DECKS)] * 2 if mirror else rng.sample(DECKS, 2)
         s = seed + i
         jobs.append((pair, s, [cand, best]))
         jobs.append((pair, s, [best, cand]))     # same decks and shuffle, the two AIs swap seats
@@ -590,6 +592,7 @@ def main():
     q.add_argument("candidate")
     q.add_argument("best")
     q.add_argument("--games", type=int, default=200)
+    q.add_argument("--mirror", action="store_true", help="both AIs play the same deck (less matchup noise)")
     q.add_argument("--record", metavar="NOTE", help="append the result to models/baselines.json (control matches)")
     for p in (g, s, q):
         p.add_argument("--workers", type=int, default=os.cpu_count() or 2)
@@ -608,7 +611,7 @@ def main():
             wide = json.load(open(a.wide)) if a.wide else None
             print(train(a.files, a.out, hidden=a.hidden, epochs=a.epochs, wide=wide, width=a.width))
     elif a.cmd == "gate":
-        res = gate(a.candidate, a.best, a.games, a.workers, a.seed)
+        res = gate(a.candidate, a.best, a.games, a.workers, a.seed, mirror=a.mirror)
         print(json.dumps(res, indent=1))
         if a.record is not None:
             record_baseline(res, a.record)

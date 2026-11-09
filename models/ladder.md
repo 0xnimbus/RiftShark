@@ -36,3 +36,10 @@ Written by tools/train_loop.py; the `learned` policy and the play page's Learned
 | 2026-11-08 17:16 UTC | learned:sp_linear | learned:gen_008 | 48.5% (42-55) | 200 | 3000 new local self-play games + gens 5-13 data (8000 games, outcome labels); not promoted |
 | 2026-11-08 17:16 UTC | learned:sp_wide | learned:gen_008 | 39.0% (33-46) | 200 | 3000 new local self-play games + gens 5-13 data (8000 games, outcome labels); not promoted (wide-and-deep, 32 hidden) |
 | 2026-11-08 19:44 UTC | learned:v3_td | learned:gen_008 | 46.5% (40-53) | 200 | features v3 (held reactions) + TD labels with responses in the opponent turn, 1200 games; held-reaction weights ~0; not promoted |
+| 2026-11-09 06:33 UTC | learned-deep:gen_008 | learned:gen_008 | 51.6% (44-58) | 192 | deep search with responding in the opponent turn (PR #30), seeds 54000 |
+| 2026-11-09 07:30 UTC | learned-r:gen_008 | learned:gen_008 | 43.7% (37-51) | 199 | opponent may react during our turn in the lookahead (learned-r), seeds 56000 |
+| 2026-11-09 08:43 UTC | learned:gen_008:s6 | learned:gen_008 | 49.5% (43-56) | 200 | one-turn lookahead with 6 determinised samples per option instead of 3, seeds 58000 |
+| 2026-11-09 10:12 UTC | learned:models/cand_v3k.json | learned:gen_008 | 44.5% (38-51) | 200 | v3 linear, TD: sp_v3_1 + 600 new gen 8 self-play games incl. Kennen and the equipment fixes |
+| 2026-11-09 10:30 UTC | learned:models/cand_v2k.json | learned:gen_008 | 50.5% (44-57) | 200 | v2-width linear, TD: gens 12-13 + the same 600 new games |
+| 2026-11-09 10:50 UTC | learned:gen_008+gen_010+gen_013 | learned:gen_008 | 51.8% (45-59) | 199 | ensemble: gen 8 + gen 10 + gen 13 averaged in logit space, mirror matches |
+| 2026-11-09 11:49 UTC | learned:models/cand_w8.json | learned:gen_008 | 46.5% (40-53) | 200 | wide-and-deep on top of gen 8: 8 hidden units, l2 1e-2, gens 6-13 + 600 new games (outcome labels); mirror |
