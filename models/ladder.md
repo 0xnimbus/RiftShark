@@ -44,3 +44,4 @@ Written by tools/train_loop.py; the `learned` policy and the play page's Learned
 | 2026-11-09 10:50 UTC | learned:gen_008+gen_010+gen_013 | learned:gen_008 | 51.8% (45-59) | 199 | ensemble: gen 8 + gen 10 + gen 13 averaged in logit space, mirror matches |
 | 2026-11-09 11:49 UTC | learned:models/cand_w8.json | learned:gen_008 | 46.5% (40-53) | 200 | wide-and-deep on top of gen 8: 8 hidden units, l2 1e-2, gens 6-13 + 600 new games (outcome labels); mirror |
 | 2026-11-09 14:06 UTC | learned:models/cand_v4.json | learned:gen_008 | 42.7% (36-50) | 199 | v4 features (held answers: affordable removal, bounce, fast spells, loose Equipment), linear td on 1000 new gen-8 self-play games; mirror |
+| 2026-11-09 18:38 UTC | learned:models/cand_rank1.json | learned:gen_008 | 43.5% (37-50) | 200 | gen 8's data (gens 6-8) + option-ranking pairs (each option of ~1200 decisions played out 3x to the end, pairs where mean results differ by 0.6+, weight 1); mirror |
