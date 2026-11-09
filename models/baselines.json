@@ -356,5 +356,20 @@
   ],
   "date": "2026-11-09 10:50 UTC",
   "note": "ensemble: gen 8 + gen 10 + gen 13 averaged in logit space, mirror matches"
+ },
+ {
+  "candidate": "learned:models/cand_w8.json",
+  "best": "learned:gen_008",
+  "games": 200,
+  "wins": 93,
+  "draws": 0,
+  "score": 0.465,
+  "interval": [
+   0.397,
+   0.534
+  ],
+  "timeouts": [],
+  "date": "2026-11-09 11:49 UTC",
+  "note": "wide-and-deep on top of gen 8: 8 hidden units, l2 1e-2, gens 6-13 + 600 new games (outcome labels); mirror"
  }
 ]
