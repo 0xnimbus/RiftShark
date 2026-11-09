@@ -18,7 +18,7 @@ CARD_BUCKETS = 64
 # held interaction (feature version 3, appended again): reaction-speed cards in p's own hand and whether p's ready runes
 # can pay for them, so the value model can learn what open energy with a counter or trick in hand is worth on the
 # opponent's turn (self-play labels those positions by playing the opponent's turn while p may respond)
-FEATURE_VERSION = 3
+FEATURE_VERSION = 4
 # turn structure: the same board is worth different amounts before and after the turn player's Awaken/Channel/Draw,
 # so the net must know where in the turn it is (without this, gen 1 rated "end my turn" above every attack because
 # the next own decision came in the opponent's Beginning phase with their runes and units still exhausted)
@@ -128,7 +128,7 @@ def encode(g, p):
         if o.zone == "board" and ("unit" in o.defn.types or "gear" in o.defn.types):
             base = CARD_BUCKETS if o.controller == p else 2 * CARD_BUCKETS
             cards[base + _card_bucket(o.defn.id)] += 0.5
-    return out + cards + _interaction(g, p)
+    return out + cards + _interaction(g, p) + _held_answers(g, p)
 
 
 def _interaction(g, p):
@@ -148,6 +148,32 @@ def _interaction(g, p):
     return [held / 3, affordable / 3, counters / 2]
 
 
+def _held_answers(g, p):
+    """Version 4 (2026-11-09): what the cards in p's own hand can answer with, and Equipment left lying unattached.
+    Kennen and Riven win by holding bounce, removal and fast spells; v3 only counted reactions, and the AI played
+    Edge of Night to an empty base. Removal and bounce count when all p's runes could pay for them (next turn they
+    are ready); fast spells when the ready runes pay for them now."""
+    ps = g.players[p]
+    runes = len(ps.runes)
+    ready = sum(1 for u in ps.runes if not g.objects[u].exhausted)
+    removal = bounce = fast = 0
+    for u in ps.hand:
+        d = g.objects[u].defn
+        if d.type != "spell":
+            continue
+        t = (d.text or "").lower()
+        e = d.energy or 0
+        if e <= runes and ("kill" in t or "deal " in t):
+            removal += 1
+        if e <= runes and ("owner's hand" in t or "owners' hands" in t):
+            bounce += 1
+        if e <= ready and (d.keywords.get("reaction") or d.keywords.get("action")):
+            fast += 1
+    loose = sum(1 for o in g.objects.values() if o.zone == "board" and o.controller == p and o.defn.is_equipment
+                and o.attached_to is None)
+    return [removal / 3, bounce / 3, fast / 3, loose / 2]
+
+
 def _card_bucket(card_id):
     return zlib.crc32(b"card:" + card_id.encode()) % CARD_BUCKETS
 
@@ -160,5 +186,9 @@ def size_v2():
     return size_v1() + 3 * CARD_BUCKETS
 
 
-def size():
+def size_v3():
     return size_v2() + 3
+
+
+def size():
+    return size_v3() + 4
