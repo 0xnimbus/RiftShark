@@ -92,6 +92,8 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   `flow._first_designation` keys them by (uid, entered_stamp). Late arrivals still attack once (CR 466.2.c.3.a).
   2026-11-09 05:20: the "target" event is now one per chosen object ("When you choose a friendly unit" triggers per unit);
   Blade Dancer's auto-script fired (and readied "it") when you chose only enemies; now needs a friendly unit target.
+  10:20: a countered spell played from the trash (Flow, Kennen's granted Flow) went back to the trash and could be
+  played again; `do_counter` now banishes it (CR 829.1.b.1).
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
