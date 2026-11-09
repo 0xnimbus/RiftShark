@@ -786,3 +786,28 @@ def test_attack_triggers_fire_once_per_combat(db):
     late = put(g, db, 0, "Thousand-Tailed Watcher", ("bf", 0))
     g._cleanup_once()
     assert g.objects[late].designation == "attacker" and seen.count(("attack", late)) == 1
+
+
+def test_choose_a_friendly_unit_triggers_once_per_friendly_unit(db):
+    """'When you choose a friendly unit' triggers for each friendly unit a spell chooses, and never for a spell that
+    chooses only enemies (Blade Dancer's auto-script fired on any target)."""
+    g = main_phase(db, [_deck(db, "irelia_blade_dancer"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    a, b = put(g, db, 0, "Forecaster", "base"), put(g, db, 0, "Forecaster", "base")
+    dancer = put(g, db, 0, "Blade Dancer", "base")
+    foe = put(g, db, 1, "Forecaster", ("bf", 0))
+    asks = []
+
+    def pick(d):
+        if d.kind == "yesno":
+            asks.append(d.labels[0])
+            return False
+        return None
+    _cast(g, db, 0, "Charm", lambda d: foe if d.kind == "choose" and foe in d.options else pick(d))
+    assert asks == []                                   # Charm chose only an enemy unit
+    first = []
+    _cast(g, db, 0, "Defiant Dance", lambda d: (first.append(1) or a) if d.kind == "choose" and a in d.options and not first
+          else (b if d.kind == "choose" and b in d.options else pick(d)))
+    irelia = [x for x in asks if "Irelia" in x]
+    assert len(irelia) == 2                             # one Irelia trigger per chosen friendly unit
+    assert len(asks) == 4                               # and one Blade Dancer trigger per chosen friendly unit

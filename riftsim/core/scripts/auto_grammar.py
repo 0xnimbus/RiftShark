@@ -1351,7 +1351,9 @@ TRIGGER_PATTERNS = [
     (r"when you lose a combat", "you_lose_combat"),
     (r"when you hide a card", "you_hide"),
     (r"when a combat that i was in ends", "survive_combat_self"),
-    (r"when you choose a friendly unit", lambda g, s, ev: ev.get("kind") == "target" and ev.get("player") == g.objects[s].controller),
+    (r"when you choose a friendly unit", lambda g, s, ev: ev.get("kind") == "target" and ev.get("player") == g.objects[s].controller
+     and any(u in g.objects and g.objects[u].zone == "board" and g.objects[u].controller == g.objects[s].controller
+             and "unit" in g.chars(u).types for u in ev.get("targets", ()))),
     (r"when an enemy unit attacks a battlefield you control", lambda g, s, ev: ev.get("kind") == "attack" and ev.get("player") != g.objects[s].controller and g.battlefields[ev["loc"][1]].controller == g.objects[s].controller),
     (r"when an enemy unit moves here", "enemy_unit_enters_here"),
     (r"when a friendly unit moves here", "friendly_unit_enters_here"),
