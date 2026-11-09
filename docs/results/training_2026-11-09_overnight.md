@@ -15,6 +15,8 @@ turn ahead. Every candidate played gen 8 head to head (same decks and shuffle, s
 | gen 8 + gen 10 + gen 13 | three value nets averaged as the judge (mirror) | 199 | 51.8% |
 | cand_w8 | 8-unit neural correction on top of gen 8 (weight decay), 5000 games; better prediction (val loss 0.507 vs 0.528) (mirror) | 200 | 46.5% |
 | learned-tmcts:60 | MCTS with both players' choices in the tree, leaves judged at the next turn (mirror) | 80 | 30.0% |
+| cand_v4 (day) | v4 features for held answers (affordable removal, bounce, fast spells, loose Equipment), 1000 new games (mirror) | 200 | 42.7% |
+| cand_rank1 (day) | gen 8's data plus option-ranking pairs from tools/rank_data.py (mirror) | 200 | 43.5% |
 
 ## What this says
 
@@ -62,3 +64,21 @@ the clearest test case for the next levers.
 2. Features for what held cards can do next turn (an affordable bounce, kill, counter or hidden card, by target),
    since the current ones only count reactions in hand; Kennen and Riven are the test decks.
 3. A real opponent model inside the lookahead: the opponent's reply chosen by the learned AI itself (2-3x slower).
+
+## Day 2026-11-09: held-answer features and option-ranking labels
+
+- **v4 features** (`_held_answers`: affordable removal, bounce, fast spells, Equipment with no unit) trained on 1000 new
+  gen 8 self-play games: 42.7%. Trained to predict the winner, the new features got weights near zero, like the held
+  reactions in v3.
+- **Option-ranking labels** (`tools/rank_data.py`, lever 1 above): 400 games, 1186 decisions (37% reaction windows in
+  the opponent's turn), every option (up to 4) played to the end 3 times with gen 8 (one sample) on both sides, in the
+  same sampled world per playout. What the data says:
+  - The labels are noisy: two playouts agree on which of two options is better only 60% of the time, and in 61% of
+    playouts every option ends the same way. Most options of a decision barely change the result.
+  - Gen 8's judge already ranks the options right 72.5% of the time where the mean results differ by 0.6+ (heuristic
+    score alone: 69%); on single playouts 61%, near the 60% the labels agree with each other.
+  - Training the linear judge with these pairs (gens 6-8 + 1353 pairs) did not raise held-out pair accuracy and scored
+    43.5% against gen 8.
+- Reading: the judge's weights are not the main error. The error is the position it is shown: the end of our turn
+  with the opponent passing. The next experiment puts the learned AI itself in the opponent's seat inside the lookahead
+  (the earlier `learned-r` used the cheap heuristic AI there and lost 43.7%).

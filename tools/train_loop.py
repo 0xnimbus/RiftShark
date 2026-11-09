@@ -354,9 +354,45 @@ def td_targets(d, net, lam=0.7):
     return out
 
 
-def train_linear(files, out, l2=1e-2, seed=0, meta=None, target="outcome", net=None, lam=0.7, width=None):
+def rank_pairs(files, width, min_gap=0.0):
+    """Pairwise rows from tools/rank_data.py files: (features of the better option, features of the worse one,
+    decision id). min_gap 0: every playout where two options ended differently. min_gap > 0: an option is better when
+    its mean result over all playouts of the decision is at least min_gap higher (single playouts agree with each
+    other only ~60% of the time, so the mean is the cleaner label); one pair per playout, from the two options'
+    turn-end features in that playout's world."""
+    import numpy as np
+    xa, xb, ds = [], [], []
+    for fi, f in enumerate(files):
+        d = np.load(f)
+        X, Y, D, O, P = d["x"][:, :width], d["y"], d["dec"], d["opt"], d["po"]
+        dec = {}
+        for i in range(len(Y)):
+            dec.setdefault(int(D[i]), {}).setdefault(int(P[i]), {})[int(O[i])] = i
+        for k, plays in dec.items():
+            if min_gap > 0:
+                res = {}
+                for po in plays.values():
+                    for o, i in po.items():
+                        res.setdefault(o, []).append(Y[i])
+                mu = {o: float(np.mean(v)) for o, v in res.items()}
+            for po in plays.values():
+                for a, i in po.items():
+                    for b, j in po.items():
+                        better = (mu[a] - mu[b] >= min_gap - 1e-9) if min_gap > 0 else Y[i] > Y[j]
+                        if a != b and better:
+                            xa.append(X[i]); xb.append(X[j]); ds.append(fi * 10**12 + k)
+    if not xa:
+        return None
+    return np.array(xa, dtype=np.float32), np.array(xb, dtype=np.float32), np.array(ds)
+
+
+def train_linear(files, out, l2=1e-2, seed=0, meta=None, target="outcome", net=None, lam=0.7, width=None,
+                 pairs=None, pair_weight=1.0, pair_gap=0.0):
     """Logistic regression on the standardised features plus the hand-written score's logit: about 100 weights, so it
-    needs far less data than the MLP and cannot overfit the turn-to-turn noise. Same JSON format (no hidden units)."""
+    needs far less data than the MLP and cannot overfit the turn-to-turn noise. Same JSON format (no hidden units).
+    pairs: tools/rank_data.py files; each pair (better option a, worse option b of one decision) adds a row
+    logistic(w . (z_a - z_b)) -> 1 with weight pair_weight relative to the mean value row, so the same weights also
+    learn to rank the options of a decision (bias and constant parts cancel in the difference)."""
     import numpy as np
     from riftsim.core.learn.features import H_INDEX, size
     xs, ys, gs, off = [], [], [], 0
@@ -388,15 +424,42 @@ def train_linear(files, out, l2=1e-2, seed=0, meta=None, target="outcome", net=N
     w = np.zeros(A.shape[1]); w[-2] = 1.0
     At, Yt, Av, Yv = A[~vm], Y[~vm], A[vm], Y[vm]
     del A
+    Wt = np.ones(len(Yt))
+    Pv = None
+    nv = len(Yt)                                # value rows come first (train_loss reports those only)
+    if pairs:
+        pr = rank_pairs(pairs, width or size(), pair_gap)
+        if pr is not None:
+            xa, xb, ds = pr
+
+            def zrow(x):
+                z = np.empty((len(x), x.shape[1] + 2), dtype=np.float32)
+                z[:, :-2] = (x - mean.astype(np.float32)) / std.astype(np.float32)
+                z[:, -2] = np.arctanh(np.clip(x[:, H_INDEX], -0.999999, 0.999999))
+                z[:, -1] = 1.0
+                return z
+            Dz = zrow(xa) - zrow(xb)            # bias column cancels to 0
+            udec = np.unique(ds)
+            pval = set(rs.choice(udec, size=max(1, len(udec) // 10), replace=False).tolist())
+            pm = np.isin(ds, np.array(sorted(pval)))
+            # both orientations keep the pairwise rows symmetric
+            Pt = np.concatenate([Dz[~pm], -Dz[~pm]])
+            PYt = np.concatenate([np.ones((~pm).sum()), np.zeros((~pm).sum())])
+            Pv = Dz[pm]
+            scale = pair_weight * len(Yt) / max(1, len(Pt))
+            At = np.concatenate([At, Pt]); Yt = np.concatenate([Yt, PYt])
+            Wt = np.concatenate([Wt, np.full(len(Pt), scale)])
+            print(f"  ranking pairs: {len(Dz)} ({(~pm).sum()} train, {pm.sum()} val), row weight {scale:.2f}")
 
     def loss(Am, Ym, w):
         p = np.clip(1 / (1 + np.exp(-np.clip(Am @ w, -30, 30))), 1e-6, 1 - 1e-6)
         return float(-(Ym * np.log(p) + (1 - Ym) * np.log(1 - p)).mean()), float(((p > 0.5) == (Ym > 0.5)).mean())
     reg = np.full(len(w), l2); reg[-2:] = 0.0
+    Wn = Wt / Wt.sum()
     for _ in range(25):                         # Newton steps (IRLS) with L2 on the feature weights
         p = 1 / (1 + np.exp(-np.clip(At @ w, -30, 30)))
-        g = At.T @ (p - Yt) / len(Yt) + reg * w
-        H = (At * (p * (1 - p))[:, None].astype(np.float32)).T.astype(np.float64) @ At / len(Yt) + np.diag(reg + 1e-9)
+        g = At.T @ ((p - Yt) * Wn) + reg * w
+        H = (At * (p * (1 - p) * Wn)[:, None].astype(np.float32)).T.astype(np.float64) @ At + np.diag(reg + 1e-9)
         step = np.linalg.solve(H, g)
         w -= step
         if np.abs(step).max() < 1e-6:
@@ -404,9 +467,12 @@ def train_linear(files, out, l2=1e-2, seed=0, meta=None, target="outcome", net=N
     vl, va = loss(Av, Yv, w)
     w0 = np.zeros(len(w)); w0[-2] = 1.0
     hl, _ = loss(Av, Yv, w0)
-    info = {"positions": int(len(Y)), "games": int(len(games)), "train_loss": round(loss(At, Yt, w)[0], 4),
+    info = {"positions": int(len(Y)), "games": int(len(games)), "train_loss": round(loss(At[:nv], Yt[:nv], w)[0], 4),
             "val_loss": round(vl, 4), "val_acc": round(va, 4), "val_loss_constant": 0.6931,
             "val_loss_heuristic": round(hl, 4), "h_scale": round(float(w[-2]), 4), "hidden": 0, "kind": "linear"}
+    if Pv is not None and len(Pv):
+        info["val_pair_acc"] = round(float(((Pv @ w) > 0).mean()), 4)
+        info["val_pair_acc_heuristic"] = round(float(((Pv @ w0) > 0).mean()), 4)
     d = {"meta": dict(meta or {}, **info), "mean": mean.tolist(), "std": std.tolist(), "w1": [], "b1": [], "w2": [],
          "b2": float(w[-1]), "h_index": H_INDEX, "h_scale": float(w[-2]), "lin": w[:-2].tolist()}
     with open(out, "w") as f:
@@ -586,6 +652,10 @@ def main():
     t.add_argument("--wide", metavar="LINEAR_JSON", help="MLP that corrects this linear model (wide-and-deep)")
     t.add_argument("--epochs", type=int, default=40)
     t.add_argument("--width", type=int, help="feature count to train on (an older version's prefix); default: current")
+    t.add_argument("--pairs", nargs="+", help="tools/rank_data.py files: add option-ranking rows (linear only)")
+    t.add_argument("--pair-gap", type=float, default=0.0,
+                   help="pair options whose mean playout results differ by at least this (0: per playout)")
+    t.add_argument("--pair-weight", type=float, default=1.0, help="total weight of ranking rows vs value rows")
     t.add_argument("--target", choices=("td", "outcome"), default="outcome",
                    help="td: bootstrapped labels from the best model (files recorded with --labels td)")
     q = sub.add_parser("gate")
@@ -606,7 +676,8 @@ def main():
     elif a.cmd == "train":
         if a.linear:
             print(train_linear(a.files, a.out, width=a.width, target=a.target,
-                               net=_best_net() if a.target == "td" else None))
+                               net=_best_net() if a.target == "td" else None, pairs=a.pairs,
+                               pair_weight=a.pair_weight, pair_gap=a.pair_gap))
         else:
             wide = json.load(open(a.wide)) if a.wide else None
             print(train(a.files, a.out, hidden=a.hidden, epochs=a.epochs, wide=wide, width=a.width))
