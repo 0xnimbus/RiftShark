@@ -254,3 +254,36 @@ def scuttle_crab(defn):
                 O.Do(lambda g, c: g.peek_facedown.__setitem__(c.controller, g.turn), label="look at their facedown cards"),
                 O.GainXP(1),
             ], label="Deathknell", source_text=defn.text, keyword="deathknell")]
+
+
+# ----------------------------------------------------------------------------- Kennen deck (Europe RC, 2026-11-08)
+def _your_trash(kind):
+    return Sel(kind, zone="trash", pred=lambda g, c, u: g.objects[u].owner == c.controller)
+
+
+@script("Last Rites")
+def last_rites(defn):
+    # [Equip] — [Chaos], Recycle 2 cards from your trash (the cost comes from keyword_abilities)
+    # effect: When I conquer or hold, you may play a unit from your trash. (You still pay its costs.)
+    def play_from_trash():
+        return [O.Choose(_your_trash("unit"), out="__lr", targeted=False, allow_none=True,
+                         label="play a unit from your trash (you pay its costs)"),
+                O.If(Ref("__lr"), [O.PlayCard(Ref("__lr"))])]
+    return {"effect_abilities": [Triggered(ev, play_from_trash(), label=f"Last Rites ({ev.split('_')[0]})",
+                                           source_text=defn.effect_text)
+                                 for ev in ("conquer_self", "hold_self")],
+            "replace": False}
+
+
+@script("Veiled Temple")
+def veiled_temple(defn):
+    # When you conquer here, you may ready a friendly gear. If it's an Equipment, you may detach it.
+    def is_equipment(g, c):
+        u = c.vars.get("__vt")
+        return u is not None and u in g.objects and g.objects[u].attached_to is not None
+    return [Triggered("you_conquer_here",
+                      [O.Choose(Sel("gear", side="friendly"), out="__vt", targeted=False, allow_none=True,
+                                label="ready a friendly gear"),
+                       O.If(Ref("__vt"), [O.Ready(Ref("__vt")),
+                                          O.If(is_equipment, [O.May([O.Detach(Ref("__vt"))], label="detach it")])])],
+                      label="Veiled Temple", source_text=defn.text)]

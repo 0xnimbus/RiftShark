@@ -1,0 +1,159 @@
+{
+ "name": "Heart of the Tempest (ASC Evansrhim, 1st Riftbound Regional Championship: Europe)",
+ "legend": "VEN-197",
+ "champion": "VEN-113",
+ "main": [
+  {
+   "id": "RAD-107",
+   "name": "Bedeviling Stranger",
+   "count": 2
+  },
+  {
+   "id": "OGN-199",
+   "name": "Tideturner",
+   "count": 1
+  },
+  {
+   "id": "OGN-185",
+   "name": "Traveling Merchant",
+   "count": 3
+  },
+  {
+   "id": "RAD-129",
+   "name": "Trifarian Captain",
+   "count": 3
+  },
+  {
+   "id": "SFD-140",
+   "name": "Fizz, Trickster",
+   "count": 1
+  },
+  {
+   "id": "RAD-105",
+   "name": "Reckless Innovator",
+   "count": 2
+  },
+  {
+   "id": "OGN-194",
+   "name": "Nocturne, Horrifying",
+   "count": 3
+  },
+  {
+   "id": "OGN-195",
+   "name": "Rhasa the Sunderer",
+   "count": 3
+  },
+  {
+   "id": "OGN-204",
+   "name": "Seal of Discord",
+   "count": 3
+  },
+  {
+   "id": "SFD-139",
+   "name": "Edge of Night",
+   "count": 2
+  },
+  {
+   "id": "SFD-150",
+   "name": "Last Rites",
+   "count": 2
+  },
+  {
+   "id": "OGN-169",
+   "name": "Gust",
+   "count": 2
+  },
+  {
+   "id": "VEN-156",
+   "name": "Lightning Rush",
+   "count": 3
+  },
+  {
+   "id": "RAD-101",
+   "name": "An Offer You Can't Refuse",
+   "count": 1
+  },
+  {
+   "id": "SFD-136",
+   "name": "Hard Bargain",
+   "count": 1
+  },
+  {
+   "id": "OGN-213",
+   "name": "Hidden Blade",
+   "count": 1
+  },
+  {
+   "id": "OGN-172",
+   "name": "Rebuke",
+   "count": 1
+  },
+  {
+   "id": "OGN-173",
+   "name": "Ride the Wind",
+   "count": 1
+  },
+  {
+   "id": "SFD-145",
+   "name": "Switcheroo",
+   "count": 2
+  },
+  {
+   "id": "UNL-128",
+   "name": "Star-Crossed",
+   "count": 2
+  }
+ ],
+ "runes": {
+  "chaos": 9,
+  "order": 3
+ },
+ "battlefields": [
+  "SFD-212",
+  "SFD-221",
+  "OGN-298"
+ ],
+ "source": {
+  "url": "https://riftdecks.com/riftbound-metagame/deck-kennen-heart-of-the-tempest-345106",
+  "player": "ASC Evansrhim",
+  "placement": 1,
+  "tournament": "Riftbound Regional Championship: Europe",
+  "players": 315,
+  "date": "2026-11-08",
+  "set": "Radiance",
+  "sideboard": [
+   [
+    "Abandon",
+    1
+   ],
+   [
+    "An Offer You Can't Refuse",
+    1
+   ],
+   [
+    "Decree of Unity",
+    2
+   ],
+   [
+    "Lacerate",
+    1
+   ],
+   [
+    "Ride the Wind",
+    1
+   ],
+   [
+    "Fizz, Trickster",
+    1
+   ],
+   [
+    "Ravenbloom Prefect",
+    2
+   ],
+   [
+    "The Good Stuff",
+    1
+   ]
+  ]
+ }
+}

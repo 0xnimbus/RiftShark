@@ -600,8 +600,16 @@ class Game(flow.FlowMixin):
         for k in picks:
             uid, o, ab, _, equip = entries[k]
             if equip:
-                if ab.matches(self, uid, ev):
-                    pend.append((uid, ab, None))
+                # an Equipment's effect is an ability of the unit it is attached to: "When I conquer" means that unit
+                # conquers and "me" is that unit; the gear stays the source (Blighted Battleaxe unattaches itself)
+                unit = o.attached_to
+                if unit in self.objects and self.objects[unit].zone == "board":
+                    try:
+                        ok = ab.matches(self, unit, ev)
+                    except (KeyError, AttributeError, TypeError):
+                        ok = False
+                    if ok:
+                        pend.append((uid, ab, unit))
                 continue
             if not ab.active(self, uid):
                 # "When you play me" abilities work while the card is still on the chain (CR 340: the
@@ -638,8 +646,8 @@ class Game(flow.FlowMixin):
             return ((ctrl - self.turn_player) % len(self.players), getattr(ab, "priority", 0))
         pend.sort(key=order)
         groups = {}
-        for uid, ab, _ in pend:
-            item = self._add_trigger(uid, ab, ev)
+        for uid, ab, me in pend:
+            item = self._add_trigger(uid, ab, ev, me=me)
             if item is not None:
                 groups.setdefault(item.controller, []).append(item)
         # CR 383: each player puts their own simultaneous triggers on the chain in the order they choose
@@ -648,7 +656,7 @@ class Game(flow.FlowMixin):
             if len(items) > 1 and len({id(it.ability) if it.ability is not None else it.label for it in items}) > 1:
                 self.reorder_requests.append({"player": ctrl, "items": [it.id for it in items], "order": []})
 
-    def _add_trigger(self, uid, ab, ev):
+    def _add_trigger(self, uid, ab, ev, me=None):
         o = self.objects.get(uid)
         if isinstance(ab, DelayedAbility):
             ctx = ab.ctx.clone()
@@ -678,6 +686,9 @@ class Game(flow.FlowMixin):
         ctx.event = ev
         ctx.vars["ev"] = ev
         ctx.vars["self"] = uid
+        if me is not None:                      # Equipment effect: "me" is the unit it is attached to
+            ctx.vars["self"] = me
+            ctx.here = self.objects[me].place
         if ev.get("kind") == "play" and ev.get("uid") == uid:
             ctx.shown_off = self.shown_off.get(uid)      # "When you play me, if you showed off" (CR 832.1.c.1)
             ctx.paid = dict(ev.get("paid") or {})          # "When you play me, if you paid the additional cost"
@@ -812,6 +823,16 @@ class Game(flow.FlowMixin):
                         self._add_trigger(uid, ab, fake)
                 except (KeyError, AttributeError, TypeError):
                     pass
+        for gu, go in list(self.objects.items()):        # its Equipment's effects are its abilities too
+            if go.attached_to != uid or go.zone != "board":
+                continue
+            for ab in go.defn.effect_abilities:
+                if isinstance(ab, Triggered):
+                    try:
+                        if ab.matches(self, uid, fake):
+                            self._add_trigger(gu, ab, fake, me=uid)
+                    except (KeyError, AttributeError, TypeError):
+                        pass
 
     # ------------------------------------------------------------------ game actions
     def do_draw(self, p, n, ctx=None):

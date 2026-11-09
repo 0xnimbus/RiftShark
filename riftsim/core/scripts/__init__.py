@@ -67,8 +67,8 @@ def keyword_abilities(defn):
         out.append(Triggered("attack_self", [O.GiveMight(Ref("t"), -n)], targets=[O.Choose(Sel("unit", side="enemy", where="here"))],
                              label=f"Disarm {n}", keyword="disarm"))
     if kws.get("equip") is not None and defn.is_gear:
-        cost = parse_cost(_equip_cost_text(defn))
-        mx = re.search(r"\[Equip\]\s*(?:[-—–:]\s*)?Spend (\d+) XP", defn.text)
+        cost = _equip_cost(defn)
+        mx =re.search(r"\[Equip\]\s*(?:[-—–:]\s*)?Spend (\d+) XP", defn.text)
         if mx:
             cost["xp"] = int(mx.group(1))
         out.append(Activated(cost, [O.Attach(Ref("self"), Ref("t"))],
@@ -105,6 +105,21 @@ def weaponmaster_ability():
                                         [O.PayEquip(Ref("t"), out="__eq"), O.If(Ref("__eq"), [O.Attach(Ref("t"), Ref("self"))])])],
                      targets=[O.Choose(Sel("gear", side="friendly", tags=["Equipment"]), allow_none=True, targeted=False)],
                      label="Weaponmaster", optional=True, keyword="weaponmaster")
+
+
+def _equip_cost(defn):
+    """Equip cost: resources, plus other parts after a comma ("[Chaos], Recycle 2 cards from your trash",
+    "[Order], Kill a friendly unit"). Costs the phrase parser can't read keep the resource part only and the
+    card stays flagged (cards with such costs are hand-scripted)."""
+    m = re.search(r"\[Equip\]\s*(?:[-—–:]\s*)?([^(\n]*)", defn.text)
+    phrase = m.group(1).strip().rstrip(".") if m else ""
+    if "," in phrase:
+        from .auto_grammar import parse_cost_phrase, ParseError
+        try:
+            return parse_cost_phrase(phrase, defn)
+        except ParseError:
+            pass
+    return parse_cost(_equip_cost_text(defn))
 
 
 def _equip_cost_text(defn):

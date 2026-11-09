@@ -1911,6 +1911,8 @@ class FlowMixin:
         if cost.get("discard", 0) > len([h for h in self.players[p].hand if h != uid and (
                 cost.get("discard_type") is None or cost["discard_type"] in self.chars(h).types)]):
             return False
+        if cost.get("recycle", 0) > len(getattr(self.players[p], cost.get("recycle_zone", "trash"), ()) or ()):
+            return False
         if cost.get("disempower_self") and not o.empowered:     # you can't disempower something that isn't empowered
             return False
         if cost.get("sacrifice") is not None:

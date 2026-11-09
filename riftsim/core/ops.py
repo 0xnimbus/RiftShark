@@ -1176,8 +1176,7 @@ class Mill(Instr):
             ps = game.players[p]
             if not game._burn_out_until_cards(p):     # CR 432.1.b
                 break
-            u = ps.deck.pop(0)
-            game.put_in_trash(u, ctx)
+            game.put_in_trash(ps.deck[0], ctx)      # put_in_trash takes it out of the deck
         return None
 
 
