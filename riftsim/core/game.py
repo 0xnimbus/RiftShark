@@ -1488,7 +1488,11 @@ class Game(flow.FlowMixin):
                 if it.uid is not None and it.kind in ("spell", "unit", "gear"):
                     o = self.objects[it.uid]
                     if o.zone == "chain":
-                        self._to_zone(o, "trash")
+                        # a spell played from the trash for its Flow cost is banished whenever it leaves the chain
+                        # other than by its own execution, so countering it banishes it too (CR 829.1.b.1)
+                        flow = it.kind == "spell" and it.ctx is not None and it.ctx.played_from == "trash" \
+                            and not it.ctx.vars.get("__recycle_after")
+                        self._to_zone(o, "banish" if flow else "trash")
                 self.log("counter", item=item_id, label=it.label)
                 self.emit("counter", item=item_id, player=it.controller, ctx=ctx)
                 self.dirty = True

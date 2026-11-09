@@ -811,3 +811,24 @@ def test_choose_a_friendly_unit_triggers_once_per_friendly_unit(db):
     irelia = [x for x in asks if "Irelia" in x]
     assert len(irelia) == 2                             # one Irelia trigger per chosen friendly unit
     assert len(asks) == 4                               # and one Blade Dancer trigger per chosen friendly unit
+
+
+def test_countered_flow_spell_is_banished(db):
+    """CR 829.1.b.1: a spell played for its Flow cost is banished if it leaves the chain any way other than its own
+    execution, so a countered Lightning Rush must not go back to the trash to be played again."""
+    g = main_phase(db, [_deck(db, "kennen_tempest"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    u = give(g, 0, "Lightning Rush", db)
+    g._to_zone(g.objects[u], "trash")
+    for r in list(g.players[0].rune_deck)[:6]:
+        g.players[0].rune_deck.remove(r)
+        g.players[0].runes.append(r)
+        g.objects[r].zone = "board"
+    _ready_runes(g, 0)
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == u))
+    _drive(g, stop=lambda d: any(it.uid == u and it.finalized for it in g.chain))
+    item = next(it for it in g.chain if it.uid == u)
+    assert item.ctx.played_from == "trash"
+    assert g.do_counter(item.id)
+    assert g.objects[u].zone == "banish"
