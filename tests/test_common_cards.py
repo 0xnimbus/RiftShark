@@ -1285,3 +1285,16 @@ def test_entrenched_boar_may_enter_ready_but_then_cannot_move(db, decks):
         _play_and_settle(g, 0, b, ("base", 0), yes)
         assert g.objects[b].zone == "board"
         assert g.objects[b].exhausted is (not yes) and g.cant_move(b) is yes
+
+
+def test_noxian_emissary_empowered_deathknell_plays_two_recruits(db, decks):
+    from riftsim.core.vm import Context
+    for emp in (False, True):
+        g = main_phase(db, decks)
+        u = put(g, db, 0, "Noxian Emissary", ("base", 0))
+        assert any(getattr(a, "is_empower", False) for a in g.abilities(u))
+        g.objects[u].empowered = 1 if emp else 0; g.bump()
+        n = sum(o.defn.name == "Recruit" and o.zone == "board" for o in g.objects.values())
+        g.do_kill([u], Context(1, None)); settle(g)
+        m = sum(o.defn.name == "Recruit" and o.zone == "board" for o in g.objects.values())
+        assert m - n == (2 if emp else 0)

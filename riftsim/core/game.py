@@ -1126,7 +1126,7 @@ class Game(flow.FlowMixin):
             ev = self.replace_event({"kind": "die", "uid": u, "player": o.controller, "loc": o.location, "killer": killer,
                                      "in_combat": in_combat or self.combat is not None and o.location == ("bf", self.combat["bf"]),
                                      "card_type": "unit" if "unit" in self.chars(u).types else "gear", "by": by,
-                                     "token": o.defn.is_token, "might": self.chars(u).might, "stunned": o.stunned, "buffed": o.buffs > 0,
+                                     "token": o.defn.is_token, "might": self.chars(u).might, "stunned": o.stunned, "buffed": o.buffs > 0, "empowered": bool(o.empowered),
                                      "alone": alone.get(u, False), "dmg_item": o.temp.get("dmg_item") if by == "damage" else None,
                                      "batch": batch})
             if ev is None:
