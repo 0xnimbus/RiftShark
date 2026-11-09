@@ -130,6 +130,9 @@ class _RestoreChoices(Instr):
         if snap:
             from .vm import _copy_containers
             ctx.vars.update(_copy_containers(snap))
+            # the earlier executions may have made these choices illegal (Hard Bargain countering the same spell
+            # twice): instructions that can't be performed are ignored (CR 820.1.d.2)
+            game._revalidate_targets(ctx)
         return None
 
 
@@ -1349,7 +1352,9 @@ class FlowMixin:
         if it.uid is not None and it.kind in ("spell", "unit", "gear"):
             o = self.objects[it.uid]
             if o.zone == "chain":
-                self._to_zone(o, "trash")
+                flow = it.kind == "spell" and it.ctx is not None and it.ctx.played_from == "trash" \
+                    and not it.ctx.vars.get("__recycle_after")
+                self._to_zone(o, "banish" if flow else "trash")      # Flow: banished on leaving the chain (CR 829.1.b.1)
         self.log("fizzle", item=it.id, label=it.label, why=why)
         self.dirty = True
 
@@ -1359,15 +1364,7 @@ class FlowMixin:
 
     def _resolve_item(self, it):
         ctx = it.ctx
-        # re-validate targets (CR 355.6 mistargeting): targets that no longer match are dropped
-        for name, sel in ctx.vars.get("__targets", []):
-            v = ctx.vars.get(name)
-            if v is None:
-                continue
-            if isinstance(v, tuple):
-                ctx.vars[name] = tuple(u for u in v if u in self.objects and self._still_valid(sel, ctx, u))
-            elif not (v in self.objects and self._still_valid(sel, ctx, v)):
-                ctx.vars[name] = None
+        self._revalidate_targets(ctx)
         self.log("resolve", item=it.id, label=it.label, controller=it.controller)
         if it.kind in ("unit", "gear"):
             self._enter_board(it)
@@ -1386,6 +1383,17 @@ class FlowMixin:
                 self.vm_frames.append(Frame([_RestoreChoices(0)], ctx))
             return
         self.vm_frames.append(Frame(it.code or [], ctx, tag=("resolve", it.id)))
+
+    def _revalidate_targets(self, ctx):
+        """Re-validate targets (CR 355.6 mistargeting): targets that no longer match are dropped."""
+        for name, sel in ctx.vars.get("__targets", []):
+            v = ctx.vars.get(name)
+            if v is None:
+                continue
+            if isinstance(v, tuple):
+                ctx.vars[name] = tuple(u for u in v if u in self.objects and self._still_valid(sel, ctx, u))
+            elif not (v in self.objects and self._still_valid(sel, ctx, v)):
+                ctx.vars[name] = None
 
     def _still_valid(self, sel, ctx, u):
         if sel is None or isinstance(sel, (list, tuple)):

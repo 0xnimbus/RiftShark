@@ -94,6 +94,9 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   Blade Dancer's auto-script fired (and readied "it") when you chose only enemies; now needs a friendly unit target.
   10:20: a countered spell played from the trash (Flow, Kennen's granted Flow) went back to the trash and could be
   played again; `do_counter` now banishes it (CR 829.1.b.1).
+  20:20: spells could choose themselves while being played (Hard Bargain, any Sel zone="chain"); `Sel.matches` now needs a
+  finalized chain item (CR 355.9.a.2). Repeat executions re-validate their own targets (CR 820.1.d.2), Hard Bargain asks
+  nobody to pay when its spell is gone, and a fizzled trash-played spell is banished like a countered one.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

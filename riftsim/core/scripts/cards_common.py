@@ -2614,9 +2614,10 @@ def hard_bargain(defn):
     ctl = lambda g, c: item(g, c).controller if item(g, c) is not None else g.opponent(c.controller)
     return [SpellEffect([O.Choose(Sel("spell", zone="chain", pred=lambda g, c, u: any(it.uid == u and it.kind == "spell" for it in g.chain)),
                                   out="__sp", targeted=True),
-                         O.PayResources(2, out="__hb", player=ctl),
-                         O.If(lambda g, c: not c.vars.get("__hb"),
-                              [O.CounterItem(lambda g, c: item(g, c).id if item(g, c) is not None else None)])],
+                         O.If(lambda g, c: item(g, c) is not None, [      # no spell left to counter: nobody is asked to pay
+                             O.PayResources(2, out="__hb", player=ctl),
+                             O.If(lambda g, c: not c.vars.get("__hb"),
+                                  [O.CounterItem(lambda g, c: item(g, c).id if item(g, c) is not None else None)])])],
                         label=defn.name, source_text=defn.text)]
 
 
