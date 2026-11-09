@@ -109,7 +109,9 @@ class LearnedGreedy(GreedyPolicy):
         self.net = net
         self.helper = GreedyPolicy(seed + 991, samples=1)
         # react=True ('learned-r'): in the lookahead the opponent may answer during our turn (to_turn_end opp)
-        self.opp_react = GreedyPolicy(seed + 433, samples=1) if react else None
+        # react="learned" ('learned-rl'): the opponent's answers come from the one-sample learned AI instead
+        self.opp_react = (LearnedGreedy(net, seed=seed + 433, samples=1) if react == "learned"
+                          else GreedyPolicy(seed + 433, samples=1) if react else None)
         self.deep, self.margin, self.deep_samples = deep, margin, deep_samples
         self.opp = LearnedGreedy(net, seed=seed + 577, samples=1) if deep else None
         self.deep_calls = 0
@@ -170,7 +172,7 @@ class LearnedMCTS(MCTSPolicy):
 
 
 def make_learned(kind, arg, seed=0):
-    if kind in ("learned", "learned-deep", "learned-r", "learned-deep-r"):
+    if kind in ("learned", "learned-deep", "learned-r", "learned-deep-r", "learned-rl"):
         # learned-deep:gen_008:0.1 -> close-call margin 0.1 (default 0.04): more decisions get the look through the
         # opponent's turn
         ref, _, rest = (arg or "").partition(":")
@@ -186,7 +188,8 @@ def make_learned(kind, arg, seed=0):
         if len(nums) > 1:
             kw["deep_samples"] = int(nums[1])
         path = _resolve(ref)
-        pol = LearnedGreedy(M.load(path), seed=seed, deep=kind.startswith("learned-deep"), react=kind.endswith("-r"), **kw)
+        pol = LearnedGreedy(M.load(path), seed=seed, deep=kind.startswith("learned-deep"),
+                            react="learned" if kind == "learned-rl" else kind.endswith("-r"), **kw)
         pol.name = kind + ":" + (path if path == "heuristic" else os.path.basename(path)[:-5]) + (":" + rest if rest else "")
         return pol
     it, _, ref = (arg or "").partition(":")
