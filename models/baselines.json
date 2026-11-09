@@ -407,5 +407,46 @@
   "timeouts": [],
   "date": "2026-11-09 18:38 UTC",
   "note": "gen 8's data (gens 6-8) + option-ranking pairs (each option of ~1200 decisions played out 3x to the end, pairs where mean results differ by 0.6+, weight 1); mirror"
+ },
+ {
+  "candidate": "learned-rl:gen_008",
+  "best": "learned:gen_008",
+  "games": 115,
+  "wins": 50,
+  "draws": 0,
+  "score": 0.4348,
+  "interval": [
+   0.348,
+   0.526
+  ],
+  "timeouts": [
+   [
+    "azir_emperor.json",
+    "azir_emperor.json",
+    68004
+   ],
+   [
+    "irelia_blade_dancer.json",
+    "irelia_blade_dancer.json",
+    68022
+   ],
+   [
+    "viktor_herald.json",
+    "viktor_herald.json",
+    68032
+   ],
+   [
+    "riven_exile.json",
+    "riven_exile.json",
+    68056
+   ],
+   [
+    "riven_exile.json",
+    "riven_exile.json",
+    68056
+   ]
+  ],
+  "date": "2026-11-09 19:21 UTC",
+  "note": "learned-rl: in the lookahead the opponent answers during our turn with the one-sample learned AI (gen 8) instead of the heuristic AI; mirror"
  }
 ]
