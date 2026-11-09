@@ -213,5 +213,97 @@
   "timeouts": [],
   "date": "2026-11-08 19:44 UTC",
   "note": "features v3 (held reactions) + TD labels with responses in the opponent turn, 1200 games; held-reaction weights ~0; not promoted"
+ },
+ {
+  "candidate": "learned-deep:gen_008",
+  "best": "learned:gen_008",
+  "games": 192,
+  "wins": 99,
+  "draws": 0,
+  "score": 0.5156,
+  "interval": [
+   0.445,
+   0.585
+  ],
+  "timeouts": [
+   [
+    "nasus_curator.json",
+    "azir_emperor.json",
+    54003
+   ],
+   [
+    "vex_gloomist.json",
+    "azir_emperor.json",
+    54025
+   ],
+   [
+    "reksai_void_burrower.json",
+    "azir_emperor.json",
+    54028
+   ],
+   [
+    "nasus_curator.json",
+    "viktor_herald.json",
+    54066
+   ],
+   [
+    "vex_gloomist.json",
+    "viktor_herald.json",
+    54071
+   ],
+   [
+    "irelia_blade_dancer.json",
+    "reksai_void_burrower.json",
+    54088
+   ],
+   [
+    "azir_emperor.json",
+    "riven_exile.json",
+    54098
+   ],
+   [
+    "azir_emperor.json",
+    "riven_exile.json",
+    54098
+   ]
+  ],
+  "date": "2026-11-09 06:33 UTC",
+  "note": "deep search with responding in the opponent turn (PR #30), seeds 54000"
+ },
+ {
+  "candidate": "learned-r:gen_008",
+  "best": "learned:gen_008",
+  "games": 199,
+  "wins": 87,
+  "draws": 0,
+  "score": 0.4372,
+  "interval": [
+   0.37,
+   0.507
+  ],
+  "timeouts": [
+   [
+    "akali_rogue.json",
+    "azir_emperor.json",
+    56003
+   ]
+  ],
+  "date": "2026-11-09 07:30 UTC",
+  "note": "opponent may react during our turn in the lookahead (learned-r), seeds 56000"
+ },
+ {
+  "candidate": "learned:gen_008:s6",
+  "best": "learned:gen_008",
+  "games": 200,
+  "wins": 99,
+  "draws": 0,
+  "score": 0.495,
+  "interval": [
+   0.426,
+   0.564
+  ],
+  "timeouts": [],
+  "date": "2026-11-09 08:43 UTC",
+  "note": "one-turn lookahead with 6 determinised samples per option instead of 3, seeds 58000"
  }
 ]

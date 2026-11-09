@@ -34,10 +34,13 @@ def _resolve(ref):
     return os.path.join(M.MODELS_DIR, ref + ".json")
 
 
-def to_turn_end(g, p, helper, max_steps=400):
+def to_turn_end(g, p, helper, max_steps=400, opp=None):
     """Advance g (a determinised copy) to the first decision of the next turn: p ends its turn as soon as it may act
     freely, the opponent passes, payments use the standard plan, and p's other choices (targets, modes, damage
-    assignment) come from `helper`. Returns when the turn number changes or the game ends."""
+    assignment) come from `helper`. Returns when the turn number changes or the game ends.
+    With `opp`, the opponent is not assumed to pass: whenever it gets priority during p's turn with something it
+    could play (a combat trick, a counter, a hidden card), `opp` decides, so an attack is judged against the
+    reactions the opponent's (sampled) hand allows ("playing around" Falling Star and the like)."""
     start = g.turn
     for _ in range(max_steps):
         d = g.run()
@@ -49,11 +52,17 @@ def to_turn_end(g, p, helper, max_steps=400):
         elif d.kind == "mulligan":
             o = mulligan_choice(g, d)
         elif d.kind == "action":
-            o = next((x for x in (("end_turn",), ("pass",)) if x in opts), None)
+            o = None
+            if opp is not None and d.player != p and any(isinstance(x, tuple) and x[0] not in ("pass", "end_turn") for x in opts):
+                o = opp.choose(g, d)
+            if o is None:
+                o = next((x for x in (("end_turn",), ("pass",)) if x in opts), None)
             if o is None:
                 o = helper.choose(g, d) if d.player == p else opts[0]
         elif d.player == p:
             o = helper.choose(g, d)
+        elif opp is not None:
+            o = opp.choose(g, d)          # the opponent's targets, modes and damage for the reaction it chose
         else:
             o = random.Random(len(g.events) if hasattr(g, "events") else 0).choice(opts)
         g.choose(o)
@@ -95,10 +104,12 @@ class LearnedGreedy(GreedyPolicy):
     view of our hand is a sample too), and judge the start of our next turn. Only close calls pay for the deeper
     look, so a game costs a few times a plain one instead of a hundred times."""
 
-    def __init__(self, net, seed=0, samples=3, deep=False, margin=0.04, deep_samples=2, **kw):
+    def __init__(self, net, seed=0, samples=3, deep=False, margin=0.04, deep_samples=2, react=False, **kw):
         super().__init__(seed, samples=samples, **kw)
         self.net = net
         self.helper = GreedyPolicy(seed + 991, samples=1)
+        # react=True ('learned-r'): in the lookahead the opponent may answer during our turn (to_turn_end opp)
+        self.opp_react = GreedyPolicy(seed + 433, samples=1) if react else None
         self.deep, self.margin, self.deep_samples = deep, margin, deep_samples
         self.opp = LearnedGreedy(net, seed=seed + 577, samples=1) if deep else None
         self.deep_calls = 0
@@ -111,7 +122,7 @@ class LearnedGreedy(GreedyPolicy):
                 g = determinize(game, d.player, self.rng)
                 if g.pending is not None and o in g.pending.options:
                     g.choose(o)
-                to_turn_end(g, d.player, self.helper)
+                to_turn_end(g, d.player, self.helper, opp=self.opp_react)
                 v += self.net.predict(g, d.player)
             v = 1000.0 * (v / self.samples - 0.5) + self.rng.random() * self.noise
             vals.append(v)
@@ -127,7 +138,7 @@ class LearnedGreedy(GreedyPolicy):
                         g = determinize(game, d.player, self.rng)
                         if g.pending is not None and opts[i] in g.pending.options:
                             g.choose(opts[i])
-                        to_turn_end(g, d.player, self.helper)
+                        to_turn_end(g, d.player, self.helper, opp=self.opp_react)
                         if not g.over:
                             opponent_turn(g, d.player, self.opp)
                         v += self.net.predict(g, d.player)
@@ -147,10 +158,24 @@ class LearnedMCTS(MCTSPolicy):
 
 
 def make_learned(kind, arg, seed=0):
-    if kind in ("learned", "learned-deep"):
-        path = _resolve(arg)
-        pol = LearnedGreedy(M.load(path), seed=seed, deep=kind == "learned-deep")
-        pol.name = kind + ":" + (path if path == "heuristic" else os.path.basename(path)[:-5])
+    if kind in ("learned", "learned-deep", "learned-r", "learned-deep-r"):
+        # learned-deep:gen_008:0.1 -> close-call margin 0.1 (default 0.04): more decisions get the look through the
+        # opponent's turn
+        ref, _, rest = (arg or "").partition(":")
+        # learned-deep:gen_008:0.15:3 -> margin 0.15, 3 deep samples; a field "s6" -> 6 determinised samples per option
+        kw, nums = {}, []
+        for f in (rest.split(":") if rest else []):
+            if f.startswith("s"):
+                kw["samples"] = int(f[1:])
+            else:
+                nums.append(f)
+        if nums:
+            kw["margin"] = float(nums[0])
+        if len(nums) > 1:
+            kw["deep_samples"] = int(nums[1])
+        path = _resolve(ref)
+        pol = LearnedGreedy(M.load(path), seed=seed, deep=kind.startswith("learned-deep"), react=kind.endswith("-r"), **kw)
+        pol.name = kind + ":" + (path if path == "heuristic" else os.path.basename(path)[:-5]) + (":" + rest if rest else "")
         return pol
     it, _, ref = arg.partition(":")
     path = _resolve(ref)

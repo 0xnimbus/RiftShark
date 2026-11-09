@@ -36,3 +36,8 @@ Written by tools/train_loop.py; the `learned` policy and the play page's Learned
 | 2026-11-08 17:16 UTC | learned:sp_linear | learned:gen_008 | 48.5% (42-55) | 200 | 3000 new local self-play games + gens 5-13 data (8000 games, outcome labels); not promoted |
 | 2026-11-08 17:16 UTC | learned:sp_wide | learned:gen_008 | 39.0% (33-46) | 200 | 3000 new local self-play games + gens 5-13 data (8000 games, outcome labels); not promoted (wide-and-deep, 32 hidden) |
 | 2026-11-08 19:44 UTC | learned:v3_td | learned:gen_008 | 46.5% (40-53) | 200 | features v3 (held reactions) + TD labels with responses in the opponent turn, 1200 games; held-reaction weights ~0; not promoted |
+| 2026-11-09 06:33 UTC | learned-deep:gen_008 | learned:gen_008 | 51.6% (44-58) | 192 | deep search with responding in the opponent turn (PR #30), seeds 54000 |
+| 2026-11-09 07:30 UTC | learned-r:gen_008 | learned:gen_008 | 43.7% (37-51) | 199 | opponent may react during our turn in the lookahead (learned-r), seeds 56000 |
+| 2026-11-09 08:43 UTC | learned:gen_008:s6 | learned:gen_008 | 49.5% (43-56) | 200 | one-turn lookahead with 6 determinised samples per option instead of 3, seeds 58000 |
+| 2026-11-09 07:00 UTC | learned-deep:gen_008:0.15:3 | learned:gen_008 | 56.1% (43-68) | 57 | wider deep search (margin 0.15, 3 deep samples), pilot on seeds 55000 |
+| 2026-11-09 08:15 UTC | learned-deep:gen_008:0.15:3 | learned:gen_008 | 41.3% (31-52) | 80 | same, confirmation on seeds 57000, stopped at 80 games (combined 65/140, 46%) |
