@@ -2781,3 +2781,11 @@ def entrenched_boar(defn):
     return [PlayPermission("as_play", value=[O.AskYesNo(out="__opt_ready", label="enter ready (then I can't move this turn)")]),
             Replacement("enter_ready", lambda g, s, ev: ev.get("uid") == s and ev.get("opt_ready"), ready,
                         label="enter ready; can't move this turn", zone="any", source_text=defn.text)]
+
+
+@script("Noxian Emissary")
+def noxian_emissary(defn):
+    # [Empower] [1][Order]  /  [Empowered] [Deathknell] Play two 1 [M] Recruit unit tokens to your base.
+    # (The [Empower] keyword ability comes from the keyword layer.)
+    return [Triggered("die_self", [O.PlayToken("Recruit", loc="base", count=2)], filt=lambda g, s, ev: bool(ev.get("empowered")),
+                      label="Deathknell (Empowered): two Recruits", source_text=defn.text, keyword="deathknell")]

@@ -1,12 +1,12 @@
 {
- "name": "Heart of the Tempest (ASC Evansrhim, 1st Riftbound Regional Championship: Europe)",
+ "name": "Heart of the Tempest (Tilted2211, 1st Radiance Standard Challenge Friday - Riftbound Regional Championship: Europe)",
  "legend": "VEN-197",
  "champion": "VEN-113",
  "main": [
   {
    "id": "RAD-107",
    "name": "Bedeviling Stranger",
-   "count": 2
+   "count": 1
   },
   {
    "id": "OGN-199",
@@ -24,19 +24,24 @@
    "count": 3
   },
   {
+   "id": "SFD-149",
+   "name": "Ezreal, Prodigy",
+   "count": 2
+  },
+  {
    "id": "SFD-140",
    "name": "Fizz, Trickster",
    "count": 1
   },
   {
-   "id": "RAD-105",
-   "name": "Reckless Innovator",
-   "count": 2
-  },
-  {
    "id": "OGN-194",
    "name": "Nocturne, Horrifying",
    "count": 3
+  },
+  {
+   "id": "UNL-150",
+   "name": "Vex, Apathetic",
+   "count": 1
   },
   {
    "id": "OGN-195",
@@ -51,7 +56,7 @@
   {
    "id": "SFD-139",
    "name": "Edge of Night",
-   "count": 2
+   "count": 1
   },
   {
    "id": "SFD-150",
@@ -74,13 +79,13 @@
    "count": 1
   },
   {
-   "id": "SFD-136",
-   "name": "Hard Bargain",
+   "id": "OGS-011",
+   "name": "Flash",
    "count": 1
   },
   {
-   "id": "OGN-213",
-   "name": "Hidden Blade",
+   "id": "SFD-136",
+   "name": "Hard Bargain",
    "count": 1
   },
   {
@@ -91,7 +96,7 @@
   {
    "id": "OGN-173",
    "name": "Ride the Wind",
-   "count": 1
+   "count": 3
   },
   {
    "id": "SFD-145",
@@ -101,7 +106,7 @@
   {
    "id": "UNL-128",
    "name": "Star-Crossed",
-   "count": 2
+   "count": 1
   }
  ],
  "runes": {
@@ -110,50 +115,17 @@
  },
  "battlefields": [
   "SFD-212",
-  "SFD-221",
+  "RAD-166",
   "OGN-298"
  ],
  "source": {
-  "url": "https://riftdecks.com/riftbound-metagame/deck-kennen-heart-of-the-tempest-345106",
-  "player": "ASC Evansrhim",
+  "url": "https://riftdecks.com/riftbound-metagame/deck-kennen-heart-of-the-tempest-343353",
+  "player": "Tilted2211",
   "placement": 1,
-  "tournament": "Riftbound Regional Championship: Europe",
-  "players": 315,
-  "date": "2026-11-08",
+  "tournament": "Radiance Standard Challenge Friday - Riftbound Regional Championship: Europe",
+  "players": 1792,
+  "date": "2026-11-06",
   "set": "Radiance",
-  "sideboard": [
-   [
-    "Abandon",
-    1
-   ],
-   [
-    "An Offer You Can't Refuse",
-    1
-   ],
-   [
-    "Decree of Unity",
-    2
-   ],
-   [
-    "Lacerate",
-    1
-   ],
-   [
-    "Ride the Wind",
-    1
-   ],
-   [
-    "Fizz, Trickster",
-    1
-   ],
-   [
-    "Ravenbloom Prefect",
-    2
-   ],
-   [
-    "The Good Stuff",
-    1
-   ]
-  ]
+  "sideboard": []
  }
 }
