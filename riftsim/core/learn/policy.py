@@ -149,11 +149,23 @@ class LearnedGreedy(GreedyPolicy):
 
 
 class LearnedMCTS(MCTSPolicy):
-    def __init__(self, net, iterations=120, seed=0, **kw):
+    """turn_leaf=True ('learned-tmcts'): no random rollout; a leaf is played to the start of the next turn the same
+    way the greedy lookahead does (the player whose turn it is ends it, the other passes) and judged there, at the
+    point the net was trained on. The tree itself holds both players' choices, the opponent's answers during our
+    turn included (sampled hands, UCT picks the replies that hurt us most), so interaction is searched, not assumed
+    away."""
+
+    def __init__(self, net, iterations=120, seed=0, turn_leaf=False, **kw):
+        if turn_leaf:
+            kw.setdefault("rollout_depth", 0)
         super().__init__(iterations=iterations, seed=seed, **kw)
         self.net = net
+        self.turn_leaf = turn_leaf
+        self.helper = GreedyPolicy(seed + 991, samples=1) if turn_leaf else None
 
     def leaf(self, g, me):
+        if self.turn_leaf and not g.over:
+            to_turn_end(g, g.turn_player, self.helper)
         return 2.0 * self.net.predict(g, me) - 1.0
 
 
@@ -177,8 +189,8 @@ def make_learned(kind, arg, seed=0):
         pol = LearnedGreedy(M.load(path), seed=seed, deep=kind.startswith("learned-deep"), react=kind.endswith("-r"), **kw)
         pol.name = kind + ":" + (path if path == "heuristic" else os.path.basename(path)[:-5]) + (":" + rest if rest else "")
         return pol
-    it, _, ref = arg.partition(":")
+    it, _, ref = (arg or "").partition(":")
     path = _resolve(ref)
-    pol = LearnedMCTS(M.load(path), iterations=int(it or 120), seed=seed)
-    pol.name = f"learned-mcts:{it or 120}:" + os.path.basename(path)[:-5]
+    pol = LearnedMCTS(M.load(path), iterations=int(it or 120), seed=seed, turn_leaf=kind == "learned-tmcts")
+    pol.name = f"{kind}:{it or 120}:" + (path if path == "heuristic" else os.path.basename(path)[:-5])
     return pol

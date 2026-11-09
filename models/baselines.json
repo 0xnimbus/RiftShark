@@ -305,5 +305,56 @@
   "timeouts": [],
   "date": "2026-11-09 08:43 UTC",
   "note": "one-turn lookahead with 6 determinised samples per option instead of 3, seeds 58000"
+ },
+ {
+  "candidate": "learned:models/cand_v3k.json",
+  "best": "learned:gen_008",
+  "games": 200,
+  "wins": 89,
+  "draws": 0,
+  "score": 0.445,
+  "interval": [
+   0.378,
+   0.514
+  ],
+  "timeouts": [],
+  "date": "2026-11-09 10:12 UTC",
+  "note": "v3 linear, TD: sp_v3_1 + 600 new gen 8 self-play games incl. Kennen and the equipment fixes"
+ },
+ {
+  "candidate": "learned:models/cand_v2k.json",
+  "best": "learned:gen_008",
+  "games": 200,
+  "wins": 101,
+  "draws": 0,
+  "score": 0.505,
+  "interval": [
+   0.436,
+   0.574
+  ],
+  "timeouts": [],
+  "date": "2026-11-09 10:30 UTC",
+  "note": "v2-width linear, TD: gens 12-13 + the same 600 new games"
+ },
+ {
+  "candidate": "learned:gen_008+gen_010+gen_013",
+  "best": "learned:gen_008",
+  "games": 199,
+  "wins": 103,
+  "draws": 0,
+  "score": 0.5176,
+  "interval": [
+   0.448,
+   0.586
+  ],
+  "timeouts": [
+   [
+    "azir_emperor.json",
+    "azir_emperor.json",
+    60037
+   ]
+  ],
+  "date": "2026-11-09 10:50 UTC",
+  "note": "ensemble: gen 8 + gen 10 + gen 13 averaged in logit space, mirror matches"
  }
 ]

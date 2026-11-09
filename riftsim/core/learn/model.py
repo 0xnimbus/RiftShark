@@ -71,6 +71,26 @@ class HeuristicNet:
         return 1.0 / (1.0 + math.exp(-max(-30.0, min(30.0, heuristic(g, p) / 150.0))))
 
 
+class EnsembleNet:
+    """Several value nets averaged in logit space (`learned:gen_008+gen_006`): their errors partly cancel, so the
+    lookahead compares options with a less noisy judge. Features are encoded once and each net reads its prefix."""
+
+    def __init__(self, nets):
+        self.nets = nets
+        self.meta = {"ensemble": [n.meta for n in nets]}
+
+    def predict(self, g, p):
+        if g.over:
+            return 0.5 if g.winner is None else (1.0 if g.winner == p else 0.0)
+        x = encode(g, p)
+        z = 0.0
+        for n in self.nets:
+            q = min(1 - 1e-9, max(1e-9, n.predict_x(x)))
+            z += math.log(q / (1 - q))
+        z /= len(self.nets)
+        return 1.0 / (1.0 + math.exp(-max(-30.0, min(30.0, z))))
+
+
 _CACHE = {}
 
 
@@ -84,6 +104,10 @@ def best_path():
 def load(path=None):
     if path == "heuristic":
         return HeuristicNet()
+    if path and "+" in os.path.basename(path):
+        d = os.path.dirname(path)
+        names = os.path.basename(path)[:-5].split("+") if path.endswith(".json") else os.path.basename(path).split("+")
+        return EnsembleNet([load(os.path.join(d, n if n.endswith(".json") else n + ".json")) for n in names])
     path = path or best_path()
     if path not in _CACHE:
         _CACHE[path] = ValueNet.load(path)

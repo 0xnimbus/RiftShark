@@ -417,7 +417,7 @@ def make_policy(spec, seed=0):
         pol.name = spec
         return pol
     name, _, arg = spec.partition(":")
-    if name in ("learned", "learned-deep", "learned-mcts", "learned-r", "learned-deep-r"):
+    if name in ("learned", "learned-deep", "learned-mcts", "learned-r", "learned-deep-r", "learned-tmcts"):
         from .learn.policy import make_learned
         return make_learned(name, arg, seed)
     if name == "random":
