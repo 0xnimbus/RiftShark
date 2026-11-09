@@ -371,5 +371,26 @@
   "timeouts": [],
   "date": "2026-11-09 11:49 UTC",
   "note": "wide-and-deep on top of gen 8: 8 hidden units, l2 1e-2, gens 6-13 + 600 new games (outcome labels); mirror"
+ },
+ {
+  "candidate": "learned:models/cand_v4.json",
+  "best": "learned:gen_008",
+  "games": 199,
+  "wins": 85,
+  "draws": 0,
+  "score": 0.4271,
+  "interval": [
+   0.36,
+   0.497
+  ],
+  "timeouts": [
+   [
+    "azir_emperor.json",
+    "azir_emperor.json",
+    64033
+   ]
+  ],
+  "date": "2026-11-09 14:06 UTC",
+  "note": "v4 features (held answers: affordable removal, bounce, fast spells, loose Equipment), linear td on 1000 new gen-8 self-play games; mirror"
  }
 ]
