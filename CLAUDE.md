@@ -90,6 +90,8 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   Sprite nowhere); auto triggers now store the event's player as __p and a move's origin as __tloc.
   20:20: attack/defend triggers re-fired when a unit left a combat and came back (CR 383.4.e.2.a: once per combat);
   `flow._first_designation` keys them by (uid, entered_stamp). Late arrivals still attack once (CR 466.2.c.3.a).
+  2026-11-09 05:20: the "target" event is now one per chosen object ("When you choose a friendly unit" triggers per unit);
+  Blade Dancer's auto-script fired (and readied "it") when you chose only enemies; now needs a friendly unit target.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
