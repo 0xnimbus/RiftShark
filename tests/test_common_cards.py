@@ -271,6 +271,7 @@ def test_lilting_lullaby_counters_and_locks_spells(db, decks):
     sp = _card_in(g, db, 1, "Get Excited!", "hand")
     g._to_zone(g.objects[sp], "chain"); g.bump()
     it = ChainItem(900, "spell", 1, uid=sp, label="Get Excited!")
+    it.finalized = True                 # only a finalized spell can be chosen (CR 355.9.a.2)
     g.chain.append(it)
     _run_spell(g, db, "Lilting Lullaby", picks=[sp])
     assert it not in g.chain and g.objects[sp].zone == "trash"
@@ -681,6 +682,7 @@ def test_riposte_counters_and_pumps(db, decks):
     sp = _card_in(g, db, 1, "Get Excited!", "hand")
     g._to_zone(g.objects[sp], "chain"); g.bump()
     g.chain.append(ChainItem(900, "spell", 1, uid=sp, label="Get Excited!"))
+    g.chain[-1].finalized = True        # only a finalized spell can be chosen (CR 355.9.a.2)
     base = g.chars(u).might
     _run_spell(g, db, "Riposte", picks=[u, sp])
     assert g.objects[sp].zone == "trash" and g.chars(u).might == base + (g.objects[sp].base_defn().energy or 0)
@@ -723,6 +725,7 @@ def test_abandon_returns_the_spell_to_hand(db, decks):
     sp = _card_in(g, db, 1, "Get Excited!", "hand")
     g._to_zone(g.objects[sp], "chain"); g.bump()
     g.chain.append(ChainItem(900, "spell", 1, uid=sp, label="Get Excited!"))
+    g.chain[-1].finalized = True        # only a finalized spell can be chosen (CR 355.9.a.2)
     _run_spell(g, db, "Abandon", picks=[sp])
     assert g.objects[sp].zone == "hand" and sp in g.players[1].hand
 

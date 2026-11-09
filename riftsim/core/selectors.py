@@ -44,6 +44,8 @@ class Sel:
                 return False
         elif self.zone != "any" and o.zone != self.zone:
             return False
+        if self.zone == "chain" and not any(it.uid == uid and it.finalized and not it.removed for it in g.chain):
+            return False        # only a finalized spell on the chain can be chosen (CR 355.9.a.2): not the one being played
         k = self.kind
         if k == "unit" and "unit" not in ch.types: return False
         if k == "gear" and "gear" not in ch.types: return False
