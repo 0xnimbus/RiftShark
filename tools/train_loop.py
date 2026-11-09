@@ -354,29 +354,40 @@ def td_targets(d, net, lam=0.7):
     return out
 
 
-def rank_pairs(files, width):
-    """Pairwise rows from tools/rank_data.py files: for every playout where two options of one decision ended
-    differently, (features of the better option, features of the worse one, decision id)."""
+def rank_pairs(files, width, min_gap=0.0):
+    """Pairwise rows from tools/rank_data.py files: (features of the better option, features of the worse one,
+    decision id). min_gap 0: every playout where two options ended differently. min_gap > 0: an option is better when
+    its mean result over all playouts of the decision is at least min_gap higher (single playouts agree with each
+    other only ~60% of the time, so the mean is the cleaner label); one pair per playout, from the two options'
+    turn-end features in that playout's world."""
     import numpy as np
     xa, xb, ds = [], [], []
-    for f in files:
+    for fi, f in enumerate(files):
         d = np.load(f)
-        X, Y, D, P = d["x"][:, :width], d["y"], d["dec"], d["po"]
-        groups = {}
+        X, Y, D, O, P = d["x"][:, :width], d["y"], d["dec"], d["opt"], d["po"]
+        dec = {}
         for i in range(len(Y)):
-            groups.setdefault((int(D[i]), int(P[i])), []).append(i)
-        for (dec, _), idx in groups.items():
-            for i in idx:
-                for j in idx:
-                    if Y[i] > Y[j]:
-                        xa.append(X[i]); xb.append(X[j]); ds.append(hash((f, dec)) & 0x7fffffff)
+            dec.setdefault(int(D[i]), {}).setdefault(int(P[i]), {})[int(O[i])] = i
+        for k, plays in dec.items():
+            if min_gap > 0:
+                res = {}
+                for po in plays.values():
+                    for o, i in po.items():
+                        res.setdefault(o, []).append(Y[i])
+                mu = {o: float(np.mean(v)) for o, v in res.items()}
+            for po in plays.values():
+                for a, i in po.items():
+                    for b, j in po.items():
+                        better = (mu[a] - mu[b] >= min_gap - 1e-9) if min_gap > 0 else Y[i] > Y[j]
+                        if a != b and better:
+                            xa.append(X[i]); xb.append(X[j]); ds.append(fi * 10**12 + k)
     if not xa:
         return None
     return np.array(xa, dtype=np.float32), np.array(xb, dtype=np.float32), np.array(ds)
 
 
 def train_linear(files, out, l2=1e-2, seed=0, meta=None, target="outcome", net=None, lam=0.7, width=None,
-                 pairs=None, pair_weight=1.0):
+                 pairs=None, pair_weight=1.0, pair_gap=0.0):
     """Logistic regression on the standardised features plus the hand-written score's logit: about 100 weights, so it
     needs far less data than the MLP and cannot overfit the turn-to-turn noise. Same JSON format (no hidden units).
     pairs: tools/rank_data.py files; each pair (better option a, worse option b of one decision) adds a row
@@ -417,7 +428,7 @@ def train_linear(files, out, l2=1e-2, seed=0, meta=None, target="outcome", net=N
     Pv = None
     nv = len(Yt)                                # value rows come first (train_loss reports those only)
     if pairs:
-        pr = rank_pairs(pairs, width or size())
+        pr = rank_pairs(pairs, width or size(), pair_gap)
         if pr is not None:
             xa, xb, ds = pr
 
@@ -642,6 +653,8 @@ def main():
     t.add_argument("--epochs", type=int, default=40)
     t.add_argument("--width", type=int, help="feature count to train on (an older version's prefix); default: current")
     t.add_argument("--pairs", nargs="+", help="tools/rank_data.py files: add option-ranking rows (linear only)")
+    t.add_argument("--pair-gap", type=float, default=0.0,
+                   help="pair options whose mean playout results differ by at least this (0: per playout)")
     t.add_argument("--pair-weight", type=float, default=1.0, help="total weight of ranking rows vs value rows")
     t.add_argument("--target", choices=("td", "outcome"), default="outcome",
                    help="td: bootstrapped labels from the best model (files recorded with --labels td)")
@@ -664,7 +677,7 @@ def main():
         if a.linear:
             print(train_linear(a.files, a.out, width=a.width, target=a.target,
                                net=_best_net() if a.target == "td" else None, pairs=a.pairs,
-                               pair_weight=a.pair_weight))
+                               pair_weight=a.pair_weight, pair_gap=a.pair_gap))
         else:
             wide = json.load(open(a.wide)) if a.wide else None
             print(train(a.files, a.out, hidden=a.hidden, epochs=a.epochs, wide=wide, width=a.width))
