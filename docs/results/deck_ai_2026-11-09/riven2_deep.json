@@ -1,0 +1,54 @@
+{
+ "deck": "riven_exile",
+ "policy": "learned-deep:gen_008:0.15:3",
+ "opponent": "learned:gen_008",
+ "wins": 110.0,
+ "games": 188,
+ "score": 0.5851,
+ "interval": [
+  0.514,
+  0.653
+ ],
+ "per_matchup": {
+  "kennen_tempest": [
+   16.0,
+   19
+  ],
+  "akali_rogue": [
+   16.0,
+   20
+  ],
+  "irelia_blade_dancer": [
+   16.0,
+   20
+  ],
+  "azir_emperor": [
+   10.0,
+   14
+  ],
+  "vex_gloomist": [
+   14.0,
+   20
+  ],
+  "nasus_curator": [
+   13.0,
+   19
+  ],
+  "kaisa_void": [
+   9.0,
+   19
+  ],
+  "reksai_void_burrower": [
+   7.0,
+   19
+  ],
+  "viktor_herald": [
+   6.0,
+   18
+  ],
+  "master_yi_wuju": [
+   3.0,
+   20
+  ]
+ }
+}
