@@ -1286,12 +1286,16 @@ class Game(flow.FlowMixin):
         self.emit("disempower", uid=uid, player=o.controller, ctx=ctx)
         self.dirty = True
 
-    def valid_destination(self, uid, dest, standard=False):
+    def valid_destination(self, uid, dest, standard=False, mover=None):
+        """`mover`: the player whose move or effect moves the unit (default its controller)."""
         o = self.objects[uid]
         if dest == o.location:
             return False
         if self.cant_move(uid):
             return False
+        by = self.keyword_value(uid, "cant_move_by")
+        if by and (o.controller if mover is None else mover) in by:
+            return False          # Vex, Apathetic: "They can't move it this turn" (other players still may)
         if dest[0] == "base":
             if any(self.objects[src].place == o.location for src, _ in self.rules("cant_move_to_base")):
                 return False          # "Units can't move from here to base"
@@ -1325,7 +1329,8 @@ class Game(flow.FlowMixin):
             if o is None or o.zone != "board" or "unit" not in self.chars(u).types:
                 continue
             origin[u] = o.location
-            if not self.valid_destination(u, dest):
+            mover = ctx.controller if (ctx is not None and not standard and ctx.controller is not None) else o.controller
+            if not self.valid_destination(u, dest, mover=mover):
                 continue
             if ctx is not None and not standard and ctx.controller is not None \
                     and not self.is_friendly(ctx.controller, o.controller) and self.has_keyword(u, "unmovable_by_enemies"):

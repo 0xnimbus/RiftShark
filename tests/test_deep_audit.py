@@ -1035,3 +1035,19 @@ def test_pay_x_as_an_additional_cost_is_paid_with_the_cost(db):
     assert any(d.kind == "additional_cost" for d in seen)
     assert g.objects[sm].zone == "board" and g.objects[sm].buffs
     assert all(g.objects[r].exhausted for r in g.players[0].runes)
+
+
+def test_vex_apathetic_only_stops_its_controller_moving_the_unit(db):
+    """Vex, Apathetic: "When an opponent plays a unit while I'm at a battlefield, [Stun] it. They can't move it this
+    turn." Only that opponent is locked: Vex's controller may still move it with Charm ("Move an enemy unit")."""
+    g = _fresh(db, "master_yi_wuju")             # calm runes for Charm
+    put(g, db, 0, "Vex, Apathetic", ("bf", 0))
+    tok = g.play_token(1, "Recruit", ("base", 1), Context(1))
+    settle(g)
+    assert g.objects[tok].stunned
+    assert not g.valid_destination(tok, ("bf", 1), standard=True)          # its controller can't move it
+    assert not g.valid_destination(tok, ("bf", 1), mover=1)
+    assert g.valid_destination(tok, ("bf", 1), mover=0)
+    _cast(g, db, 0, "Charm", lambda d: tok if d.kind == "choose" and tok in d.options else
+          (("bf", 1) if d.kind == "choose_location" else None))
+    assert g.objects[tok].location == ("bf", 1)

@@ -1777,7 +1777,7 @@ def stormbringer(defn):
 def dragons_rage(defn):
     # Move an enemy unit. Then choose another enemy unit at its destination. They deal damage equal to their Mights to
     # each other.
-    dests = lambda g, c, l: c.vars.get("t") is not None and l != g.objects[c.vars["t"]].location and g.valid_destination(c.vars["t"], l)
+    dests = lambda g, c, l: c.vars.get("t") is not None and l != g.objects[c.vars["t"]].location and g.valid_destination(c.vars["t"], l, mover=c.controller)
     there = lambda g, c: [u for u in g.units_at(g.objects[c.vars["t"]].location) if u != c.vars["t"] and _enemy(g, c, u)] \
         if c.vars.get("t") in g.objects and g.objects[c.vars["t"]].zone == "board" else []
     return [SpellEffect([O.Choose(Sel("unit", side="enemy"), out="t"),
@@ -1793,7 +1793,7 @@ def zenith_blade(defn):
     # [Action]  Stun an enemy unit at a battlefield. You may move a friendly unit to that enemy unit's battlefield.
     bf = lambda g, c: g.objects[c.vars["t"]].location
     movers = lambda g, c: [u for u, o in g.objects.items() if o.zone == "board" and g.is_friendly(o.controller, c.controller)
-                           and "unit" in g.chars(u).types and o.location != bf(g, c) and g.valid_destination(u, bf(g, c))]
+                           and "unit" in g.chars(u).types and o.location != bf(g, c) and g.valid_destination(u, bf(g, c), mover=c.controller)]
     return [SpellEffect([O.Choose(Sel("unit", side="enemy", where="battlefield"), out="t"), O.Stun(Ref("t")),
                          O.ChooseFromList(movers, out="__zm", up_to=True, label="you may move a friendly unit there"),
                          O.Move(lambda g, c: list(c.vars.get("__zm") or ()), bf)],
@@ -1901,7 +1901,7 @@ def call_to_battle(defn):
     mine = lambda g, c, l: g.battlefields[l[1]].controller == c.controller
     theirs = lambda g, c: [u for u, o in g.objects.items() if c.vars.get("loc") is not None and o.zone == "board"
                            and o.controller == c.vars.get("__opp") and "unit" in g.chars(u).types and o.location != c.vars["loc"]
-                           and g.valid_destination(u, c.vars["loc"])]
+                           and g.valid_destination(u, c.vars["loc"], mover=c.controller)]
     return [SpellEffect([O.Choose(Sel("unit", side="friendly", pred=lambda g, c, u: g.objects[u].controller == c.controller), out="t"),
                          O.ChooseLocation(out="loc", pred=mine, label="a battlefield you control"),
                          O.Move(Ref("t"), Ref("loc")),
@@ -1968,7 +1968,7 @@ def suave_negotiator(defn):
 def sirens_song(defn):
     # [Reaction]  Move an enemy unit that moved this turn.
     moved = Sel("unit", side="enemy", pred=lambda g, c, u: g.objects[u].temp.get(("moved", g.turn)))
-    dests = lambda g, c, l: l != g.objects[c.vars["t"]].location and g.valid_destination(c.vars["t"], l)
+    dests = lambda g, c, l: l != g.objects[c.vars["t"]].location and g.valid_destination(c.vars["t"], l, mover=c.controller)
     return [SpellEffect([O.Choose(moved, out="t"), O.ChooseLocation(out="loc", pred=dests, include_bases=True, label="move it where?"),
                          O.Move(Ref("t"), Ref("loc"))], label=defn.name, source_text=defn.text)]
 
@@ -2186,7 +2186,7 @@ def angler_wyrm(defn):
     def theirs(g, c):
         loc = g.objects[c.source].location
         return [u for u, o in g.objects.items() if o.zone == "board" and o.controller == c.vars.get("__opp") and "unit" in g.chars(u).types
-                and o.location != loc and g.valid_destination(u, loc)]
+                and o.location != loc and g.valid_destination(u, loc, mover=c.vars.get("__opp"))]
     at_bf = lambda g, c: g.objects[c.source].location is not None and g.objects[c.source].location[0] == "bf"
     return [Activated({"energy": 0, "power": [], "exhaust": True},
                       [O.ChoosePlayer(out="__opp", opponent=True),
@@ -2199,7 +2199,7 @@ def angler_wyrm(defn):
 def cataclysm(defn):
     # Opponents can't play spells this turn.  Move a friendly unit to an occupied enemy battlefield.
     occ = lambda g, c, l: g.battlefields[l[1]].controller is not None and not g.is_friendly(g.battlefields[l[1]].controller, c.controller) \
-        and bool(g.units_at(l)) and g.valid_destination(c.vars["t"], l)
+        and bool(g.units_at(l)) and g.valid_destination(c.vars["t"], l, mover=c.controller)
     return [SpellEffect([O.Do(lambda g, c: g.add_turn_effect(c, "cant_play_spells", {"players": tuple(g.opponents(c.controller))}),
                               label="opponents can't play spells this turn"),
                          O.Choose(Sel("unit", side="friendly"), out="t"),
@@ -2266,7 +2266,7 @@ def demon_shade(defn):
     no_open = lambda g, c: not opens(g, c)
     return [SpellEffect([O.Choose(Sel("unit", side="friendly"), out="t"),
                          O.ChooseMode([("move it to an open battlefield",
-                                        [O.ChooseLocation(out="loc", pred=lambda g, c, l: l in opens(g, c) and g.valid_destination(c.vars["t"], l)),
+                                        [O.ChooseLocation(out="loc", pred=lambda g, c, l: l in opens(g, c) and g.valid_destination(c.vars["t"], l, mover=c.controller)),
                                          O.Move(Ref("t"), Ref("loc"))]),
                                        ("give it [Ganking] this turn if there are no open battlefields",
                                         [O.If(no_open, [O.Do(lambda g, c: g.add_mod(c.vars["t"], "keyword", ("ganking", True), duration="turn",
@@ -2551,7 +2551,7 @@ def temptation(defn):
     def dests(g, c, l):
         u = c.vars.get("t")
         o = g.objects[u]
-        return l != o.location and any(g.objects[x].controller == o.controller for x in g.units_at(l)) and g.valid_destination(u, l)
+        return l != o.location and any(g.objects[x].controller == o.controller for x in g.units_at(l)) and g.valid_destination(u, l, mover=c.controller)
     return [SpellEffect([O.Choose(Sel("unit", side="enemy"), out="t"),
                          O.ChooseLocation(out="loc", pred=dests, include_bases=True, label="where one of its controller's units is"),
                          O.Move(Ref("t"), Ref("loc"))], label=defn.name, source_text=defn.text)]
@@ -2563,7 +2563,7 @@ def fae_porter(defn):
     to_bf = lambda g, s, ev: ev.get("kind") == "move" and ev.get("uid") == s and ev.get("to") and ev["to"][0] == "bf"
     others = lambda g, c: [u for u, o in g.objects.items() if o.zone == "board" and o.controller == c.controller and u != c.source
                            and "unit" in g.chars(u).types and o.location != g.objects[c.source].location
-                           and g.valid_destination(u, g.objects[c.source].location)]
+                           and g.valid_destination(u, g.objects[c.source].location, mover=c.controller)]
     return [Triggered(to_bf, [O.PayResources(0, ["chaos"], out="__fp"),
                               O.If(Ref("__fp"), [O.ChooseFromList(others, out="__fpu", label="move a unit you control here"),
                                                  O.Move(Ref("__fpu"), lambda g, c: g.objects[c.source].location)])],
