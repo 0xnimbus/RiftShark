@@ -706,18 +706,24 @@ def parse_sentence(s, state):
     if m:
         kinds = {"unit or gear": ("unit", "gear"), "unit": ("unit",), "gear": ("gear",)}[m.group(1)]
 
-        def _enemy_item_targeting_mine(g, c, u, kinds=kinds):
-            # Not So Fast: an enemy chain item whose choices include a unit/gear I control
-            for it in g.chain:
-                if it.uid == u and it.controller != c.controller and it.ctx is not None and not it.removed:
-                    for x in g._target_uids(it.ctx):
-                        o = g.objects.get(x) if isinstance(x, int) else None
-                        if o is not None and o.zone == "board" and o.controller == c.controller \
-                                and set(kinds) & set(g.chars(x).types):
-                            return True
+        def _item_ok(g, c, it, kinds=kinds):
+            # Not So Fast: a finalized enemy chain item whose choices include a unit/gear I control (CR 355.9.a.2)
+            if it.controller == c.controller or it.ctx is None or it.removed or not it.finalized:
+                return False
+            for x in g._target_uids(it.ctx):
+                o = g.objects.get(x) if isinstance(x, int) else None
+                if o is not None and o.zone == "board" and o.controller == c.controller \
+                        and set(kinds) & set(g.chars(x).types):
+                    return True
             return False
-        return [O.Choose(Sel("card", zone="any", pred=_enemy_item_targeting_mine), out="__sp", targeted=True),
-                O.CounterItem(lambda g, c: next((it.id for it in g.chain if it.uid == c.vars.get("__sp") and it.controller != c.controller), None))]
+
+        def _enemy_item_targeting_mine(g, c, u):
+            return any(it.uid == u and _item_ok(g, c, it) for it in g.chain)
+        # chosen by its card/source (a token unit's ability counts too); the countered item is the one that
+        # qualifies, not just the first item that source has on the chain
+        return [O.Choose(Sel("any", zone="any", pred=_enemy_item_targeting_mine), out="__sp", targeted=True),
+                O.CounterItem(lambda g, c: next((it.id for it in reversed(g.chain) if it.uid == c.vars.get("__sp")
+                                                 and _item_ok(g, c, it)), None))]
     m = re.match(r"swap the mights of two units at the same battlefield this turn$", sl)
     if m:
         def _swap(g, c):
