@@ -94,6 +94,11 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   Blade Dancer's auto-script fired (and readied "it") when you chose only enemies; now needs a friendly unit target.
   10:20: a countered spell played from the trash (Flow, Kennen's granted Flow) went back to the trash and could be
   played again; `do_counter` now banishes it (CR 829.1.b.1).
+  20:20: spells could choose themselves while being played (Hard Bargain, any Sel zone="chain"); `Sel.matches` now needs a
+  finalized chain item (CR 355.9.a.2). Repeat executions re-validate their own targets (CR 820.1.d.2), Hard Bargain asks
+  nobody to pay when its spell is gone, and a fizzled trash-played spell is banished like a countered one.
+  2026-11-10 00:20: Not So Fast countered the first chain item of the chosen source, not the one that chose your unit
+  (one source, two abilities), could pick unfinalized items, and skipped token sources; fixed in auto_grammar.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
@@ -160,8 +165,11 @@ Every entry in the RULES.md "Simplifications" list is a bug to fix, in this orde
    optional. AIs skip floats (`policies.ai_options`) and rollouts use the standard plan; one-ply lookahead pays
    before evaluating. Old replays no longer verify (new decisions): re-run batches and re-export web/data.
 2. DONE 2026-11-06: simultaneous triggers ordered by their controller (CR 383), decision `order_triggers`.
-3. DONE 2026-11-06: mulligan (CR 117, decision `mulligan`). Optional replacements: engine refuses them (4 unscripted
-   cards need them; build a decision path before scripting those).
+3. DONE 2026-11-06: mulligan (CR 117, decision `mulligan`). Optional replacements: 2026-11-10 'die' ones work
+   (`Replacement(optional=True, options=...)`, decision `optional_replacement`; do_kill keeps the unit on the board
+   and pushes `game._OptionalReplacementStep`); Mordekaiser, Twice Slain scripted (tests/test_optional_replacement.py:
+   kill him as Whirling Twirligig's cost, he eats the Recruit, the Mech still comes, CR 203.2). Zilean, Heimerdinger,
+   Sett need other event kinds. Also fixed: "heal, exhaust and recall" on a unit already in base now heals/exhausts it.
 4. DONE 2026-11-06: Show Off (CR 832), Baron Pit, Blade of the Exile alt cost, Scuttle Crab information; the 60-turn cap
    is reported as unfinished with a warning (0 of 216 round-robin games hit it).
 5. Script every card (`python -m riftsim.core coverage`: 425 none / 67 partial / 55 keywords-only on 2026-11-06), and

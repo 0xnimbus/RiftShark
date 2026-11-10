@@ -832,3 +832,63 @@ def test_countered_flow_spell_is_banished(db):
     assert item.ctx.played_from == "trash"
     assert g.do_counter(item.id)
     assert g.objects[u].zone == "banish"
+
+
+def test_hard_bargain_repeat_on_one_spell_and_never_itself(db):
+    """Hard Bargain ([Repeat] [2], "Counter a spell unless its controller pays [2]"): it can't choose itself while it is
+    being played (only finalized spells on the chain, CR 355.9.a.2), and once its first execution counters the spell,
+    the repeat has nothing to counter, so nobody is asked to pay again (CR 820.1.d.2)."""
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "kennen_tempest")])
+    _clear_bfs(g, db)
+    put(g, db, 0, "Forecaster", "base")
+    s, hb = give(g, 0, "Discipline", db), give(g, 1, "Hard Bargain", db)
+    for p in (0, 1):
+        for r in list(g.players[p].rune_deck)[:8]:
+            g.players[p].rune_deck.remove(r)
+            g.players[p].runes.append(r)
+            g.objects[r].zone = "board"
+        _ready_runes(g, p)
+    g.run()
+    g.choose(("play", s))
+    chooses, asked = [], []
+    for _ in range(80):
+        d = g.run()
+        if d is None or (d.kind == "action" and not g.chain):
+            break
+        if d.player == 1 and d.kind == "action" and ("play", hb) in d.options:
+            g.choose(("play", hb))
+        elif d.player == 1 and d.kind == "additional_cost":
+            g.choose(True)                                   # pay Repeat
+        elif d.player == 1 and d.kind == "choose":
+            chooses.append(list(d.options))
+            g.choose(s)
+        elif d.player == 0 and d.kind == "pay" and "decline" in d.options:
+            asked.append(1)
+            g.choose("decline")
+        else:
+            g.choose(("pass",) if ("pass",) in d.options else d.options[0])
+    assert all(hb not in opts for opts in chooses)
+    assert g.objects[s].zone == "trash"                      # countered by the first execution
+    assert len(asked) == 1                                   # the repeat found no spell and asked nothing
+
+
+def test_not_so_fast_counters_the_ability_that_chooses_my_unit(db):
+    """Not So Fast ("Counter an enemy spell or ability that chooses a friendly unit or gear"): when one enemy source has
+    two abilities on the chain, it counters the one that chose my unit, not just the first one from that source."""
+    from riftsim.core.objects import ChainItem
+    from riftsim.core.vm import Context
+    g = _fresh(db, "irelia_blade_dancer")
+    mine = put(g, db, 0, "Forecaster", "base")
+    theirs = put(g, db, 1, "Forecaster", ("base", 1))
+    src = put(g, db, 1, "Forecaster", ("base", 1), exclude=(theirs,))
+    items = []
+    for i, tgt in enumerate((theirs, mine)):            # older item chooses their own unit, newer one chooses mine
+        it = ChainItem(900 + i, "ability", 1, uid=src, label=f"ability {i}")
+        it.cost, it.finalized, it.ctx, it.code = {"energy": 0, "power": []}, True, Context(1, src), []
+        it.ctx.vars["t"] = tgt
+        it.ctx.vars["__targets"] = [("t", None)]
+        g.chain.append(it)
+        items.append(it)
+    g.priority = 0
+    _cast(g, db, 0, "Not So Fast", lambda d: src if d.kind == "choose" and src in d.options else None)
+    assert items[1].countered and not items[0].countered
