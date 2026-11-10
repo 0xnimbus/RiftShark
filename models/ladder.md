@@ -53,3 +53,7 @@ Written by tools/train_loop.py; the `learned` policy and the play page's Learned
 | 2026-11-10 03:07 UTC | learned:models/cand_mhb2.json | learned:gen_008 | 48.0% (41-55) | 200 | cand_mhb2 confirmation on fresh seeds; mirror |
 | 2026-11-10 03:29 UTC | learned:models/cand_mall.json | learned:gen_008 | 50.2% (43-57) | 197 | all card identities masked (hand, our board, their board), gens 6-13 + 1600 newer games; mirror |
 | 2026-11-10 08:44 UTC | learned:models/cand_mhb3.json | learned:models/cand_mhb.json | 49.2% (42-56) | 199 | masked judge retrained with 1000 self-play games of the masked judge itself, vs cand_mhb; mirror |
+
+**2026-11-10: gen 14 promoted by decision** (Derrick handed the call to the training thread). gen_014 = cand_mhb:
+gens 6-8 trained without hand/own-board card identities (`--mask 106-233`). It plays even with gen 8 in mirrors (53% over 400 games) and better with the top decks:
+Kennen 57% vs 50%, Riven 57% vs 45% against all decks (docs/results/deck_ai_2026-11-09.md). From now on, gates compare to gen 14.
