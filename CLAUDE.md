@@ -99,6 +99,8 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   nobody to pay when its spell is gone, and a fizzled trash-played spell is banished like a countered one.
   2026-11-10 00:20: Not So Fast countered the first chain item of the chosen source, not the one that chose your unit
   (one source, two abilities), could pick unfinalized items, and skipped token sources; fixed in auto_grammar.
+  05:20: a Repeat execution's choices never paid Deflect (CR 809.1.c, "each time they choose"): `flow._RepeatDeflect`;
+  the "target" events now cover every execution's choices (Irelia triggers for the repeat's unit too).
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

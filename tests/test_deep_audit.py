@@ -892,3 +892,44 @@ def test_not_so_fast_counters_the_ability_that_chooses_my_unit(db):
     g.priority = 0
     _cast(g, db, 0, "Not So Fast", lambda d: src if d.kind == "choose" and src in d.options else None)
     assert items[1].countered and not items[0].countered
+
+
+def test_repeat_pays_deflect_again_for_its_second_choice(db):
+    """Deflect is paid "for each time they choose [me]" (CR 809.1.c): Blood Rush with [Repeat] choosing an enemy
+    Tianna Crownguard ([Deflect]) for both executions pays [A] twice, not once."""
+    g = _fresh(db, "akali_rogue")
+    tianna = put(g, db, 1, "Tianna Crownguard", ("base", 1))
+    n = len(g.events)
+
+    def pick(d):
+        if d.kind == "choose" and tianna in d.options:
+            return tianna
+        if d.kind == "additional_cost":
+            return True
+        if d.kind == "pay":
+            return d.options[0]
+        return None
+    _cast(g, db, 0, "Blood Rush", pick)
+    power = sum(len(e["power"]) for e in g.events[n:] if e["kind"] == "pay" and e["player"] == 0)
+    assert power == 2                                  # Blood Rush has no Power cost: both are Deflect
+
+
+def test_repeat_choices_count_as_chosen(db):
+    """Both executions' choices are made while playing a Repeat spell (CR 820.2), so "When you choose a friendly unit"
+    (Irelia, Blade Dancer) triggers for the repeat's unit too, not only for the first execution's."""
+    g = main_phase(db, [_deck(db, "irelia_blade_dancer"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    a, b = put(g, db, 0, "Forecaster", "base"), put(g, db, 0, "Forecaster", "base")
+    order, asks = [a, b], []
+
+    def pick(d):
+        if d.kind == "choose" and order and order[0] in d.options:
+            return order.pop(0)
+        if d.kind == "additional_cost":
+            return True
+        if d.kind == "yesno":
+            asks.append(d.labels[0])
+            return False
+        return None
+    _cast(g, db, 0, "Feral Strength", pick)
+    assert sum("Irelia" in x for x in asks) == 2
