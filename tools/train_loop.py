@@ -387,7 +387,7 @@ def rank_pairs(files, width, min_gap=0.0):
 
 
 def train_linear(files, out, l2=1e-2, seed=0, meta=None, target="outcome", net=None, lam=0.7, width=None,
-                 pairs=None, pair_weight=1.0, pair_gap=0.0):
+                 pairs=None, pair_weight=1.0, pair_gap=0.0, mask=None):
     """Logistic regression on the standardised features plus the hand-written score's logit: about 100 weights, so it
     needs far less data than the MLP and cannot overfit the turn-to-turn noise. Same JSON format (no hidden units).
     pairs: tools/rank_data.py files; each pair (better option a, worse option b of one decision) adds a row
@@ -421,6 +421,8 @@ def train_linear(files, out, l2=1e-2, seed=0, meta=None, target="outcome", net=N
     A[:, -2] = np.arctanh(np.clip(X[:, H_INDEX], -0.999999, 0.999999))
     A[:, -1] = 1.0
     del X
+    if mask:                                    # features the judge must not use (standardised value 0 everywhere)
+        A[:, mask] = 0.0
     w = np.zeros(A.shape[1]); w[-2] = 1.0
     At, Yt, Av, Yv = A[~vm], Y[~vm], A[vm], Y[vm]
     del A
@@ -439,6 +441,8 @@ def train_linear(files, out, l2=1e-2, seed=0, meta=None, target="outcome", net=N
                 z[:, -1] = 1.0
                 return z
             Dz = zrow(xa) - zrow(xb)            # bias column cancels to 0
+            if mask:
+                Dz[:, mask] = 0.0
             udec = np.unique(ds)
             pval = set(rs.choice(udec, size=max(1, len(udec) // 10), replace=False).tolist())
             pm = np.isin(ds, np.array(sorted(pval)))
@@ -652,6 +656,7 @@ def main():
     t.add_argument("--wide", metavar="LINEAR_JSON", help="MLP that corrects this linear model (wide-and-deep)")
     t.add_argument("--epochs", type=int, default=40)
     t.add_argument("--width", type=int, help="feature count to train on (an older version's prefix); default: current")
+    t.add_argument("--mask", help="feature index ranges the model may not use, e.g. 170-233,106-169 (linear only)")
     t.add_argument("--pairs", nargs="+", help="tools/rank_data.py files: add option-ranking rows (linear only)")
     t.add_argument("--pair-gap", type=float, default=0.0,
                    help="pair options whose mean playout results differ by at least this (0: per playout)")
@@ -677,7 +682,9 @@ def main():
         if a.linear:
             print(train_linear(a.files, a.out, width=a.width, target=a.target,
                                net=_best_net() if a.target == "td" else None, pairs=a.pairs,
-                               pair_weight=a.pair_weight, pair_gap=a.pair_gap))
+                               pair_weight=a.pair_weight, pair_gap=a.pair_gap,
+                               mask=[i for r in (a.mask or "").split(",") if r
+                                     for i in range(int(r.split("-")[0]), int(r.split("-")[-1]) + 1)]))
         else:
             wide = json.load(open(a.wide)) if a.wide else None
             print(train(a.files, a.out, hidden=a.hidden, epochs=a.epochs, wide=wide, width=a.width))

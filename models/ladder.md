@@ -46,3 +46,9 @@ Written by tools/train_loop.py; the `learned` policy and the play page's Learned
 | 2026-11-09 14:06 UTC | learned:models/cand_v4.json | learned:gen_008 | 42.7% (36-50) | 199 | v4 features (held answers: affordable removal, bounce, fast spells, loose Equipment), linear td on 1000 new gen-8 self-play games; mirror |
 | 2026-11-09 18:38 UTC | learned:models/cand_rank1.json | learned:gen_008 | 43.5% (37-50) | 200 | gen 8's data (gens 6-8) + option-ranking pairs (each option of ~1200 decisions played out 3x to the end, pairs where mean results differ by 0.6+, weight 1); mirror |
 | 2026-11-09 19:21 UTC | learned-rl:gen_008 | learned:gen_008 | 43.5% (35-53) | 115 | learned-rl: in the lookahead the opponent answers during our turn with the one-sample learned AI (gen 8) instead of the heuristic AI; mirror |
+| 2026-11-10 01:47 UTC | learned:models/cand_mb.json | learned:gen_008 | 45.5% (39-52) | 200 | card-identity features of our own board masked (170-233) when training on gens 6-8: the judge can't reward a card just for being on the board; mirror |
+| 2026-11-10 02:06 UTC | learned:models/cand_mhb.json | learned:gen_008 | 54.0% (47-61) | 200 | card-identity features of our hand and board masked (106-233), gens 6-8; mirror |
+| 2026-11-10 02:26 UTC | learned:models/cand_mhb.json | learned:gen_008 | 52.0% (45-59) | 200 | cand_mhb confirmation on fresh seeds; mirror |
+| 2026-11-10 02:49 UTC | learned:models/cand_mhb2.json | learned:gen_008 | 54.3% (47-61) | 199 | hand+board card identities masked, trained on gens 6-13 + 1600 newer games (outcome labels); mirror |
+| 2026-11-10 03:07 UTC | learned:models/cand_mhb2.json | learned:gen_008 | 48.0% (41-55) | 200 | cand_mhb2 confirmation on fresh seeds; mirror |
+| 2026-11-10 03:29 UTC | learned:models/cand_mall.json | learned:gen_008 | 50.2% (43-57) | 197 | all card identities masked (hand, our board, their board), gens 6-13 + 1600 newer games; mirror |
