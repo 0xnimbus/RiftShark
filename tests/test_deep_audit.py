@@ -933,3 +933,23 @@ def test_repeat_choices_count_as_chosen(db):
         return None
     _cast(g, db, 0, "Feral Strength", pick)
     assert sum("Irelia" in x for x in asks) == 2
+
+
+def test_hidden_guards_plays_its_sand_soldier_at_that_battlefield(db):
+    """CR 811.1.d.5: a hidden spell that plays a unit plays it at the battlefield it was hidden at. Guards! ("Play a
+    2 [M] Sand Soldier unit token") played from facedown used to offer base or any battlefield you control."""
+    g = _fresh(db, "azir_emperor")
+    g.battlefields[0].controller = g.battlefields[1].controller = 0
+    put(g, db, 0, "Forecaster", ("bf", 0))
+    put(g, db, 0, "Forecaster", ("bf", 1))
+    u = give(g, 0, "Guards!", db)
+    assert g.do_hide(0, u, ("bf", 1))
+    g.objects[u].facedown_turn = g.turn - 1              # hidden last turn: it may be played now
+    _ready_runes(g, 0)
+    g.bump()
+    d = g.run()
+    opt = next(o for o in d.options if o[0] == "play" and o[1] == u)
+    g.choose(opt)
+    _drive(g, pick=lambda d: False if d.kind == "yesno" else None)
+    toks = [o for o in g.objects.values() if o.zone == "board" and o.defn.name == "Sand Soldier"]
+    assert [o.location for o in toks] == [("bf", 1)]
