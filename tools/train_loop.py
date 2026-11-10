@@ -205,7 +205,8 @@ def selfplay(games, spec, out, workers, seed, every=3, epsilon=0.03, labels="td"
 
 
 # ------------------------------------------------------------------------------------------------ training
-def train(files, out, hidden=48, epochs=40, lr=2e-3, l2=1e-3, seed=0, warm=None, meta=None, wide=None, width=None):
+def train(files, out, hidden=48, epochs=40, lr=2e-3, l2=1e-3, seed=0, warm=None, meta=None, wide=None, width=None,
+          mask=None):
     """MLP residual on a base logit. Without `wide` the base is the hand-written score's logit; with `wide` (a model
     dict from train_linear on the same data) the base is that linear model's logit, so the hidden units only learn
     what the linear model misses (wide-and-deep). The result is saved as one model in the same JSON format."""
@@ -235,6 +236,9 @@ def train(files, out, hidden=48, epochs=40, lr=2e-3, l2=1e-3, seed=0, warm=None,
         mean = Xt.mean(0)
         std = Xt.std(0) + 1e-3
     Zt, Zv = (Xt - mean) / std, (Xv - mean) / std
+    if mask:                                   # features the hidden units may not read (their weights stay 0)
+        Zt[:, mask] = 0.0
+        Zv[:, mask] = 0.0
     n_in = X.shape[1]
     from riftsim.core.learn.features import H_INDEX
     # residual base: the hand-written score's logit (or the wide model's); the MLP learns a correction (starts near 0)
@@ -258,6 +262,8 @@ def train(files, out, hidden=48, epochs=40, lr=2e-3, l2=1e-3, seed=0, warm=None,
         b1 = np.zeros(hidden)
         W2 = rs.randn(hidden) * 0.01
         b2 = 0.0
+    if mask:
+        W1[:, mask] = 0.0
     params = [W1, b1, W2, np.array(b2), np.array(hs)]
     m = [np.zeros_like(p) for p in params]
     v = [np.zeros_like(p) for p in params]
@@ -655,6 +661,7 @@ def main():
     t.add_argument("--linear", action="store_true", help="logistic regression instead of the MLP")
     t.add_argument("--wide", metavar="LINEAR_JSON", help="MLP that corrects this linear model (wide-and-deep)")
     t.add_argument("--epochs", type=int, default=40)
+    t.add_argument("--l2", type=float, default=1e-3, help="weight decay of the MLP")
     t.add_argument("--width", type=int, help="feature count to train on (an older version's prefix); default: current")
     t.add_argument("--mask", help="feature index ranges the model may not use, e.g. 170-233,106-169 (linear only)")
     t.add_argument("--pairs", nargs="+", help="tools/rank_data.py files: add option-ranking rows (linear only)")
@@ -687,7 +694,9 @@ def main():
                                      for i in range(int(r.split("-")[0]), int(r.split("-")[-1]) + 1)]))
         else:
             wide = json.load(open(a.wide)) if a.wide else None
-            print(train(a.files, a.out, hidden=a.hidden, epochs=a.epochs, wide=wide, width=a.width))
+            print(train(a.files, a.out, hidden=a.hidden, epochs=a.epochs, wide=wide, width=a.width, l2=a.l2,
+                        mask=[i for r in (a.mask or "").split(",") if r
+                              for i in range(int(r.split("-")[0]), int(r.split("-")[-1]) + 1)]))
     elif a.cmd == "gate":
         res = gate(a.candidate, a.best, a.games, a.workers, a.seed, mirror=a.mirror)
         print(json.dumps(res, indent=1))
