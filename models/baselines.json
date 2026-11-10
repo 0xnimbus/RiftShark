@@ -478,5 +478,41 @@
   "timeouts": [],
   "date": "2026-11-10 02:06 UTC",
   "note": "card-identity features of our hand and board masked (106-233), gens 6-8; mirror"
+ },
+ {
+  "candidate": "learned:models/cand_mhb.json",
+  "best": "learned:gen_008",
+  "games": 200,
+  "wins": 104,
+  "draws": 0,
+  "score": 0.52,
+  "interval": [
+   0.451,
+   0.588
+  ],
+  "timeouts": [],
+  "date": "2026-11-10 02:26 UTC",
+  "note": "cand_mhb confirmation on fresh seeds; mirror"
+ },
+ {
+  "candidate": "learned:models/cand_mhb2.json",
+  "best": "learned:gen_008",
+  "games": 199,
+  "wins": 108,
+  "draws": 0,
+  "score": 0.5427,
+  "interval": [
+   0.473,
+   0.61
+  ],
+  "timeouts": [
+   [
+    "azir_emperor.json",
+    "azir_emperor.json",
+    76099
+   ]
+  ],
+  "date": "2026-11-10 02:49 UTC",
+  "note": "hand+board card identities masked, trained on gens 6-13 + 1600 newer games (outcome labels); mirror"
  }
 ]

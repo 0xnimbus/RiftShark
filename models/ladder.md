@@ -48,3 +48,5 @@ Written by tools/train_loop.py; the `learned` policy and the play page's Learned
 | 2026-11-09 19:21 UTC | learned-rl:gen_008 | learned:gen_008 | 43.5% (35-53) | 115 | learned-rl: in the lookahead the opponent answers during our turn with the one-sample learned AI (gen 8) instead of the heuristic AI; mirror |
 | 2026-11-10 01:47 UTC | learned:models/cand_mb.json | learned:gen_008 | 45.5% (39-52) | 200 | card-identity features of our own board masked (170-233) when training on gens 6-8: the judge can't reward a card just for being on the board; mirror |
 | 2026-11-10 02:06 UTC | learned:models/cand_mhb.json | learned:gen_008 | 54.0% (47-61) | 200 | card-identity features of our hand and board masked (106-233), gens 6-8; mirror |
+| 2026-11-10 02:26 UTC | learned:models/cand_mhb.json | learned:gen_008 | 52.0% (45-59) | 200 | cand_mhb confirmation on fresh seeds; mirror |
+| 2026-11-10 02:49 UTC | learned:models/cand_mhb2.json | learned:gen_008 | 54.3% (47-61) | 199 | hand+board card identities masked, trained on gens 6-13 + 1600 newer games (outcome labels); mirror |
