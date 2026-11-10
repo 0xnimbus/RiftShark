@@ -43,6 +43,8 @@ class Chars:
             cur = self.keywords.get(kw)
             cur = 0 if cur in (None, False) else (1 if cur is True else int(cur))
             self.keywords[kw] = cur + v
+        elif kw == "cant_move_by" and isinstance(value, tuple):      # players who can't move it: union
+            self.keywords[kw] = tuple(dict.fromkeys(tuple(self.keywords.get(kw) or ()) + value))
         elif value is False:
             self.keywords.pop(kw, None)
         else:

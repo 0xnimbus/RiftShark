@@ -106,8 +106,9 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   15:20: Ezreal, Prodigy's "[1] or [A] less" always took [A]; the player now picks (`Game.optional_cost_variants`, every
   variant's payment plans are offered). "You may pay [X] as an additional cost" (Sea Monkey, Crescent Guardian, Blast
   Corps Cadet, 11 cards) was paid on its own before the cost, so it could be paid and the card then not afforded; now it
-  is an `additional_cost` decision paid with the total cost (CR 357). Open: Vex, Apathetic's "They can't move it" also
-  stops moves by Vex's controller's effects.
+  is an `additional_cost` decision paid with the total cost (CR 357). 
+  20:20: Vex, Apathetic's "They can't move it this turn" locked the unit for every player; now keyword `cant_move_by`
+  (players) and `valid_destination(..., mover=)`: Vex's side can still move it (Charm, Temptation, Blitzcrank).
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

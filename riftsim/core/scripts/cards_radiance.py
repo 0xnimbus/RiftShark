@@ -333,7 +333,7 @@ def vex_apathetic(defn):
     opp_plays = lambda g, s, ev: ev.get("kind") == "play" and ev.get("player") is not None \
         and not g.is_friendly(ev["player"], g.objects[s].controller)
     return [Triggered(opp_plays, [O.Stun(lambda g, c: _ev(c).get("uid")),
-                                              O.GiveKeyword(lambda g, c: _ev(c).get("uid"), "cant_move", True)],
+                                              O.GiveKeyword(lambda g, c: _ev(c).get("uid"), "cant_move_by", lambda g, c: (_ev(c).get("player"),))],
                       filt=lambda g, s, ev: ev.get("card_type") == "unit" and (g.objects[s].location or ("",))[0] == "bf",
                       label=defn.name, source_text=defn.text)]
 

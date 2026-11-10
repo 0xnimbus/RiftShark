@@ -201,7 +201,7 @@ def blast_cone(defn):
     return [Triggered("play_self", [O.May([
         O.Choose(Sel("unit", side="enemy"), out="t"),
         O.ChooseLocation(out="__to", include_bases=True,
-                         pred=lambda g, c, l: c.vars.get("t") in g.objects and g.valid_destination(c.vars["t"], l)),
+                         pred=lambda g, c, l: c.vars.get("t") in g.objects and g.valid_destination(c.vars["t"], l, mover=c.controller)),
         O.Move(Ref("t"), Ref("__to"))], label="move an enemy unit")], label=defn.name, source_text=defn.text),
         Triggered(moved_enemy, [O.If(lambda g, c: not g.objects[c.source].exhausted, [O.May([
             O.Exhaust(Ref("self")), O.Stun(lambda g, c: _evd(c).get("uid"))], label="exhaust this to stun it")])],
