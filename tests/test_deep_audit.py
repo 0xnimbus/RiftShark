@@ -870,3 +870,25 @@ def test_hard_bargain_repeat_on_one_spell_and_never_itself(db):
     assert all(hb not in opts for opts in chooses)
     assert g.objects[s].zone == "trash"                      # countered by the first execution
     assert len(asked) == 1                                   # the repeat found no spell and asked nothing
+
+
+def test_not_so_fast_counters_the_ability_that_chooses_my_unit(db):
+    """Not So Fast ("Counter an enemy spell or ability that chooses a friendly unit or gear"): when one enemy source has
+    two abilities on the chain, it counters the one that chose my unit, not just the first one from that source."""
+    from riftsim.core.objects import ChainItem
+    from riftsim.core.vm import Context
+    g = _fresh(db, "irelia_blade_dancer")
+    mine = put(g, db, 0, "Forecaster", "base")
+    theirs = put(g, db, 1, "Forecaster", ("base", 1))
+    src = put(g, db, 1, "Forecaster", ("base", 1), exclude=(theirs,))
+    items = []
+    for i, tgt in enumerate((theirs, mine)):            # older item chooses their own unit, newer one chooses mine
+        it = ChainItem(900 + i, "ability", 1, uid=src, label=f"ability {i}")
+        it.cost, it.finalized, it.ctx, it.code = {"energy": 0, "power": []}, True, Context(1, src), []
+        it.ctx.vars["t"] = tgt
+        it.ctx.vars["__targets"] = [("t", None)]
+        g.chain.append(it)
+        items.append(it)
+    g.priority = 0
+    _cast(g, db, 0, "Not So Fast", lambda d: src if d.kind == "choose" and src in d.options else None)
+    assert items[1].countered and not items[0].countered

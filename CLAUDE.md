@@ -97,6 +97,8 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   20:20: spells could choose themselves while being played (Hard Bargain, any Sel zone="chain"); `Sel.matches` now needs a
   finalized chain item (CR 355.9.a.2). Repeat executions re-validate their own targets (CR 820.1.d.2), Hard Bargain asks
   nobody to pay when its spell is gone, and a fizzled trash-played spell is banished like a countered one.
+  2026-11-10 00:20: Not So Fast countered the first chain item of the chosen source, not the one that chose your unit
+  (one source, two abilities), could pick unfinalized items, and skipped token sources; fixed in auto_grammar.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
