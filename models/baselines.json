@@ -581,5 +581,65 @@
   ],
   "date": "2026-11-10 08:44 UTC",
   "note": "masked judge retrained with 1000 self-play games of the masked judge itself, vs cand_mhb; mirror"
+ },
+ {
+  "candidate": "learned:models/cand_g15lin.json",
+  "best": "learned:gen_014",
+  "games": 200,
+  "wins": 91,
+  "draws": 0,
+  "score": 0.455,
+  "interval": [
+   0.387,
+   0.524
+  ],
+  "timeouts": [],
+  "date": "2026-11-10 20:54 UTC",
+  "note": "linear, masked, gens 6-8 + 4000 games of gen 14 self-play; mirror"
+ },
+ {
+  "candidate": "learned:models/cand_g15nn.json",
+  "best": "learned:gen_014",
+  "games": 200,
+  "wins": 91,
+  "draws": 0,
+  "score": 0.455,
+  "interval": [
+   0.387,
+   0.524
+  ],
+  "timeouts": [],
+  "date": "2026-11-10 21:12 UTC",
+  "note": "wide-and-deep (16 hidden, l2 1e-2) on the masked linear, same data; mirror"
+ },
+ {
+  "candidate": "learned:models/cand_g15on.json",
+  "best": "learned:gen_014",
+  "games": 200,
+  "wins": 79,
+  "draws": 0,
+  "score": 0.395,
+  "interval": [
+   0.33,
+   0.464
+  ],
+  "timeouts": [],
+  "date": "2026-11-10 21:30 UTC",
+  "note": "linear, masked, only the 3000 games of gen 14 self-play (on-policy); mirror"
+ },
+ {
+  "candidate": "learned:models/cand_g15bd.json",
+  "best": "learned:gen_014",
+  "games": 200,
+  "wins": 92,
+  "draws": 0,
+  "score": 0.46,
+  "interval": [
+   0.392,
+   0.529
+  ],
+  "timeouts": [],
+  "date": "2026-11-10 21:48 UTC",
+  "note": "linear, masked, gens 6-8 + turn-boundary rows only of 3000 gen-14 games (no what-if rows); mirror"
  }
 ]

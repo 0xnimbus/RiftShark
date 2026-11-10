@@ -103,7 +103,10 @@ def _selfplay_game(args):
     from riftsim.core.policies import GreedyPolicy, ai_options, determinize, make_policy
     db = _db()
     decks = [Deck.load(p, db) for p in paths]
-    pols = [make_policy(spec, seed=seed * 7 + i) for i in range(2)]
+    # "a,b,c": each seat plays a randomly picked AI from the list (mixed self-play: more varied positions)
+    specs = spec.split(",")
+    pick = random.Random(seed * 31 + 7)
+    pols = [make_policy(pick.choice(specs), seed=seed * 7 + i) for i in range(2)]
     rng = random.Random(seed * 13 + 5)
     g = Game(db, decks, seed=seed, log=False)
     g.max_turns = 60
@@ -393,7 +396,7 @@ def rank_pairs(files, width, min_gap=0.0):
 
 
 def train_linear(files, out, l2=1e-2, seed=0, meta=None, target="outcome", net=None, lam=0.7, width=None,
-                 pairs=None, pair_weight=1.0, pair_gap=0.0, mask=None):
+                 pairs=None, pair_weight=1.0, pair_gap=0.0, mask=None, boundary_only=False):
     """Logistic regression on the standardised features plus the hand-written score's logit: about 100 weights, so it
     needs far less data than the MLP and cannot overfit the turn-to-turn noise. Same JSON format (no hidden units).
     pairs: tools/rank_data.py files; each pair (better option a, worse option b of one decision) adds a row
@@ -411,7 +414,9 @@ def train_linear(files, out, l2=1e-2, seed=0, meta=None, target="outcome", net=N
         use_td = target == "td" and "kind" in d
         if target == "td" and not use_td:
             print(f"  {os.path.basename(f)}: recorded before TD targets, uses game results")
-        xs.append(d["x"][:, :w]); ys.append(td_targets(d, net, lam) if use_td else d["y"]); gs.append(d["game"] + off)
+        y = td_targets(d, net, lam) if use_td else d["y"]
+        keep = (d["kind"] == 0) if boundary_only and "kind" in d else slice(None)
+        xs.append(d["x"][keep, :w]); ys.append(y[keep]); gs.append(d["game"][keep] + off)
         off = int(gs[-1].max()) + 1 if len(gs[-1]) else off
     # float32 keeps a 10k-game buffer (about a million positions) inside a 7 GB Actions runner
     X, Y, G = np.concatenate(xs).astype(np.float32), np.concatenate(ys), np.concatenate(gs)
@@ -654,6 +659,7 @@ def main():
     s.add_argument("--max-minutes", type=float, help="stop starting games after this long and save what is done")
     s.add_argument("--labels", choices=("td", "outcome"), default="td",
                    help="outcome: skip the one-turn-ahead what-if labels (about 3x faster; for big Actions runs)")
+    s.add_argument("--epsilon", type=float, default=0.03, help="chance of a random action (exploration)")
     t = sub.add_parser("train")
     t.add_argument("files", nargs="+")
     t.add_argument("--out", required=True)
@@ -668,6 +674,8 @@ def main():
     t.add_argument("--pair-gap", type=float, default=0.0,
                    help="pair options whose mean playout results differ by at least this (0: per playout)")
     t.add_argument("--pair-weight", type=float, default=1.0, help="total weight of ranking rows vs value rows")
+    t.add_argument("--boundary-only", action="store_true",
+                   help="linear: train only on real turn-boundary positions (drop the what-if rows of newer files)")
     t.add_argument("--target", choices=("td", "outcome"), default="outcome",
                    help="td: bootstrapped labels from the best model (files recorded with --labels td)")
     q = sub.add_parser("gate")
@@ -683,13 +691,13 @@ def main():
     if a.cmd == "generation":
         generation(a)
     elif a.cmd == "selfplay":
-        print(selfplay(a.games, a.policy or best_spec(), a.out, a.workers, a.seed, labels=a.labels,
+        print(selfplay(a.games, a.policy or best_spec(), a.out, a.workers, a.seed, labels=a.labels, epsilon=a.epsilon,
                        max_seconds=a.max_minutes * 60 if a.max_minutes else None))
     elif a.cmd == "train":
         if a.linear:
             print(train_linear(a.files, a.out, width=a.width, target=a.target,
                                net=_best_net() if a.target == "td" else None, pairs=a.pairs,
-                               pair_weight=a.pair_weight, pair_gap=a.pair_gap,
+                               pair_weight=a.pair_weight, pair_gap=a.pair_gap, boundary_only=a.boundary_only,
                                mask=[i for r in (a.mask or "").split(",") if r
                                      for i in range(int(r.split("-")[0]), int(r.split("-")[-1]) + 1)]))
         else:
