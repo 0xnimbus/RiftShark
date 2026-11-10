@@ -171,10 +171,13 @@ class _FinalizeCosts(Instr):
         for name, (energy, power, label) in opts:
             if name in ctx.vars["__costs"]:
                 continue
-            total_e = energy + it.cost["energy"] + sum(e for (e, _) in ctx.vars["__costs"].values())
-            total_p = list(power) + list(it.cost["power"]) + [d for (_, ps) in ctx.vars["__costs"].values() for d in ps]
-            total_p += ["any"] * game._deflect_total(it, ctx)
-            if not game.can_pay(ctx.controller, total_e, total_p, purpose=game.item_purpose(it)):
+            payable = False
+            for ve, vp in game.optional_cost_variants_for(it, ctx, name) or [(energy, power)]:
+                total_e = ve + it.cost["energy"] + sum(e for (e, _) in ctx.vars["__costs"].values())
+                total_p = list(vp) + list(it.cost["power"]) + [d for (_, ps) in ctx.vars["__costs"].values() for d in ps]
+                total_p += ["any"] * game._deflect_total(it, ctx)
+                payable = payable or game.can_pay(ctx.controller, total_e, total_p, purpose=game.item_purpose(it))
+            if not payable:
                 ctx.vars["__costs"][name] = (0, [])
                 continue
             ctx.vars["__ask"] = name
@@ -187,6 +190,7 @@ class _FinalizeCosts(Instr):
         if ctx.vars.get("__ask") == "__pay__":
             ctx.vars.pop("__ask")
             e, p = ctx.vars.pop("__pay_total")
+            e, p = ctx.vars.pop("__pay_totals", {}).get(choice, (e, p))
             game.apply_payment(ctx.controller, choice, ctx, game.item_purpose(it))
             it.cost["paid"] = (e, p)
             return None
@@ -194,7 +198,14 @@ class _FinalizeCosts(Instr):
         opts = dict(game._optional_costs(it, ctx))
         energy, power, _ = opts[name]
         if choice:
+            if name == "add":                         # "pay [X] as an additional cost"
+                ctx.paid["add"] = True
+                for ab in game._abilities_of(it.uid, game.objects[it.uid]):
+                    pr = game._resource_additional_cost(ab)
+                    if pr is not None:
+                        ctx.vars[pr.out] = True
             ctx.vars["__costs"][name] = (energy, list(power))
+            ctx.vars.setdefault("__cost_variants", {})[name] = game.optional_cost_variants_for(it, ctx, name)
             ctx.paid[name] = True
             if name.startswith("repeat"):
                 ctx.repeat += 1
@@ -221,7 +232,31 @@ class _FinalizeCosts(Instr):
         if it.cost.get("xp"):
             game.players[ctx.controller].xp -= it.cost["xp"]
         purpose = game.item_purpose(it)
-        plans = game.payment_plans(ctx.controller, e, p, purpose) if game.can_pay(ctx.controller, e, p, purpose=purpose) else []
+        # Ezreal, Prodigy: each paid optional cost is [1] or [A] less, the player's pick, so every combination's plans
+        # are offered (the first is the standard one)
+        totals = [(e, p)]
+        for name, vs in ctx.vars.get("__cost_variants", {}).items():
+            if len(vs) <= 1 or name not in ctx.vars["__costs"]:
+                continue
+            ce, cp = ctx.vars["__costs"][name]
+            nxt = []
+            for te, tp in totals:
+                rest = list(tp)
+                for d in cp:
+                    rest.remove(d)
+                for ve, vp in vs:
+                    nxt.append((te - ce + ve, rest + list(vp)))
+            totals = nxt
+        plans, plan_total = [], {}
+        for te, tp in totals:
+            if not game.can_pay(ctx.controller, te, tp, purpose=purpose):
+                continue
+            for pl in game.payment_plans(ctx.controller, te, tp, purpose):
+                if pl not in plan_total:
+                    plan_total[pl] = (te, list(tp))
+                    plans.append(pl)
+        if plans:
+            e, p = plan_total[plans[0]]
         if not plans:
             # cannot pay after all (e.g. deflect targets): the item leaves the chain (CR 355)
             game._fizzle_item(it, "cannot pay")
@@ -233,6 +268,8 @@ class _FinalizeCosts(Instr):
         # CR 357.1.a / 445.2.c: the player chooses which runes and Add abilities pay the cost
         ctx.vars["__ask"] = "__pay__"
         ctx.vars["__pay_total"] = (e, list(p))
+        if len(totals) > 1:
+            ctx.vars["__pay_totals"] = plan_total
         from .payment import plan_label
         return Decision(ctx.controller, "pay", plans, labels=[plan_label(game, pl) for pl in plans],
                         info={"item": it.id, "for": it.label, "energy": e, "power": list(p)})
@@ -1145,7 +1182,9 @@ class FlowMixin:
                     show = show + relocate(compile_effect(ab.value), len(show))
                 if isinstance(ab, PlayPermission) and ab.perm == "additional_cost" and (ab.cond is None or ab.cond(self, it.uid)):
                     req, ins, mandatory = ab.value
-                    if mandatory:
+                    if self._resource_additional_cost(ab) is not None:
+                        pass                      # paid with the rest of the cost in _FinalizeCosts (CR 357)
+                    elif mandatory:
                         pre += list(ins) + [SetVar("__add", True), Do(lambda g, c: c.paid.__setitem__("add", True))]
                     else:
                         # non-resource costs (exhaust a unit, spend a buff) set __addok False when they could not be done
@@ -1351,8 +1390,8 @@ class FlowMixin:
             total += self.keyword_value(u, "deflect")
         return total
 
-    def _optional_costs(self, it, ctx):
-        """Optional additional costs for a chain item: [(name, (energy, power, label))]."""
+    def _optional_costs_raw(self, it, ctx):
+        """Optional additional costs for a chain item before Ezreal's reduction: [(name, (energy, power, label))]."""
         out = []
         if it.kind == "unit":
             c = self.chars(it.uid)
@@ -1361,6 +1400,14 @@ class FlowMixin:
             if c.keywords.get("accelerate") or granted or ctx.vars.get("__granted_accel"):
                 dom = [c.domains[0]] if len(c.domains) == 1 else (["any"] if not c.domains else [c.domains[0]])
                 out.append(("accelerate", (1, dom, "Accelerate [1][C]")))
+        if it.kind in ("spell", "unit", "gear"):
+            for ab in self._abilities_of(it.uid, self.objects[it.uid]):
+                pr = self._resource_additional_cost(ab)
+                if pr is not None and (ab.cond is None or ab.cond(self, it.uid)):
+                    e, pw = val(self, ctx, pr.energy), [val(self, ctx, d) for d in pr.power]
+                    lbl = (f"[{e}]" if e else "") + "".join(f"[{d.capitalize() if d != 'any' else 'A'}]" for d in pw)
+                    out.append(("add", (e, pw, f"the additional cost {lbl}")))
+                    break
         rc = getattr(it.ability, "repeat_cost", None) if it.ability is not None else None
         if it.kind == "spell":
             rc = self.defn_of(it.uid).keywords.get("repeat_cost")
@@ -1372,18 +1419,58 @@ class FlowMixin:
         if gr:                                   # Temporal Portal: "[Repeat] equal to its cost"
             red = sum(int(v) for _, v in self.rules("repeat_cost_reduce", player=it.controller))
             out.append(("repeat_granted", (max(0, gr[0] - red), list(gr[1]), f"Repeat {gr}")))
-        return [(n, (*self.reduce_optional_cost(it.controller, e, p), lbl)) for n, (e, p, lbl) in out]
+        return out
+
+    @staticmethod
+    def _resource_additional_cost(ab):
+        """The PayResources of an optional "pay [X] as an additional cost" (Crescent Guardian, Sea Monkey, Rampage),
+        or None. Such a cost is added to the total cost and paid with it (CR 357), so it is only offered when the
+        whole cost can be paid, and Ezreal, Prodigy reduces it."""
+        from .ops import PayResources
+        if not (isinstance(ab, PlayPermission) and ab.perm == "additional_cost"):
+            return None
+        req, ins, mandatory = ab.value
+        if mandatory or req is not None or len(ins) != 1 or not isinstance(ins[0], PayResources):
+            return None
+        return ins[0]
+
+    def _optional_costs(self, it, ctx):
+        """Optional additional costs for a chain item: [(name, (energy, power, label))], reduced (first variant)."""
+        return [(n, (*self.reduce_optional_cost(it.controller, e, p), lbl)) for n, (e, p, lbl) in self._optional_costs_raw(it, ctx)]
 
     def reduce_optional_cost(self, p, energy, power):
-        """Ezreal, Prodigy: "Optional additional costs you pay cost [1] or [A] less" (once per such source)."""
-        power = list(power)
+        """Ezreal, Prodigy: "Optional additional costs you pay cost [1] or [A] less" (once per such source).
+        The first of optional_cost_variants (a power symbol when there is one); the payer may pick any variant."""
+        return self.optional_cost_variants(p, energy, power)[0]
+
+    def optional_cost_variants(self, p, energy, power):
+        """Every cost an optional additional cost can come to under Ezreal, Prodigy's "[1] or [A] less" (the player
+        chooses per source, so a [1][C] Accelerate can cost [C] or [1]). First: power reduced when there is power."""
+        out = [(energy, list(power))]
         for _ in self.rules("optional_cost_reduce", player=p):
-            # the reduction is [1] or [A]: power is the scarcer resource, so it takes a power symbol when there is one
-            if power:
-                power.pop()
-            elif energy > 0:
-                energy -= 1
-        return energy, power
+            nxt = []
+            for e, pw in out:
+                cands = []
+                for d in dict.fromkeys(reversed(pw)):          # [A] less: one power symbol (last one first)
+                    q = list(pw)
+                    del q[len(q) - 1 - q[::-1].index(d)]
+                    cands.append((e, q))
+                if e > 0:
+                    cands.append((e - 1, list(pw)))            # [1] less
+                nxt.extend(cands or [(e, list(pw))])
+            out = []
+            for e, pw in nxt:
+                if (e, sorted(pw)) not in [(x, sorted(y)) for x, y in out]:
+                    out.append((e, pw))
+        return out
+
+    def optional_cost_variants_for(self, it, ctx, name):
+        """The variants of chain item `it`'s optional cost `name` (before reduction, then every Ezreal choice)."""
+        raw = self._optional_costs_raw(it, ctx)
+        for n, (e, p, _) in raw:
+            if n == name:
+                return self.optional_cost_variants(it.controller, e, p)
+        return []
 
     def _optional_costs_include_repeat(self, it):
         rc = getattr(it.ability, "repeat_cost", None) if it.ability is not None else None

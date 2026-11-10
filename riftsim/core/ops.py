@@ -175,9 +175,8 @@ class May(Instr):
             def cond(game, ctx, pr=first):
                 e = val(game, ctx, pr.energy)
                 pw = [val(game, ctx, p) for p in pr.power]
-                if ctx.vars.get("__optional_cost"):
-                    e, pw = game.reduce_optional_cost(ctx.controller, e, pw)
-                return game.can_pay(ctx.controller, e, pw, purpose={"kind": "effect", "uid": ctx.source})
+                vs = game.optional_cost_variants(ctx.controller, e, pw) if ctx.vars.get("__optional_cost") else [(e, pw)]
+                return any(game.can_pay(ctx.controller, ve, vp, purpose={"kind": "effect", "uid": ctx.source}) for ve, vp in vs)
         elif isinstance(first, Discard):
             # "you may discard N to ...": not offered without N cards in hand
             def cond(game, ctx, dc=first):
@@ -964,12 +963,16 @@ class Reflexive(Instr):
         return None
 
 
-def _pay_decision(game, ctx, e, pw, purpose, decline=True, label="", player=None):
+def _pay_decision(game, ctx, e, pw, purpose, decline=True, label="", player=None, variants=None):
     """Offer every distinct way to pay (CR 445.2: paying Energy/Power is always optional; declining negates
-    the instruction). Returns a Decision, or applies the only possibility and returns None."""
+    the instruction). Returns a Decision, or applies the only possibility and returns None. `variants`: other
+    costs the payer may pick instead (Ezreal, Prodigy's "[1] or [A] less"); their plans are offered too."""
     from .payment import plan_label
     p = ctx.controller if player is None else player
-    plans = game.payment_plans(p, e, pw, purpose) if game.can_pay(p, e, pw, purpose=purpose) else []
+    plans = []
+    for ve, vp in variants or [(e, pw)]:
+        if game.can_pay(p, ve, vp, purpose=purpose):
+            plans += [pl for pl in game.payment_plans(p, ve, vp, purpose) if pl not in plans]
     opts = list(plans) + (["decline"] if decline else [])
     if not plans:
         return "cannot"
@@ -994,11 +997,13 @@ class PayResources(Instr):
         e = val(game, ctx, self.energy)
         pw = [val(game, ctx, p) for p in self.power]
         payer = self._payer(game, ctx)
+        variants = None
         if ctx.vars.get("__optional_cost"):        # an optional additional cost (Ezreal, Prodigy reduces those)
-            e, pw = game.reduce_optional_cost(payer, e, pw)
+            variants = game.optional_cost_variants(payer, e, pw)
+            e, pw = variants[0]
         purpose = {"kind": "effect", "uid": ctx.source}
         r = _pay_decision(game, ctx, e, pw, purpose, decline=True, label=f"{e} energy {pw}" if pw else f"{e} energy",
-                          player=payer)
+                          player=payer, variants=variants)
         if r == "cannot":
             ctx.vars[self.out] = False
             return None
