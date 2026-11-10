@@ -560,5 +560,26 @@
   ],
   "date": "2026-11-10 03:29 UTC",
   "note": "all card identities masked (hand, our board, their board), gens 6-13 + 1600 newer games; mirror"
+ },
+ {
+  "candidate": "learned:models/cand_mhb3.json",
+  "best": "learned:models/cand_mhb.json",
+  "games": 199,
+  "wins": 98,
+  "draws": 0,
+  "score": 0.4925,
+  "interval": [
+   0.424,
+   0.561
+  ],
+  "timeouts": [
+   [
+    "azir_emperor.json",
+    "azir_emperor.json",
+    80041
+   ]
+  ],
+  "date": "2026-11-10 08:44 UTC",
+  "note": "masked judge retrained with 1000 self-play games of the masked judge itself, vs cand_mhb; mirror"
  }
 ]
