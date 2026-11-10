@@ -344,17 +344,21 @@ class Activated(Ability):
 class Replacement(Ability):
     """`event`: event kind this applies to ('damage','die','draw','move','recall','play','buff','discard'...).
     `applies`: callable(g, src, ev) -> bool. `replace`: callable(g, src, ev) -> new ev dict, or None to prevent.
-    The engine executes replacements once per event per source. "You may ... instead" replacements need a player
-    choice the synchronous replacement pass cannot ask, so `optional=True` is refused (no scripted card uses it;
-    Mordekaiser, Zilean, Heimerdinger and Sett stay unscripted until it is built) rather than silently auto-applied."""
+    The engine executes replacements once per event per source.
+    `optional=True` ("you may ... instead"): the controller of the source decides. Supported for 'die' events only:
+    `options(g, src, ev)` lists the choices (e.g. units to kill; empty = can't apply), and
+    `replace(g, src, ev, choice)` returns the new event. `game.do_kill` keeps the unit on the board and pushes a
+    decision frame (game._OptionalReplacementStep); declining lets the death go on through the other replacements."""
     kind = "replacement"
-    __slots__ = ("event", "applies", "replace", "once_per_turn", "optional")
+    __slots__ = ("event", "applies", "replace", "once_per_turn", "optional", "options")
 
-    def __init__(self, event, applies, replace, once_per_turn=False, zone="board", cond=None, label="", source_text="", optional=False):
+    def __init__(self, event, applies, replace, once_per_turn=False, zone="board", cond=None, label="", source_text="", optional=False,
+                 options=None):
         super().__init__(label, zone, cond, source_text)
-        if optional:
-            raise NotImplementedError("optional replacement effects are not supported yet (no auto-apply): " + label)
+        if optional and (event != "die" or options is None):
+            raise NotImplementedError("optional replacement effects are only supported for 'die' events with options: " + label)
         self.event, self.applies, self.replace, self.once_per_turn, self.optional = event, applies, replace, once_per_turn, optional
+        self.options = options
 
 
 class PlayPermission(Ability):

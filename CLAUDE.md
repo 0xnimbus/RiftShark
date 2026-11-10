@@ -163,8 +163,11 @@ Every entry in the RULES.md "Simplifications" list is a bug to fix, in this orde
    optional. AIs skip floats (`policies.ai_options`) and rollouts use the standard plan; one-ply lookahead pays
    before evaluating. Old replays no longer verify (new decisions): re-run batches and re-export web/data.
 2. DONE 2026-11-06: simultaneous triggers ordered by their controller (CR 383), decision `order_triggers`.
-3. DONE 2026-11-06: mulligan (CR 117, decision `mulligan`). Optional replacements: engine refuses them (4 unscripted
-   cards need them; build a decision path before scripting those).
+3. DONE 2026-11-06: mulligan (CR 117, decision `mulligan`). Optional replacements: 2026-11-10 'die' ones work
+   (`Replacement(optional=True, options=...)`, decision `optional_replacement`; do_kill keeps the unit on the board
+   and pushes `game._OptionalReplacementStep`); Mordekaiser, Twice Slain scripted (tests/test_optional_replacement.py:
+   kill him as Whirling Twirligig's cost, he eats the Recruit, the Mech still comes, CR 203.2). Zilean, Heimerdinger,
+   Sett need other event kinds. Also fixed: "heal, exhaust and recall" on a unit already in base now heals/exhausts it.
 4. DONE 2026-11-06: Show Off (CR 832), Baron Pit, Blade of the Exile alt cost, Scuttle Crab information; the 60-turn cap
    is reported as unfinished with a warning (0 of 216 round-robin games hit it).
 5. Script every card (`python -m riftsim.core coverage`: 425 none / 67 partial / 55 keywords-only on 2026-11-06), and

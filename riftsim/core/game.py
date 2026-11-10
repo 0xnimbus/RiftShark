@@ -749,11 +749,13 @@ class Game(flow.FlowMixin):
                     self.turn_effects.remove(t)
         return out
 
-    def replace_event(self, ev, dry=False):
+    def replace_event(self, ev, dry=False, skip=()):
         """Apply replacement effects to an event (CR 367-375). Returns the (possibly modified) event or
-        None if it was prevented entirely. Optional replacements cannot be created (see abilities.Replacement).
-        dry=True previews the result without using up once-per-turn or limited-use replacements."""
-        applied = set()
+        None if it was prevented entirely. An optional replacement that applies stops the pass and returns the event
+        with "deferred": (source uid, ability id) and "applied" (keys already used) for its controller to decide
+        (do_kill asks; see abilities.Replacement). dry=True previews the result without using up once-per-turn or
+        limited-use replacements, and without optional ones. `skip`: replacement keys already applied or declined."""
+        applied = set(skip)
         changed = True
         guard = 0
         while changed and ev is not None and guard < 10:
@@ -774,8 +776,12 @@ class Game(flow.FlowMixin):
                     try:
                         if not ab.applies(self, uid, ev):
                             continue
+                        if ab.optional and (dry or not ab.options(self, uid, ev)):
+                            continue
                     except (KeyError, AttributeError, TypeError):
                         continue
+                    if ab.optional:
+                        return dict(ev, deferred=key, applied=tuple(applied))
                     applied.add(key)
                     if not dry:
                         if ab.once_per_turn:
@@ -1131,25 +1137,51 @@ class Game(flow.FlowMixin):
                                      "batch": batch})
             if ev is None:
                 continue
-            if ev.get("replaced_with") == "banish":         # "if it would die this turn, banish it instead" (Smite)
-                self.do_banish([u], ctx)
+            if ev.get("deferred"):                          # "you may ... instead": its controller decides first
+                self._ask_optional_replacement(u, ev, ctx)
                 continue
-            if ev.get("replaced_with") == "recall":
-                self.do_recall(u, ctx, heal=True, exhaust=ev.get("exhaust", False))
-                continue
-            # CR 808.1.d.2: death triggers are added before the card moves (they see the board state)
-            self.log("die", uid=u, name=o.defn.name, loc=o.location)
-            if ev["card_type"] == "unit":
-                key = ("units_died", ev["player"])           # "if an enemy unit has died this turn"
-                self.turn_memo[key] = self.turn_memo.get(key, 0) + 1
-            if ev["card_type"] == "unit" and getattr(self, "phase", None) == "beginning":
-                self.turn_memo[("died_in_beginning", ev["player"])] = True      # Shadow Watcher
-            key = ("perms_died", ev["player"])               # "if a friendly unit or gear died this turn"
+            self._finish_death(u, ev, ctx)
+
+    def _ask_optional_replacement(self, u, ev, ctx):
+        """Keep u on the board and push a frame that asks the replacement's controller (runs before anything else)."""
+        src = ev["deferred"][0]
+        c = Context(self.objects[src].controller, src, here=self.objects[src].place)
+        c.vars["__orep"] = {"uid": u, "ev": ev, "ctx_controller": ctx.controller if ctx is not None else None,
+                            "ctx_source": ctx.source if ctx is not None else None}
+        self.vm_frames.append(Frame([_OptionalReplacementStep()], c))
+
+    def _optional_replacement_ability(self, key):
+        src, aid = key
+        o = self.objects.get(src)
+        if o is None or o.zone in (None, "gone"):
+            return None
+        abl = self.abilities(src) if o.zone == "board" else self._abilities_of(src, o)
+        return next((ab for ab in abl if id(ab) == aid), None)
+
+    def _finish_death(self, u, ev, ctx):
+        o = self.objects.get(u)
+        if o is None or o.zone != "board":
+            return
+        if ev.get("replaced_with") == "banish":         # "if it would die this turn, banish it instead" (Smite)
+            self.do_banish([u], ctx)
+            return
+        if ev.get("replaced_with") == "recall":
+            self.do_recall(u, ctx, heal=True, exhaust=ev.get("exhaust", False))
+            return
+        ev = {k: v for k, v in ev.items() if k not in ("deferred", "applied")}
+        # CR 808.1.d.2: death triggers are added before the card moves (they see the board state)
+        self.log("die", uid=u, name=o.defn.name, loc=o.location)
+        if ev["card_type"] == "unit":
+            key = ("units_died", ev["player"])           # "if an enemy unit has died this turn"
             self.turn_memo[key] = self.turn_memo.get(key, 0) + 1
-            self.emit("die", ctx=ctx, **{k: v for k, v in ev.items() if k != "kind"})
-            self._to_zone(o, "trash")
-            self.emit("leave", uid=u, player=ev["player"], loc=ev["loc"], card_type=ev["card_type"], ctx=ctx)
-            self.dirty = True
+        if ev["card_type"] == "unit" and getattr(self, "phase", None) == "beginning":
+            self.turn_memo[("died_in_beginning", ev["player"])] = True      # Shadow Watcher
+        key = ("perms_died", ev["player"])               # "if a friendly unit or gear died this turn"
+        self.turn_memo[key] = self.turn_memo.get(key, 0) + 1
+        self.emit("die", ctx=ctx, **{k: v for k, v in ev.items() if k != "kind"})
+        self._to_zone(o, "trash")
+        self.emit("leave", uid=u, player=ev["player"], loc=ev["loc"], card_type=ev["card_type"], ctx=ctx)
+        self.dirty = True
 
     def do_banish(self, uids, ctx=None):
         for u in list(uids):
@@ -1335,7 +1367,13 @@ class Game(flow.FlowMixin):
         if o is None or o.zone != "board":
             return
         base = ("base", o.controller)
-        if o.location == base:
+        if o.location == base:             # "heal it, exhaust it, and recall it" still heals and exhausts a unit in base
+            if heal:
+                o.damage = 0
+                o.temp = {k: v for k, v in o.temp.items() if not (isinstance(k, tuple) and k[0] == "damaged_by")}
+            if exhaust:
+                o.exhausted = True
+            self.dirty = True
             return
         frm = o.location
         o.location = base
@@ -1869,3 +1907,57 @@ def _temporary_ability():
         from .scripts import temporary_ability
         _TEMPORARY.append(temporary_ability())
     return _TEMPORARY[0]
+
+
+class _OptionalReplacementStep:
+    """VM step for an optional death replacement ("you may kill a friendly unit to ... instead", Mordekaiser):
+    the source's controller declines or picks an option; then the death finishes (CR 370, 372)."""
+
+    def run(self, game, ctx):
+        info = ctx.vars["__orep"]
+        u, ev = info["uid"], info["ev"]
+        ab = game._optional_replacement_ability(ev["deferred"])
+        o = game.objects.get(u)
+        if o is None or o.zone != "board":
+            return None
+        opts = []
+        if ab is not None and ab.active(game, ev["deferred"][0]):
+            try:
+                opts = list(ab.options(game, ev["deferred"][0], ev))
+            except (KeyError, AttributeError, TypeError):
+                opts = []
+        if not opts:
+            return self.resume(game, ctx, "decline")
+        labels = [f"don't ({game.label(u)} dies)"] + [f"kill {game.label(x)}" if x in game.objects else str(x) for x in opts]
+        return Decision(ctx.controller, "optional_replacement", ["decline"] + opts, out="__orep_choice", labels=labels,
+                        info={"uid": u, "source": ev["deferred"][0], "label": ab.label or "optional replacement"})
+
+    def resume(self, game, ctx, choice):
+        info = ctx.vars["__orep"]
+        u, ev = info["uid"], dict(info["ev"])
+        key, applied = ev.pop("deferred"), set(ev.pop("applied", ()))
+        dctx = Context(info["ctx_controller"], info["ctx_source"]) if info["ctx_controller"] is not None else None
+        if choice in (None, "decline"):           # declined: the other replacements may still apply
+            ev = game.replace_event(ev, skip=applied | {key})
+            if ev is None:
+                return None
+            if ev.get("deferred"):
+                game._ask_optional_replacement(u, ev, dctx)
+                return None
+            game._finish_death(u, ev, dctx)
+            return None
+        src = key[0]
+        ab = game._optional_replacement_ability(key)
+        so = game.objects.get(src)
+        if ab is not None and ab.once_per_turn and so is not None:
+            so.temp[("rpt", id(ab))] = game.turn
+        game.log("replace", source=src, event="die", label=ab.label if ab is not None else "")
+        ev = ab.replace(game, src, ev, choice) if ab is not None else ev
+        ev = game.replace_event(ev, skip=applied | {key})
+        if ev is None:
+            return None
+        if ev.get("deferred"):
+            game._ask_optional_replacement(u, ev, dctx)
+            return None
+        game._finish_death(u, ev, dctx)
+        return None

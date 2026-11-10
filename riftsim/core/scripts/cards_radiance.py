@@ -582,3 +582,25 @@ def sabotage(defn):
                  if c.vars.get("__opp") is not None else [], out="t", targeted=False),
         O.Recycle(Ref("t")),
     ], label=defn.name, source_text=defn.text)]
+
+
+@script("Mordekaiser, Twice Slain")
+def mordekaiser_twice_slain(defn):
+    # [Accelerate] [Assault 3]  (keywords)
+    # Once each turn, if I would die, you may kill a friendly unit to heal me, exhaust me, and recall me instead.
+    # An optional replacement (CR 369-372): his controller chooses whether, and which friendly unit to kill. Killing
+    # him as a cost (Whirling Twirligig, Cruel Patron) still pays the cost when this replaces his death (CR 203.2).
+    def applies(g, s, ev):
+        return ev.get("uid") == s and not ev.get("replaced_with")
+
+    def options(g, s, ev):
+        me = g.objects[s]
+        return [u for u, o in g.objects.items() if u != s and o.zone == "board" and o.controller == me.controller
+                and "unit" in g.chars(u).types]
+
+    def replace(g, s, ev, choice):
+        g.do_kill([choice], None)
+        return dict(ev, replaced_with="recall", exhaust=True)
+    return [Replacement("die", applies, replace, once_per_turn=True, optional=True, options=options,
+                        label="Mordekaiser: kill a friendly unit to heal, exhaust and recall me instead",
+                        source_text=defn.text)]
