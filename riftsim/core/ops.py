@@ -725,6 +725,8 @@ class PlayToken(Instr):
 
     def run(self, game, ctx):
         loc = self.loc
+        if loc == "choose" and ctx.target_bf is not None and game.db.tokens[self.token].is_unit:
+            loc = ctx.target_bf      # CR 811.1.d.5: a hidden spell's unit is played at the battlefield it was hidden at
         if loc == "choose":
             # no location given: the usual valid locations for playing a unit, base or a battlefield you control (CR 355.2.a)
             locs = _unit_play_locations(game, ctx.controller)
