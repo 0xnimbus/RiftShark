@@ -448,5 +448,35 @@
   ],
   "date": "2026-11-09 19:21 UTC",
   "note": "learned-rl: in the lookahead the opponent answers during our turn with the one-sample learned AI (gen 8) instead of the heuristic AI; mirror"
+ },
+ {
+  "candidate": "learned:models/cand_mb.json",
+  "best": "learned:gen_008",
+  "games": 200,
+  "wins": 91,
+  "draws": 0,
+  "score": 0.455,
+  "interval": [
+   0.387,
+   0.524
+  ],
+  "timeouts": [],
+  "date": "2026-11-10 01:47 UTC",
+  "note": "card-identity features of our own board masked (170-233) when training on gens 6-8: the judge can't reward a card just for being on the board; mirror"
+ },
+ {
+  "candidate": "learned:models/cand_mhb.json",
+  "best": "learned:gen_008",
+  "games": 200,
+  "wins": 108,
+  "draws": 0,
+  "score": 0.54,
+  "interval": [
+   0.471,
+   0.608
+  ],
+  "timeouts": [],
+  "date": "2026-11-10 02:06 UTC",
+  "note": "card-identity features of our hand and board masked (106-233), gens 6-8; mirror"
  }
 ]
