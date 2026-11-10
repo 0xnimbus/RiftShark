@@ -52,3 +52,4 @@ Written by tools/train_loop.py; the `learned` policy and the play page's Learned
 | 2026-11-10 02:49 UTC | learned:models/cand_mhb2.json | learned:gen_008 | 54.3% (47-61) | 199 | hand+board card identities masked, trained on gens 6-13 + 1600 newer games (outcome labels); mirror |
 | 2026-11-10 03:07 UTC | learned:models/cand_mhb2.json | learned:gen_008 | 48.0% (41-55) | 200 | cand_mhb2 confirmation on fresh seeds; mirror |
 | 2026-11-10 03:29 UTC | learned:models/cand_mall.json | learned:gen_008 | 50.2% (43-57) | 197 | all card identities masked (hand, our board, their board), gens 6-13 + 1600 newer games; mirror |
+| 2026-11-10 08:44 UTC | learned:models/cand_mhb3.json | learned:models/cand_mhb.json | 49.2% (42-56) | 199 | masked judge retrained with 1000 self-play games of the masked judge itself, vs cand_mhb; mirror |
