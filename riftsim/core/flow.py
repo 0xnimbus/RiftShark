@@ -238,6 +238,43 @@ class _FinalizeCosts(Instr):
                         info={"item": it.id, "for": it.label, "energy": e, "power": list(p)})
 
 
+class _RepeatDeflect(Instr):
+    """Deflect is paid "for each time they choose [me]" (CR 809.1.c): the Repeat execution's choices are made after
+    the other costs were paid, so their Deflect taxes are paid here. Can't pay: the item leaves the chain, as with the
+    first execution's costs (_FinalizeCosts._finish)."""
+
+    def __init__(self, item_id):
+        self.item_id = item_id
+
+    def _item(self, game):
+        return next((it for it in game.chain if it.id == self.item_id), None)
+
+    def run(self, game, ctx):
+        it = self._item(game)
+        if it is None:
+            return None
+        n = game._deflect_total(it, ctx)
+        if n <= 0:
+            return None
+        p = ["any"] * n
+        purpose = game.item_purpose(it)
+        plans = game.payment_plans(ctx.controller, 0, p, purpose) if game.can_pay(ctx.controller, 0, p, purpose=purpose) else []
+        if not plans:
+            game._fizzle_item(it, "cannot pay Deflect")
+            return None
+        if len(plans) == 1:
+            game.apply_payment(ctx.controller, plans[0], ctx, purpose)
+            return None
+        from .payment import plan_label
+        return Decision(ctx.controller, "pay", plans, labels=[plan_label(game, pl) for pl in plans],
+                        info={"item": it.id, "for": it.label + " (Deflect, repeat)", "energy": 0, "power": list(p)})
+
+    def resume(self, game, ctx, choice):
+        it = self._item(game)
+        game.apply_payment(ctx.controller, choice, ctx, game.item_purpose(it) if it is not None else None)
+        return None
+
+
 class DamageAssignments:
     """Legal combat damage assignments (CR 467.2.c) for targets with (lethal need or None, priority) each, priority
     0 = Tank, 1 = normal, 2 = Backline / "assigned last". Units are dealt lethal in full in priority order (any order
@@ -1136,8 +1173,8 @@ class FlowMixin:
         code = code + relocate(tcode, len(code)) + [_FinalizeCosts(it.id)]
         if tcode and self._optional_costs_include_repeat(it):
             # CR 820.2: each additional execution gets its own choices (they may differ from the first)
-            code = code + [_SnapChoices(0), _SkipUnlessRepeat(len(code) + 3 + len(tcode))]
-            code = code + relocate(tcode, len(code)) + [_SnapChoices(1)]
+            code = code + [_SnapChoices(0), _SkipUnlessRepeat(len(code) + 4 + len(tcode))]
+            code = code + relocate(tcode, len(code)) + [_RepeatDeflect(it.id), _SnapChoices(1)]
         self.vm_frames.append(Frame(code, ctx, tag=("finalize", it.id)))
 
     # "As you play me, you may <do X> any number of times as an additional cost. Reduce my cost by [D] for each."
@@ -1248,6 +1285,15 @@ class FlowMixin:
         it.finalized = True
         self.log("finalized", item=it.id, label=it.label, controller=it.controller)
         targets = [u for u in self._target_uids(ctx) if u is not None]
+        snaps = ctx.vars.get("__rep_choices") or {}
+        if ctx.repeat and snaps:
+            # Repeat (CR 820.2): every execution's choices were made while playing it; all of them are chosen
+            targets = []
+            for k in sorted(snaps):
+                saved = ctx.vars
+                ctx.vars = dict(saved, **snaps[k])
+                targets += [u for u in self._target_uids(ctx) if u is not None]
+                ctx.vars = saved
         if targets:
             # one event per chosen object: "When you choose a friendly unit" triggers once for each friendly unit a
             # spell chooses (only "the Nth time" triggers collapse simultaneous conditions, CR 383.1.b)
