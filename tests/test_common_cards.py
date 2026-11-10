@@ -1213,7 +1213,7 @@ def test_crescent_guardian_pays_chaos_after_a_spell_to_enter_ready(db, decks):
     asked = False
     for _ in range(40):
         d = g.run()
-        if d.kind == "yesno":
+        if d.kind in ("yesno", "additional_cost"):
             asked = True; g.choose(True); continue
         if d.kind == "action" and not g.chain:
             break

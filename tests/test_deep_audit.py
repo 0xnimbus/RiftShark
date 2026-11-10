@@ -953,3 +953,85 @@ def test_hidden_guards_plays_its_sand_soldier_at_that_battlefield(db):
     _drive(g, pick=lambda d: False if d.kind == "yesno" else None)
     toks = [o for o in g.objects.values() if o.zone == "board" and o.defn.name == "Sand Soldier"]
     assert [o.location for o in toks] == [("bf", 1)]
+
+
+def _set_runes(g, db, p, spec):
+    """Give player p exactly these runes: [(domain, exhausted)]."""
+    rdefs = {c.domains[0]: c for c in db if c.type == "rune" and len(c.domains) == 1}
+    ps = g.players[p]
+    while len(ps.runes) < len(spec):
+        r = ps.rune_deck.pop(0)
+        ps.runes.append(r)
+        g.objects[r].zone = "board"
+    for r in ps.runes[len(spec):]:
+        ps.runes.remove(r)
+        ps.rune_deck.append(r)
+        g.objects[r].zone = "rune_deck"
+    for r, (dom, ex) in zip(ps.runes, spec):
+        o = g.objects[r]
+        o.defn, o.domain, o.exhausted = rdefs[dom], dom, ex
+    g.pending = None
+    g.bump()
+
+
+def _play_from_hand(g, p, u, pick):
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == u and (len(o) < 3 or o[2][0] == "base")))
+    seen = []
+
+    def wrap(d):
+        seen.append(d)
+        return pick(d)
+    _drive(g, pick=wrap)
+    return seen
+
+
+def test_ezreal_reduces_an_optional_cost_by_1_or_a_power_the_players_pick(db):
+    """Ezreal, Prodigy: "Optional additional costs you pay cost [1] or [A] less." The player picks, so Blast Corps
+    Cadet's [1][Fury] can cost [Fury] or [1]. It always took the power off, so with only an exhausted rune left to
+    recycle (power but no energy) the [1] was demanded and the additional cost was never offered."""
+    g = _fresh(db, "kennen_tempest")
+    put(g, db, 0, "Ezreal, Prodigy", "base")
+    assert g.optional_cost_variants(0, 1, ["fury"]) == [(1, []), (0, ["fury"])]
+    enemy = put(g, db, 1, "Forecaster", ("bf", 0))
+    cadet = give(g, 0, "Blast Corps Cadet", db)
+    _set_runes(g, db, 0, [("fury", False), ("fury", False), ("fury", True)])
+    n = len(g.events)
+    seen = _play_from_hand(g, 0, cadet, lambda d: True if d.kind == "additional_cost" else
+                           (enemy if d.kind == "choose" and enemy in d.options else None))
+    assert any(d.kind == "additional_cost" for d in seen)
+    pays = [e for e in g.events[n:] if e["kind"] == "pay" and e["player"] == 0]
+    assert sum(e["energy"] for e in pays) == 2 and sum(len(e["power"]) for e in pays) == 1   # [2] + [Fury]
+    assert g.objects[enemy].damage == 2 or g.objects[enemy].zone != "board"
+
+    # three ready runes: both ways are offered ([1] less: exhaust 3; [Fury] less: exhaust 2, recycle 1)
+    g = _fresh(db, "kennen_tempest")
+    put(g, db, 0, "Ezreal, Prodigy", "base")
+    cadet = give(g, 0, "Blast Corps Cadet", db)
+    _set_runes(g, db, 0, [("fury", False)] * 3)
+    pays = []
+    _play_from_hand(g, 0, cadet, lambda d: True if d.kind == "additional_cost" else
+                    (pays.append(d) or d.options[0] if d.kind == "pay" else None))
+    plans = pays[0].options
+    assert any(not any(a[0] == "rc" for a in pl[0]) for pl in plans if pl != "decline")
+    assert any(any(a[0] == "rc" for a in pl[0]) for pl in plans if pl != "decline")
+
+
+def test_pay_x_as_an_additional_cost_is_paid_with_the_cost(db):
+    """CR 357: additional costs are added to the total cost and paid together. Sea Monkey's "you may pay [1] as an
+    additional cost" was paid on its own first, so with exactly [2] the player could pay the [1] and then not afford
+    the card (it left the chain). It is only offered when [3] can be paid, and paying it still buffs Sea Monkey."""
+    g = _fresh(db, "kennen_tempest")
+    sm = give(g, 0, "Sea Monkey", db)
+    _set_runes(g, db, 0, [("body", False)] * 2)
+    seen = _play_from_hand(g, 0, sm, lambda d: True if d.kind in ("additional_cost", "yesno") else None)
+    assert not any(d.kind in ("additional_cost", "yesno") for d in seen)
+    assert g.objects[sm].zone == "board" and not g.objects[sm].buffs
+
+    g = _fresh(db, "kennen_tempest")
+    sm = give(g, 0, "Sea Monkey", db)
+    _set_runes(g, db, 0, [("body", False)] * 3)
+    seen = _play_from_hand(g, 0, sm, lambda d: True if d.kind == "additional_cost" else None)
+    assert any(d.kind == "additional_cost" for d in seen)
+    assert g.objects[sm].zone == "board" and g.objects[sm].buffs
+    assert all(g.objects[r].exhausted for r in g.players[0].runes)
