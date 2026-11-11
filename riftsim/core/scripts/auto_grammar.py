@@ -463,6 +463,15 @@ def _next_out(state):
 BRACKET_WORDS = re.compile(r"\[(buff|stun|predict|burn|add|mighty|empowered|hidden|equip|temporary)\]", re.I)
 
 
+def _each_player_kills(kind):
+    """"Each player kills one of their units/gear": not a target (CR 355.10.e). Each player, the spell's controller
+    first, picks as the spell resolves, then the picked objects die at the same time."""
+    a = O.Choose(Sel(kind, side="friendly"), out="__k1", targeted=False)
+    b = O.Choose(Sel(kind, side="enemy"), out="__k2", targeted=False, player="opponent")
+    a.at_resolution = b.at_resolution = True
+    return [a, b, O.Kill(lambda g, c: [u for u in (c.vars.get("__k1"), c.vars.get("__k2")) if u is not None])]
+
+
 def parse_sentence(s, state):
     s = s.strip()
     if s.endswith("."):
@@ -540,8 +549,7 @@ def parse_sentence(s, state):
         return [O.Choose(Sel("rune", side="friendly"), out="__rn", targeted=False), O.Recycle(Ref("__rn"))]
     m = re.match(r"each player kills one of their gear$", sl)
     if m:
-        return [O.Choose(Sel("gear", side="friendly"), out="__k1", targeted=False), O.Kill(Ref("__k1")),
-                O.Choose(Sel("gear", side="enemy"), out="__k2", targeted=False, player="opponent"), O.Kill(Ref("__k2"))]
+        return _each_player_kills("gear")
     m = re.match(r"prevent all spell and ability damage this turn$", sl)
     if m:
         return [O.DelayedPassive("replace:damage", {"applies": lambda g, c, ev: not ev.get("combat"), "replace": lambda g, c, ev: None})]
@@ -630,8 +638,7 @@ def parse_sentence(s, state):
         return [O.ChooseLocation(out="__bl"), O.PlayToken("Bomb", loc=Ref("__bl"))]
     m = re.match(r"each player kills one of their units$", sl)
     if m:
-        return [O.Choose(Sel("unit", side="friendly"), out="__k1", targeted=False), O.Kill(Ref("__k1")),
-                O.Choose(Sel("unit", side="enemy"), out="__k2", targeted=False, player="opponent"), O.Kill(Ref("__k2"))]
+        return _each_player_kills("unit")
     m = re.match(r"(?:its|their) owner channels (\w+) runes? exhausted$", sl)
     if m:
         return [O.Channel(parse_amount(m.group(1)), exhausted=True, player=O.controller_of(Ref("t")))]

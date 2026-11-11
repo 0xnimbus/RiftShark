@@ -111,6 +111,9 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   (players) and `valid_destination(..., mover=)`: Vex's side can still move it (Charm, Temptation, Blitzcrank).
   2026-11-11 00:20: Rhasa the Sunderer played from the trash (Last Rites, Kennen) counted itself as a card in your trash
   (cost [1] too low): it is on the chain when its cost is set. An 80-game greedy rules_audit found no problems.
+  10:20: Cull the Weak / Acceptable Losses ("Each player kills one of their units/gear") were chosen while playing, so
+  they needed a unit of your own and locked the picks before responses; now picked at resolution (CR 355.10.e, the
+  Choose's `at_resolution` flag keeps it out of `targeting.split_choices`), caster first, killed together.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
