@@ -606,7 +606,7 @@ def parse_sentence(s, state):
         m = None
     if m:
         ins, ref, _ = choose(m.group(1), _next_out(state))
-        return ins + [O.ChooseLocation(out="__dest", include_bases=True, pred=lambda g, c, l: c.vars.get("t") in g.objects and g.valid_destination(c.vars["t"], l)), O.Move(ref, Ref("__dest"))]
+        return ins + [O.ChooseLocation(out="__dest", include_bases=True, pred=lambda g, c, l: c.vars.get("t") in g.objects and g.valid_destination(c.vars["t"], l, mover=c.controller)), O.Move(ref, Ref("__dest"))]
     m = re.match(r"draw (\w+) or channel (\w+) runes? exhausted$", sl)
     if m:
         return [O.ChooseMode([("draw", [O.Draw(parse_amount(m.group(1)))]), ("channel", [O.Channel(parse_amount(m.group(2)), exhausted=True)])])]

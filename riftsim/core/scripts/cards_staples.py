@@ -123,7 +123,7 @@ def yasuo_legend(defn):
             return False
         u = c.vars["t"]
         if cur[0] == "base":
-            return loc[0] == "bf" and g.valid_destination(u, loc)            # from its base
+            return loc[0] == "bf" and g.valid_destination(u, loc, mover=c.controller)            # from its base
         return loc == ("base", g.objects[u].controller)                      # to its base
     return {"abilities": [Activated({"energy": 2, "exhaust": True}, [
         O.If(lambda g, c: c.vars.get("t") is not None and c.vars.get("dest") is not None, [O.Move(Ref("t"), Ref("dest"))]),

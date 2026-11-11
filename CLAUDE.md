@@ -103,6 +103,14 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   the "target" events now cover every execution's choices (Irelia triggers for the repeat's unit too).
   10:20: a hidden spell's unspecified-location unit token (Guards!) went to base/any battlefield; PlayToken "choose" now
   uses the battlefield it was hidden at (CR 811.1.d.5). Open: is "choose a battlefield" in a hidden play effect restricted?
+  15:20: Ezreal, Prodigy's "[1] or [A] less" always took [A]; the player now picks (`Game.optional_cost_variants`, every
+  variant's payment plans are offered). "You may pay [X] as an additional cost" (Sea Monkey, Crescent Guardian, Blast
+  Corps Cadet, 11 cards) was paid on its own before the cost, so it could be paid and the card then not afforded; now it
+  is an `additional_cost` decision paid with the total cost (CR 357). 
+  20:20: Vex, Apathetic's "They can't move it this turn" locked the unit for every player; now keyword `cant_move_by`
+  (players) and `valid_destination(..., mover=)`: Vex's side can still move it (Charm, Temptation, Blitzcrank).
+  2026-11-11 00:20: Rhasa the Sunderer played from the trash (Last Rites, Kennen) counted itself as a card in your trash
+  (cost [1] too low): it is on the chain when its cost is set. An 80-game greedy rules_audit found no problems.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
