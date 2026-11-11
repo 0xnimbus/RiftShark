@@ -1065,3 +1065,34 @@ def test_rhasa_played_from_the_trash_does_not_count_itself(db):
     assert g.card_cost(0, rh, "hand")[0] == max(0, base - 2)
     g._to_zone(g.objects[rh], "trash")
     assert g.card_cost(0, rh, "trash")[0] == max(0, base - 2)
+
+
+def test_cull_the_weak_each_player_picks_as_it_resolves(db):
+    """Cull the Weak ("Each player kills one of their units") doesn't target (CR 355.10.e): each player, the caster
+    too, picks as it resolves. It was chosen while playing, so it couldn't be played without a unit of your own, and
+    the picks were locked before the opponent could respond."""
+    g = _fresh(db, "viktor_herald")
+    a, b = put(g, db, 1, "Forecaster", ("base", 1)), put(g, db, 1, "Forecaster", ("base", 1))
+    picks = []
+
+    def pick(d):
+        if d.kind == "choose" and b in d.options:
+            picks.append(d.player)
+            return b
+        return None
+    _cast(g, db, 0, "Cull the Weak", pick)                # P0 has no units: still playable
+    assert picks == [1]
+    assert g.objects[b].zone == "trash" and g.objects[a].zone == "board"
+
+    g = _fresh(db, "viktor_herald")
+    mine = put(g, db, 0, "Forecaster", ("base", 0))
+    theirs = put(g, db, 1, "Forecaster", ("base", 1))
+    item = []
+
+    def watch(d):
+        if d.kind == "action" and g.chain and not item:
+            item.append(dict(g.chain[-1].ctx.vars))          # nothing picked while it is on the chain
+        return None
+    _cast(g, db, 0, "Cull the Weak", watch)
+    assert item and "__k1" not in item[0] and "__k2" not in item[0]
+    assert g.objects[mine].zone == "trash" and g.objects[theirs].zone == "trash"

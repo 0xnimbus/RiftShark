@@ -33,6 +33,8 @@ def _items(tree):
 def _hoistable_choose(ins, outs):
     if not isinstance(ins, O.Choose) or not isinstance(ins.sel, Sel):
         return False
+    if getattr(ins, "at_resolution", False):
+        return False            # chosen as the spell resolves (CR 355.10.e-g)
     if ins.sel.zone not in PUBLIC_ZONES:
         return False
     w = ins.sel.where or ""
