@@ -641,5 +641,20 @@
   "timeouts": [],
   "date": "2026-11-10 21:48 UTC",
   "note": "linear, masked, gens 6-8 + turn-boundary rows only of 3000 gen-14 games (no what-if rows); mirror"
+ },
+ {
+  "candidate": "learned:models/cand_g15mix.json",
+  "best": "learned:gen_014",
+  "games": 200,
+  "wins": 102,
+  "draws": 0,
+  "score": 0.51,
+  "interval": [
+   0.441,
+   0.578
+  ],
+  "timeouts": [],
+  "date": "2026-11-11 04:31 UTC",
+  "note": "linear, masked, gens 6-8 + mixed self-play (gens 14/8/6/heuristic, epsilon 0.06); mirror"
  }
 ]
