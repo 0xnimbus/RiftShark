@@ -59,7 +59,4 @@ Written by tools/train_loop.py; the `learned` policy and the play page's Learned
 | 2026-11-10 21:48 UTC | learned:models/cand_g15bd.json | learned:gen_014 | 46.0% (39-53) | 200 | linear, masked, gens 6-8 + turn-boundary rows only of 3000 gen-14 games (no what-if rows); mirror |
 | 2026-11-11 04:31 UTC | learned:models/cand_g15mix.json | learned:gen_014 | 51.0% (44-58) | 200 | linear, masked, gens 6-8 + mixed self-play (gens 14/8/6/heuristic, epsilon 0.06); mirror |
 | 2026-11-11 09:28 UTC | learned:models/cand_g15mix2.json | learned:gen_014 | 44.0% (37-51) | 200 | linear, masked, gens 6-8 + two mixed self-play runs (second: gens 14/8/6/3/heuristic, epsilon 0.12); mirror |
-
-**2026-11-10: gen 14 promoted by decision** (Derrick handed the call to the training thread). gen_014 = cand_mhb:
-gens 6-8 trained without hand/own-board card identities (`--mask 106-233`). It plays even with gen 8 in mirrors (53% over 400 games) and better with the top decks:
-Kennen 57% vs 50%, Riven 57% vs 45% against all decks (docs/results/deck_ai_2026-11-09.md). From now on, gates compare to gen 14.
+| 2026-11-11 10:50 UTC | learned:gen_014:rw | learned:gen_014 | 47.5% (41-54) | 200 | gen 14 with reaction windows judged after the opponent plays out its turn (rw); mirror |
