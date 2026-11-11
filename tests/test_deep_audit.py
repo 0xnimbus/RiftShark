@@ -1051,3 +1051,17 @@ def test_vex_apathetic_only_stops_its_controller_moving_the_unit(db):
     _cast(g, db, 0, "Charm", lambda d: tok if d.kind == "choose" and tok in d.options else
           (("bf", 1) if d.kind == "choose_location" else None))
     assert g.objects[tok].location == ("bf", 1)
+
+
+def test_rhasa_played_from_the_trash_does_not_count_itself(db):
+    """Rhasa the Sunderer ("I cost [1] less for each card in your trash"): played from the trash with Last Rites, it
+    moves to the chain before its cost is set (CR 354.1, 357), so it is not one of the cards in your trash."""
+    g = _fresh(db, "kennen_tempest")
+    rh = give(g, 0, "Rhasa the Sunderer", db)
+    base = g.objects[rh].base_defn().energy
+    others = [give(g, 0, "Gust", db) for _ in range(2)]
+    for u in others:
+        g._to_zone(g.objects[u], "trash")
+    assert g.card_cost(0, rh, "hand")[0] == max(0, base - 2)
+    g._to_zone(g.objects[rh], "trash")
+    assert g.card_cost(0, rh, "trash")[0] == max(0, base - 2)

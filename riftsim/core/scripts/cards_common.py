@@ -244,8 +244,9 @@ def mindsplitter(defn):
 
 @script("Rhasa the Sunderer")
 def rhasa(defn):
-    # I cost [1] less for each card in your trash.
-    return [PlayPermission("cost", cost_mod=lambda g, u, e, p: (max(0, e - len(g.players[_ctrl(g, u)].trash)), p),
+    # I cost [1] less for each card in your trash. Played from the trash (Last Rites) Rhasa is on the chain when its cost
+    # is set (CR 354-357), so it doesn't count itself.
+    return [PlayPermission("cost", cost_mod=lambda g, u, e, p: (max(0, e - sum(1 for x in g.players[_ctrl(g, u)].trash if x != u)), p),
                            label="[1] less per card in your trash", source_text=defn.text)]
 
 
