@@ -58,3 +58,4 @@ Written by tools/train_loop.py; the `learned` policy and the play page's Learned
 | 2026-11-10 21:30 UTC | learned:models/cand_g15on.json | learned:gen_014 | 39.5% (33-46) | 200 | linear, masked, only the 3000 games of gen 14 self-play (on-policy); mirror |
 | 2026-11-10 21:48 UTC | learned:models/cand_g15bd.json | learned:gen_014 | 46.0% (39-53) | 200 | linear, masked, gens 6-8 + turn-boundary rows only of 3000 gen-14 games (no what-if rows); mirror |
 | 2026-11-11 04:31 UTC | learned:models/cand_g15mix.json | learned:gen_014 | 51.0% (44-58) | 200 | linear, masked, gens 6-8 + mixed self-play (gens 14/8/6/heuristic, epsilon 0.06); mirror |
+| 2026-11-11 09:28 UTC | learned:models/cand_g15mix2.json | learned:gen_014 | 44.0% (37-51) | 200 | linear, masked, gens 6-8 + two mixed self-play runs (second: gens 14/8/6/3/heuristic, epsilon 0.12); mirror |
