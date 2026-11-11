@@ -116,7 +116,7 @@ class LearnedGreedy(GreedyPolicy):
     look, so a game costs a few times a plain one instead of a hundred times."""
 
     def __init__(self, net, seed=0, samples=3, deep=False, margin=0.04, deep_samples=2, react=False, window=None,
-                 hold=False, hold_k=3, **kw):
+                 hold=False, hold_k=3, pnet=None, pk=3, **kw):
         super().__init__(seed, samples=samples, **kw)
         self.net = net
         # window ('learned:REF:rw', 'rwl' with the learned AI as the opponent): an action decision in the opponent's
@@ -137,6 +137,17 @@ class LearnedGreedy(GreedyPolicy):
         self.hold_k = hold_k
         self.hold_opp = GreedyPolicy(seed + 307, samples=1) if hold else None
         self.hold_calls = 0
+        # pnet ('learned:REF:p=POLICY[:kN]', AI v2 step 2): for our turn's decisions and reaction windows, the best `pk`
+        # options by the one-turn judgement (and ending the turn / passing) are judged two turns deep: the rest of the
+        # current turn and the opponent's whole turn are played with the fast policy net on both sides (its answers,
+        # our counters), on determinised copies; judged at the start of our next turn.
+        self.pnet = None
+        self.pk = pk
+        self.p_calls = 0
+        if pnet:
+            from .policy_net import PolicyNet, PolicyNetPlayer
+            pn = PolicyNet.load(pnet)
+            self.pnet = [PolicyNetPlayer(pn, seed=seed + 613), PolicyNetPlayer(pn, seed=seed + 617)]
         self.helper = GreedyPolicy(seed + 991, samples=1)
         # react=True ('learned-r'): in the lookahead the opponent may answer during our turn (to_turn_end opp)
         # react="learned" ('learned-rl'): the opponent's answers come from the one-sample learned AI instead
@@ -165,6 +176,30 @@ class LearnedGreedy(GreedyPolicy):
                 v += self.net.predict(g, d.player)
             v = 1000.0 * (v / self.samples - 0.5) + self.rng.random() * self.noise
             vals.append(v)
+        if self.pnet is not None and d.kind == "action" and len(opts) >= 2:
+            mine = game.turn_player == d.player
+            real = any(isinstance(x, tuple) and x[0] not in ("pass", "end_turn") for x in opts)
+            if mine or real:
+                self.p_calls += 1
+                order = sorted(range(len(opts)), key=lambda i: -vals[i])
+                cand = order[:self.pk]
+                for i, o in enumerate(opts):
+                    if o in (("end_turn",), ("pass",)) and i not in cand:
+                        cand.append(i)
+                me, them = self.pnet
+                for i in cand:
+                    v = 0.0
+                    for _ in range(self.deep_samples):
+                        g = determinize(game, d.player, self.rng)
+                        if g.pending is not None and opts[i] in g.pending.options:
+                            g.choose(opts[i])
+                        if mine:
+                            to_turn_end(g, d.player, self.helper, opp=them)
+                        if not g.over:
+                            opponent_turn(g, d.player, them, respond=me)
+                        v += self.net.predict(g, d.player)
+                    vals[i] = 1e6 + 1000.0 * (v / self.deep_samples - 0.5)
+                return vals
         if (self.hold and d.kind == "action" and len(opts) >= 2 and game.turn_player == d.player
                 and _fast_in_hand(game, d.player)):
             self.hold_calls += 1
@@ -236,7 +271,12 @@ def make_learned(kind, arg, seed=0):
         # learned-deep:gen_008:0.15:3 -> margin 0.15, 3 deep samples; a field "s6" -> 6 determinised samples per option
         kw, nums = {}, []
         for f in (rest.split(":") if rest else []):
-            if f == "hold" or f.startswith("hold") and f[4:].isdigit():
+            if f.startswith("p="):
+                pr = f[2:]
+                kw["pnet"] = pr if (pr.endswith(".json") or os.path.sep in pr) else os.path.join(M.MODELS_DIR, pr + ".json")
+            elif f.startswith("k") and f[1:].isdigit():
+                kw["pk"] = int(f[1:])
+            elif f == "hold" or f.startswith("hold") and f[4:].isdigit():
                 kw["hold"] = True
                 if f[4:]:
                     kw["hold_k"] = int(f[4:])
