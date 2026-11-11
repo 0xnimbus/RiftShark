@@ -1355,6 +1355,12 @@ class FlowMixin:
             if it.kind in ("unit", "gear") and pl is not None and pl[0] == "bf":
                 self.turn_memo[("played_to_bf", it.controller)] = True      # Hold 'Em
             o = self.objects[it.uid]
+            if it.kind == "spell":
+                # Ravenborn Tome: "The next spell you play this turn deals 1 Bonus Damage": used up by this spell even if
+                # it deals nothing, and added to each of its Deal actions (CR 715)
+                extra = sum(t.get("amount", 0) for t in self.consume_turn_effects("bonus_damage", player=it.controller))
+                if extra:
+                    ctx.vars["__spell_bonus"] = ctx.vars.get("__spell_bonus", 0) + extra
             self.emit("play", uid=it.uid, player=it.controller, card_type=it.kind, loc=ctx.vars.get("__loc") or ctx.target_bf,
                       from_zone=ctx.played_from, item=it.id, energy=self._energy_spent(it), paid=dict(ctx.paid), ctx=ctx)
         elif it.kind == "ability":

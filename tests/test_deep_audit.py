@@ -1096,3 +1096,35 @@ def test_cull_the_weak_each_player_picks_as_it_resolves(db):
     _cast(g, db, 0, "Cull the Weak", watch)
     assert item and "__k1" not in item[0] and "__k2" not in item[0]
     assert g.objects[mine].zone == "trash" and g.objects[theirs].zone == "trash"
+
+
+def _cast_with(g, db, p, name, runes, pick):
+    u = give(g, p, name, db)
+    _set_runes(g, db, p, runes)
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == u))
+    _drive(g, pick=pick)
+    return u
+
+
+def test_next_spell_bonus_damage_goes_to_that_spells_every_deal(db):
+    """Ravenborn Tome: "The next spell you play this turn deals 1 Bonus Damage." It belongs to the next spell played
+    (CR 2955 example): each of Falling Star's two Deal actions gets it, and a spell that deals nothing still uses it up.
+    It was spent by the first Deal of any source (an ability's Deal wasted it) and given to one Deal only."""
+    from riftsim.core import ops as O
+    tome = _card(db, "Ravenborn Tome")
+    assert any(isinstance(i, O.DelayedPassive) and i.kind == "bonus_damage" for a in tome.abilities for i in a.code)
+    g = _fresh(db, "akali_rogue")
+    a, b = put(g, db, 1, "Rhasa the Sunderer", ("base", 1)), put(g, db, 1, "Rhasa the Sunderer", ("base", 1))
+    g.add_turn_effect(Context(0, None), "bonus_damage", {"amount": 1, "spell_only": True}, uses=1)   # what the Tome does
+    order = [a, b]
+    _cast_with(g, db, 0, "Falling Star", [("fury", False)] * 4,
+               lambda d: order.pop(0) if d.kind == "choose" and order and order[0] in d.options else None)
+    assert (g.objects[a].damage, g.objects[b].damage) == (4, 4)
+
+    g = _fresh(db, "akali_rogue")
+    a = put(g, db, 1, "Rhasa the Sunderer", ("base", 1))
+    g.add_turn_effect(Context(0, None), "bonus_damage", {"amount": 1, "spell_only": True}, uses=1)
+    _cast_with(g, db, 0, "Discipline", [("calm", False)] * 4, lambda d: None)      # deals nothing, still the next spell
+    _cast_with(g, db, 0, "Falling Star", [("fury", False)] * 4, lambda d: a if d.kind == "choose" and a in d.options else None)
+    assert g.objects[a].damage == 6

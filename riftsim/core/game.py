@@ -1017,10 +1017,7 @@ class Game(flow.FlowMixin):
             if so is not None and so.zone == "board" and "gear" in self.chars(ctx.source).types:
                 for src_r, v in self.rules("bonus_damage_gear_abilities", player=ctx.controller):    # Ziggs, Short-Fused
                     bonus += v
-            for t in self.consume_turn_effects("bonus_damage", player=ctx.controller):
-                if t.get("spell_only") and not (ctx.item is not None and self._item_is_spell(ctx.item)):
-                    continue
-                bonus += t.get("amount", 0)
+            bonus += ctx.vars.get("__spell_bonus", 0)       # the next spell you play deals N Bonus Damage (flow)
         here_bonus = {}
         if ctx is not None and not combat:
             for src_r, v in self.rules("bonus_damage_here"):
