@@ -51,7 +51,7 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   RAD gallery data had wrong types/domains/tags on 84 cards: checked against the card images, fixed in data/cards/overrides.json.
   Common cards are hand-scripted in `riftsim/core/scripts/cards_common.py` (tests: tests/test_common_cards.py).
   Hand scripts for staples/legends/champions live in `riftsim/core/scripts/cards_staples.py` (tests: tests/test_legends.py, tests/test_champions.py).
-- `data/decks/tournament/`: 10 decks (Rek'Sai added 2026-11-06 13:15; specs in tools/deckspecs/radiance_2026-11.json). Top Radiance lists (Riven 1st CoolStuffCon Orlando $25k; Kai'Sa 3rd Convergence IV) from
+- `data/decks/tournament/`: 12 decks (Rek'Sai added 2026-11-06 13:15; Sett added 2026-11-11 from Nation Clash Saturday, which now has individual ranks; specs in tools/deckspecs/radiance_2026-11.json). Top Radiance lists (Riven 1st CoolStuffCon Orlando $25k; Kai'Sa 3rd Convergence IV) from
   riftdecks.com qualifying events (3 relevance stars, 256+ players). Derrick wants these refreshed daily and every
   relevant legend covered eventually; Kai'Sa vs Riven is the matchup he cares about now.
 - First Kai'Sa vs Riven batch (200 greedy games): Kai'Sa 52.5%, Riven 47.5%; first player ~58%. Exported to web/data.
@@ -114,6 +114,8 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   10:20: Cull the Weak / Acceptable Losses ("Each player kills one of their units/gear") were chosen while playing, so
   they needed a unit of your own and locked the picks before responses; now picked at resolution (CR 355.10.e, the
   Choose's `at_resolution` flag keeps it out of `targeting.split_choices`), caster first, killed together.
+  15:20: "The next spell you play this turn deals 1 Bonus Damage" (Ravenborn Tome) was spent by the first Deal of any
+  source and given to one Deal only; now taken by the next spell played (ctx `__spell_bonus`), every Deal of it.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

@@ -350,15 +350,16 @@ class Replacement(Ability):
     `replace(g, src, ev, choice)` returns the new event. `game.do_kill` keeps the unit on the board and pushes a
     decision frame (game._OptionalReplacementStep); declining lets the death go on through the other replacements."""
     kind = "replacement"
-    __slots__ = ("event", "applies", "replace", "once_per_turn", "optional", "options")
+    __slots__ = ("event", "applies", "replace", "once_per_turn", "optional", "options", "option_label")
 
     def __init__(self, event, applies, replace, once_per_turn=False, zone="board", cond=None, label="", source_text="", optional=False,
-                 options=None):
+                 options=None, option_label=None):
         super().__init__(label, zone, cond, source_text)
         if optional and (event != "die" or options is None):
             raise NotImplementedError("optional replacement effects are only supported for 'die' events with options: " + label)
         self.event, self.applies, self.replace, self.once_per_turn, self.optional = event, applies, replace, once_per_turn, optional
         self.options = options
+        self.option_label = option_label    # callable(g, src, choice) -> str, for the decision's option labels
 
 
 class PlayPermission(Ability):

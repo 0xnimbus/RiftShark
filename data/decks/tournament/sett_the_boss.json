@@ -1,0 +1,135 @@
+{
+ "name": "Sett, The Boss (HXN Pandanaconda, 10th Nation Clash Saturday - Riftbound Regional Championship: Europe)",
+ "legend": "OPP-269",
+ "champion": "OGN-240",
+ "main": [
+  {
+   "id": "UNL-112",
+   "name": "Irresistible Faefolk",
+   "count": 3
+  },
+  {
+   "id": "OGN-136",
+   "name": "Pit Rookie",
+   "count": 3
+  },
+  {
+   "id": "RAD-129",
+   "name": "Trifarian Captain",
+   "count": 3
+  },
+  {
+   "id": "OGN-132",
+   "name": "First Mate",
+   "count": 2
+  },
+  {
+   "id": "UNL-097",
+   "name": "Kinkou Initiate",
+   "count": 2
+  },
+  {
+   "id": "SFD-113",
+   "name": "Lucian, Merciless",
+   "count": 2
+  },
+  {
+   "id": "UNL-114",
+   "name": "Nidalee, Cat Form",
+   "count": 1
+  },
+  {
+   "id": "SFD-109",
+   "name": "Akshan, Mischievous",
+   "count": 2
+  },
+  {
+   "id": "OGN-232",
+   "name": "Fiora, Victorious",
+   "count": 3
+  },
+  {
+   "id": "UNL-120A",
+   "name": "Rengar, Trophy Hunter",
+   "count": 2
+  },
+  {
+   "id": "UNL-176",
+   "name": "Vi, Peacekeeper",
+   "count": 2
+  },
+  {
+   "id": "RAD-073",
+   "name": "Pillaged Armory",
+   "count": 3
+  },
+  {
+   "id": "SFD-097",
+   "name": "Punch First",
+   "count": 3
+  },
+  {
+   "id": "OGN-270",
+   "name": "Showstopper, Sett",
+   "count": 3
+  },
+  {
+   "id": "OGN-207",
+   "name": "Call to Glory",
+   "count": 3
+  },
+  {
+   "id": "VEN-083",
+   "name": "Rampage",
+   "count": 2
+  }
+ ],
+ "runes": {
+  "body": 8,
+  "order": 4
+ },
+ "battlefields": [
+  "OGN-282",
+  "RAD-164",
+  "UNL-218"
+ ],
+ "source": {
+  "url": "https://riftdecks.com/riftbound-metagame/deck-sett-the-boss-347099",
+  "player": "HXN Pandanaconda",
+  "placement": 10,
+  "tournament": "Nation Clash Saturday - Riftbound Regional Championship: Europe",
+  "players": 1976,
+  "date": "2026-11-07",
+  "set": "Radiance",
+  "sideboard": [
+   [
+    "Decree of Strength",
+    1
+   ],
+   [
+    "Repulse",
+    2
+   ],
+   [
+    "Sabotage",
+    2
+   ],
+   [
+    "Decree of Unity",
+    1
+   ],
+   [
+    "Salvage",
+    2
+   ],
+   [
+    "Rampage",
+    1
+   ],
+   [
+    "Ruin Runner",
+    1
+   ]
+  ]
+ }
+}

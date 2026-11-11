@@ -3,7 +3,7 @@ other staples). Printed text, with errata applied, is quoted above each script."
 from __future__ import annotations
 
 from . import script, SpellEffect
-from ..abilities import Static, Triggered, Activated, PlayPermission
+from ..abilities import Static, Triggered, Activated, PlayPermission, Replacement
 from ..selectors import Sel
 from .. import ops as O
 from ..vm import Ref
@@ -1635,3 +1635,58 @@ def karma_channeler(defn):
         return True
     return {"abilities": [Triggered(to_main, [O.Buff(Ref("t"))], targets=[O.Choose(Sel("unit", side="friendly"), out="t")],
                                     label=defn.name, source_text=defn.text)], "replace": True}
+
+
+# ----------------------------------------------------------------------------- Sett
+@script("The Boss", "Sett, The Boss")
+def the_boss(defn):
+    # Errata (Origins errata): If a buffed unit you control would die, you may pay [C], exhaust me, and spend its buff
+    # to heal it, exhaust it, and recall it instead. (Send it to base. This isn't a move.) When you conquer, ready me.
+    # [C] on a Body/Order card is one Body or Order power (CR 135.2.e.6.c). An optional replacement (CR 369-372): each
+    # option is one distinct way to pay; the cost is paid as the replacement is applied.
+    from .. import payment
+
+    def doms(g, s):
+        d = list(g.objects[s].base_defn().domains or ())
+        return d or ["any"]
+
+    def purpose(g, s):
+        return {"kind": "ability", "types": {"legend"}, "uid": s}
+
+    def applies(g, s, ev):
+        me, u = g.objects[s], ev.get("uid")
+        o = g.objects.get(u)
+        return (not ev.get("replaced_with") and o is not None and o.zone == "board" and o.controller == me.controller
+                and "unit" in g.chars(u).types and o.buffs > 0)
+
+    def options(g, s, ev):
+        me = g.objects[s]
+        if me.exhausted:
+            return []
+        seen, out = set(), []
+        for d in doms(g, s):
+            for pl in g.payment_plans(me.controller, 0, [d], purpose=purpose(g, s)):
+                if pl not in seen:
+                    seen.add(pl)
+                    out.append(pl)
+        return out
+
+    def option_label(g, s, plan):
+        return "pay [C], exhaust Sett and spend its buff to recall it (" + payment.plan_label(g, plan) + ")"
+
+    def replace(g, s, ev, plan):
+        me = g.objects[s]
+        g.apply_payment(me.controller, plan, None, purpose=purpose(g, s))
+        g.do_exhaust(s)
+        g.do_spend_buff(ev["uid"])
+        return dict(ev, replaced_with="recall", exhaust=True)
+
+    def conquer(g, s, ev):
+        return ev.get("kind") == "conquer" and ev.get("player") == g.objects[s].controller
+
+    return {"abilities": [
+        Replacement("die", applies, replace, optional=True, options=options, option_label=option_label,
+                    label="Sett: pay [C], exhaust me and spend its buff to heal, exhaust and recall it instead",
+                    source_text=defn.text),
+        Triggered(conquer, [O.Do(lambda g, c: g.do_ready(c.source, c))],
+                  label="Sett: when you conquer, ready me", source_text=defn.text)], "replace": True}
