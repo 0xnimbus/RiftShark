@@ -114,6 +114,8 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   10:20: Cull the Weak / Acceptable Losses ("Each player kills one of their units/gear") were chosen while playing, so
   they needed a unit of your own and locked the picks before responses; now picked at resolution (CR 355.10.e, the
   Choose's `at_resolution` flag keeps it out of `targeting.split_choices`), caster first, killed together.
+  15:20: "The next spell you play this turn deals 1 Bonus Damage" (Ravenborn Tome) was spent by the first Deal of any
+  source and given to one Deal only; now taken by the next spell played (ctx `__spell_bonus`), every Deal of it.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
