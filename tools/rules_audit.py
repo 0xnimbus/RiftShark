@@ -276,8 +276,10 @@ def check_invariants(g, a, seed, last):
             a.bad("zones", f"{where}: {g.label(u)} is listed in {z} but its zone is {o.zone}")
     # state-based checks only when nothing is pending (no chain, combat or showdown)
     if not g.chain and g.combat is None and g.showdown is None and g.phase == "main":
+        waiting_replacement = g.pending is not None and g.pending.kind == "optional_replacement"
         for u, o in g.objects.items():
-            if o.zone == "board" and "unit" in g.chars(u).types and g.lethal_damage(u):
+            # a unit waiting on an optional 'die' replacement (Sett, The Boss) stays on the board until it is answered
+            if o.zone == "board" and "unit" in g.chars(u).types and g.lethal_damage(u) and not waiting_replacement:
                 a.bad("lethal", f"{where}: {g.label(u)} has lethal damage on the board (CR 323 cleanup)")
         for b in g.battlefields:
             ctl = {g.objects[x].controller for x in g.units_at(("bf", b.idx))}

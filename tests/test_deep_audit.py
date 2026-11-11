@@ -1128,3 +1128,28 @@ def test_next_spell_bonus_damage_goes_to_that_spells_every_deal(db):
     _cast_with(g, db, 0, "Discipline", [("calm", False)] * 4, lambda d: None)      # deals nothing, still the next spell
     _cast_with(g, db, 0, "Falling Star", [("fury", False)] * 4, lambda d: a if d.kind == "choose" and a in d.options else None)
     assert g.objects[a].damage == 6
+
+
+def test_that_battlefield_in_a_trigger_is_the_events_battlefield(db):
+    """Irresistible Faefolk ("When I move to a battlefield, you may move an enemy unit to that battlefield"), Vex,
+    Mocking and Exemplar of Demacia read "that battlefield" from a variable nothing set, so the move went nowhere."""
+    for name in ("Irresistible Faefolk", "Vex, Mocking", "Exemplar of Demacia"):
+        assert any(getattr(a, "store", {}).get("loc") == "__bl" for a in _card(db, name).abilities), name
+    g = _fresh(db, "sett_the_boss")
+    f = put(g, db, 0, "Irresistible Faefolk", ("base", 0))
+    e = put(g, db, 1, "Forecaster", ("base", 1))
+    moved = []
+    g.pending = None
+    g.bump()
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "move" and f in o[1] and o[-1] == ("bf", 0)))
+    for _ in range(40):
+        d = g.run()
+        if any(ev["kind"] == "move" and ev.get("uid") == e for ev in g.events):
+            moved.append(True)
+            break
+        if d is None or (d.kind == "action" and not g.chain):
+            break
+        g.choose(True if d.kind == "yesno" else (e if d.kind == "choose" and e in d.options else
+                 (("pass",) if ("pass",) in d.options else d.options[0])))
+    assert moved

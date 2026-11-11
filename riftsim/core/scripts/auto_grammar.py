@@ -1916,6 +1916,10 @@ def _script_line(defn, line, cond=None):
         store["player"] = "__p"           # "that player" / "they": the player the event is about (Obelisk of Power)
         if re.search(r"\bmoves? from\b", prefix, re.I):
             store["from"] = "__tloc"      # "When I move from a location, ... there" (Lillia, Fae Fawn)
+        if re.search(r"\bthat battlefield\b", rest, re.I) and not re.search(r"\bchoose a battlefield\b", rest, re.I):
+            # "When I move to a battlefield / you stun a unit at a battlefield / you play a Deploy gear, ... that
+            # battlefield" (Irresistible Faefolk, Vex, Mocking, Exemplar of Demacia): the event's location
+            store["loc"] = "__bl"
         eff = parse_effect(rest, state)
         once_flag = once or prefix.lower().startswith("the first time")
         return [Triggered(ev, eff, filt=filt, once_per_turn=once_flag, label=line[:40], source_text=line, store=store, cond=cond, optional=optional)]
