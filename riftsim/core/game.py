@@ -1930,7 +1930,10 @@ class _OptionalReplacementStep:
                 opts = []
         if not opts:
             return self.resume(game, ctx, "decline")
-        labels = [f"don't ({game.label(u)} dies)"] + [f"kill {game.label(x)}" if x in game.objects else str(x) for x in opts]
+        if ab.option_label is not None:
+            labels = [f"don't ({game.label(u)} dies)"] + [ab.option_label(game, ev["deferred"][0], x) for x in opts]
+        else:
+            labels = [f"don't ({game.label(u)} dies)"] + [f"kill {game.label(x)}" if x in game.objects else str(x) for x in opts]
         return Decision(ctx.controller, "optional_replacement", ["decline"] + opts, out="__orep_choice", labels=labels,
                         info={"uid": u, "source": ev["deferred"][0], "label": ab.label or "optional replacement"})
 

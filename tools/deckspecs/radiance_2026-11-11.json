@@ -1,0 +1,148 @@
+{
+ "sett_the_boss": {
+  "player": "HXN Pandanaconda",
+  "placement": 10,
+  "tournament": "Nation Clash Saturday - Riftbound Regional Championship: Europe",
+  "players": 1976,
+  "date": "2026-11-07",
+  "url": "https://riftdecks.com/riftbound-metagame/deck-sett-the-boss-347099",
+  "list": {
+   "LEGEND": [
+    [
+     1,
+     "Sett, The Boss"
+    ]
+   ],
+   "CHAMPION": [
+    [
+     1,
+     "Sett, Kingpin"
+    ]
+   ],
+   "UNIT": [
+    [
+     3,
+     "Irresistible Faefolk"
+    ],
+    [
+     3,
+     "Pit Rookie"
+    ],
+    [
+     3,
+     "Trifarian Captain"
+    ],
+    [
+     2,
+     "First Mate"
+    ],
+    [
+     2,
+     "Kinkou Initiate"
+    ],
+    [
+     2,
+     "Lucian, Merciless"
+    ],
+    [
+     1,
+     "Nidalee, Cat Form"
+    ],
+    [
+     2,
+     "Akshan, Mischievous"
+    ],
+    [
+     3,
+     "Fiora, Victorious"
+    ],
+    [
+     2,
+     "Rengar, Trophy Hunter"
+    ],
+    [
+     2,
+     "Vi, Peacekeeper"
+    ]
+   ],
+   "GEAR": [
+    [
+     3,
+     "Pillaged Armory"
+    ]
+   ],
+   "SPELL": [
+    [
+     3,
+     "Punch First"
+    ],
+    [
+     3,
+     "Showstopper"
+    ],
+    [
+     3,
+     "Call to Glory"
+    ],
+    [
+     2,
+     "Rampage"
+    ]
+   ],
+   "BATTLEFIELDS": [
+    [
+     1,
+     "Monastery of Hirana"
+    ],
+    [
+     1,
+     "Packed Amphitheater"
+    ],
+    [
+     1,
+     "Valley of Idols"
+    ]
+   ],
+   "RUNES": [
+    [
+     8,
+     "Body Rune"
+    ],
+    [
+     4,
+     "Order Rune"
+    ]
+   ]
+  },
+  "sideboard": [
+   [
+    1,
+    "Decree of Strength"
+   ],
+   [
+    2,
+    "Repulse"
+   ],
+   [
+    2,
+    "Sabotage"
+   ],
+   [
+    1,
+    "Decree of Unity"
+   ],
+   [
+    2,
+    "Salvage"
+   ],
+   [
+    1,
+    "Rampage"
+   ],
+   [
+    1,
+    "Ruin Runner"
+   ]
+  ]
+ }
+}

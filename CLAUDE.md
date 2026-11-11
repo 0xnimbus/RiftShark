@@ -51,7 +51,7 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   RAD gallery data had wrong types/domains/tags on 84 cards: checked against the card images, fixed in data/cards/overrides.json.
   Common cards are hand-scripted in `riftsim/core/scripts/cards_common.py` (tests: tests/test_common_cards.py).
   Hand scripts for staples/legends/champions live in `riftsim/core/scripts/cards_staples.py` (tests: tests/test_legends.py, tests/test_champions.py).
-- `data/decks/tournament/`: 10 decks (Rek'Sai added 2026-11-06 13:15; specs in tools/deckspecs/radiance_2026-11.json). Top Radiance lists (Riven 1st CoolStuffCon Orlando $25k; Kai'Sa 3rd Convergence IV) from
+- `data/decks/tournament/`: 12 decks (Rek'Sai added 2026-11-06 13:15; Sett added 2026-11-11 from Nation Clash Saturday, which now has individual ranks; specs in tools/deckspecs/radiance_2026-11.json). Top Radiance lists (Riven 1st CoolStuffCon Orlando $25k; Kai'Sa 3rd Convergence IV) from
   riftdecks.com qualifying events (3 relevance stars, 256+ players). Derrick wants these refreshed daily and every
   relevant legend covered eventually; Kai'Sa vs Riven is the matchup he cares about now.
 - First Kai'Sa vs Riven batch (200 greedy games): Kai'Sa 52.5%, Riven 47.5%; first player ~58%. Exported to web/data.
