@@ -61,3 +61,8 @@ Written by tools/train_loop.py; the `learned` policy and the play page's Learned
 | 2026-11-11 09:28 UTC | learned:models/cand_g15mix2.json | learned:gen_014 | 44.0% (37-51) | 200 | linear, masked, gens 6-8 + two mixed self-play runs (second: gens 14/8/6/3/heuristic, epsilon 0.12); mirror |
 | 2026-11-11 10:50 UTC | learned:gen_014:rw | learned:gen_014 | 47.5% (41-54) | 200 | gen 14 with reaction windows judged after the opponent plays out its turn (rw); mirror |
 | 2026-11-11 14:56 UTC | learned:models/cand_pg1.json | learned:gen_014 | 41.7% (35-49) | 199 | policy gradient iteration 1 (2000 games at T 0.1, normalized step 0.2) from gen_014; mirror |
+| 2026-11-11 15:18 UTC | learned:models/cand_pg1s.json | learned:gen_014 | 42.5% (36-49) | 200 | policy gradient, 2000 games at T 0.1, raw step (lr 1, norm 0.087); mirror |
+| 2026-11-11 15:40 UTC | learned:models/cand_pg1z.json | learned:gen_014 | 50.5% (44-57) | 200 | policy gradient, 2000 games at T 0.1, raw step on weights over 2 std errors only; mirror |
+| 2026-11-11 19:26 UTC | learned:models/cand_pg2z.json | learned:gen_014 | 52.0% (45-59) | 200 | policy gradient, 5000 games (gen 14 + cand_pg1z) at T 0.1, raw step on weights over 2 std errors; mirror |
+| 2026-11-11 19:48 UTC | learned:models/cand_pg2z_x3.json | learned:gen_014 | 49.0% (42-56) | 200 | policy gradient, 5000 games, step on weights over 2 std errors scaled x3; mirror |
+| 2026-11-11 20:08 UTC | learned:models/cand_pg2z_x8.json | learned:gen_014 | 45.0% (38-52) | 200 | policy gradient, 5000 games, step on weights over 2 std errors scaled x8; mirror |

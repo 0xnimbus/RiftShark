@@ -707,5 +707,80 @@
   ],
   "date": "2026-11-11 14:56 UTC",
   "note": "policy gradient iteration 1 (2000 games at T 0.1, normalized step 0.2) from gen_014; mirror"
+ },
+ {
+  "candidate": "learned:models/cand_pg1s.json",
+  "best": "learned:gen_014",
+  "games": 200,
+  "wins": 85,
+  "draws": 0,
+  "score": 0.425,
+  "interval": [
+   0.359,
+   0.494
+  ],
+  "timeouts": [],
+  "date": "2026-11-11 15:18 UTC",
+  "note": "policy gradient, 2000 games at T 0.1, raw step (lr 1, norm 0.087); mirror"
+ },
+ {
+  "candidate": "learned:models/cand_pg1z.json",
+  "best": "learned:gen_014",
+  "games": 200,
+  "wins": 101,
+  "draws": 0,
+  "score": 0.505,
+  "interval": [
+   0.436,
+   0.574
+  ],
+  "timeouts": [],
+  "date": "2026-11-11 15:40 UTC",
+  "note": "policy gradient, 2000 games at T 0.1, raw step on weights over 2 std errors only; mirror"
+ },
+ {
+  "candidate": "learned:models/cand_pg2z.json",
+  "best": "learned:gen_014",
+  "games": 200,
+  "wins": 104,
+  "draws": 0,
+  "score": 0.52,
+  "interval": [
+   0.451,
+   0.588
+  ],
+  "timeouts": [],
+  "date": "2026-11-11 19:26 UTC",
+  "note": "policy gradient, 5000 games (gen 14 + cand_pg1z) at T 0.1, raw step on weights over 2 std errors; mirror"
+ },
+ {
+  "candidate": "learned:models/cand_pg2z_x3.json",
+  "best": "learned:gen_014",
+  "games": 200,
+  "wins": 98,
+  "draws": 0,
+  "score": 0.49,
+  "interval": [
+   0.422,
+   0.559
+  ],
+  "timeouts": [],
+  "date": "2026-11-11 19:48 UTC",
+  "note": "policy gradient, 5000 games, step on weights over 2 std errors scaled x3; mirror"
+ },
+ {
+  "candidate": "learned:models/cand_pg2z_x8.json",
+  "best": "learned:gen_014",
+  "games": 200,
+  "wins": 90,
+  "draws": 0,
+  "score": 0.45,
+  "interval": [
+   0.383,
+   0.519
+  ],
+  "timeouts": [],
+  "date": "2026-11-11 20:08 UTC",
+  "note": "policy gradient, 5000 games, step on weights over 2 std errors scaled x8; mirror"
  }
 ]
