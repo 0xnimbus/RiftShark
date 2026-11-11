@@ -686,5 +686,26 @@
   "timeouts": [],
   "date": "2026-11-11 10:50 UTC",
   "note": "gen 14 with reaction windows judged after the opponent plays out its turn (rw); mirror"
+ },
+ {
+  "candidate": "learned:models/cand_pg1.json",
+  "best": "learned:gen_014",
+  "games": 199,
+  "wins": 83,
+  "draws": 0,
+  "score": 0.4171,
+  "interval": [
+   0.351,
+   0.487
+  ],
+  "timeouts": [
+   [
+    "viktor_herald.json",
+    "viktor_herald.json",
+    90048
+   ]
+  ],
+  "date": "2026-11-11 14:56 UTC",
+  "note": "policy gradient iteration 1 (2000 games at T 0.1, normalized step 0.2) from gen_014; mirror"
  }
 ]

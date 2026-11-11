@@ -60,3 +60,4 @@ Written by tools/train_loop.py; the `learned` policy and the play page's Learned
 | 2026-11-11 04:31 UTC | learned:models/cand_g15mix.json | learned:gen_014 | 51.0% (44-58) | 200 | linear, masked, gens 6-8 + mixed self-play (gens 14/8/6/heuristic, epsilon 0.06); mirror |
 | 2026-11-11 09:28 UTC | learned:models/cand_g15mix2.json | learned:gen_014 | 44.0% (37-51) | 200 | linear, masked, gens 6-8 + two mixed self-play runs (second: gens 14/8/6/3/heuristic, epsilon 0.12); mirror |
 | 2026-11-11 10:50 UTC | learned:gen_014:rw | learned:gen_014 | 47.5% (41-54) | 200 | gen 14 with reaction windows judged after the opponent plays out its turn (rw); mirror |
+| 2026-11-11 14:56 UTC | learned:models/cand_pg1.json | learned:gen_014 | 41.7% (35-49) | 199 | policy gradient iteration 1 (2000 games at T 0.1, normalized step 0.2) from gen_014; mirror |
