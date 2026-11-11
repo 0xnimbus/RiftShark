@@ -53,6 +53,12 @@ Written by tools/train_loop.py; the `learned` policy and the play page's Learned
 | 2026-11-10 03:07 UTC | learned:models/cand_mhb2.json | learned:gen_008 | 48.0% (41-55) | 200 | cand_mhb2 confirmation on fresh seeds; mirror |
 | 2026-11-10 03:29 UTC | learned:models/cand_mall.json | learned:gen_008 | 50.2% (43-57) | 197 | all card identities masked (hand, our board, their board), gens 6-13 + 1600 newer games; mirror |
 | 2026-11-10 08:44 UTC | learned:models/cand_mhb3.json | learned:models/cand_mhb.json | 49.2% (42-56) | 199 | masked judge retrained with 1000 self-play games of the masked judge itself, vs cand_mhb; mirror |
+| 2026-11-10 20:54 UTC | learned:models/cand_g15lin.json | learned:gen_014 | 45.5% (39-52) | 200 | linear, masked, gens 6-8 + 4000 games of gen 14 self-play; mirror |
+| 2026-11-10 21:12 UTC | learned:models/cand_g15nn.json | learned:gen_014 | 45.5% (39-52) | 200 | wide-and-deep (16 hidden, l2 1e-2) on the masked linear, same data; mirror |
+| 2026-11-10 21:30 UTC | learned:models/cand_g15on.json | learned:gen_014 | 39.5% (33-46) | 200 | linear, masked, only the 3000 games of gen 14 self-play (on-policy); mirror |
+| 2026-11-10 21:48 UTC | learned:models/cand_g15bd.json | learned:gen_014 | 46.0% (39-53) | 200 | linear, masked, gens 6-8 + turn-boundary rows only of 3000 gen-14 games (no what-if rows); mirror |
+| 2026-11-11 04:31 UTC | learned:models/cand_g15mix.json | learned:gen_014 | 51.0% (44-58) | 200 | linear, masked, gens 6-8 + mixed self-play (gens 14/8/6/heuristic, epsilon 0.06); mirror |
+| 2026-11-11 09:28 UTC | learned:models/cand_g15mix2.json | learned:gen_014 | 44.0% (37-51) | 200 | linear, masked, gens 6-8 + two mixed self-play runs (second: gens 14/8/6/3/heuristic, epsilon 0.12); mirror |
 
 **2026-11-10: gen 14 promoted by decision** (Derrick handed the call to the training thread). gen_014 = cand_mhb:
 gens 6-8 trained without hand/own-board card identities (`--mask 106-233`). It plays even with gen 8 in mirrors (53% over 400 games) and better with the top decks:
