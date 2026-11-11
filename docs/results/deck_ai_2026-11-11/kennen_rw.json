@@ -1,0 +1,54 @@
+{
+ "deck": "kennen_tempest",
+ "policy": "learned:gen_014:rw",
+ "opponent": "learned:gen_014",
+ "wins": 101.0,
+ "games": 200,
+ "score": 0.505,
+ "interval": [
+  0.436,
+  0.574
+ ],
+ "per_matchup": {
+  "akali_rogue": [
+   15.0,
+   20
+  ],
+  "azir_emperor": [
+   14.0,
+   20
+  ],
+  "viktor_herald": [
+   14.0,
+   20
+  ],
+  "irelia_blade_dancer": [
+   13.0,
+   20
+  ],
+  "reksai_void_burrower": [
+   12.0,
+   20
+  ],
+  "nasus_curator": [
+   9.0,
+   20
+  ],
+  "riven_exile": [
+   9.0,
+   20
+  ],
+  "vex_gloomist": [
+   9.0,
+   20
+  ],
+  "kaisa_void": [
+   3.0,
+   20
+  ],
+  "master_yi_wuju": [
+   3.0,
+   20
+  ]
+ }
+}

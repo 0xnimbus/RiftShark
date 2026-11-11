@@ -97,6 +97,17 @@ def opponent_turn(g, p, helper, max_steps=600, respond=None):
         g.choose(o)
 
 
+def _fast_in_hand(g, p):
+    """p holds a spell it could cast in the opponent's turn (Reaction or Action) with all its runes ready."""
+    ps = g.players[p]
+    runes = len(ps.runes)
+    for u in ps.hand:
+        d = g.objects[u].defn
+        if d.type == "spell" and (d.keywords.get("reaction") or d.keywords.get("action")) and (d.energy or 0) <= runes:
+            return True
+    return False
+
+
 class LearnedGreedy(GreedyPolicy):
     """deep=True ('learned-deep'): when the two best options of an action decision are within `margin` win
     probability of each other, they are compared again one turn deeper: play the option, end the turn, let the
@@ -104,9 +115,28 @@ class LearnedGreedy(GreedyPolicy):
     view of our hand is a sample too), and judge the start of our next turn. Only close calls pay for the deeper
     look, so a game costs a few times a plain one instead of a hundred times."""
 
-    def __init__(self, net, seed=0, samples=3, deep=False, margin=0.04, deep_samples=2, react=False, **kw):
+    def __init__(self, net, seed=0, samples=3, deep=False, margin=0.04, deep_samples=2, react=False, window=None,
+                 hold=False, hold_k=3, **kw):
         super().__init__(seed, samples=samples, **kw)
         self.net = net
+        # window ('learned:REF:rw', 'rwl' with the learned AI as the opponent): an action decision in the opponent's
+        # turn (a reaction window) is not judged as if the opponent then ends its turn at once; the opponent plays the
+        # rest of its turn (one-sample AI, on the determinised copy) and we may still answer its later plays, so
+        # holding a counter for a bigger threat is weighed against spending it now. Judged at the start of our turn.
+        self.window = None
+        if window == "greedy":
+            self.window = GreedyPolicy(seed + 211, samples=1)
+        elif window == "learned":
+            self.window = LearnedGreedy(net, seed=seed + 211, samples=1)
+        self.window_calls = 0
+        # hold ('learned:REF:hold'): on our own turn, while our hand has a fast spell (Reaction/Action) that our runes
+        # could pay for, the best `hold_k` options (and ending the turn) are judged after the opponent's whole turn,
+        # in which we may answer (one-sample AIs on both sides, determinised copies). Energy kept up for a counter
+        # only has a value if the lookahead lets us spend it; the plain lookahead stops before the opponent acts.
+        self.hold = hold
+        self.hold_k = hold_k
+        self.hold_opp = GreedyPolicy(seed + 307, samples=1) if hold else None
+        self.hold_calls = 0
         self.helper = GreedyPolicy(seed + 991, samples=1)
         # react=True ('learned-r'): in the lookahead the opponent may answer during our turn (to_turn_end opp)
         # react="learned" ('learned-rl'): the opponent's answers come from the one-sample learned AI instead
@@ -118,16 +148,43 @@ class LearnedGreedy(GreedyPolicy):
 
     def evaluate(self, game, d, opts):
         vals = []
+        window = (self.window is not None and d.kind == "action" and game.turn_player != d.player
+                  and any(isinstance(x, tuple) and x[0] not in ("pass", "end_turn") for x in opts))
+        if window:
+            self.window_calls += 1
         for o in opts:
             v = 0.0
             for _ in range(self.samples):
                 g = determinize(game, d.player, self.rng)
                 if g.pending is not None and o in g.pending.options:
                     g.choose(o)
-                to_turn_end(g, d.player, self.helper, opp=self.opp_react)
+                if window:
+                    opponent_turn(g, d.player, self.window, respond=self.helper)
+                else:
+                    to_turn_end(g, d.player, self.helper, opp=self.opp_react)
                 v += self.net.predict(g, d.player)
             v = 1000.0 * (v / self.samples - 0.5) + self.rng.random() * self.noise
             vals.append(v)
+        if (self.hold and d.kind == "action" and len(opts) >= 2 and game.turn_player == d.player
+                and _fast_in_hand(game, d.player)):
+            self.hold_calls += 1
+            order = sorted(range(len(opts)), key=lambda i: -vals[i])
+            cand = order[:self.hold_k]
+            for i, o in enumerate(opts):
+                if o == ("end_turn",) and i not in cand:
+                    cand.append(i)
+            for i in cand:
+                v = 0.0
+                for _ in range(self.deep_samples):
+                    g = determinize(game, d.player, self.rng)
+                    if g.pending is not None and opts[i] in g.pending.options:
+                        g.choose(opts[i])
+                    to_turn_end(g, d.player, self.helper)
+                    if not g.over:
+                        opponent_turn(g, d.player, self.hold_opp, respond=self.helper)
+                    v += self.net.predict(g, d.player)
+                vals[i] = 1e6 + 1000.0 * (v / self.deep_samples - 0.5)
+            return vals
         if self.deep and d.kind == "action" and len(opts) >= 2:
             order = sorted(range(len(opts)), key=lambda i: -vals[i])
             a, b = order[0], order[1]
@@ -179,7 +236,13 @@ def make_learned(kind, arg, seed=0):
         # learned-deep:gen_008:0.15:3 -> margin 0.15, 3 deep samples; a field "s6" -> 6 determinised samples per option
         kw, nums = {}, []
         for f in (rest.split(":") if rest else []):
-            if f.startswith("s"):
+            if f == "hold" or f.startswith("hold") and f[4:].isdigit():
+                kw["hold"] = True
+                if f[4:]:
+                    kw["hold_k"] = int(f[4:])
+            elif f in ("rw", "rwl"):
+                kw["window"] = "learned" if f == "rwl" else "greedy"
+            elif f.startswith("s"):
                 kw["samples"] = int(f[1:])
             else:
                 nums.append(f)
