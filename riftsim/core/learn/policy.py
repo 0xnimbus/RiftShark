@@ -116,7 +116,7 @@ class LearnedGreedy(GreedyPolicy):
     look, so a game costs a few times a plain one instead of a hundred times."""
 
     def __init__(self, net, seed=0, samples=3, deep=False, margin=0.04, deep_samples=2, react=False, window=None,
-                 hold=False, hold_k=3, pnet=None, pk=3, **kw):
+                 hold=False, hold_k=3, pnet=None, pk=3, blend=None, pstrong=0, **kw):
         super().__init__(seed, samples=samples, **kw)
         self.net = net
         # window ('learned:REF:rw', 'rwl' with the learned AI as the opponent): an action decision in the opponent's
@@ -143,11 +143,18 @@ class LearnedGreedy(GreedyPolicy):
         # our counters), on determinised copies; judged at the start of our next turn.
         self.pnet = None
         self.pk = pk
+        self.blend = blend          # None: the deep value decides among the candidates; x: shallow + x * (deep - shallow)
         self.p_calls = 0
         if pnet:
             from .policy_net import PolicyNet, PolicyNetPlayer
             pn = PolicyNet.load(pnet)
-            self.pnet = [PolicyNetPlayer(pn, seed=seed + 613), PolicyNetPlayer(pn, seed=seed + 617)]
+            if pstrong:
+                # the opponent model inside the search: the one-sample learned AI judging only the policy net's
+                # `pstrong` most likely options (about gen-14 strength at a fraction of its cost)
+                self.pnet = [PrunedLearned(net, pn, pstrong, seed=seed + 613),
+                             PrunedLearned(net, pn, pstrong, seed=seed + 617)]
+            else:
+                self.pnet = [PolicyNetPlayer(pn, seed=seed + 613), PolicyNetPlayer(pn, seed=seed + 617)]
         self.helper = GreedyPolicy(seed + 991, samples=1)
         # react=True ('learned-r'): in the lookahead the opponent may answer during our turn (to_turn_end opp)
         # react="learned" ('learned-rl'): the opponent's answers come from the one-sample learned AI instead
@@ -198,7 +205,8 @@ class LearnedGreedy(GreedyPolicy):
                         if not g.over:
                             opponent_turn(g, d.player, them, respond=me)
                         v += self.net.predict(g, d.player)
-                    vals[i] = 1e6 + 1000.0 * (v / self.deep_samples - 0.5)
+                    dv = 1000.0 * (v / self.deep_samples - 0.5)
+                    vals[i] = 1e6 + dv if self.blend is None else vals[i] + self.blend * (dv - vals[i])
                 return vals
         if (self.hold and d.kind == "action" and len(opts) >= 2 and game.turn_player == d.player
                 and _fast_in_hand(game, d.player)):
@@ -242,6 +250,32 @@ class LearnedGreedy(GreedyPolicy):
         return vals
 
 
+class PrunedLearned(LearnedGreedy):
+    """One-sample learned AI that only judges the policy net's `top` most likely options (plus passing / ending the
+    turn): an opponent model for the two-turn search close to the learned AI's strength at a fraction of its cost."""
+
+    def __init__(self, net, pnet, top=3, seed=0):
+        super().__init__(net, seed=seed, samples=1)
+        self.pn, self.top = pnet, top
+
+    def choose(self, game, d):
+        opts = ai_options(d, game)
+        if d.kind == "mulligan":
+            return mulligan_choice(game, d)
+        if len(opts) == 1 or d.kind == "pay":
+            return opts[0]
+        if len(opts) > self.top:
+            pr = self.pn.probs(game, d, opts)
+            order = sorted(range(len(opts)), key=lambda i: -pr[i])[:self.top]
+            keep = [opts[i] for i in order]
+            for o in (("pass",), ("end_turn",)):
+                if o in opts and o not in keep:
+                    keep.append(o)
+            opts = keep
+        vals = LearnedGreedy.evaluate(self, game, d, opts)
+        return opts[max(range(len(opts)), key=lambda i: vals[i])]
+
+
 class LearnedMCTS(MCTSPolicy):
     """turn_leaf=True ('learned-tmcts'): no random rollout; a leaf is played to the start of the next turn the same
     way the greedy lookahead does (the player whose turn it is ends it, the other passes) and judged there, at the
@@ -274,6 +308,12 @@ def make_learned(kind, arg, seed=0):
             if f.startswith("p="):
                 pr = f[2:]
                 kw["pnet"] = pr if (pr.endswith(".json") or os.path.sep in pr) else os.path.join(M.MODELS_DIR, pr + ".json")
+            elif f.startswith("ps") and f[2:].isdigit():
+                kw["pstrong"] = int(f[2:])
+            elif f.startswith("b=") :
+                kw["blend"] = float(f[2:])
+            elif f.startswith("d") and f[1:].isdigit():
+                kw["deep_samples"] = int(f[1:])
             elif f.startswith("k") and f[1:].isdigit():
                 kw["pk"] = int(f[1:])
             elif f == "hold" or f.startswith("hold") and f[4:].isdigit():
