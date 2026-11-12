@@ -231,7 +231,7 @@ def khazix(defn):
         o = g.objects[s]
         enemies = [u for u in g.units_at(o.location) if not g.is_friendly(g.objects[u].controller, o.controller)]
         return len(enemies) == 1
-    eff = [O.If(lambda g, c: enemy_alone(g, c.source), [O.GiveMight(Ref("self"), 2), O.GainXP(2)])]
+    eff = [O.GiveMight(Ref("self"), 2), O.GainXP(2)]        # "if" is part of the condition (CR 383.2.a.1)
     return [Triggered("attack_self", eff, filt=enemy_alone, label=defn.name, source_text=defn.text),
             Triggered("defend_self", eff, filt=enemy_alone, label=defn.name, source_text=defn.text)]
 
@@ -274,11 +274,11 @@ def tomb_raider_barbara(defn):
     def seven(g, c_or_s, ev=None):
         p = _ctrl(g, c_or_s) if ev is not None else c_or_s.controller
         return len(g.players[p].runes) >= 7
+    # the rune count is part of the trigger condition, not checked again on resolution (CR 383.2.a.1)
     return [Triggered("play_self", [
         O.Choose(Sel("gear", side="enemy"), out="t"),
-        O.If(lambda g, c: seven(g, c), [
-            O.If(lambda g, c: c.vars.get("t") is not None and bool(g.objects[c.vars["t"]].empowered),
-                 [O.Disempower(Ref("t"))], [O.Kill(Ref("t"))])]),
+        O.If(lambda g, c: c.vars.get("t") is not None and bool(g.objects[c.vars["t"]].empowered),
+             [O.Disempower(Ref("t"))], [O.Kill(Ref("t"))]),
     ], filt=lambda g, s, ev: seven(g, s, ev), label=defn.name, source_text=defn.text)]
 
 

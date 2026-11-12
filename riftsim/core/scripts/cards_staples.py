@@ -548,7 +548,7 @@ def _others_here(g, s):
 @script("Shen, Scourge of Shadows")
 def shen_scourge(defn):
     # When I hold, if there is exactly one other unit you control here, draw 1.
-    return {"abilities": [Triggered("hold_self", [O.If(lambda g, c: len(_others_here(g, c.source)) == 1, [O.Draw(1)])],
+    return {"abilities": [Triggered("hold_self", [O.Draw(1)], intervening=lambda g, c: len(_others_here(g, c.source)) == 1,
                                     label=defn.name, source_text=defn.text)], "replace": True}
 
 
@@ -556,7 +556,7 @@ def shen_scourge(defn):
 def shen_leader(defn):
     # [Shield]   (keyword)
     # When I hold, if there is exactly one other unit you control here, you score 1 point.
-    return {"abilities": [Triggered("hold_self", [O.If(lambda g, c: len(_others_here(g, c.source)) == 1, [O.GainPoints(1)])],
+    return {"abilities": [Triggered("hold_self", [O.GainPoints(1)], intervening=lambda g, c: len(_others_here(g, c.source)) == 1,
                                     label=defn.name, source_text=defn.text)], "replace": True}
 
 
@@ -579,7 +579,7 @@ def swain_visionary(defn):
         played = [g.objects[u].base_defn() for u in g.players[c.controller].played_this_turn if u in g.objects]
         return any(d.is_unit and not d.is_token for d in played) and any(d.type == "gear" and not d.is_token for d in played) \
             and any(d.type == "spell" for d in played)
-    return {"abilities": [Triggered("conquer_self", [O.If(did_all, [O.GainPoints(1)])], label=defn.name, source_text=defn.text)],
+    return {"abilities": [Triggered("conquer_self", [O.GainPoints(1)], intervening=did_all, label=defn.name, source_text=defn.text)],
             "replace": True}
 
 
@@ -701,7 +701,7 @@ def _opponent_near_victory(g, c):
 def poppy_paragon(defn):
     # [Deflect]   (keyword)
     # When you play me, if an opponent's score is within 3 points of the Victory Score, ready me and gain 3 XP.
-    return {"abilities": [Triggered("play_self", [O.If(_opponent_near_victory, [O.Ready(Ref("self")), O.GainXP(3)])],
+    return {"abilities": [Triggered("play_self", [O.Ready(Ref("self")), O.GainXP(3)], intervening=_opponent_near_victory,
                                     label=defn.name, source_text=defn.text)], "replace": True}
 
 
@@ -1211,7 +1211,7 @@ def jarvan_paragon(defn):
         return any(o.zone == "board" and o.location == me.location and o.controller == c.controller and
                    "gear" in g.chars(u).types and o.base_defn().keywords.get("deploy") for u, o in g.objects.items())
     return {"abilities": [Static("self", "rule", ("deploy_gear_action",), label="your [Deploy] gear have [Action]", source_text=defn.text),
-                          Triggered("conquer_self", [O.If(deploy_gear_here, [O.Channel(1, exhausted=True)])],
+                          Triggered("conquer_self", [O.Channel(1, exhausted=True)], intervening=deploy_gear_here,
                                     label=defn.name, source_text=defn.text)], "replace": True}
 
 
