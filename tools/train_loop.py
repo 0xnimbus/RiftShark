@@ -90,7 +90,7 @@ def _gate_timed(args):
     return _timed(_gate_game, args, GAME_LIMIT)
 
 
-GAME_LIMIT = 300
+GAME_LIMIT = int(os.environ.get("RIFTSHARK_GAME_LIMIT", 300))   # seconds; searching AIs need more
 
 # ------------------------------------------------------------------------------------------------ self-play
 def _selfplay_game(args):
