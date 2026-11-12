@@ -11,7 +11,7 @@ import itertools
 from .abilities import Activated, PlayPermission, Static
 from .objects import ChainItem
 from .vm import Context, Decision, Frame, Instr, Ref, compile_effect, relocate, run_vm, resume_vm, val
-from .ops import Choose, May, SetVar, Do, PayResources
+from .ops import Choose, ChooseMode, May, SetVar, Do, PayResources
 from . import payment
 
 PHASES = ["awaken", "beginning", "scoring", "channel", "draw", "main", "ending", "expiration"]
@@ -2023,10 +2023,25 @@ class FlowMixin:
             ctx = Context(p, uid, here=None)
             if z == "facedown":
                 ctx.target_bf = self.objects[uid].hidden_at
-            for ins in tc:
-                if isinstance(ins, Choose) and not ins.up_to and not ins.allow_none and not _depends_on_choice(ins):
-                    if not self.choice_candidates(ctx, ins.sel, targeted=ins.targeted):
-                        return False
+            if not self._targets_possible(ctx, getattr(ab, "targets", None), tc):
+                return False
+        return True
+
+    def _targets_possible(self, ctx, targets, code):
+        """CR 355.8 / 403.3: every required target can be chosen. A modal item ("choose one") needs one mode whose
+        targets can all be chosen (its other modes' choices are not required)."""
+        if isinstance(targets, list):
+            items = targets
+        else:
+            items = code or []
+        for ins in items:
+            if isinstance(ins, ChooseMode):
+                if not any(self._targets_possible(ctx, body if isinstance(body, list) else [body], None)
+                           for _, body in ins.modes):
+                    return False
+            elif isinstance(ins, Choose) and not ins.up_to and not ins.allow_none and not _depends_on_choice(ins):
+                if not self.choice_candidates(ctx, ins.sel, targeted=ins.targeted):
+                    return False
         return True
 
     def _can_activate(self, p, uid, idx, ab):
@@ -2082,10 +2097,8 @@ class FlowMixin:
             return False
         if ab.targets:
             ctx = Context(p, uid, here=o.place)
-            for ins in ab.target_code:
-                if isinstance(ins, Choose) and not ins.up_to and not ins.allow_none and not _depends_on_choice(ins):
-                    if not self.choice_candidates(ctx, ins.sel, targeted=ins.targeted):
-                        return False
+            if not self._targets_possible(ctx, ab.targets, ab.target_code):
+                return False
         return True
 
     MOVE_COMBO_LIMIT = 6          # up to this many movable units: one action per group; more: pick the group unit by unit

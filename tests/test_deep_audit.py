@@ -1181,3 +1181,43 @@ def test_you_may_pay_to_affect_a_unit_chooses_it_as_the_trigger_goes_on_the_chai
     _play_from_hand(g, 0, kennen, pick)
     assert [k for k, _ in order] == ["choose", "yesno"]
     assert g.objects[enemy].stunned
+
+
+def test_modes_and_their_targets_are_chosen_as_the_ability_goes_on_the_chain(db):
+    """CR 355.3 / 403.2: the mode of a "choose one" ability is chosen as it is put on the chain, then that mode's
+    targets (355.5). Udyr, Wildman's "Spend my buff: Choose one ..." asked for the mode and the unit only when it
+    resolved, after both players had passed, so the opponent could never see what it would do."""
+    g = _fresh(db, "sett_the_boss")
+    udyr = put(g, db, 0, "Udyr, Wildman", ("base", 0))
+    g.objects[udyr].buffs = 1
+    enemy = put(g, db, 1, "Forecaster", ("bf", 0))
+    put(g, db, 1, "Forecaster", ("bf", 0), exclude=(enemy,))
+    g.pending = None
+    g.bump()
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "activate" and o[1] == udyr))
+    order = []
+
+    def pick(d):
+        if d.kind == "mode":
+            order.append("mode")
+            return next(o for o, lab in zip(d.options, d.labels) if lab.startswith("Stun"))
+        if d.kind == "choose" and enemy in d.options:
+            order.append("choose")
+            return enemy
+        if d.kind == "action" and ("pass",) in d.options and g.chain:
+            order.append("pass")
+        return None
+    _drive(g, pick=pick)
+    assert order[:2] == ["mode", "choose"] and "pass" in order[2:]
+    assert g.objects[enemy].stunned
+    # with no unit at a battlefield, the Deal and Stun modes can't choose a target, so they aren't offered (CR 355.8)
+    g = _fresh(db, "sett_the_boss")
+    udyr = put(g, db, 0, "Udyr, Wildman", ("base", 0))
+    g.objects[udyr].buffs = 1
+    g.pending = None
+    g.bump()
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "activate" and o[1] == udyr))
+    d = g.run()
+    assert d.kind == "mode" and d.labels == ["Ready me", "Give me [Ganking] this turn"]
