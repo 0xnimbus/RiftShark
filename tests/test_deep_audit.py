@@ -1248,3 +1248,25 @@ def test_a_leading_you_may_is_decided_and_its_cost_paid_as_the_trigger_goes_on_t
         else:
             assert not any(k[1] == tid and k[0] in ("finalized", "resolve") for k in kinds)
             assert ("trigger_declined", tid, None) in kinds and not g.objects[enemy].stunned
+
+
+def test_you_may_exhaust_me_is_paid_as_the_trigger_goes_on_the_chain(db):
+    """CR 383.3.b: "you may exhaust me [and pay [A]] to ..." makes exhausting the source the trigger's base cost, paid as
+    it is finalized (Irelia, Blade Dancer; also Rek'Sai, Void Burrower, Vex, Gloomist, Nasus' Curator of the Sands, Sivir,
+    Renata, Exemplar of Demacia). It used to be paid at resolution, so the legend stayed ready on the chain."""
+    for name in ("Rek'sai, Void Burrower", "Gloomist", "Curator of the Sands", "Irelia, Blade Dancer", "Exemplar of Demacia"):
+        trig = next(a for a in _card(db, name).abilities if type(a).__name__ == "Triggered" and a.targets)
+        assert any(type(i).__name__ == "Exhaust" for i in trig.targets), name
+    g = _fresh(db, "irelia_blade_dancer")
+    legend = next(u for u, o in g.objects.items() if o.zone == "board" and o.location == ("legend", 0))
+    unit = put(g, db, 0, "Forecaster", ("base", 0))
+    g.objects[unit].exhausted = True
+    n = len(g.events)
+    _cast_with(g, db, 0, "Discipline", [("calm", False)] * 4,
+               lambda d: True if d.kind == "yesno" else (unit if d.kind == "choose" and unit in d.options else None))
+    evs = g.events[n:]
+    tid = next(e["item"] for e in evs if e["kind"] == "trigger" and e.get("source") == legend)
+    kinds = [(e["kind"], e.get("uid"), e.get("item")) for e in evs]
+    ex = kinds.index(("event:exhaust", legend, None))
+    fin = kinds.index(("finalized", None, tid))
+    assert ex < fin and not g.objects[unit].exhausted and g.objects[legend].exhausted

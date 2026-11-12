@@ -199,12 +199,20 @@ _END = 10 ** 9          # jump past the end of the finalize program
 class _TriggerMay(Instr):
     """"When ..., you may ...": whether to perform the triggered ability is decided as it is finalized (CR 383.3.a)."""
 
-    def __init__(self, may):
+    def __init__(self, may, pre=(), costs=()):
         self.may = may
         self.out = may.out or "__may"
+        self.pre, self.costs = list(pre), list(costs)
 
     def _offered(self, game, ctx):
-        first = next((b for b in self.may.body if not isinstance(b, O.Choose)), None)
+        if any(not c(game, ctx) for c in self.pre):
+            return False
+        if any(isinstance(c, O.Exhaust) for c in self.costs):
+            o = game.objects.get(ctx.source)
+            if o is None or o.zone != "board" or o.exhausted:
+                return False          # "exhaust me" can't be paid
+        pays = [c for c in self.costs if isinstance(c, O.PayResources)]
+        first = pays[0] if pays else next((b for b in self.may.body if not isinstance(b, O.Choose)), None)
         if isinstance(first, O.PayResources):
             from .vm import val
             e = val(game, ctx, first.energy)
@@ -232,14 +240,49 @@ class _TriggerMay(Instr):
         return None
 
 
-class _TriggerPaid(Instr):
-    """CR 383.3.b.1: a cost at the start of the effect is the trigger's base cost and must be paid to finalize it."""
+def _is_self(ref):
+    return isinstance(ref, Ref) and ref.name == "self"
 
-    def __init__(self, out):
-        self.out = out
+
+def _peel_costs(body):
+    """Split a "you may" body into (leading choices, preconditions, costs, effect). Costs are what CR 383.3.b makes the
+    trigger's base cost: "exhaust me", "pay [N]" (and "If you paid, ..." around the rest), behind the script's
+    "if I'm ready" check (a precondition for saying yes)."""
+    body = list(body)
+    lead = []
+    while body and isinstance(body[0], O.Choose):
+        lead.append(body.pop(0))
+    pre, costs = [], []
+    while body:
+        b = body[0]
+        tail_ok = all(isinstance(x, O.SetVar) for x in body[1:])      # "... SetVar(__did)" after the If
+        if isinstance(b, O.If) and not b.els and tail_ok and b.then and (
+                (isinstance(b.then[0], O.Exhaust) and _is_self(b.then[0].targets)) or isinstance(b.then[0], O.PayResources)):
+            if not ("has_var" in getattr(b.cond, "__qualname__", "") and costs):
+                pre.append(b.cond)        # (an "if you paid, ..." around the rest needs nothing: payment is checked)
+            body = list(b.then) + body[1:]
+            continue
+        if isinstance(b, O.Exhaust) and _is_self(b.targets):
+            costs.append(body.pop(0))
+            continue
+        if isinstance(b, O.PayResources) and not b.optional and b.out:
+            costs.append(body.pop(0))
+            continue
+        if isinstance(b, O.If) and not b.els and costs and "has_var" in getattr(b.cond, "__qualname__", "") and tail_ok:
+            body = list(b.then) + body[1:]
+            continue
+        break
+    return lead, pre, costs, body
+
+
+class _TriggerCostsOk(Instr):
+    """After paying: an unpaid "pay [N]" removes the trigger (CR 383.3.b.1)."""
+
+    def __init__(self, outs):
+        self.outs = outs
 
     def run(self, game, ctx):
-        if ctx.vars.get(self.out) is None:
+        if any(ctx.vars.get(o) is None for o in self.outs):
             _remove_trigger(game, ctx)
             return _END
         return None
@@ -247,17 +290,15 @@ class _TriggerPaid(Instr):
 
 def split_trigger(tree):
     """split_choices for triggered abilities: a leading "you may" is decided as the trigger is finalized (CR 383.3.a),
-    and a cost right after it ("you may pay [1] to ...") is paid then (383.3.b). Other effects: split_choices."""
+    and a cost right after it ("you may pay [1] / exhaust me to ...") is paid then (383.3.b). Other effects:
+    split_choices."""
     items = _items(tree)
     if not items or not isinstance(items[0], O.May) or items[0].player is not None:
         return split_choices(items)
     may = items[0]
-    hoisted, rest = split_choices(list(may.body) + items[1:])
-    head = []
-    while rest and isinstance(rest[0], (_Recheck, _GroupRecheck)):
-        head.append(rest.pop(0))
-    cost = []
-    if rest and isinstance(rest[0], O.PayResources) and rest[0].out:
-        pr = rest.pop(0)
-        cost = [pr, _TriggerPaid(pr.out)]
-    return [_TriggerMay(may)] + hoisted + cost, head + [O.SetVar(may.out or "__may", True)] + rest
+    lead, pre, costs, eff = _peel_costs(may.body)
+    hoisted, rest = split_choices(lead + eff + items[1:])
+    fin_costs = []
+    if costs:
+        fin_costs = list(costs) + [_TriggerCostsOk([c.out for c in costs if isinstance(c, O.PayResources)])]
+    return [_TriggerMay(may, pre, costs)] + hoisted + fin_costs, [O.SetVar(may.out or "__may", True)] + rest
