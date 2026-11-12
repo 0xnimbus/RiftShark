@@ -108,6 +108,24 @@ def _fast_in_hand(g, p):
     return False
 
 
+def _reseed(pols, x):
+    """Re-seed the random generators of these policies and the helper policies they hold."""
+    seen, stack, k = set(), list(pols), 0
+    while stack:
+        p = stack.pop()
+        if p is None or id(p) in seen:
+            continue
+        seen.add(id(p))
+        if isinstance(getattr(p, "rng", None), random.Random):
+            k += 1
+            p.rng.seed(x * 1000003 + k)
+        for a in ("helper", "opp_react", "window", "opp", "hold_opp"):
+            stack.append(getattr(p, a, None))
+        sub = getattr(p, "pnet", None)
+        if isinstance(sub, list):
+            stack.extend(sub)
+
+
 class LearnedGreedy(GreedyPolicy):
     """deep=True ('learned-deep'): when the two best options of an action decision are within `margin` win
     probability of each other, they are compared again one turn deeper: play the option, end the turn, let the
@@ -116,7 +134,7 @@ class LearnedGreedy(GreedyPolicy):
     look, so a game costs a few times a plain one instead of a hundred times."""
 
     def __init__(self, net, seed=0, samples=3, deep=False, margin=0.04, deep_samples=2, react=False, window=None,
-                 hold=False, hold_k=3, pnet=None, pk=3, blend=None, pstrong=0, **kw):
+                 hold=False, hold_k=3, pnet=None, pk=3, blend=None, pstrong=0, crn=False, **kw):
         super().__init__(seed, samples=samples, **kw)
         self.net = net
         # window ('learned:REF:rw', 'rwl' with the learned AI as the opponent): an action decision in the opponent's
@@ -145,6 +163,9 @@ class LearnedGreedy(GreedyPolicy):
         self.pk = pk
         self.blend = blend          # None: the deep value decides among the candidates; x: shallow + x * (deep - shallow)
         self.p_calls = 0
+        # crn ('crn'): every candidate is played out on the same determinised copies with the same random seeds
+        # (common random numbers), so the comparison between candidates is not drowned by which hands were sampled
+        self.crn = crn
         if pnet:
             from .policy_net import PolicyNet, PolicyNetPlayer
             pn = PolicyNet.load(pnet)
@@ -194,10 +215,15 @@ class LearnedGreedy(GreedyPolicy):
                     if o in (("end_turn",), ("pass",)) and i not in cand:
                         cand.append(i)
                 me, them = self.pnet
+                seeds = [self.rng.random() for _ in range(self.deep_samples)]
                 for i in cand:
                     v = 0.0
-                    for _ in range(self.deep_samples):
-                        g = determinize(game, d.player, self.rng)
+                    for j in range(self.deep_samples):
+                        if self.crn:
+                            g = determinize(game, d.player, random.Random(seeds[j]))
+                            _reseed((me, them, self.helper), seeds[j])
+                        else:
+                            g = determinize(game, d.player, self.rng)
                         if g.pending is not None and opts[i] in g.pending.options:
                             g.choose(opts[i])
                         if mine:
@@ -310,6 +336,8 @@ def make_learned(kind, arg, seed=0):
                 kw["pnet"] = pr if (pr.endswith(".json") or os.path.sep in pr) else os.path.join(M.MODELS_DIR, pr + ".json")
             elif f.startswith("ps") and f[2:].isdigit():
                 kw["pstrong"] = int(f[2:])
+            elif f == "crn":
+                kw["crn"] = True
             elif f.startswith("b=") :
                 kw["blend"] = float(f[2:])
             elif f.startswith("d") and f[1:].isdigit():
