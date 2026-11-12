@@ -62,7 +62,7 @@ def _game(args):
 
 
 def _timed(args):
-    return T._timed(_game, args, 3600)
+    return T._timed(_game, args, int(os.environ.get("RIFTSHARK_GAME_LIMIT", 3600)))
 
 
 def main():
