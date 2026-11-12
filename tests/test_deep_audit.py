@@ -1153,3 +1153,31 @@ def test_that_battlefield_in_a_trigger_is_the_events_battlefield(db):
         g.choose(True if d.kind == "yesno" else (e if d.kind == "choose" and e in d.options else
                  (("pass",) if ("pass",) in d.options else d.options[0])))
     assert moved
+
+
+def test_you_may_pay_to_affect_a_unit_chooses_it_as_the_trigger_goes_on_the_chain(db):
+    """Kennen, Keeper of Balance: "When you play me or I attack, you may pay [2] to [Stun] a unit." The unit is a
+    target, chosen as the trigger goes on the chain and independently of the decision to pay (CR 355.5, 355.12,
+    403.2); it was picked at resolution after paying, so nobody could respond to it. Same for Icevale Archer,
+    Sinister Poro, Mask Mother, Portable Portal and Exemplar of Demacia."""
+    for name in ("Kennen, Keeper of Balance", "Icevale Archer", "Sinister Poro", "Mask Mother", "Portable Portal",
+                 "Exemplar of Demacia"):
+        trig = next(a for a in _card(db, name).abilities if getattr(a, "targets", None) is not None and a.targets)
+        assert any(type(i).__name__ == "Choose" for i in trig.targets), name
+    g = _fresh(db, "viktor_herald")
+    enemy = put(g, db, 1, "Forecaster", ("base", 1))
+    kennen = give(g, 0, "Kennen, Keeper of Balance", db)
+    _set_runes(g, db, 0, [("chaos", False)] * 7)
+    order = []
+
+    def pick(d):
+        if d.kind == "choose" and enemy in d.options:
+            order.append(("choose", bool(g.chain)))
+            return enemy
+        if d.kind == "yesno":
+            order.append(("yesno", bool(g.chain)))
+            return True
+        return None
+    _play_from_hand(g, 0, kennen, pick)
+    assert [k for k, _ in order] == ["choose", "yesno"]
+    assert g.objects[enemy].stunned
