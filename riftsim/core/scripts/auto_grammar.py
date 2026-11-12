@@ -472,6 +472,15 @@ def _each_player_kills(kind):
     return [a, b, O.Kill(lambda g, c: [u for u in (c.vars.get("__k1"), c.vars.get("__k2")) if u is not None])]
 
 
+def _lift_choices(instrs):
+    """"You may pay [1] to stun a unit": the unit is a target chosen as the ability goes on the chain, independently of
+    the decision to pay (CR 355.12, 355.5): move the effect's leading choices ahead of the cost so they are hoisted."""
+    lead = []
+    while instrs and isinstance(instrs[0], O.Choose) and not getattr(instrs[0], "at_resolution", False) and instrs[0].targeted:
+        lead.append(instrs.pop(0))
+    return lead, instrs
+
+
 def parse_sentence(s, state):
     s = s.strip()
     if s.endswith("."):
@@ -486,7 +495,8 @@ def parse_sentence(s, state):
     if m:
         from . import parse_cost
         c = parse_cost(m.group(1))
-        return [O.PayResources(c["energy"], c["power"], out="__paid", optional=False), O.If(O.has_var("__paid"), parse_sentence(m.group(2), state) + [O.SetVar("__did", True)])]
+        lead, eff = _lift_choices(parse_sentence(m.group(2), state))
+        return lead + [O.PayResources(c["energy"], c["power"], out="__paid", optional=False), O.If(O.has_var("__paid"), eff + [O.SetVar("__did", True)])]
     m = re.match(r"you score (\w+) points?$", sl)
     if m:
         return [O.GainPoints(parse_amount(m.group(1)))]
@@ -753,7 +763,8 @@ def parse_sentence(s, state):
     m = re.match(r"exhaust me(?: and (.+?))? to (.+)$", sl)
     if m:
         cost = parse_sentence(m.group(1), state) if m.group(1) else []
-        return [O.If(lambda g, c: c.source in g.objects and not g.objects[c.source].exhausted, [O.Exhaust(Ref("self"))] + cost + parse_sentence(m.group(2), state))]
+        lead, eff = _lift_choices(parse_sentence(m.group(2), state))
+        return lead + [O.If(lambda g, c: c.source in g.objects and not g.objects[c.source].exhausted, [O.Exhaust(Ref("self"))] + cost + eff)]
     m = re.match(r"(discard \w+|pay (?:\[[^\]]+\])+) and exhaust me to (.+)$", sl)
     if m:
         return parse_sentence("exhaust me and " + m.group(1) + " to " + m.group(2), state)
@@ -1916,6 +1927,10 @@ def _script_line(defn, line, cond=None):
         store["player"] = "__p"           # "that player" / "they": the player the event is about (Obelisk of Power)
         if re.search(r"\bmoves? from\b", prefix, re.I):
             store["from"] = "__tloc"      # "When I move from a location, ... there" (Lillia, Fae Fawn)
+        if re.search(r"\bthat battlefield\b", rest, re.I) and not re.search(r"\bchoose a battlefield\b", rest, re.I):
+            # "When I move to a battlefield / you stun a unit at a battlefield / you play a Deploy gear, ... that
+            # battlefield" (Irresistible Faefolk, Vex, Mocking, Exemplar of Demacia): the event's location
+            store["loc"] = "__bl"
         eff = parse_effect(rest, state)
         once_flag = once or prefix.lower().startswith("the first time")
         return [Triggered(ev, eff, filt=filt, once_per_turn=once_flag, label=line[:40], source_text=line, store=store, cond=cond, optional=optional)]
