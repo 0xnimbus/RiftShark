@@ -287,12 +287,13 @@ class ChooseLocation(Instr):
 class ChooseMode(Instr):
     """Choose one of several labelled bodies. Modes: list of (label, body)."""
 
-    def __init__(self, modes, out=None, player=None, exclude_used=False):
+    def __init__(self, modes, out=None, player=None, exclude_used=False, legal_only=False):
         self.modes, self.out, self.player, self.exclude_used = modes, out, player, exclude_used
+        self.legal_only = legal_only      # finalize-time pick: modes whose targets can't be chosen aren't offered
 
     def compile(self, out, counter):
         var = self.out or new_label(counter, "__mode")
-        out.append(_ModeAsk(self.modes, var, self.player, self.exclude_used))
+        out.append(_ModeAsk(self.modes, var, self.player, self.exclude_used, self.legal_only))
         l_end = new_label(counter, "endmode")
         for idx, (label, body) in enumerate(self.modes):
             l_next = new_label(counter, "mode")
@@ -304,13 +305,43 @@ class ChooseMode(Instr):
         out.append(Label(l_end))
 
 
+class ModeDispatch(Instr):
+    """Run the body of the mode already chosen into `var` (the choice was made as the item was finalized, CR 355.3)."""
+
+    def __init__(self, var, bodies):
+        self.var, self.bodies = var, bodies
+
+    def compile(self, out, counter):
+        l_end = new_label(counter, "endmode")
+        for idx, body in enumerate(self.bodies):
+            l_next = new_label(counter, "mode")
+            out.append(JumpIf(lambda g, c, idx=idx, var=self.var: c.vars.get(var) == idx, l_next, negate=True))
+            for i in (body if isinstance(body, list) else [body]):
+                i.compile(out, counter)
+            out.append(Jump(l_end))
+            out.append(Label(l_next))
+        out.append(Label(l_end))
+
+
 class _ModeAsk(Instr):
-    def __init__(self, modes, out, player, exclude_used):
+    def __init__(self, modes, out, player, exclude_used, legal_only=False):
         self.modes, self.out, self.player, self.exclude_used = modes, out, player, exclude_used
+        self.legal_only = legal_only
+
+    def _legal(self, game, ctx, body):
+        """CR 355.8 / 403.3: a mode needs valid choices for all of its targets."""
+        for i in (body if isinstance(body, list) else [body]):
+            if isinstance(i, Choose) and isinstance(i.sel, Sel) and not i.up_to and not i.allow_none:
+                if not game.choice_candidates(ctx, i.sel, targeted=i.targeted):
+                    return False
+        return True
 
     def run(self, game, ctx):
         p = _player(game, ctx, self.player)
         idxs = list(range(len(self.modes)))
+        if self.legal_only:
+            ok = [i for i in idxs if self._legal(game, ctx, self.modes[i][1])]
+            idxs = ok or idxs
         if self.exclude_used:
             used = game.turn_memo.setdefault(("modes", ctx.source), set())
             idxs = [i for i in idxs if i not in used]

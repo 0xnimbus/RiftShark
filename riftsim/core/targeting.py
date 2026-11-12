@@ -8,7 +8,9 @@ unit"). `split_choices` moves the choices out of that list into the item's final
 - the same inside a top-level May body ("You may move an enemy unit": the unit is chosen now, the may is decided
   on resolution, CR 355.12);
 - SetVar("__tloc", ...) right after a hoisted choice is copied (both phases), so "there" / "at its location" work.
-Choices inside conditionals (If, ForEach, modes) and choices among hidden cards (hand, deck) stay at resolution.
+- a top-level ChooseMode: the mode is picked now (CR 355.3), with that mode's own leading choices; the bodies run
+  at resolution through ModeDispatch.
+Choices inside conditionals (If, ForEach) and choices among hidden cards (hand, deck) stay at resolution.
 
 Each hoisted Choose is followed by `_Stamp`, which records the chosen objects' zone-entry stamps and, for targeted
 choices, registers the variable in ctx.vars["__targets"] (Deflect costs, "when chosen" triggers). The resolution code
@@ -66,6 +68,16 @@ def split_choices(tree):
             hoisted.append(ins)
             outs.add(ins.name)
             rest.append(ins)
+            continue
+        if isinstance(ins, O.ChooseMode):
+            # CR 355.3: the mode is chosen as the item is finalized, then that mode's choices (355.5)
+            var = ins.out or f"__mode{len(hoisted)}_{id(ins)}"
+            parts = [split_choices(list(body) if isinstance(body, list) else [body]) for _, body in ins.modes]
+            hoisted.append(O.ChooseMode([(label, h) for (label, _), (h, _) in zip(ins.modes, parts)], out=var,
+                                        player=ins.player, exclude_used=ins.exclude_used, legal_only=True))
+            outs.add(var)
+            rest.append(O.ModeDispatch(var, [r for _, r in parts]))
+            prev_hoisted = True
             continue
         if isinstance(ins, O.May):
             body_h, body_r = [], []

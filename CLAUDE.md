@@ -122,6 +122,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   2026-11-12 00:20: "you may pay [N] to stun/move/give a unit ..." (Kennen, Keeper of Balance, Icevale Archer, Sinister
   Poro, Mask Mother, Portable Portal, Exemplar of Demacia) chose the unit at resolution after paying; it is a target
   chosen as the trigger goes on the chain, whatever the pay decision (CR 355.12): `auto_grammar._lift_choices`.
+  05:20: "choose one" modes (Udyr, Wildman, Aphelios, Riven, Broken Blade, Royal Entourage, Jayce, Hammer in Hand,
+  Reckless Innovator ...) were picked at resolution; the mode and its targets are now picked as the item goes on the
+  chain (CR 355.3/355.5: `targeting.split_choices` hoists a top-level ChooseMode, `ops.ModeDispatch` runs the body),
+  modes whose targets can't be chosen aren't offered, and `flow._targets_possible` needs one legal mode.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
