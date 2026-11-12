@@ -67,3 +67,4 @@ Written by tools/train_loop.py; the `learned` policy and the play page's Learned
 | 2026-11-11 19:48 UTC | learned:models/cand_pg2z_x3.json | learned:gen_014 | 49.0% (42-56) | 200 | policy gradient, 5000 games, step on weights over 2 std errors scaled x3; mirror |
 | 2026-11-11 20:08 UTC | learned:models/cand_pg2z_x8.json | learned:gen_014 | 45.0% (38-52) | 200 | policy gradient, 5000 games, step on weights over 2 std errors scaled x8; mirror |
 | 2026-11-12 07:11 UTC | learned:gen_014:p=policy_g14:ps3:crn:b=0.3:d6 | learned:gen_014 | 51.5% | 99 | AI v2 two-turn search: policy-net-pruned learned opponent, common random numbers, 6 samples, blend 0.3; game limit 2400 s; mirror |
+| 2026-11-12 12:08 UTC | learned:gen_014:p=policy_g14:ps3:crn:b=0.3:d10 | learned:gen_014 | 65.0% (55-74) | 100 | AI v2 two-turn search with 10 shared samples, blend 0.3; seed 91000; game limit 4000 s; mirror |
