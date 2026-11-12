@@ -186,6 +186,9 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   Void Burrower 65%, Riven 61%, Viktor 61% ... Gloomist 44%, Irelia 16%; Kai'Sa beats Riven 11-3). The background container
   is reclaimed when the thread is idle with no Monitor attached: keep a Monitor on long local runs.
   The 5-hourly "RiftShark round-robin training" routine should run a generation and then a round-robin with `--policy learned`.
+  2026-11-12 AI v2 (docs/plans/ai_v2.md, docs/results/ai_v2_2026-11-12.md): policy net `models/policy_g14.json`
+  (`policy:REF`) + two-turn search `search-v2` (= `learned:gen_014:p=policy_g14:ps3:crn:b=0.3:d10`) beat gen 14 65-35
+  and 60-37. ~15-20x slower per move; gates need `RIFTSHARK_GAME_LIMIT=4000`. Gen 14 stays the fast default.
 - Main deck = 39 cards + chosen champion (CR 103.3). `When you play me` triggers fire from the chain.
 - `riftsim/` top level still holds the v1 simplified engine (engine.py, policies.py, replay.py, runner.py, cli.py).
   It will be replaced by v2 equivalents.
