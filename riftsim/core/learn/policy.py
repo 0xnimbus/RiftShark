@@ -108,6 +108,24 @@ def _fast_in_hand(g, p):
     return False
 
 
+def _reseed(pols, x):
+    """Re-seed the random generators of these policies and the helper policies they hold."""
+    seen, stack, k = set(), list(pols), 0
+    while stack:
+        p = stack.pop()
+        if p is None or id(p) in seen:
+            continue
+        seen.add(id(p))
+        if isinstance(getattr(p, "rng", None), random.Random):
+            k += 1
+            p.rng.seed(x * 1000003 + k)
+        for a in ("helper", "opp_react", "window", "opp", "hold_opp"):
+            stack.append(getattr(p, a, None))
+        sub = getattr(p, "pnet", None)
+        if isinstance(sub, list):
+            stack.extend(sub)
+
+
 class LearnedGreedy(GreedyPolicy):
     """deep=True ('learned-deep'): when the two best options of an action decision are within `margin` win
     probability of each other, they are compared again one turn deeper: play the option, end the turn, let the
@@ -116,7 +134,7 @@ class LearnedGreedy(GreedyPolicy):
     look, so a game costs a few times a plain one instead of a hundred times."""
 
     def __init__(self, net, seed=0, samples=3, deep=False, margin=0.04, deep_samples=2, react=False, window=None,
-                 hold=False, hold_k=3, **kw):
+                 hold=False, hold_k=3, pnet=None, pk=3, blend=None, pstrong=0, crn=False, **kw):
         super().__init__(seed, samples=samples, **kw)
         self.net = net
         # window ('learned:REF:rw', 'rwl' with the learned AI as the opponent): an action decision in the opponent's
@@ -137,6 +155,27 @@ class LearnedGreedy(GreedyPolicy):
         self.hold_k = hold_k
         self.hold_opp = GreedyPolicy(seed + 307, samples=1) if hold else None
         self.hold_calls = 0
+        # pnet ('learned:REF:p=POLICY[:kN]', AI v2 step 2): for our turn's decisions and reaction windows, the best `pk`
+        # options by the one-turn judgement (and ending the turn / passing) are judged two turns deep: the rest of the
+        # current turn and the opponent's whole turn are played with the fast policy net on both sides (its answers,
+        # our counters), on determinised copies; judged at the start of our next turn.
+        self.pnet = None
+        self.pk = pk
+        self.blend = blend          # None: the deep value decides among the candidates; x: shallow + x * (deep - shallow)
+        self.p_calls = 0
+        # crn ('crn'): every candidate is played out on the same determinised copies with the same random seeds
+        # (common random numbers), so the comparison between candidates is not drowned by which hands were sampled
+        self.crn = crn
+        if pnet:
+            from .policy_net import PolicyNet, PolicyNetPlayer
+            pn = PolicyNet.load(pnet)
+            if pstrong:
+                # the opponent model inside the search: the one-sample learned AI judging only the policy net's
+                # `pstrong` most likely options (about gen-14 strength at a fraction of its cost)
+                self.pnet = [PrunedLearned(net, pn, pstrong, seed=seed + 613),
+                             PrunedLearned(net, pn, pstrong, seed=seed + 617)]
+            else:
+                self.pnet = [PolicyNetPlayer(pn, seed=seed + 613), PolicyNetPlayer(pn, seed=seed + 617)]
         self.helper = GreedyPolicy(seed + 991, samples=1)
         # react=True ('learned-r'): in the lookahead the opponent may answer during our turn (to_turn_end opp)
         # react="learned" ('learned-rl'): the opponent's answers come from the one-sample learned AI instead
@@ -165,6 +204,36 @@ class LearnedGreedy(GreedyPolicy):
                 v += self.net.predict(g, d.player)
             v = 1000.0 * (v / self.samples - 0.5) + self.rng.random() * self.noise
             vals.append(v)
+        if self.pnet is not None and d.kind == "action" and len(opts) >= 2:
+            mine = game.turn_player == d.player
+            real = any(isinstance(x, tuple) and x[0] not in ("pass", "end_turn") for x in opts)
+            if mine or real:
+                self.p_calls += 1
+                order = sorted(range(len(opts)), key=lambda i: -vals[i])
+                cand = order[:self.pk]
+                for i, o in enumerate(opts):
+                    if o in (("end_turn",), ("pass",)) and i not in cand:
+                        cand.append(i)
+                me, them = self.pnet
+                seeds = [self.rng.random() for _ in range(self.deep_samples)]
+                for i in cand:
+                    v = 0.0
+                    for j in range(self.deep_samples):
+                        if self.crn:
+                            g = determinize(game, d.player, random.Random(seeds[j]))
+                            _reseed((me, them, self.helper), seeds[j])
+                        else:
+                            g = determinize(game, d.player, self.rng)
+                        if g.pending is not None and opts[i] in g.pending.options:
+                            g.choose(opts[i])
+                        if mine:
+                            to_turn_end(g, d.player, self.helper, opp=them)
+                        if not g.over:
+                            opponent_turn(g, d.player, them, respond=me)
+                        v += self.net.predict(g, d.player)
+                    dv = 1000.0 * (v / self.deep_samples - 0.5)
+                    vals[i] = 1e6 + dv if self.blend is None else vals[i] + self.blend * (dv - vals[i])
+                return vals
         if (self.hold and d.kind == "action" and len(opts) >= 2 and game.turn_player == d.player
                 and _fast_in_hand(game, d.player)):
             self.hold_calls += 1
@@ -207,6 +276,32 @@ class LearnedGreedy(GreedyPolicy):
         return vals
 
 
+class PrunedLearned(LearnedGreedy):
+    """One-sample learned AI that only judges the policy net's `top` most likely options (plus passing / ending the
+    turn): an opponent model for the two-turn search close to the learned AI's strength at a fraction of its cost."""
+
+    def __init__(self, net, pnet, top=3, seed=0):
+        super().__init__(net, seed=seed, samples=1)
+        self.pn, self.top = pnet, top
+
+    def choose(self, game, d):
+        opts = ai_options(d, game)
+        if d.kind == "mulligan":
+            return mulligan_choice(game, d)
+        if len(opts) == 1 or d.kind == "pay":
+            return opts[0]
+        if len(opts) > self.top:
+            pr = self.pn.probs(game, d, opts)
+            order = sorted(range(len(opts)), key=lambda i: -pr[i])[:self.top]
+            keep = [opts[i] for i in order]
+            for o in (("pass",), ("end_turn",)):
+                if o in opts and o not in keep:
+                    keep.append(o)
+            opts = keep
+        vals = LearnedGreedy.evaluate(self, game, d, opts)
+        return opts[max(range(len(opts)), key=lambda i: vals[i])]
+
+
 class LearnedMCTS(MCTSPolicy):
     """turn_leaf=True ('learned-tmcts'): no random rollout; a leaf is played to the start of the next turn the same
     way the greedy lookahead does (the player whose turn it is ends it, the other passes) and judged there, at the
@@ -236,7 +331,20 @@ def make_learned(kind, arg, seed=0):
         # learned-deep:gen_008:0.15:3 -> margin 0.15, 3 deep samples; a field "s6" -> 6 determinised samples per option
         kw, nums = {}, []
         for f in (rest.split(":") if rest else []):
-            if f == "hold" or f.startswith("hold") and f[4:].isdigit():
+            if f.startswith("p="):
+                pr = f[2:]
+                kw["pnet"] = pr if (pr.endswith(".json") or os.path.sep in pr) else os.path.join(M.MODELS_DIR, pr + ".json")
+            elif f.startswith("ps") and f[2:].isdigit():
+                kw["pstrong"] = int(f[2:])
+            elif f == "crn":
+                kw["crn"] = True
+            elif f.startswith("b=") :
+                kw["blend"] = float(f[2:])
+            elif f.startswith("d") and f[1:].isdigit():
+                kw["deep_samples"] = int(f[1:])
+            elif f.startswith("k") and f[1:].isdigit():
+                kw["pk"] = int(f[1:])
+            elif f == "hold" or f.startswith("hold") and f[4:].isdigit():
                 kw["hold"] = True
                 if f[4:]:
                     kw["hold_k"] = int(f[4:])

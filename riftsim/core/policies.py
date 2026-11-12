@@ -420,6 +420,15 @@ def make_policy(spec, seed=0):
     if name in ("learned", "learned-deep", "learned-mcts", "learned-r", "learned-deep-r", "learned-tmcts", "learned-rl"):
         from .learn.policy import make_learned
         return make_learned(name, arg, seed)
+    if name == "policy":
+        # policy:REF -> the policy net alone (no lookahead), AI v2 step 1
+        import os
+        from .learn.policy_net import PolicyNet, PolicyNetPlayer
+        from .learn import model as _M
+        path = arg if (arg.endswith(".json") or os.path.sep in arg) else os.path.join(_M.MODELS_DIR, arg + ".json")
+        pol = PolicyNetPlayer(PolicyNet.load(path), seed=seed)
+        pol.name = "policy:" + os.path.basename(path)[:-5]
+        return pol
     if name == "random":
         return RandomPolicy(seed)
     if name == "greedy":
