@@ -119,6 +119,9 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   20:20: "that battlefield" in auto triggers (Irresistible Faefolk, Vex, Mocking, Exemplar of Demacia) read `__bl`,
   which nothing set, so the move went nowhere; the trigger now stores the event's location as `__bl`. rules_audit no
   longer reports lethal damage on a unit waiting on an optional die replacement (Sett, The Boss).
+  2026-11-12 00:20: "you may pay [N] to stun/move/give a unit ..." (Kennen, Keeper of Balance, Icevale Archer, Sinister
+  Poro, Mask Mother, Portable Portal, Exemplar of Demacia) chose the unit at resolution after paying; it is a target
+  chosen as the trigger goes on the chain, whatever the pay decision (CR 355.12): `auto_grammar._lift_choices`.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
