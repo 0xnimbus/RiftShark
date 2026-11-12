@@ -1179,7 +1179,7 @@ def test_you_may_pay_to_affect_a_unit_chooses_it_as_the_trigger_goes_on_the_chai
             return True
         return None
     _play_from_hand(g, 0, kennen, pick)
-    assert [k for k, _ in order] == ["choose", "yesno"]
+    assert [k for k, _ in order] == ["yesno", "choose"]       # the may, then the target, both as it goes on the chain
     assert g.objects[enemy].stunned
 
 
@@ -1221,3 +1221,30 @@ def test_modes_and_their_targets_are_chosen_as_the_ability_goes_on_the_chain(db)
     g.choose(next(o for o in d.options if o[0] == "activate" and o[1] == udyr))
     d = g.run()
     assert d.kind == "mode" and d.labels == ["Ready me", "Give me [Ganking] this turn"]
+
+
+def test_a_leading_you_may_is_decided_and_its_cost_paid_as_the_trigger_goes_on_the_chain(db):
+    """CR 383.3.a: "When ..., you may ..." is decided as the trigger is finalized; declining removes it from the chain
+    (it never triggered). CR 383.3.b: a cost right after that "you may" (Kennen, Keeper of Balance: "you may pay [2]
+    to [Stun] a unit") is the trigger's base cost, paid then. Both used to happen at resolution."""
+    for accept in (False, True):
+        g = _fresh(db, "viktor_herald")
+        enemy = put(g, db, 1, "Forecaster", ("base", 1))
+        kennen = give(g, 0, "Kennen, Keeper of Balance", db)
+        _set_runes(g, db, 0, [("chaos", False)] * 7)
+        n = len(g.events)
+        _play_from_hand(g, 0, kennen, lambda d: accept if d.kind == "yesno" else
+                        (enemy if d.kind == "choose" and enemy in d.options else None))
+        evs = g.events[n:]
+        trig = [e for e in evs if e["kind"] == "trigger" and e.get("source") == kennen]
+        assert len(trig) == 1
+        tid = trig[0]["item"]
+        kinds = [(e["kind"], e.get("item"), e.get("energy")) for e in evs]
+        if accept:
+            fin = kinds.index(("finalized", tid, None))
+            res = next(i for i, k in enumerate(kinds) if k[0] == "resolve" and k[1] == tid)
+            pay = next(i for i, k in enumerate(kinds) if k[0] == "pay" and k[2] == 2)
+            assert pay < fin < res and g.objects[enemy].stunned
+        else:
+            assert not any(k[1] == tid and k[0] in ("finalized", "resolve") for k in kinds)
+            assert ("trigger_declined", tid, None) in kinds and not g.objects[enemy].stunned

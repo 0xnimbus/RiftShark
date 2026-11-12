@@ -126,6 +126,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   Reckless Innovator ...) were picked at resolution; the mode and its targets are now picked as the item goes on the
   chain (CR 355.3/355.5: `targeting.split_choices` hoists a top-level ChooseMode, `ops.ModeDispatch` runs the body),
   modes whose targets can't be chosen aren't offered, and `flow._targets_possible` needs one legal mode.
+  10:20: "When ..., you may ..." was decided at resolution; it is decided as the trigger is finalized (CR 383.3.a,
+  `targeting.split_trigger`): no removes it from the chain as if it never triggered (a once-each-turn one can fire
+  again, 383.3.e.2.b), and a cost right after the "you may" ("you may pay [2] to ...") is paid then (383.3.b).
+  Open: "you may exhaust me to ..." is also a base cost by 383.3.b but is still paid at resolution.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

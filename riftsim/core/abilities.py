@@ -15,7 +15,7 @@ Trigger conditions
 from __future__ import annotations
 
 from .vm import compile_effect
-from .targeting import split_choices
+from .targeting import split_choices, split_trigger
 
 
 def _ev_is(ev, kind):
@@ -269,7 +269,7 @@ class Triggered(Ability):
         self.event, self.filt, self.targets, self.effect = event, filt, targets, effect
         self.optional, self.once_per_turn = optional, once_per_turn
         if targets is None:
-            targets, effect = split_choices(effect)      # choices are made as the trigger is finalized (CR 355, 382)
+            targets, effect = split_trigger(effect)      # choices are made as the trigger is finalized (CR 355, 383.3)
             self.targets, self.effect = targets or None, effect
         self.code = compile_effect(effect)
         self.target_code = compile_effect(targets)

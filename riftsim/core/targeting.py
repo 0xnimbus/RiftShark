@@ -176,3 +176,88 @@ class _GroupRecheck(Instr):
         return Decision(ctx.controller, "choose_many", opts, out=self.out,
                         labels=[", ".join(game.label(u) for u in o) for o in opts],
                         info={"label": "targets that still share a location"})
+
+
+def _remove_trigger(game, ctx):
+    """CR 383.3.a.2 / 383.3.e.2.b: a declined (or unpaid) optional trigger leaves the chain as if it never triggered."""
+    it = next((x for x in game.chain if x.id == ctx.item), None)
+    if it is None:
+        return
+    game.chain.remove(it)
+    ab = it.ability
+    o = game.objects.get(it.uid)
+    if ab is not None and getattr(ab, "once_per_turn", False) and o is not None:
+        o.temp.pop(("opt", id(ab)), None)
+    game.log("trigger_declined", item=it.id, label=it.label, controller=it.controller)
+    game.bump()
+    game.dirty = True
+
+
+_END = 10 ** 9          # jump past the end of the finalize program
+
+
+class _TriggerMay(Instr):
+    """"When ..., you may ...": whether to perform the triggered ability is decided as it is finalized (CR 383.3.a)."""
+
+    def __init__(self, may):
+        self.may = may
+        self.out = may.out or "__may"
+
+    def _offered(self, game, ctx):
+        first = next((b for b in self.may.body if not isinstance(b, O.Choose)), None)
+        if isinstance(first, O.PayResources):
+            from .vm import val
+            e = val(game, ctx, first.energy)
+            pw = [val(game, ctx, p) for p in first.power]
+            vs = game.optional_cost_variants(ctx.controller, e, pw) if ctx.vars.get("__optional_cost") else [(e, pw)]
+            return any(game.can_pay(ctx.controller, ve, vp, purpose={"kind": "effect", "uid": ctx.source}) for ve, vp in vs)
+        if isinstance(first, O.Discard):
+            from .vm import val
+            return len(game.players[ctx.controller].hand) >= max(1, val(game, ctx, first.n) or 0)
+        return True
+
+    def run(self, game, ctx):
+        from .vm import Decision
+        if not self._offered(game, ctx):
+            ctx.vars[self.out] = False
+            _remove_trigger(game, ctx)
+            return _END
+        return Decision(ctx.controller, "yesno", [True, False], out=self.out,
+                        labels=["yes: " + self.may.label, "no"])
+
+    def resume(self, game, ctx, choice):
+        if not choice:
+            _remove_trigger(game, ctx)
+            return _END
+        return None
+
+
+class _TriggerPaid(Instr):
+    """CR 383.3.b.1: a cost at the start of the effect is the trigger's base cost and must be paid to finalize it."""
+
+    def __init__(self, out):
+        self.out = out
+
+    def run(self, game, ctx):
+        if ctx.vars.get(self.out) is None:
+            _remove_trigger(game, ctx)
+            return _END
+        return None
+
+
+def split_trigger(tree):
+    """split_choices for triggered abilities: a leading "you may" is decided as the trigger is finalized (CR 383.3.a),
+    and a cost right after it ("you may pay [1] to ...") is paid then (383.3.b). Other effects: split_choices."""
+    items = _items(tree)
+    if not items or not isinstance(items[0], O.May) or items[0].player is not None:
+        return split_choices(items)
+    may = items[0]
+    hoisted, rest = split_choices(list(may.body) + items[1:])
+    head = []
+    while rest and isinstance(rest[0], (_Recheck, _GroupRecheck)):
+        head.append(rest.pop(0))
+    cost = []
+    if rest and isinstance(rest[0], O.PayResources) and rest[0].out:
+        pr = rest.pop(0)
+        cost = [pr, _TriggerPaid(pr.out)]
+    return [_TriggerMay(may)] + hoisted + cost, head + [O.SetVar(may.out or "__may", True)] + rest
