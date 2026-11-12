@@ -416,6 +416,12 @@ def make_policy(spec, seed=0):
         pol = GreedyPolicy(seed, **cfg) if kind == "greedy" else MCTSPolicy(seed=seed, **cfg)
         pol.name = spec
         return pol
+    if spec == "search-v2":
+        # AI v2 step 2 (2026-11-12): gen 14 + two-turn search with the policy-net-pruned learned opponent, 10 shared
+        # samples, blend 0.3; beat gen 14 65-35 and 60-37 (docs/results/ai_v2_2026-11-12.md). ~15-20x slower per move.
+        pol = make_policy("learned:gen_014:p=policy_g14:ps3:crn:b=0.3:d10", seed)
+        pol.name = "search-v2"
+        return pol
     name, _, arg = spec.partition(":")
     if name in ("learned", "learned-deep", "learned-mcts", "learned-r", "learned-deep-r", "learned-tmcts", "learned-rl"):
         from .learn.policy import make_learned
