@@ -132,6 +132,9 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   15:20: "you may exhaust me [and pay [A]] to ..." is now that base cost too (`targeting._peel_costs`): Irelia, Rek'Sai,
   Vex (Gloomist) and Nasus (Curator) legends, Sivir, Renata, Exemplar ... exhaust as the trigger is finalized, and
   yes is only offered while the source is ready.
+  20:20: "When X, if Y, ..." re-checked Y on resolution in 10 hand scripts (Tomb-Raider Barbara, Kha'Zix, Mutating
+  Horror, both Shens, Swain, Poppy, Jarvan IV, Cosmic Vista, Poro Herder, Patched Porobot, Dropboarder); Y is part of
+  the trigger condition only (CR 383.2.a.1). `Triggered(..., intervening=cond(g, ctx))` checks it when X happens.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

@@ -1270,3 +1270,34 @@ def test_you_may_exhaust_me_is_paid_as_the_trigger_goes_on_the_chain(db):
     ex = kinds.index(("event:exhaust", legend, None))
     fin = kinds.index(("finalized", None, tid))
     assert ex < fin and not g.objects[unit].exhausted and g.objects[legend].exhausted
+
+
+def test_an_if_right_after_the_trigger_condition_is_not_checked_again_on_resolution(db):
+    """CR 383.2.a.1: "When you play me, if you control 7 or more runes, ..." (Tomb-Raider Barbara): the "if" is part
+    of the trigger condition. Once the trigger is on the chain it resolves even if the runes drop below 7 (Sona's
+    example in the rules). Several hand scripts checked the condition again on resolution (Barbara, Kha'Zix, Shen,
+    Swain, Poppy, Jarvan IV, Cosmic Vista, Poro Herder, Patched Porobot, Dropboarder)."""
+    g = _fresh(db, "nasus_curator")
+    gear = put(g, db, 1, "Long Sword", ("base", 1))
+    barbara = give(g, 0, "Tomb-Raider Barbara", db)
+    _set_runes(g, db, 0, [("calm", False)] * 4 + [("calm", True)] * 4)
+    done = []
+
+    def pick(d):
+        if g.chain and any(it.kind == "trigger" and it.uid == barbara for it in g.chain) and not done:
+            ps = g.players[0]
+            while len(ps.runes) > 6:              # "in response": two runes leave
+                r = ps.runes.pop()
+                ps.rune_deck.append(r)
+                g.objects[r].zone = "rune_deck"
+            g.bump()
+            done.append(True)
+        return gear if d.kind == "choose" and gear in d.options else None
+    _play_from_hand(g, 0, barbara, pick)
+    assert done and len(g.players[0].runes) == 6
+    assert g.objects[gear].zone == "trash"
+    for name in ("Shen, Scourge of Shadows", "Shen, Leader of the Kinkou Order", "Swain, Visionary", "Poppy, Paragon",
+                 "Jarvan IV, Martial Paragon", "Cosmic Vista", "Poro Herder", "Patched Porobot", "Dropboarder",
+                 "Kha'Zix, Mutating Horror"):
+        trig = [a for a in _card(db, name).abilities if type(a).__name__ == "Triggered"][-1]
+        assert trig.filt is not None and not any(type(i).__name__ == "If" for i in trig.effect), name
