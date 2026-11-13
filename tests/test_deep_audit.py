@@ -1301,3 +1301,24 @@ def test_an_if_right_after_the_trigger_condition_is_not_checked_again_on_resolut
                  "Kha'Zix, Mutating Horror"):
         trig = [a for a in _card(db, name).abilities if type(a).__name__ == "Triggered"][-1]
         assert trig.filt is not None and not any(type(i).__name__ == "If" for i in trig.effect), name
+
+
+def test_a_unit_dying_with_another_does_not_see_its_death(db):
+    """CR 383.2.c.2: "When another friendly unit dies, ..." (Viktor, Leader) doesn't trigger when Viktor dies at the
+    same time (the rules' own example). It did when the other unit happened to be killed first in the batch."""
+    def recruits(g):
+        return sum(1 for o in g.objects.values() if o.zone == "board" and o.defn.name == "Recruit")
+    for order in (0, 1):
+        g = _fresh(db, "viktor_herald")
+        a = put(g, db, 0, "Forecaster", ("base", 0))
+        v = put(g, db, 0, "Viktor, Leader", ("base", 0))
+        g.do_kill([a, v] if order == 0 else [v, a], None, by="damage")
+        _drive(g)
+        assert recruits(g) == 0, order
+        assert getattr(g, "_leaving", frozenset()) == frozenset()
+    g = _fresh(db, "viktor_herald")
+    a = put(g, db, 0, "Forecaster", ("base", 0))
+    put(g, db, 0, "Viktor, Leader", ("base", 0))
+    g.do_kill([a], None, by="damage")
+    _drive(g)
+    assert recruits(g) == 1
