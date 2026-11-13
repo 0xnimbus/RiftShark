@@ -117,7 +117,7 @@ def main():
             if (k + 1) % 20 == 0:
                 print(f"policy data {k + 1}/{len(jobs)} games, {sum(len(v) for v in acc['n'])} decisions ({time.time() - t:.0f}s)",
                       file=sys.stderr)
-            if (k + 1) % 50 == 0:
+            if (k + 1) % 10 == 0:
                 save(part, done=k + 1)
     finally:
         ex.shutdown(wait=False, cancel_futures=True)
