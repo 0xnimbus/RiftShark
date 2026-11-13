@@ -1274,7 +1274,8 @@ TRIGGER_PATTERNS = [
     (r"when you play a card that costs \[(\d+)\] or more", "you_play_card"),
     (r"when i become empowered", "empowered_self"),
     (r"when you buff me", "buffed_self"),
-    (r"when you ready a friendly unit", lambda g, s, ev: ev.get("kind") == "ready" and ev.get("player") == g.objects[s].controller),
+    (r"when you ready a friendly unit", lambda g, s, ev: ev.get("kind") == "ready" and ev.get("player") == g.objects[s].controller
+     and ev.get("uid") in g.objects and g.objects[ev["uid"]].zone == "board" and "unit" in g.chars(ev["uid"]).types),
     (r"when you spend a buff", lambda g, s, ev: ev.get("kind") == "spend_buff" and ev.get("player") == g.objects[s].controller),
     (r"when you recycle a rune", lambda g, s, ev: ev.get("kind") == "recycle" and ev.get("player") == g.objects[s].controller and g.objects[ev["uid"]].defn.type == "rune"),
     (r"when you recycle one or more cards", "you_recycle_batch"),
