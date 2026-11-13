@@ -138,6 +138,9 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   2026-11-13 00:20: units dying together saw each other die when the other came first in the batch (Viktor, Leader
   made a Recruit dying with another unit; CR 383.2.c.2 says no). `do_kill` now marks the whole batch as `_leaving` and
   `_collect_triggers` skips their triggers except for their own death/leave (383.2.c.3).
+  05:20: Wraith of Echoes ("The first time a friendly unit dies each turn") was a once-each-turn trigger, so it fired on
+  a later death when the first one happened before it was on the board; it now needs the turn's first batch of
+  friendly deaths (turn_memo `first_unit_die_batch`, CR 383.1.b). Manual "Nth time" scripts already count per turn.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

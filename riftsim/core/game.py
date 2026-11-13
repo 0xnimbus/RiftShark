@@ -1185,6 +1185,7 @@ class Game(flow.FlowMixin):
         self.log("die", uid=u, name=o.defn.name, loc=o.location)
         if ev["card_type"] == "unit":
             key = ("units_died", ev["player"])           # "if an enemy unit has died this turn"
+            self.turn_memo.setdefault(("first_unit_die_batch", ev["player"]), ev.get("batch"))  # "the first time"
             self.turn_memo[key] = self.turn_memo.get(key, 0) + 1
         if ev["card_type"] == "unit" and getattr(self, "phase", None) == "beginning":
             self.turn_memo[("died_in_beginning", ev["player"])] = True      # Shadow Watcher
