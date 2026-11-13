@@ -651,7 +651,7 @@ def parse_sentence(s, state):
         return _each_player_kills("unit")
     m = re.match(r"(?:its|their) owner channels (\w+) runes? exhausted$", sl)
     if m:
-        return [O.Channel(parse_amount(m.group(1)), exhausted=True, player=O.controller_of(Ref("t")))]
+        return [O.Channel(parse_amount(m.group(1)), exhausted=True, player=O.owner_of(Ref("t")))]
     m = re.match(r"its base might becomes (\d+) this turn$", sl)
     if m:
         return [O.SetMight(Ref("t"), int(m.group(1)))]

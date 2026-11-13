@@ -1403,7 +1403,20 @@ def might_of(ref):
 
 
 def controller_of(ref):
-    return lambda g, c: g.objects[val(g, c, ref)].controller if val(g, c, ref) in g.objects else None
+    """The object's controller; once it has left the board, its controller as it last existed there (Hidden Blade:
+    "Kill a unit at a battlefield. Its controller draws 2." - a unit you took control of makes you draw)."""
+    def f(g, c):
+        o = g.objects.get(val(g, c, ref))
+        if o is None:
+            return None
+        if o.zone not in ("board", "chain") and "__lk_controller" in o.temp:
+            return o.temp["__lk_controller"]
+        return o.controller
+    return f
+
+
+def owner_of(ref):
+    return lambda g, c: g.objects[val(g, c, ref)].owner if val(g, c, ref) in g.objects else None
 
 
 def loc_of(ref):

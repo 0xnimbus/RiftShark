@@ -1349,3 +1349,23 @@ def test_the_first_time_a_friendly_unit_dies_counts_deaths_before_the_source_arr
     g.do_kill([a, b], None, by="damage")
     _drive(g)
     assert wraith_triggers(g, n) == 1
+
+
+def test_its_controller_is_the_controller_it_had_when_it_left_the_board(db):
+    """Hidden Blade: "Kill a unit at a battlefield. Its controller draws 2." The unit is in the trash when the draw
+    happens; its controller is the one it had on the board (last known information), not its owner. A unit you had
+    taken control of made its owner draw. "Its owner channels" (Retreat) still uses the owner."""
+    g = _fresh(db, "akali_rogue")
+    u = put(g, db, 1, "Rhasa the Sunderer", ("bf", 0))
+    g.objects[u].controller = 0                     # taken control of (Possession and the like)
+    g.bump()
+    hands = [len(g.players[0].hand), len(g.players[1].hand)]
+    _cast_with(g, db, 0, "Hidden Blade", [("order", False)] * 3, lambda d: u if d.kind == "choose" and u in d.options else None)
+    assert g.objects[u].zone == "trash"
+    assert [len(g.players[0].hand), len(g.players[1].hand)] == [hands[0] + 2, hands[1]]
+    from riftsim.core.scripts.auto_grammar import parse_sentence
+    instrs = parse_sentence("its owner channels 1 rune exhausted", {"tcount": 1})
+    g.objects[u].temp["__lk_controller"] = 0
+    c = Context(0, None)
+    c.vars["t"] = u
+    assert instrs[0].player(g, c) == 1

@@ -504,6 +504,8 @@ class Game(flow.FlowMixin):
 
     def _to_zone(self, o, zone, location=None, top=False, controller=None):
         """Low level zone change. Tokens leaving the board cease to exist (CR 187)."""
+        if o.zone == "board" and zone != "board":
+            o.temp["__lk_controller"] = o.controller     # last known controller ("Its controller draws 2")
         self._remove_from_zone(o)
         if o.defn.is_token and zone not in ("board", "chain"):
             o.zone = "gone"
