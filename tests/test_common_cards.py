@@ -883,6 +883,19 @@ def test_transpositionist_and_bottled_constellation(db, decks):
     _fire(g, t, "Transpositionist", ctx_vars={})
     settle(g, picks=[big, (small,)])
     assert g.objects[big].zone == "hand" and g.objects[small].zone == "board"
+    # "a unit with less Might than that unit had": a buffed unit returned to hand is a card with its printed Might,
+    # so it can be played again (it was excluded)
+    g = main_phase(db, decks)
+    t = put(g, db, 0, "Transpositionist", ("base", 0))
+    r = g.players[0].runes[0]
+    g.objects[r].defn = next(c for c in db if c.name == "Chaos Rune"); g.objects[r].domain = "chaos"; g.bump()
+    dog = put(g, db, 0, "Hunting Dog", ("bf", 0), exclude=(t,))
+    g.do_buff(dog, None)
+    g.bump()
+    assert g.chars(dog).might == (g.objects[dog].defn.might or 0) + 1
+    _fire(g, t, "Transpositionist", ctx_vars={})
+    settle(g, picks=[dog, (dog,)])
+    assert g.objects[dog].zone == "board"
     g = main_phase(db, decks)
     bc = put(g, db, 0, "Bottled Constellation", ("base", 0))
     us = []
