@@ -1322,3 +1322,30 @@ def test_a_unit_dying_with_another_does_not_see_its_death(db):
     g.do_kill([a], None, by="damage")
     _drive(g)
     assert recruits(g) == 1
+
+
+def test_the_first_time_a_friendly_unit_dies_counts_deaths_before_the_source_arrived(db):
+    """CR 383.1/383.1.b: Wraith of Echoes ("The first time a friendly unit dies each turn, draw 1") only triggers on
+    the turn's first friendly death; one that happened before Wraith was on the board still counts. Two units dying
+    at the same time are one instance (it draws 1)."""
+    def wraith_triggers(g, n):
+        return sum(1 for e in g.events[n:] if e["kind"] == "trigger" and g.objects.get(e.get("source")) is not None
+                   and g.objects[e["source"]].defn.name == "Wraith of Echoes")
+    g = _fresh(db, "viktor_herald")
+    a = put(g, db, 0, "Forecaster", ("base", 0))
+    g.do_kill([a], None, by="damage")
+    _drive(g)
+    put(g, db, 0, "Wraith of Echoes", ("base", 0))
+    b = put(g, db, 0, "Forecaster", ("base", 0))
+    n = len(g.events)
+    g.do_kill([b], None, by="damage")
+    _drive(g)
+    assert wraith_triggers(g, n) == 0
+    g = _fresh(db, "viktor_herald")
+    put(g, db, 0, "Wraith of Echoes", ("base", 0))
+    a = put(g, db, 0, "Forecaster", ("base", 0))
+    b = put(g, db, 0, "Forecaster", ("base", 0))
+    n = len(g.events)
+    g.do_kill([a, b], None, by="damage")
+    _drive(g)
+    assert wraith_triggers(g, n) == 1

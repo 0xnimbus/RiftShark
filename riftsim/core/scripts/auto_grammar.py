@@ -1933,6 +1933,14 @@ def _script_line(defn, line, cond=None):
             store["loc"] = "__bl"
         eff = parse_effect(rest, state)
         once_flag = once or prefix.lower().startswith("the first time")
+        if re.match(r"the first time a friendly unit dies each turn", prefix, re.I):
+            # CR 383.1: "the first time" counts every friendly death this turn, including ones before this object was
+            # on the board (Wraith of Echoes played after a unit died doesn't trigger on the next death); deaths at the
+            # same time are one instance (383.1.b), so the trigger needs the turn's first batch of friendly deaths.
+            def filt(g, s, ev, inner=filt):
+                if g.turn_memo.get(("first_unit_die_batch", g.objects[s].controller)) != ev.get("batch"):
+                    return False
+                return inner is None or inner(g, s, ev)
         return [Triggered(ev, eff, filt=filt, once_per_turn=once_flag, label=line[:40], source_text=line, store=store, cond=cond, optional=optional)]
     # play permissions
     if bl in ("you may play me to an open battlefield.", "you may play me to an open battlefield"):
