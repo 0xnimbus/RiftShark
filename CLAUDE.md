@@ -144,6 +144,9 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   10:20: "Its controller draws 2" (Hidden Blade) read the controller after the kill, when it had reset to the owner:
   killing a unit you had taken control of made its owner draw. `_to_zone` keeps the last known controller
   (temp `__lk_controller`) for `ops.controller_of`; "its owner channels" (Retreat) now uses `ops.owner_of`.
+  15:20 (16:05): Transpositionist ("Return a friendly unit ... You may play a unit with less Might than that unit had")
+  excluded the returned card, so a buffed unit could not be replayed; the card in hand is a new object with its printed
+  Might. Checked OK: Deathgrip and Heedless Resurrection use the killed unit's last known Might/cost.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

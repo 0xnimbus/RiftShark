@@ -2306,7 +2306,7 @@ def transpositionist(defn):
         c.vars["__tm"] = g.chars(u).might or 0
         g.put_in_hand(u, c) if hasattr(g, "put_in_hand") else g._to_zone(g.objects[u], "hand")
     smaller = lambda g, c: [u for u in g.players[c.controller].hand if g.objects[u].base_defn().is_unit
-                            and (g.objects[u].base_defn().might or 0) < c.vars.get("__tm", 0) and u != c.vars.get("t")]
+                            and (g.objects[u].base_defn().might or 0) < c.vars.get("__tm", 0)]   # the returned card too
     return [Activated({"energy": 0, "power": ["chaos"], "exhaust": True},
                       [O.Choose(Sel("unit", side="friendly"), out="t"), O.Do(ret, label="return it to its owner's hand"),
                        O.ChooseFromList(smaller, out="__tp", up_to=True, label="play a unit with less Might, ignoring its cost"),
