@@ -264,8 +264,12 @@ class Triggered(Ability):
                  "store", "controller", "uses_chain", "priority")
 
     def __init__(self, event, effect=None, targets=None, filt=None, optional=False, once_per_turn=False, zone="board",
-                 cond=None, label="", source_text="", store=None, controller="self", keyword=None):
+                 cond=None, label="", source_text="", store=None, controller="self", keyword=None, intervening=None):
         super().__init__(label, zone, cond, source_text, keyword)
+        if intervening is not None:
+            # "When X, if Y, ...": Y is part of the trigger condition, checked when X happens and not again on
+            # resolution (CR 383.2.a.1). intervening(g, ctx) sees the trigger's controller and source.
+            filt = _with_intervening(filt, intervening, controller)
         self.event, self.filt, self.targets, self.effect = event, filt, targets, effect
         self.optional, self.once_per_turn = optional, once_per_turn
         if targets is None:
@@ -285,6 +289,27 @@ class Triggered(Ability):
         if self.filt is not None and not self.filt(g, src, ev):
             return False
         return True
+
+
+def _with_intervening(filt, cond, controller):
+    from .vm import Context
+
+    def f(g, src, ev):
+        if filt is not None and not filt(g, src, ev):
+            return False
+        o = g.objects[src]
+        if controller == "event" and ev.get("player") is not None:
+            ctrl = ev["player"]
+        elif controller == "owner":
+            ctrl = o.owner
+        else:
+            ctrl = o.controller if o.controller is not None else g.turn_player
+        c = Context(ctrl, src, here=o.place)
+        c.event = ev
+        c.vars["ev"] = ev
+        c.vars["self"] = src
+        return bool(cond(g, c))
+    return f
 
 
 def _trigger_kinds():

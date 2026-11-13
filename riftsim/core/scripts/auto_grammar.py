@@ -651,7 +651,7 @@ def parse_sentence(s, state):
         return _each_player_kills("unit")
     m = re.match(r"(?:its|their) owner channels (\w+) runes? exhausted$", sl)
     if m:
-        return [O.Channel(parse_amount(m.group(1)), exhausted=True, player=O.controller_of(Ref("t")))]
+        return [O.Channel(parse_amount(m.group(1)), exhausted=True, player=O.owner_of(Ref("t")))]
     m = re.match(r"its base might becomes (\d+) this turn$", sl)
     if m:
         return [O.SetMight(Ref("t"), int(m.group(1)))]
@@ -1274,7 +1274,8 @@ TRIGGER_PATTERNS = [
     (r"when you play a card that costs \[(\d+)\] or more", "you_play_card"),
     (r"when i become empowered", "empowered_self"),
     (r"when you buff me", "buffed_self"),
-    (r"when you ready a friendly unit", lambda g, s, ev: ev.get("kind") == "ready" and ev.get("player") == g.objects[s].controller),
+    (r"when you ready a friendly unit", lambda g, s, ev: ev.get("kind") == "ready" and ev.get("player") == g.objects[s].controller
+     and ev.get("uid") in g.objects and g.objects[ev["uid"]].zone == "board" and "unit" in g.chars(ev["uid"]).types),
     (r"when you spend a buff", lambda g, s, ev: ev.get("kind") == "spend_buff" and ev.get("player") == g.objects[s].controller),
     (r"when you recycle a rune", lambda g, s, ev: ev.get("kind") == "recycle" and ev.get("player") == g.objects[s].controller and g.objects[ev["uid"]].defn.type == "rune"),
     (r"when you recycle one or more cards", "you_recycle_batch"),
@@ -1933,6 +1934,14 @@ def _script_line(defn, line, cond=None):
             store["loc"] = "__bl"
         eff = parse_effect(rest, state)
         once_flag = once or prefix.lower().startswith("the first time")
+        if re.match(r"the first time a friendly unit dies each turn", prefix, re.I):
+            # CR 383.1: "the first time" counts every friendly death this turn, including ones before this object was
+            # on the board (Wraith of Echoes played after a unit died doesn't trigger on the next death); deaths at the
+            # same time are one instance (383.1.b), so the trigger needs the turn's first batch of friendly deaths.
+            def filt(g, s, ev, inner=filt):
+                if g.turn_memo.get(("first_unit_die_batch", g.objects[s].controller)) != ev.get("batch"):
+                    return False
+                return inner is None or inner(g, s, ev)
         return [Triggered(ev, eff, filt=filt, once_per_turn=once_flag, label=line[:40], source_text=line, store=store, cond=cond, optional=optional)]
     # play permissions
     if bl in ("you may play me to an open battlefield.", "you may play me to an open battlefield"):

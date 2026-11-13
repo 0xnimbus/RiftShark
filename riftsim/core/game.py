@@ -504,6 +504,8 @@ class Game(flow.FlowMixin):
 
     def _to_zone(self, o, zone, location=None, top=False, controller=None):
         """Low level zone change. Tokens leaving the board cease to exist (CR 187)."""
+        if o.zone == "board" and zone != "board":
+            o.temp["__lk_controller"] = o.controller     # last known controller ("Its controller draws 2")
         self._remove_from_zone(o)
         if o.defn.is_token and zone not in ("board", "chain"):
             o.zone = "gone"
@@ -597,8 +599,12 @@ class Game(flow.FlowMixin):
         entries, by_kind = self._trigger_index()
         kind = ev.get("kind")
         picks = sorted(by_kind.get(kind, []) + by_kind.get("*", []))
+        leaving = getattr(self, "_leaving", None)
         for k in picks:
             uid, o, ab, _, equip = entries[k]
+            if leaving and (uid in leaving or (equip and o.attached_to in leaving)) \
+                    and ev.get("uid") not in (uid, o.attached_to if equip else uid):
+                continue                                    # CR 383.2.c.2: leaving at the same time
             if equip:
                 # an Equipment's effect is an ability of the unit it is attached to: "When I conquer" means that unit
                 # conquers and "me" is that unit; the gear stays the source (Blighted Battleaxe unattaches itself)
@@ -1121,6 +1127,7 @@ class Game(flow.FlowMixin):
             o = self.objects.get(u)
             if o is not None and o.zone == "board" and o.location is not None:
                 alone[u] = len([x for x in self.units_at(o.location, o.controller)]) == 1
+        events = []
         for u in list(uids):
             o = self.objects.get(u)
             if o is None or o.zone != "board" or not self.defn_of(u).is_permanent:
@@ -1132,12 +1139,22 @@ class Game(flow.FlowMixin):
                                      "token": o.defn.is_token, "might": self.chars(u).might, "stunned": o.stunned, "buffed": o.buffs > 0, "empowered": bool(o.empowered),
                                      "alone": alone.get(u, False), "dmg_item": o.temp.get("dmg_item") if by == "damage" else None,
                                      "batch": batch})
-            if ev is None:
-                continue
-            if ev.get("deferred"):                          # "you may ... instead": its controller decides first
-                self._ask_optional_replacement(u, ev, ctx)
-                continue
-            self._finish_death(u, ev, ctx)
+            if ev is not None:
+                events.append((u, ev))
+        # CR 383.2.c.2: an object leaving the board at the same time as another one doesn't see that one leave
+        # (Viktor, Leader dying together with another unit makes no Recruit); its own death/leave triggers still
+        # work (383.2.c.3). Recalled units stay on the board, and deferred ones wait for their controller.
+        prev = getattr(self, "_leaving", frozenset())
+        self._leaving = prev | {u for u, ev in events
+                                if not ev.get("deferred") and ev.get("replaced_with") != "recall"}
+        try:
+            for u, ev in events:
+                if ev.get("deferred"):                      # "you may ... instead": its controller decides first
+                    self._ask_optional_replacement(u, ev, ctx)
+                    continue
+                self._finish_death(u, ev, ctx)
+        finally:
+            self._leaving = prev
 
     def _ask_optional_replacement(self, u, ev, ctx):
         """Keep u on the board and push a frame that asks the replacement's controller (runs before anything else)."""
@@ -1170,6 +1187,7 @@ class Game(flow.FlowMixin):
         self.log("die", uid=u, name=o.defn.name, loc=o.location)
         if ev["card_type"] == "unit":
             key = ("units_died", ev["player"])           # "if an enemy unit has died this turn"
+            self.turn_memo.setdefault(("first_unit_die_batch", ev["player"]), ev.get("batch"))  # "the first time"
             self.turn_memo[key] = self.turn_memo.get(key, 0) + 1
         if ev["card_type"] == "unit" and getattr(self, "phase", None) == "beginning":
             self.turn_memo[("died_in_beginning", ev["player"])] = True      # Shadow Watcher

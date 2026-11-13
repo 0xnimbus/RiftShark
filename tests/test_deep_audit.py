@@ -1270,3 +1270,127 @@ def test_you_may_exhaust_me_is_paid_as_the_trigger_goes_on_the_chain(db):
     ex = kinds.index(("event:exhaust", legend, None))
     fin = kinds.index(("finalized", None, tid))
     assert ex < fin and not g.objects[unit].exhausted and g.objects[legend].exhausted
+
+
+def test_an_if_right_after_the_trigger_condition_is_not_checked_again_on_resolution(db):
+    """CR 383.2.a.1: "When you play me, if you control 7 or more runes, ..." (Tomb-Raider Barbara): the "if" is part
+    of the trigger condition. Once the trigger is on the chain it resolves even if the runes drop below 7 (Sona's
+    example in the rules). Several hand scripts checked the condition again on resolution (Barbara, Kha'Zix, Shen,
+    Swain, Poppy, Jarvan IV, Cosmic Vista, Poro Herder, Patched Porobot, Dropboarder)."""
+    g = _fresh(db, "nasus_curator")
+    gear = put(g, db, 1, "Long Sword", ("base", 1))
+    barbara = give(g, 0, "Tomb-Raider Barbara", db)
+    _set_runes(g, db, 0, [("calm", False)] * 4 + [("calm", True)] * 4)
+    done = []
+
+    def pick(d):
+        if g.chain and any(it.kind == "trigger" and it.uid == barbara for it in g.chain) and not done:
+            ps = g.players[0]
+            while len(ps.runes) > 6:              # "in response": two runes leave
+                r = ps.runes.pop()
+                ps.rune_deck.append(r)
+                g.objects[r].zone = "rune_deck"
+            g.bump()
+            done.append(True)
+        return gear if d.kind == "choose" and gear in d.options else None
+    _play_from_hand(g, 0, barbara, pick)
+    assert done and len(g.players[0].runes) == 6
+    assert g.objects[gear].zone == "trash"
+    for name in ("Shen, Scourge of Shadows", "Shen, Leader of the Kinkou Order", "Swain, Visionary", "Poppy, Paragon",
+                 "Jarvan IV, Martial Paragon", "Cosmic Vista", "Poro Herder", "Patched Porobot", "Dropboarder",
+                 "Kha'Zix, Mutating Horror"):
+        trig = [a for a in _card(db, name).abilities if type(a).__name__ == "Triggered"][-1]
+        assert trig.filt is not None and not any(type(i).__name__ == "If" for i in trig.effect), name
+
+
+def test_a_unit_dying_with_another_does_not_see_its_death(db):
+    """CR 383.2.c.2: "When another friendly unit dies, ..." (Viktor, Leader) doesn't trigger when Viktor dies at the
+    same time (the rules' own example). It did when the other unit happened to be killed first in the batch."""
+    def recruits(g):
+        return sum(1 for o in g.objects.values() if o.zone == "board" and o.defn.name == "Recruit")
+    for order in (0, 1):
+        g = _fresh(db, "viktor_herald")
+        a = put(g, db, 0, "Forecaster", ("base", 0))
+        v = put(g, db, 0, "Viktor, Leader", ("base", 0))
+        g.do_kill([a, v] if order == 0 else [v, a], None, by="damage")
+        _drive(g)
+        assert recruits(g) == 0, order
+        assert getattr(g, "_leaving", frozenset()) == frozenset()
+    g = _fresh(db, "viktor_herald")
+    a = put(g, db, 0, "Forecaster", ("base", 0))
+    put(g, db, 0, "Viktor, Leader", ("base", 0))
+    g.do_kill([a], None, by="damage")
+    _drive(g)
+    assert recruits(g) == 1
+
+
+def test_the_first_time_a_friendly_unit_dies_counts_deaths_before_the_source_arrived(db):
+    """CR 383.1/383.1.b: Wraith of Echoes ("The first time a friendly unit dies each turn, draw 1") only triggers on
+    the turn's first friendly death; one that happened before Wraith was on the board still counts. Two units dying
+    at the same time are one instance (it draws 1)."""
+    def wraith_triggers(g, n):
+        return sum(1 for e in g.events[n:] if e["kind"] == "trigger" and g.objects.get(e.get("source")) is not None
+                   and g.objects[e["source"]].defn.name == "Wraith of Echoes")
+    g = _fresh(db, "viktor_herald")
+    a = put(g, db, 0, "Forecaster", ("base", 0))
+    g.do_kill([a], None, by="damage")
+    _drive(g)
+    put(g, db, 0, "Wraith of Echoes", ("base", 0))
+    b = put(g, db, 0, "Forecaster", ("base", 0))
+    n = len(g.events)
+    g.do_kill([b], None, by="damage")
+    _drive(g)
+    assert wraith_triggers(g, n) == 0
+    g = _fresh(db, "viktor_herald")
+    put(g, db, 0, "Wraith of Echoes", ("base", 0))
+    a = put(g, db, 0, "Forecaster", ("base", 0))
+    b = put(g, db, 0, "Forecaster", ("base", 0))
+    n = len(g.events)
+    g.do_kill([a, b], None, by="damage")
+    _drive(g)
+    assert wraith_triggers(g, n) == 1
+
+
+def test_its_controller_is_the_controller_it_had_when_it_left_the_board(db):
+    """Hidden Blade: "Kill a unit at a battlefield. Its controller draws 2." The unit is in the trash when the draw
+    happens; its controller is the one it had on the board (last known information), not its owner. A unit you had
+    taken control of made its owner draw. "Its owner channels" (Retreat) still uses the owner."""
+    g = _fresh(db, "akali_rogue")
+    u = put(g, db, 1, "Rhasa the Sunderer", ("bf", 0))
+    g.objects[u].controller = 0                     # taken control of (Possession and the like)
+    g.bump()
+    hands = [len(g.players[0].hand), len(g.players[1].hand)]
+    _cast_with(g, db, 0, "Hidden Blade", [("order", False)] * 3, lambda d: u if d.kind == "choose" and u in d.options else None)
+    assert g.objects[u].zone == "trash"
+    assert [len(g.players[0].hand), len(g.players[1].hand)] == [hands[0] + 2, hands[1]]
+    from riftsim.core.scripts.auto_grammar import parse_sentence
+    instrs = parse_sentence("its owner channels 1 rune exhausted", {"tcount": 1})
+    g.objects[u].temp["__lk_controller"] = 0
+    c = Context(0, None)
+    c.vars["t"] = u
+    assert instrs[0].player(g, c) == 1
+
+
+def test_the_awaken_phase_readying_triggers_when_i_become_ready(db):
+    """CR 315.1.b / 416.3.a: the Awaken Phase readies with the Ready action, so "When I become ready" (Fretful Feline,
+    Jayce, Hammer in Hand) and "When you choose or ready me" (Irelia, Fervent) trigger then. They never did."""
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    cat = put(g, db, 1, "Fretful Feline", ("base", 1))
+    ire = put(g, db, 1, "Irelia, Fervent", ("base", 1))
+    for u in (cat, ire):
+        g.objects[u].exhausted = True
+    g.bump()
+    base = g.chars(cat).might, g.chars(ire).might
+    g.run()
+    g.choose(("end_turn",))
+    _drive(g, stop=lambda d: g.turn_player == 1 and g.phase == "main" and d.kind == "action" and not g.chain)
+    assert not g.objects[cat].exhausted and not g.objects[ire].exhausted
+    assert (g.chars(cat).might, g.chars(ire).might) == (base[0] + 2, base[1] + 1)
+    # "When you ready a friendly unit" (Pirate's Haven) is about units: readying runes doesn't trigger it
+    haven = [a for a in _card(db, "Pirate's Haven").abilities if type(a).__name__ == "Triggered"][0]
+    g.set_bf_controller(0, 1)
+    g.bump()
+    r = g.players[1].runes[0]
+    assert haven.matches(g, g.battlefields[0].uid, {"kind": "ready", "uid": cat, "player": 1})
+    assert not haven.matches(g, g.battlefields[0].uid, {"kind": "ready", "uid": r, "player": 1})

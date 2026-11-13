@@ -129,7 +129,7 @@ def poro_herder(defn):
         me = g.objects[s].controller if g.objects[s].controller is not None else g.objects[s].owner
         return any(o.zone == "board" and o.controller == me and u != s and "Poro" in g.chars(u).tags
                    for u, o in g.objects.items())
-    return [Triggered("play_self", [O.If(lambda g, c: poro(g, c.source), [O.Buff(Ref("self")), O.Draw(1)])],
+    return [Triggered("play_self", [O.Buff(Ref("self")), O.Draw(1)],
                       filt=poro, label=defn.name, source_text=defn.text)]
 
 
@@ -429,7 +429,7 @@ def dropboarder(defn):
     # When you play me, if you control two or more gear, ready me.
     two_gear = lambda g, s: sum(1 for u, o in g.objects.items() if o.zone == "board" and o.controller == g.objects[s].controller
                                 and "gear" in g.chars(u).types) >= 2
-    return [Triggered("play_self", [O.If(lambda g, c: two_gear(g, c.source), [O.Ready(Ref("self"))])],
+    return [Triggered("play_self", [O.Ready(Ref("self"))],
                       filt=lambda g, s, ev: two_gear(g, s), label=defn.name, source_text=defn.text)]
 
 
@@ -908,7 +908,7 @@ def patched_porobot(defn):
     # (I enter exhausted.)  When you play me, if you control 3 or more other gear, draw 1.
     gear3 = lambda g, s: sum(1 for u, o in g.objects.items() if u != s and o.zone == "board"
                              and o.controller == g.objects[s].controller and "gear" in g.chars(u).types) >= 3
-    return [Triggered("play_self", [O.If(lambda g, c: gear3(g, c.source), [O.Draw(1)])], filt=lambda g, s, ev: gear3(g, s),
+    return [Triggered("play_self", [O.Draw(1)], filt=lambda g, s, ev: gear3(g, s),
                       label=defn.name, source_text=defn.text)]
 
 
@@ -2035,7 +2035,7 @@ def steadfast_outrider(defn):
 def cosmic_vista(defn):
     # When you hold here, if your Rune Deck is empty, you score 1 point.
     empty = lambda g, c: not g.players[c.controller].rune_deck
-    return [Triggered("you_hold_here", [O.If(empty, [O.GainPoints(1)])], controller="event", label=defn.name, source_text=defn.text)]
+    return [Triggered("you_hold_here", [O.GainPoints(1)], intervening=empty, controller="event", label=defn.name, source_text=defn.text)]
 
 
 @script("Ntofo Strikes")
@@ -2306,7 +2306,7 @@ def transpositionist(defn):
         c.vars["__tm"] = g.chars(u).might or 0
         g.put_in_hand(u, c) if hasattr(g, "put_in_hand") else g._to_zone(g.objects[u], "hand")
     smaller = lambda g, c: [u for u in g.players[c.controller].hand if g.objects[u].base_defn().is_unit
-                            and (g.objects[u].base_defn().might or 0) < c.vars.get("__tm", 0) and u != c.vars.get("t")]
+                            and (g.objects[u].base_defn().might or 0) < c.vars.get("__tm", 0)]   # the returned card too
     return [Activated({"energy": 0, "power": ["chaos"], "exhaust": True},
                       [O.Choose(Sel("unit", side="friendly"), out="t"), O.Do(ret, label="return it to its owner's hand"),
                        O.ChooseFromList(smaller, out="__tp", up_to=True, label="play a unit with less Might, ignoring its cost"),

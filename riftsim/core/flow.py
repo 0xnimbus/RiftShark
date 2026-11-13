@@ -649,12 +649,19 @@ class FlowMixin:
 
     def _awaken(self):
         p = self.turn_player
+        readied = []
         for u, o in list(self.objects.items()):
             if o.zone == "board" and o.controller == p and o.exhausted:
                 if any(src == u for src, _ in self.rules("cant_ready")):
                     continue
                 o.exhausted = False
+                readied.append((u, o.location))
         self.bump()
+        # CR 315.1.b / 416.3.a: this is the Ready action, so "When I become ready" (Jayce, Hammer in Hand; Fretful
+        # Feline), "When you choose or ready me" (Irelia, Fervent) and "When you ready a friendly unit" (Pirate's
+        # Haven) trigger for each object readied here
+        for u, loc in readied:
+            self.emit("ready", uid=u, player=p, loc=loc, ctx=None)
         self.emit("awaken", player=p)
 
     def _expiration(self):

@@ -132,6 +132,24 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   15:20: "you may exhaust me [and pay [A]] to ..." is now that base cost too (`targeting._peel_costs`): Irelia, Rek'Sai,
   Vex (Gloomist) and Nasus (Curator) legends, Sivir, Renata, Exemplar ... exhaust as the trigger is finalized, and
   yes is only offered while the source is ready.
+  20:20: "When X, if Y, ..." re-checked Y on resolution in 10 hand scripts (Tomb-Raider Barbara, Kha'Zix, Mutating
+  Horror, both Shens, Swain, Poppy, Jarvan IV, Cosmic Vista, Poro Herder, Patched Porobot, Dropboarder); Y is part of
+  the trigger condition only (CR 383.2.a.1). `Triggered(..., intervening=cond(g, ctx))` checks it when X happens.
+  2026-11-13 00:20: units dying together saw each other die when the other came first in the batch (Viktor, Leader
+  made a Recruit dying with another unit; CR 383.2.c.2 says no). `do_kill` now marks the whole batch as `_leaving` and
+  `_collect_triggers` skips their triggers except for their own death/leave (383.2.c.3).
+  05:20: Wraith of Echoes ("The first time a friendly unit dies each turn") was a once-each-turn trigger, so it fired on
+  a later death when the first one happened before it was on the board; it now needs the turn's first batch of
+  friendly deaths (turn_memo `first_unit_die_batch`, CR 383.1.b). Manual "Nth time" scripts already count per turn.
+  10:20: "Its controller draws 2" (Hidden Blade) read the controller after the kill, when it had reset to the owner:
+  killing a unit you had taken control of made its owner draw. `_to_zone` keeps the last known controller
+  (temp `__lk_controller`) for `ops.controller_of`; "its owner channels" (Retreat) now uses `ops.owner_of`.
+  15:20 (16:05): Transpositionist ("Return a friendly unit ... You may play a unit with less Might than that unit had")
+  excluded the returned card, so a buffed unit could not be replayed; the card in hand is a new object with its printed
+  Might. Checked OK: Deathgrip and Heedless Resurrection use the killed unit's last known Might/cost.
+  20:20: the Awaken Phase readied objects without the Ready action's event (CR 315.1.b, 416.3.a), so "When I become
+  ready" (Jayce, Hammer in Hand; Fretful Feline), Irelia, Fervent and Pirate's Haven never triggered at the start of
+  the turn; `flow._awaken` now emits "ready" per readied object. Pirate's Haven no longer triggers on runes.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
