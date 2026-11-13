@@ -1369,3 +1369,28 @@ def test_its_controller_is_the_controller_it_had_when_it_left_the_board(db):
     c = Context(0, None)
     c.vars["t"] = u
     assert instrs[0].player(g, c) == 1
+
+
+def test_the_awaken_phase_readying_triggers_when_i_become_ready(db):
+    """CR 315.1.b / 416.3.a: the Awaken Phase readies with the Ready action, so "When I become ready" (Fretful Feline,
+    Jayce, Hammer in Hand) and "When you choose or ready me" (Irelia, Fervent) trigger then. They never did."""
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    cat = put(g, db, 1, "Fretful Feline", ("base", 1))
+    ire = put(g, db, 1, "Irelia, Fervent", ("base", 1))
+    for u in (cat, ire):
+        g.objects[u].exhausted = True
+    g.bump()
+    base = g.chars(cat).might, g.chars(ire).might
+    g.run()
+    g.choose(("end_turn",))
+    _drive(g, stop=lambda d: g.turn_player == 1 and g.phase == "main" and d.kind == "action" and not g.chain)
+    assert not g.objects[cat].exhausted and not g.objects[ire].exhausted
+    assert (g.chars(cat).might, g.chars(ire).might) == (base[0] + 2, base[1] + 1)
+    # "When you ready a friendly unit" (Pirate's Haven) is about units: readying runes doesn't trigger it
+    haven = [a for a in _card(db, "Pirate's Haven").abilities if type(a).__name__ == "Triggered"][0]
+    g.set_bf_controller(0, 1)
+    g.bump()
+    r = g.players[1].runes[0]
+    assert haven.matches(g, g.battlefields[0].uid, {"kind": "ready", "uid": cat, "player": 1})
+    assert not haven.matches(g, g.battlefields[0].uid, {"kind": "ready", "uid": r, "player": 1})
