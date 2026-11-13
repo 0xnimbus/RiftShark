@@ -135,6 +135,9 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   20:20: "When X, if Y, ..." re-checked Y on resolution in 10 hand scripts (Tomb-Raider Barbara, Kha'Zix, Mutating
   Horror, both Shens, Swain, Poppy, Jarvan IV, Cosmic Vista, Poro Herder, Patched Porobot, Dropboarder); Y is part of
   the trigger condition only (CR 383.2.a.1). `Triggered(..., intervening=cond(g, ctx))` checks it when X happens.
+  2026-11-13 00:20: units dying together saw each other die when the other came first in the batch (Viktor, Leader
+  made a Recruit dying with another unit; CR 383.2.c.2 says no). `do_kill` now marks the whole batch as `_leaving` and
+  `_collect_triggers` skips their triggers except for their own death/leave (383.2.c.3).
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
