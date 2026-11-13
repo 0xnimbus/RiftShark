@@ -134,7 +134,7 @@ class LearnedGreedy(GreedyPolicy):
     look, so a game costs a few times a plain one instead of a hundred times."""
 
     def __init__(self, net, seed=0, samples=3, deep=False, margin=0.04, deep_samples=2, react=False, window=None,
-                 hold=False, hold_k=3, pnet=None, pk=3, blend=None, pstrong=0, crn=False, **kw):
+                 hold=False, hold_k=3, pnet=None, pk=3, blend=None, pstrong=0, crn=False, adapt=0, adapt_gap=15.0, **kw):
         super().__init__(seed, samples=samples, **kw)
         self.net = net
         # window ('learned:REF:rw', 'rwl' with the learned AI as the opponent): an action decision in the opponent's
@@ -166,6 +166,7 @@ class LearnedGreedy(GreedyPolicy):
         # crn ('crn'): every candidate is played out on the same determinised copies with the same random seeds
         # (common random numbers), so the comparison between candidates is not drowned by which hands were sampled
         self.crn = crn
+        self.adapt, self.adapt_gap = adapt, adapt_gap      # 'aN[:gX]': adaptive sample count (needs crn)
         if pnet:
             from .policy_net import PolicyNet, PolicyNetPlayer
             pn = PolicyNet.load(pnet)
@@ -215,6 +216,8 @@ class LearnedGreedy(GreedyPolicy):
                     if o in (("end_turn",), ("pass",)) and i not in cand:
                         cand.append(i)
                 me, them = self.pnet
+                if self.adapt:
+                    return self._adaptive_deep(game, d, opts, vals, cand, mine, me, them)
                 seeds = [self.rng.random() for _ in range(self.deep_samples)]
                 for i in cand:
                     v = 0.0
@@ -273,6 +276,44 @@ class LearnedGreedy(GreedyPolicy):
                     deep[i] = v
                 win = a if deep[a] >= deep[b] else b
                 vals[win] = vals[a] + 1.0
+        return vals
+
+
+    def _sample_deep(self, game, d, o, mine, me, them, seed):
+        g = determinize(game, d.player, random.Random(seed))
+        _reseed((me, them, self.helper), seed)
+        if g.pending is not None and o in g.pending.options:
+            g.choose(o)
+        if mine:
+            to_turn_end(g, d.player, self.helper, opp=them)
+        if not g.over:
+            opponent_turn(g, d.player, them, respond=me)
+        return self.net.predict(g, d.player)
+
+    def _adaptive_deep(self, game, d, opts, vals, cand, mine, me, them):
+        """`aN` (with crn): N shared samples per candidate first; while the best two blended values are within
+        `adapt_gap` (in 1000 x win-probability units), two more shared samples each, up to `deep_samples`.
+        Clear decisions stop early, close ones get the full count."""
+        shallow = {i: vals[i] for i in cand}
+        sums = {i: 0.0 for i in cand}
+        seeds = []
+
+        def blended(i):
+            dv = 1000.0 * (sums[i] / len(seeds) - 0.5)
+            return 1e6 + dv if self.blend is None else shallow[i] + self.blend * (dv - shallow[i])
+        while len(seeds) < self.deep_samples:
+            step = self.adapt if not seeds else 2
+            for _ in range(min(step, self.deep_samples - len(seeds))):
+                sd = self.rng.random()
+                seeds.append(sd)
+                for i in cand:
+                    sums[i] += self._sample_deep(game, d, opts[i], mine, me, them, sd)
+            b = sorted((blended(i) for i in cand), reverse=True)
+            if len(b) < 2 or b[0] - b[1] >= self.adapt_gap:
+                break
+        self.p_samples = getattr(self, "p_samples", 0) + len(seeds)
+        for i in cand:
+            vals[i] = blended(i)
         return vals
 
 
@@ -336,6 +377,10 @@ def make_learned(kind, arg, seed=0):
                 kw["pnet"] = pr if (pr.endswith(".json") or os.path.sep in pr) else os.path.join(M.MODELS_DIR, pr + ".json")
             elif f.startswith("ps") and f[2:].isdigit():
                 kw["pstrong"] = int(f[2:])
+            elif f.startswith("a") and f[1:].isdigit():
+                kw["adapt"] = int(f[1:])
+            elif f.startswith("g") and f[1:].replace(".", "", 1).isdigit():
+                kw["adapt_gap"] = float(f[1:])
             elif f == "crn":
                 kw["crn"] = True
             elif f.startswith("b=") :
