@@ -762,12 +762,17 @@ class Game(flow.FlowMixin):
         (do_kill asks; see abilities.Replacement). dry=True previews the result without using up once-per-turn or
         limited-use replacements, and without optional ones. `skip`: replacement keys already applied or declined."""
         applied = set(skip)
+        if first is not None and first[0] == "te" and isinstance(first[1], int) and first[1] < len(self.turn_effects):
+            first = ("te", id(self.turn_effects[first[1]]))         # chosen turn effect, by its index in turn_effects
         changed = True
         guard = 0
         while changed and ev is not None and guard < 10:
+            if ev["kind"] == "die" and ev.get("replaced_with"):
+                break           # the death was replaced (recall, banish): there is no death left to replace (CR 370)
             changed = False
             guard += 1
-            order = list(self.objects.items())
+            te_first = first is not None and first[0] == "te" and first not in applied
+            order = [] if te_first else list(self.objects.items())
             if first is not None and first[0] in self.objects and first not in applied:
                 order.insert(0, (first[0], self.objects[first[0]]))      # the replacement chosen for this event
             for uid, o in order:
@@ -806,7 +811,12 @@ class Game(flow.FlowMixin):
                 if changed:
                     break
             # turn effects acting as replacements
-            for t in list(self.turn_effects):
+            if changed:
+                continue
+            tes = list(self.turn_effects)
+            if te_first:
+                tes.sort(key=lambda t: id(t) != first[1])
+            for t in tes:
                 if t["kind"] != "replace:" + ev["kind"]:
                     continue
                 key = ("te", id(t))
@@ -825,7 +835,42 @@ class Game(flow.FlowMixin):
                 if ev is None:
                     return None
                 break
+            if te_first and not changed:
+                first, changed = None, True           # the chosen turn effect no longer applies: try the others
         return ev
+
+    def die_replacements(self, ev):
+        """The replacement effects that could apply to death event `ev` now, as (key, label): object ones as
+        (uid, id(ability)), turn effects as ("te", index in turn_effects). Used to let the dying object's controller
+        pick which one applies first (CR 372)."""
+        out = []
+        for uid, o in list(self.objects.items()):
+            if o.zone in (None, "gone"):
+                continue
+            abl = self.abilities(uid) if o.zone == "board" else self._abilities_of(uid, o)
+            for ab in abl:
+                if not isinstance(ab, Replacement) or ab.event != "die" or not ab.active(self, uid):
+                    continue
+                if ab.once_per_turn and o.temp.get(("rpt", id(ab))) == self.turn:
+                    continue
+                try:
+                    if not ab.applies(self, uid, ev) or (ab.optional and not ab.options(self, uid, ev)):
+                        continue
+                except (KeyError, AttributeError, TypeError):
+                    continue
+                out.append(((uid, id(ab)), ab.label or self.label(uid)))
+        for i, t in enumerate(self.turn_effects):
+            if t["kind"] != "replace:die":
+                continue
+            f = t["data"].get("applies")
+            try:
+                if f is not None and not f(self, t["ctx"], ev):
+                    continue
+            except (KeyError, AttributeError, TypeError):
+                continue
+            src = t["ctx"].source
+            out.append((("te", i), self.label(src) if src in self.objects else "an effect"))
+        return out
 
     def activate_named_triggers(self, uid, event, ctx):
         """'Activate the conquer effects of units here': add matching triggers as if event happened."""
@@ -1157,6 +1202,20 @@ class Game(flow.FlowMixin):
                                 "ctx_source": ctx.source if ctx is not None else None}
             self.vm_frames.append(Frame([_ReplacementOrderStep()], c))
             return
+        # CR 372: when several replacement effects could replace one death, the dying object's controller picks the
+        # one that applies (a replaced death is no longer a death, so the others then don't apply).
+        for u in dying:
+            if u in _first:
+                continue
+            opts = self.die_replacements(base_ev(u))
+            if len(opts) >= 2:
+                c = Context(self.objects[u].controller, u, here=self.objects[u].place)
+                c.vars["__rord"] = {"uids": tuple(dying), "unit": u, "opts": tuple(k for k, _ in opts),
+                                    "labels": tuple(l for _, l in opts), "first": _first, "by": by,
+                                    "in_combat": in_combat, "ctx_controller": killer,
+                                    "ctx_source": ctx.source if ctx is not None else None}
+                self.vm_frames.append(Frame([_ReplacementChoiceStep()], c))
+                return
         dying.sort(key=lambda u: (list(_first).index(u) if u in _first else len(_first)))
         events = []
         for u in dying:
@@ -2057,6 +2116,29 @@ class _ReplacementOrderStep:
         first = dict(info["first"])
         if choice is not None:
             first[choice] = info["key"]
+        dctx = Context(info["ctx_controller"], info["ctx_source"]) if info["ctx_controller"] is not None else None
+        game.do_kill(info["uids"], dctx, by=info["by"], in_combat=info["in_combat"], _first=first)
+        return None
+
+
+class _ReplacementChoiceStep:
+    """VM step: several replacement effects could replace one death (Zhonya's Hourglass and Smite, Guardian Angel and
+    Zhonya's ...): the dying object's controller picks the one that applies (CR 372); then the deaths go on."""
+
+    def run(self, game, ctx):
+        info = ctx.vars["__rord"]
+        u = info["unit"]
+        if u not in game.objects or game.objects[u].zone != "board":
+            return self.resume(game, ctx, None)
+        return Decision(ctx.controller, "order_replacement", list(range(len(info["opts"]))), out="__rord_choice",
+                        labels=[f"{l} replaces {game.label(u)}'s death" for l in info["labels"]],
+                        info={"uid": u, "label": game.label(u)})
+
+    def resume(self, game, ctx, choice):
+        info = ctx.vars["__rord"]
+        first = dict(info["first"])
+        if choice is not None:
+            first[info["unit"]] = info["opts"][choice]      # options are indexes (ability ids differ between runs)
         dctx = Context(info["ctx_controller"], info["ctx_source"]) if info["ctx_controller"] is not None else None
         game.do_kill(info["uids"], dctx, by=info["by"], in_combat=info["in_combat"], _first=first)
         return None
