@@ -1412,3 +1412,24 @@ def test_a_combat_i_was_in_ends_even_after_a_tie_recalled_me(db):
     _drive(g)
     assert g.objects[big].zone == "board" and g.objects[w].location == ("base", 0)
     assert g.objects[w].empowered
+
+
+def test_units_cant_move_to_base_is_every_unit_and_from_here_only_that_battlefield(db):
+    """Minotaur Reckoner: "Units can't move to base." stops every unit (it only stopped units at Reckoner's own
+    location). Vilemaw's Lair: "Units can't move from here to base." stops only units at that battlefield.
+    Recalls are not moves (CR 458.3)."""
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    put(g, db, 1, "Minotaur Reckoner", ("base", 1))
+    a = put(g, db, 0, "Forecaster", ("bf", 0))
+    b = put(g, db, 1, "Forecaster", ("bf", 1))
+    assert not g.valid_destination(a, ("base", 0)) and not g.valid_destination(b, ("base", 1))
+    g.do_recall(a)
+    assert g.objects[a].location == ("base", 0)
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    g.objects[g.battlefields[0].uid].defn = _card(db, "Vilemaw's Lair")
+    g.bump()
+    a = put(g, db, 0, "Forecaster", ("bf", 0))
+    b = put(g, db, 0, "Forecaster", ("bf", 1))
+    assert not g.valid_destination(a, ("base", 0)) and g.valid_destination(b, ("base", 0))

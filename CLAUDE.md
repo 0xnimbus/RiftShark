@@ -154,6 +154,8 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   the battlefield, so attackers recalled after a tie never triggered; combat_end's survivors now include every unit
   designated in that combat that is still the same object on the board (CR 740.2.c). A trigger-fire count over 40
   greedy games (scratch script, every tournament card with a trigger) found no other dead triggers.
+  10:20: Minotaur Reckoner ("Units can't move to base.") shared Vilemaw's Lair's "from here" rule, so it only stopped
+  units at Reckoner's own location; the rule now carries "all" or "here" (game.valid_destination, rules_audit).
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
