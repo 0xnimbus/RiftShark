@@ -1394,3 +1394,21 @@ def test_the_awaken_phase_readying_triggers_when_i_become_ready(db):
     r = g.players[1].runes[0]
     assert haven.matches(g, g.battlefields[0].uid, {"kind": "ready", "uid": cat, "player": 1})
     assert not haven.matches(g, g.battlefields[0].uid, {"kind": "ready", "uid": r, "player": 1})
+
+
+def test_a_combat_i_was_in_ends_even_after_a_tie_recalled_me(db):
+    """Mournful Witness: "When a combat that I was in ends, empower me." After a tie the attackers are recalled before
+    the combat ends; Witness was still in that combat (CR 740.2.c: it had a combat designation), so it triggers. Only
+    units still at the battlefield counted."""
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    w = put(g, db, 0, "Mournful Witness", ("base", 0))
+    big = put(g, db, 1, "Elnuk Herd", ("bf", 0))
+    g.set_bf_controller(0, 1)
+    g.objects[big].stunned = True               # deals no damage; Witness's 2 doesn't kill it: a tie
+    g.bump()
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "move" and o[1] == (w,) and o[2] == ("bf", 0)))
+    _drive(g)
+    assert g.objects[big].zone == "board" and g.objects[w].location == ("base", 0)
+    assert g.objects[w].empowered

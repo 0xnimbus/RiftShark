@@ -150,6 +150,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   20:20: the Awaken Phase readied objects without the Ready action's event (CR 315.1.b, 416.3.a), so "When I become
   ready" (Jayce, Hammer in Hand; Fretful Feline), Irelia, Fervent and Pirate's Haven never triggered at the start of
   the turn; `flow._awaken` now emits "ready" per readied object. Pirate's Haven no longer triggers on runes.
+  2026-11-14 05:20: "When a combat that I was in ends" (Mournful Witness, Affectionate Poro) only saw units still at
+  the battlefield, so attackers recalled after a tie never triggered; combat_end's survivors now include every unit
+  designated in that combat that is still the same object on the board (CR 740.2.c). A trigger-fire count over 40
+  greedy games (scratch script, every tournament card with a trigger) found no other dead triggers.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
