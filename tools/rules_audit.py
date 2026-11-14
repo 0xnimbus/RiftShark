@@ -77,7 +77,7 @@ def expected_moves(g, p):
                                             or any(g.objects[s].place == dest for s, _ in g.rules("move_here_from_anywhere")))
                 if any(g.objects[s].location == dest and v is True for s, v in g.rules("cant_move_here")):
                     good = False
-            if dest[0] == "base" and (any(g.objects[s].place == o.location for s, _ in g.rules("cant_move_to_base"))
+            if dest[0] == "base" and (any(v == "all" or g.objects[s].place == o.location for s, v in g.rules("cant_move_to_base"))
                                       or any(s == u for s, _ in g.rules("i_cant_move_to_base"))):
                 good = False
             if good:
