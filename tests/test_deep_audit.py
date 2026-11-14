@@ -1469,3 +1469,47 @@ def test_zhonyas_hourglass_saves_the_unit_its_controller_picks_when_two_die_toge
     small = put(g, db, 0, "Forecaster", ("bf", 0))
     g.do_kill([small])
     assert g.objects[small].zone == "trash" and g.objects[z].zone == "facedown"
+
+
+def _smite_on(g, db, caster, unit):
+    sm = give(g, caster, "Smite", db)
+    c = Context(caster, sm)
+    c.vars["t"] = unit
+    next(i for i in _card(db, "Smite").abilities[0].code if type(i).__name__ == "DelayedPassive").run(g, c)
+    return c
+
+
+def test_the_dying_units_controller_picks_which_replacement_saves_it(db):
+    """Smite ("If it would die this turn, banish it instead") on a unit whose controller has Zhonya's Hourglass: both
+    replace the same death, its controller picks one (CR 372), and a replaced death is no longer a death, so the other
+    doesn't apply. The engine applied Zhonya's (killing it) and then Smite's banish anyway."""
+    for pick_zhonya in (True, False):
+        g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+        _clear_bfs(g, db)
+        z = put(g, db, 1, "Zhonya's Hourglass", ("base", 1))
+        a = put(g, db, 1, "Forecaster", ("bf", 0))
+        c = _smite_on(g, db, 0, a)
+        g.do_deal([a], 5, c)
+        d = g.run()
+        assert d.kind == "order_replacement" and d.player == 1 and len(d.options) == 2
+        want = "Zhonya" if pick_zhonya else "Smite"
+        g.choose(next(o for o, l in zip(d.options, d.labels) if want in l))
+        g.run()
+        if pick_zhonya:
+            assert g.objects[a].location == ("base", 1) and g.objects[z].zone == "trash"
+        else:
+            assert g.objects[a].zone == "banish" and g.objects[z].zone == "board"
+    # Guardian Angel on the unit and Zhonya's: only the picked one is spent
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    z = put(g, db, 0, "Zhonya's Hourglass", ("base", 0))
+    a = put(g, db, 0, "Forecaster", ("bf", 0))
+    ga = put(g, db, 0, "Guardian Angel", ("bf", 0))
+    g.do_attach(ga, a)
+    g.bump()
+    g.do_kill([a])
+    d = g.run()
+    assert d.kind == "order_replacement"
+    g.choose(next(o for o, l in zip(d.options, d.labels) if "Guardian" in l))
+    g.run()
+    assert g.objects[a].location == ("base", 0) and g.objects[ga].zone == "trash" and g.objects[z].zone == "board"

@@ -159,6 +159,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   15:20: Zhonya's Hourglass saved whichever friendly unit came first when two died together; its controller now picks
   (CR 373, decision `order_replacement`, `Replacement(single_use=True)`, game._ReplacementOrderStep). Checked OK:
   facedown Zhonya does nothing, Soraka's replacement sees units dying with her (CR 370.4), final point rule.
+  20:20: Smite on a unit whose controller had Zhonya's Hourglass spent Zhonya's and still banished the unit: a death
+  replaced by a recall/banish took more 'die' replacements. `replace_event` now stops once a death is replaced, and
+  when several could replace one death its controller picks (CR 372, `Game.die_replacements`, game._ReplacementChoiceStep,
+  decision `order_replacement` with index options). Guardian Angel vs Zhonya's is that player's pick too.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
