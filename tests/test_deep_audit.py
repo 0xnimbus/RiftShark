@@ -1433,3 +1433,39 @@ def test_units_cant_move_to_base_is_every_unit_and_from_here_only_that_battlefie
     a = put(g, db, 0, "Forecaster", ("bf", 0))
     b = put(g, db, 0, "Forecaster", ("bf", 1))
     assert not g.valid_destination(a, ("base", 0)) and g.valid_destination(b, ("base", 0))
+
+
+def test_zhonyas_hourglass_saves_the_unit_its_controller_picks_when_two_die_together(db):
+    """Zhonya's Hourglass: "The next time a friendly unit would die, kill this instead. Recall that unit exhausted."
+    When two friendly units die at the same time its controller decides which death it replaces (CR 373); it always
+    saved the first one in the engine's list. Facedown (Hidden) it has no text and saves nobody."""
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    z = put(g, db, 0, "Zhonya's Hourglass", ("base", 0))
+    small = put(g, db, 0, "Forecaster", ("bf", 0))
+    baron = put(g, db, 0, "Baron Nashor", ("bf", 0))
+    g.do_kill([small, baron])
+    d = g.run()
+    assert d.kind == "order_replacement" and d.player == 0 and set(d.options) == {small, baron}
+    g.choose(baron)
+    g.run()
+    assert g.objects[small].zone == "trash" and g.objects[z].zone == "trash"
+    assert g.objects[baron].location == ("base", 0) and g.objects[baron].exhausted
+    # one friendly death: no question, it is saved
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    z = put(g, db, 0, "Zhonya's Hourglass", ("base", 0))
+    small = put(g, db, 0, "Forecaster", ("bf", 0))
+    enemy = put(g, db, 1, "Forecaster", ("bf", 1))
+    g.do_kill([small, enemy])
+    assert g.objects[small].location == ("base", 0) and g.objects[enemy].zone == "trash"
+    assert g.objects[z].zone == "trash"
+    # hidden facedown it does nothing
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    g.set_bf_controller(0, 0)
+    z = give(g, 0, "Zhonya's Hourglass", db)
+    assert g.do_hide(0, z, ("bf", 0))
+    small = put(g, db, 0, "Forecaster", ("bf", 0))
+    g.do_kill([small])
+    assert g.objects[small].zone == "trash" and g.objects[z].zone == "facedown"

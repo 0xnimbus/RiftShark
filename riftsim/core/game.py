@@ -755,7 +755,7 @@ class Game(flow.FlowMixin):
                     self.turn_effects.remove(t)
         return out
 
-    def replace_event(self, ev, dry=False, skip=()):
+    def replace_event(self, ev, dry=False, skip=(), first=None):
         """Apply replacement effects to an event (CR 367-375). Returns the (possibly modified) event or
         None if it was prevented entirely. An optional replacement that applies stops the pass and returns the event
         with "deferred": (source uid, ability id) and "applied" (keys already used) for its controller to decide
@@ -767,10 +767,15 @@ class Game(flow.FlowMixin):
         while changed and ev is not None and guard < 10:
             changed = False
             guard += 1
-            for uid, o in list(self.objects.items()):
+            order = list(self.objects.items())
+            if first is not None and first[0] in self.objects and first not in applied:
+                order.insert(0, (first[0], self.objects[first[0]]))      # the replacement chosen for this event
+            for uid, o in order:
                 if o.zone in (None, "gone"):
                     continue
                 abl = self.abilities(uid) if o.zone == "board" else self._abilities_of(uid, o)
+                if first is not None and uid == first[0]:
+                    abl = sorted(abl, key=lambda a: id(a) != first[1])
                 for ab in abl:
                     if not isinstance(ab, Replacement) or ab.event != ev["kind"]:
                         continue
@@ -1119,26 +1124,43 @@ class Game(flow.FlowMixin):
         return any(o.temp.get(("damaged_by", self.objects[src].controller)) and not self.is_friendly(self.objects[src].controller, o.controller)
                    for src, _ in self.rules("any_damage_kills_enemies"))
 
-    def do_kill(self, uids, ctx=None, by=None, in_combat=False):
-        """Kill permanents (CR 429): they are sent to their owner's trash; deathknell triggers first."""
+    def do_kill(self, uids, ctx=None, by=None, in_combat=False, _first=None):
+        """Kill permanents (CR 429): they are sent to their owner's trash; deathknell triggers first.
+        `_first`: {uid: replacement key} picked by _ReplacementOrderStep (those deaths are replaced first, by that key)."""
+        _first = dict(_first or {})
         alone = {}
         batch = self.tick()            # one id for everything killed at the same time ("one or more units die")
         for u in list(uids):
             o = self.objects.get(u)
             if o is not None and o.zone == "board" and o.location is not None:
                 alone[u] = len([x for x in self.units_at(o.location, o.controller)]) == 1
+        killer = ctx.controller if ctx is not None else None
+
+        def base_ev(u):
+            o = self.objects[u]
+            return {"kind": "die", "uid": u, "player": o.controller, "loc": o.location, "killer": killer,
+                    "in_combat": in_combat or self.combat is not None and o.location == ("bf", self.combat["bf"]),
+                    "card_type": "unit" if "unit" in self.chars(u).types else "gear", "by": by,
+                    "token": o.defn.is_token, "might": self.chars(u).might, "stunned": o.stunned, "buffed": o.buffs > 0, "empowered": bool(o.empowered),
+                    "alone": alone.get(u, False), "dmg_item": o.temp.get("dmg_item") if by == "damage" else None,
+                    "batch": batch}
+        dying = [u for u in dict.fromkeys(uids) if u in self.objects and self.objects[u].zone == "board"
+                 and self.defn_of(u).is_permanent]
+        # CR 373: a replacement that can be applied to only one event (Zhonya's Hourglass) and could replace several of
+        # these simultaneous deaths is applied where its controller chooses.
+        contest = self._contested_single_use(dying, base_ev, _first)
+        if contest is not None:
+            key, cands = contest
+            c = Context(self.objects[key[0]].controller, key[0], here=self.objects[key[0]].place)
+            c.vars["__rord"] = {"uids": tuple(dying), "key": key, "cands": tuple(cands), "first": _first, "by": by,
+                                "in_combat": in_combat, "ctx_controller": killer,
+                                "ctx_source": ctx.source if ctx is not None else None}
+            self.vm_frames.append(Frame([_ReplacementOrderStep()], c))
+            return
+        dying.sort(key=lambda u: (list(_first).index(u) if u in _first else len(_first)))
         events = []
-        for u in list(uids):
-            o = self.objects.get(u)
-            if o is None or o.zone != "board" or not self.defn_of(u).is_permanent:
-                continue
-            killer = ctx.controller if ctx is not None else None
-            ev = self.replace_event({"kind": "die", "uid": u, "player": o.controller, "loc": o.location, "killer": killer,
-                                     "in_combat": in_combat or self.combat is not None and o.location == ("bf", self.combat["bf"]),
-                                     "card_type": "unit" if "unit" in self.chars(u).types else "gear", "by": by,
-                                     "token": o.defn.is_token, "might": self.chars(u).might, "stunned": o.stunned, "buffed": o.buffs > 0, "empowered": bool(o.empowered),
-                                     "alone": alone.get(u, False), "dmg_item": o.temp.get("dmg_item") if by == "damage" else None,
-                                     "batch": batch})
+        for u in dying:
+            ev = self.replace_event(base_ev(u), first=_first.get(u))
             if ev is not None:
                 events.append((u, ev))
         # CR 383.2.c.2: an object leaving the board at the same time as another one doesn't see that one leave
@@ -1155,6 +1177,35 @@ class Game(flow.FlowMixin):
                 self._finish_death(u, ev, ctx)
         finally:
             self._leaving = prev
+
+    def _contested_single_use(self, dying, base_ev, first):
+        """A single-use 'die' replacement (not yet assigned in `first`) that applies to 2+ of `dying`, as
+        (key, candidate uids), or None."""
+        if len(dying) < 2:
+            return None
+        done = set(first.values())
+        for src, o in list(self.objects.items()):
+            if o.zone in (None, "gone"):
+                continue
+            abl = self.abilities(src) if o.zone == "board" else self._abilities_of(src, o)
+            for ab in abl:
+                if not isinstance(ab, Replacement) or ab.event != "die" or not getattr(ab, "single_use", False):
+                    continue
+                key = (src, id(ab))
+                if key in done or not ab.active(self, src):
+                    continue
+                cands = []
+                for u in dying:
+                    if u in first:
+                        continue
+                    try:
+                        if ab.applies(self, src, base_ev(u)):
+                            cands.append(u)
+                    except (KeyError, AttributeError, TypeError):
+                        pass
+                if len(cands) >= 2:
+                    return key, cands
+        return None
 
     def _ask_optional_replacement(self, u, ev, ctx):
         """Keep u on the board and push a frame that asks the replacement's controller (runs before anything else)."""
@@ -1983,4 +2034,29 @@ class _OptionalReplacementStep:
             game._ask_optional_replacement(u, ev, dctx)
             return None
         game._finish_death(u, ev, dctx)
+        return None
+
+
+class _ReplacementOrderStep:
+    """VM step: the controller of a single-use death replacement picks which of several simultaneous deaths it
+    replaces (CR 373, e.g. Zhonya's Hourglass when two friendly units die together); then the deaths go on."""
+
+    def run(self, game, ctx):
+        info = ctx.vars["__rord"]
+        cands = [u for u in info["cands"] if u in game.objects and game.objects[u].zone == "board"]
+        if len(cands) < 2:
+            return self.resume(game, ctx, None)
+        src = info["key"][0]
+        name = game.label(src)
+        return Decision(ctx.controller, "order_replacement", cands, out="__rord_choice",
+                        labels=[f"{name} saves {game.label(u)}" for u in cands],
+                        info={"source": src, "label": name})
+
+    def resume(self, game, ctx, choice):
+        info = ctx.vars["__rord"]
+        first = dict(info["first"])
+        if choice is not None:
+            first[choice] = info["key"]
+        dctx = Context(info["ctx_controller"], info["ctx_source"]) if info["ctx_controller"] is not None else None
+        game.do_kill(info["uids"], dctx, by=info["by"], in_combat=info["in_combat"], _first=first)
         return None
