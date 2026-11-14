@@ -156,6 +156,9 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   greedy games (scratch script, every tournament card with a trigger) found no other dead triggers.
   10:20: Minotaur Reckoner ("Units can't move to base.") shared Vilemaw's Lair's "from here" rule, so it only stopped
   units at Reckoner's own location; the rule now carries "all" or "here" (game.valid_destination, rules_audit).
+  15:20: Zhonya's Hourglass saved whichever friendly unit came first when two died together; its controller now picks
+  (CR 373, decision `order_replacement`, `Replacement(single_use=True)`, game._ReplacementOrderStep). Checked OK:
+  facedown Zhonya does nothing, Soraka's replacement sees units dying with her (CR 370.4), final point rule.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

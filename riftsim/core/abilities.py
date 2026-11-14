@@ -373,18 +373,21 @@ class Replacement(Ability):
     `optional=True` ("you may ... instead"): the controller of the source decides. Supported for 'die' events only:
     `options(g, src, ev)` lists the choices (e.g. units to kill; empty = can't apply), and
     `replace(g, src, ev, choice)` returns the new event. `game.do_kill` keeps the unit on the board and pushes a
-    decision frame (game._OptionalReplacementStep); declining lets the death go on through the other replacements."""
+    decision frame (game._OptionalReplacementStep); declining lets the death go on through the other replacements.
+    `single_use=True`: the replacement can be applied to one event only (Zhonya's Hourglass kills itself). When it
+    could replace more than one simultaneous death, its controller picks which (CR 373, game._ReplacementOrderStep)."""
     kind = "replacement"
-    __slots__ = ("event", "applies", "replace", "once_per_turn", "optional", "options", "option_label")
+    __slots__ = ("event", "applies", "replace", "once_per_turn", "optional", "options", "option_label", "single_use")
 
     def __init__(self, event, applies, replace, once_per_turn=False, zone="board", cond=None, label="", source_text="", optional=False,
-                 options=None, option_label=None):
+                 options=None, option_label=None, single_use=False):
         super().__init__(label, zone, cond, source_text)
         if optional and (event != "die" or options is None):
             raise NotImplementedError("optional replacement effects are only supported for 'die' events with options: " + label)
         self.event, self.applies, self.replace, self.once_per_turn, self.optional = event, applies, replace, once_per_turn, optional
         self.options = options
         self.option_label = option_label    # callable(g, src, choice) -> str, for the decision's option labels
+        self.single_use = single_use
 
 
 class PlayPermission(Ability):
