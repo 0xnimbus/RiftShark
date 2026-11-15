@@ -962,8 +962,6 @@ class Game(flow.FlowMixin):
         o = self.objects.get(uid)
         if o is None or o.zone != "board" or not o.exhausted:
             return False
-        if o.stunned:
-            return False
         if any(src == uid for src, _ in self.rules("cant_ready")):
             return False
         if ctx is not None and (o.defn.is_unit or o.defn.is_gear) and any(
@@ -1501,17 +1499,17 @@ class Game(flow.FlowMixin):
                 o.damage = 0
                 o.temp = {k: v for k, v in o.temp.items() if not (isinstance(k, tuple) and k[0] == "damaged_by")}
             if exhaust:
-                o.exhausted = True
+                self.do_exhaust(uid, ctx)      # the Exhaust action: "When I become exhausted" triggers (CR 415)
             self.dirty = True
             return
         frm = o.location
-        o.location = base
-        self._on_change_location(o)
         if heal:
             o.damage = 0
             o.temp = {k: v for k, v in o.temp.items() if not (isinstance(k, tuple) and k[0] == "damaged_by")}
         if exhaust:
-            o.exhausted = True
+            self.do_exhaust(uid, ctx)          # "heal it, exhaust it, and recall it", in that order
+        o.location = base
+        self._on_change_location(o)
         o.designation = None
         self.log("recall", uid=uid, name=o.defn.name, frm=frm)
         self.emit("recall", uid=uid, player=o.controller, **{"from": frm}, ctx=ctx)
