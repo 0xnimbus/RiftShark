@@ -1587,3 +1587,29 @@ def test_granted_vision_triggers_once_per_instance(db):
     kinds = []
     _drive(g, pick=lambda d: kinds.append(d.kind) and None)
     assert "predict" in kinds
+
+
+def test_granted_disarm_triggers_with_the_summed_value(db):
+    """Clanging Sentry: "Your Mechs have [Disarm]." Disarm is an attack trigger (CR 831.1.d); a granted Disarm
+    triggers too, once, with the summed value (831.1.d.1, 831.2: two Sentries give Disarm 2). Granted keywords were
+    keyword flags only and never triggered."""
+    from riftsim.core.scripts import disarm_ability, hunt_ability
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    s1 = put(g, db, 0, "Clanging Sentry", ("base", 0))
+    s2 = put(g, db, 0, "Clanging Sentry", ("base", 0))
+    assert g.keyword_value(s1, "disarm") == 2
+    assert [a for a in g.abilities(s1) if getattr(a, "keyword", None) == "disarm"] == [disarm_ability()]
+    enemy = put(g, db, 1, "Elnuk Herd", ("bf", 0))
+    g.set_bf_controller(0, 1)
+    g.bump()
+    before = g.chars(enemy).might
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "move" and o[1] == (s1,) and o[2] == ("bf", 0)))
+    _drive(g, pick=lambda d: enemy if d.kind == "choose" and enemy in d.options else None,
+           stop=lambda d: g.combat is not None and g.combat.get("step") == "damage")
+    assert g.chars(enemy).might == before - 2
+    # printed Hunt adds up with a granted one into one trigger (CR 823.2)
+    gromp = put(g, db, 0, "Voracious Gromp", ("base", 0))
+    assert [a for a in g.abilities(gromp) if getattr(a, "keyword", None) == "hunt"] == [hunt_ability()]
+    assert g.keyword_value(gromp, "hunt") == 3

@@ -50,6 +50,38 @@ class SpellEffect:
 
 
 # ----------------------------------------------------------------------------- keywords
+def _keyword_total(kw):
+    """The unit's summed Hunt/Disarm value (CR 823.2, 831.2: every printed and granted instance adds up and the
+    keyword triggers once with the total); last known printed value if it has left the board."""
+    def f(g, c):
+        o = g.objects.get(c.source)
+        if o is not None and o.zone == "board":
+            return g.keyword_value(c.source, kw) or 1
+        v = o.defn.keywords.get(kw) if o is not None else None
+        return v if isinstance(v, int) and v > 0 else 1
+    return f
+
+
+_KW_ABILITIES = {}
+
+
+def hunt_ability():
+    # CR 823.1.c.1: "When I Conquer or Hold, my controller gains X XP."
+    if "hunt" not in _KW_ABILITIES:
+        _KW_ABILITIES["hunt"] = Triggered("score_self", [O.GainXP(_keyword_total("hunt"))], label="Hunt", keyword="hunt")
+    return _KW_ABILITIES["hunt"]
+
+
+def disarm_ability():
+    # CR 831.1.d: "When I attack, give an enemy unit here -X [M] this turn."
+    if "disarm" not in _KW_ABILITIES:
+        tot = _keyword_total("disarm")
+        _KW_ABILITIES["disarm"] = Triggered("attack_self", [O.GiveMight(Ref("t"), lambda g, c: -tot(g, c))],
+                                            targets=[O.Choose(Sel("unit", side="enemy", where="here"))],
+                                            label="Disarm", keyword="disarm")
+    return _KW_ABILITIES["disarm"]
+
+
 def keyword_abilities(defn):
     kws = defn.keywords
     out = []
@@ -60,12 +92,9 @@ def keyword_abilities(defn):
     if kws.get("vision"):
         out.append(Triggered("enter_self", [O.Predict(1)], label="Vision", keyword="vision"))
     if kws.get("hunt"):
-        n = kws["hunt"] if isinstance(kws["hunt"], int) else 1
-        out.append(Triggered("score_self", [O.GainXP(n)], label=f"Hunt {n}", keyword="hunt"))
+        out.append(hunt_ability())
     if kws.get("disarm"):
-        n = kws["disarm"] if isinstance(kws["disarm"], int) else 1
-        out.append(Triggered("attack_self", [O.GiveMight(Ref("t"), -n)], targets=[O.Choose(Sel("unit", side="enemy", where="here"))],
-                             label=f"Disarm {n}", keyword="disarm"))
+        out.append(disarm_ability())
     if kws.get("equip") is not None and defn.is_gear:
         cost = _equip_cost(defn)
         mx =re.search(r"\[Equip\]\s*(?:[-—–:]\s*)?Spend (\d+) XP", defn.text)
