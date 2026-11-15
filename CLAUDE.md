@@ -163,6 +163,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   replaced by a recall/banish took more 'die' replacements. `replace_event` now stops once a death is replaced, and
   when several could replace one death its controller picks (CR 372, `Game.die_replacements`, game._ReplacementChoiceStep,
   decision `order_replacement` with index options). Guardian Angel vs Zhonya's is that player's pick too.
+  2026-11-15 00:20: [Stun] exhausted the unit, so a ready unit stunned in the main phase couldn't move or pay exhaust
+  costs; CR 424.1.b says stunned only stops its combat damage (Vex, Apathetic adds "They can't move it" for that). A
+  stunned unit is no longer stunned again (424.1.a.1): no second "stun" event for Eclipse Herald-style triggers.
+  Round-robins before this overrate stun decks (Vex, Kai'Sa's Stupefy, Riven, Broken Blade).
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

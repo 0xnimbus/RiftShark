@@ -1513,3 +1513,27 @@ def test_the_dying_units_controller_picks_which_replacement_saves_it(db):
     g.choose(next(o for o, l in zip(d.options, d.labels) if "Guardian" in l))
     g.run()
     assert g.objects[a].location == ("base", 0) and g.objects[ga].zone == "trash" and g.objects[z].zone == "board"
+
+
+def test_stun_does_not_exhaust_and_a_stunned_unit_cant_be_stunned_again(db):
+    """CR 424.1.b: a stunned unit only deals no combat damage; stunning doesn't exhaust it (Vex, Apathetic adds "They
+    can't move it this turn" for that reason). The engine exhausted it, so a ready unit stunned in the main phase
+    could no longer move or pay exhaust costs. CR 424.1.a.1: stunning an already stunned unit does nothing, so "When
+    you stun" triggers don't fire again."""
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    u = put(g, db, 0, "Forecaster", ("base", 0))
+    stuns = []
+    g.do_stun(u, Context(1, None))
+    assert g.objects[u].stunned and not g.objects[u].exhausted
+    d = g.run()
+    assert any(o[0] == "move" and o[1] == (u,) for o in d.options)      # a stunned unit may still move
+    orig = g.emit
+
+    def spy(kind, **kw):
+        if kind == "stun":
+            stuns.append(kw.get("uid"))
+        return orig(kind, **kw)
+    g.emit = spy
+    g.do_stun(u, Context(1, None))
+    assert stuns == []

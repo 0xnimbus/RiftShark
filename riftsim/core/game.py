@@ -1014,15 +1014,14 @@ class Game(flow.FlowMixin):
 
     def do_stun(self, uid, ctx=None):
         o = self.objects.get(uid)
-        if o is None or o.zone != "board":
-            return
+        if o is None or o.zone != "board" or o.stunned:
+            return            # CR 424.1.a.1: a stunned unit can't be stunned again (no "stun" event)
         if self._chosen_harm_redirect(uid, ctx):
             return
         ev = self.replace_event({"kind": "stun", "uid": uid, "player": o.controller, "loc": o.location})
         if ev is None:
             return
-        o.stunned = True
-        o.exhausted = True
+        o.stunned = True      # CR 424.1.b: it only stops its combat damage; stunning doesn't exhaust it
         self.bump()
         self.emit("stun", uid=uid, player=o.controller, loc=o.location, by=ctx.controller if ctx else None, ctx=ctx)
         self.dirty = True
