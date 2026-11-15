@@ -369,6 +369,10 @@ class Game(flow.FlowMixin):
             c.might = v
         elif k == "keyword":
             c.add_keyword(*v) if isinstance(v, tuple) else c.add_keyword(v, True)
+            if (v[0] if isinstance(v, tuple) else v) == "vision" and (not isinstance(v, tuple) or v[1]):
+                # a granted [Vision] is the keyword's triggered ability too, one instance per grant (CR 817.1.b,
+                # 817.2): Forecaster's "Your Mechs have [Vision]", Gemcraft Seer's "Other friendly units have [Vision]"
+                c.abilities.append(_granted_vision())
         elif k == "ability":
             c.abilities.append(v)
         elif k == "abilities":
@@ -2024,6 +2028,17 @@ class Game(flow.FlowMixin):
 
 
 _TEMPORARY = []
+
+
+_VISION = []
+
+
+def _granted_vision():
+    if not _VISION:
+        from .abilities import Triggered
+        from . import ops as O
+        _VISION.append(Triggered("enter_self", [O.Predict(1)], label="Vision", keyword="vision"))
+    return _VISION[0]
 
 
 def _temporary_ability():

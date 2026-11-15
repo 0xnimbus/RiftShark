@@ -1562,3 +1562,28 @@ def test_heal_exhaust_and_recall_is_an_exhaust_action(db):
     assert ("exhaust", r) in seen
     d = g.run()
     assert g.chain or (d is not None and d.kind != "action")      # its trigger is waiting (mode pick or on the chain)
+
+
+def test_granted_vision_triggers_once_per_instance(db):
+    """Forecaster: "Your Mechs have [Vision]" (it is a Mech itself); Gemcraft Seer: "[Vision] Other friendly units have
+    [Vision]". Vision is a triggered ability ("When this is played, [Predict]", CR 817.1.b), so a granted Vision
+    triggers too, once per instance (817.2). Only printed Vision triggered: Kai'Sa's Forecasters never predicted."""
+    from riftsim.core.game import _granted_vision
+    g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    f = put(g, db, 0, "Forecaster", ("base", 0))
+    assert sum(1 for a in g.abilities(f) if a is _granted_vision()) == 1
+    put(g, db, 0, "Gemcraft Seer", ("base", 0))
+    assert sum(1 for a in g.abilities(f) if a is _granted_vision()) == 2       # Mech + "other friendly units"
+    _, ab = next((u, a) for u in [f] for a in g.abilities(f) if a is _granted_vision())
+    assert ab.matches(g, f, {"kind": "enter", "uid": f, "player": 0})
+    # playing Forecaster from hand: Vision's Predict is offered
+    g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    fh = give(g, 0, "Forecaster", db)
+    _ready_runes(g, 0)
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == fh))
+    kinds = []
+    _drive(g, pick=lambda d: kinds.append(d.kind) and None)
+    assert "predict" in kinds

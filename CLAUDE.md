@@ -171,6 +171,11 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   "Heal it, exhaust it, and recall it" (Zhonya's, Guardian Angel, Soraka, Tactical Retreat) set the exhausted flag
   without the Exhaust action, so "When I become exhausted" (Reckless Innovator, Riven, Broken Blade) never triggered;
   `do_recall` now uses `do_exhaust`. rules_audit's move check now knows Vex's `cant_move_by`.
+  10:20: a granted [Vision] (Forecaster: "Your Mechs have [Vision]", a Mech itself, 3 in Kai'Sa; Gemcraft Seer: "Other
+  friendly units have [Vision]") was only a keyword, so it never predicted: Vision is a triggered ability (CR 817.1.b).
+  `_apply_static` now adds the Vision trigger per grant (817.2: instances trigger separately). Checked OK: Brynhir's
+  lock doesn't stop hiding (811.1.c.1), Temporal Breach on a token plays nothing, hidden cards at a lost battlefield
+  are trashed in the cleanup (107.3.d).
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
