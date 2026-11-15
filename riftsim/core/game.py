@@ -258,6 +258,7 @@ class Game(flow.FlowMixin):
             c.might = m.value
         elif k == "keyword":
             c.add_keyword(*m.value)
+            _grant_keyword_trigger(c, m.value)
         elif k == "ability":
             c.abilities.append(m.value)
         elif k == "tag":
@@ -369,10 +370,7 @@ class Game(flow.FlowMixin):
             c.might = v
         elif k == "keyword":
             c.add_keyword(*v) if isinstance(v, tuple) else c.add_keyword(v, True)
-            if (v[0] if isinstance(v, tuple) else v) == "vision" and (not isinstance(v, tuple) or v[1]):
-                # a granted [Vision] is the keyword's triggered ability too, one instance per grant (CR 817.1.b,
-                # 817.2): Forecaster's "Your Mechs have [Vision]", Gemcraft Seer's "Other friendly units have [Vision]"
-                c.abilities.append(_granted_vision())
+            _grant_keyword_trigger(c, v)
         elif k == "ability":
             c.abilities.append(v)
         elif k == "abilities":
@@ -2028,6 +2026,21 @@ class Game(flow.FlowMixin):
 
 
 _TEMPORARY = []
+
+
+def _grant_keyword_trigger(c, v):
+    """A granted triggered-ability keyword is its trigger too. [Vision]: one instance per grant (CR 817.1.b, 817.2:
+    Forecaster's "Your Mechs have [Vision]", Gemcraft Seer). [Hunt]/[Disarm]: one trigger using the summed value
+    (CR 823.2, 831.1.d.1: Clanging Sentry's "Your Mechs have [Disarm]")."""
+    kw, val_ = (v[0], v[1]) if isinstance(v, tuple) else (v, True)
+    if val_ is False or val_ is None:
+        return
+    if kw == "vision":
+        c.abilities.append(_granted_vision())
+    elif kw in ("hunt", "disarm"):
+        if not any(getattr(a, "keyword", None) == kw for a in c.abilities):
+            from .scripts import hunt_ability, disarm_ability
+            c.abilities.append(hunt_ability() if kw == "hunt" else disarm_ability())
 
 
 _VISION = []
