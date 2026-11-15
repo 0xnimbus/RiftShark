@@ -179,6 +179,9 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   15:20: the same gap for [Disarm]/[Hunt]: Clanging Sentry's "Your Mechs have [Disarm]" never triggered, and printed
   Hunt/Disarm used the printed number only. Now one trigger per unit with the summed value (CR 823.2, 831.1.d.1:
   `scripts.hunt_ability/disarm_ability`, `game._grant_keyword_trigger` for statics and mods).
+  20:20: Predict 2+ put the kept cards back in their old order; CR 437.1.a says "in any order": a `predict_order`
+  decision (top to bottom) follows the recycle pick (ops.Predict). Checked OK: Legion counts only other cards
+  finalized this turn (tokens aren't cards), Tianna/Otterpus replace gaining points (CR 470.2), Blitzcrank's hold.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

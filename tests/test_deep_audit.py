@@ -1613,3 +1613,23 @@ def test_granted_disarm_triggers_with_the_summed_value(db):
     gromp = put(g, db, 0, "Voracious Gromp", ("base", 0))
     assert [a for a in g.abilities(gromp) if getattr(a, "keyword", None) == "hunt"] == [hunt_ability()]
     assert g.keyword_value(gromp, "hunt") == 3
+
+
+def test_predict_puts_the_kept_cards_back_in_the_order_the_player_picks(db):
+    """CR 437.1.a: "the Predicting player looks at that many cards and Recycles any number of them before putting the
+    rest back on top of their Main Deck in any order." The kept cards always went back in their old order (The
+    Empyrean's "[Predict] equal to its Power cost", any Predict 2+)."""
+    from riftsim.core import ops as O
+    from riftsim.core.vm import Frame
+    g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "vex_gloomist")])
+    deck = g.players[0].deck
+    a, b, c = deck[0], deck[1], deck[2]
+    g.vm_frames.append(Frame([O.Predict(3)], Context(0, None)))
+    d = g.run()
+    assert d.kind == "predict"
+    g.choose((b,))                                   # recycle the middle one
+    d = g.run()
+    assert d.kind == "predict_order" and set(d.options) == {(a, c), (c, a)}
+    g.choose((c, a))
+    g.run()
+    assert deck[:2] == [c, a] and b not in deck[:2]
