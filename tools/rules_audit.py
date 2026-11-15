@@ -67,8 +67,8 @@ def expected_moves(g, p):
         ok = []
         for u in ready:
             o = g.objects[u]
-            if o.location == dest or g.cant_move(u):
-                continue
+            if o.location == dest or g.cant_move(u) or p in (g.keyword_value(u, "cant_move_by") or ()):
+                continue          # Vex, Apathetic: "They can't move it this turn"
             if dest[0] == "base":
                 good = o.location[0] == "bf"
             else:

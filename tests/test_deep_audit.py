@@ -1537,3 +1537,28 @@ def test_stun_does_not_exhaust_and_a_stunned_unit_cant_be_stunned_again(db):
     g.emit = spy
     g.do_stun(u, Context(1, None))
     assert stuns == []
+    # nothing stops readying a stunned unit either (it stayed exhausted when an effect readied it)
+    g.objects[u].exhausted = True
+    assert g.do_ready(u, Context(0, None)) and not g.objects[u].exhausted and g.objects[u].stunned
+
+
+def test_heal_exhaust_and_recall_is_an_exhaust_action(db):
+    """Zhonya's Hourglass / Guardian Angel / Soraka: "heal it, exhaust it, and recall it". Exhausting is the Exhaust
+    action (CR 415), so "When I become exhausted" (Reckless Innovator, Riven, Broken Blade) triggers; the engine set
+    the flag without the event."""
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    put(g, db, 0, "Zhonya's Hourglass", ("base", 0))
+    r = put(g, db, 0, "Reckless Innovator", ("bf", 0))
+    seen = []
+    orig = g.emit
+
+    def spy(kind, **kw):
+        seen.append((kind, kw.get("uid")))
+        return orig(kind, **kw)
+    g.emit = spy
+    g.do_kill([r])
+    assert g.objects[r].location == ("base", 0) and g.objects[r].exhausted
+    assert ("exhaust", r) in seen
+    d = g.run()
+    assert g.chain or (d is not None and d.kind != "action")      # its trigger is waiting (mode pick or on the chain)
