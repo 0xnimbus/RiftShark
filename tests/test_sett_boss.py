@@ -28,7 +28,7 @@ def _setup(db, decks):
     g = main_phase(db, decks)
     unit = put(g, db, 0, "Pit Rookie", ("bf", 0))
     g.do_buff(unit)
-    g.bump()
+    g.restruct()
     return g, g.players[0].legend, unit
 
 
@@ -71,7 +71,7 @@ def test_decline_lets_it_die(db, decks):
 def test_no_offer_when_unbuffed_or_sett_exhausted(db, decks):
     g, sett, unit = _setup(db, decks)
     g.objects[sett].exhausted = True
-    g.bump()
+    g.restruct()
     asked, _ = _kill_and_answer(g, unit, lambda d: "decline")
     assert asked == [] and g.objects[unit].zone == "trash"
     g, sett, unit = _setup(db, decks)
@@ -86,7 +86,7 @@ def test_no_offer_without_body_or_order_power(db, decks):
     for u in g.players[0].runes:
         g.objects[u].defn, g.objects[u].domain = fury, "fury"
     g.players[0].energy, g.players[0].power = 0, []
-    g.bump()
+    g.restruct()
     asked, _ = _kill_and_answer(g, unit, lambda d: "decline")
     assert asked == [] and g.objects[unit].zone == "trash"
 
@@ -94,7 +94,7 @@ def test_no_offer_without_body_or_order_power(db, decks):
 def test_conquer_readies_sett(db, decks):
     g, sett, unit = _setup(db, decks)
     g.objects[sett].exhausted = True
-    g.bump()
+    g.restruct()
     g.emit("conquer", player=0, loc=("bf", 0), units=[unit])
     for _ in range(20):
         d = g.run()

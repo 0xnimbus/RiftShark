@@ -50,7 +50,7 @@ def test_void_burrower_reveals_banishes_and_plays(db, decks):
     top = ps.deck[:2]
     cheap = next(c for c in db if c.name == "Noxus Hopeful")
     g.objects[top[0]].defn = cheap
-    g.bump()
+    g.restruct()
     hand = len(ps.hand)
     g.emit("conquer", player=0, units=(), loc=("bf", 0))
     picked = []
@@ -74,7 +74,7 @@ def test_undertitan_adds_2_as_revealed_from_deck(db, decks):
     g = main_phase(db, decks)
     ps = g.players[0]
     g.objects[ps.deck[0]].defn = next(c for c in db if c.name == "Undertitan")
-    g.bump()
+    g.restruct()
     e = ps.energy
     from riftsim.core.ops import Look
     from riftsim.core.vm import Context
@@ -86,7 +86,7 @@ def test_reksai_breacher_grants_accelerate_off_hand_plays(db, decks):
     g = main_phase(db, decks)
     rk = give(g, 0, "Rek'Sai, Breacher", db)
     g._to_zone(g.objects[rk], "board", location=("base", 0), controller=0)
-    g.bump()
+    g.restruct()
     u = g.players[0].deck[0]
     g.objects[u].defn = next(c for c in db if c.name == "Noxus Hopeful")
     assert not g.objects[u].defn.keywords.get("accelerate")
@@ -96,7 +96,7 @@ def test_reksai_breacher_grants_accelerate_off_hand_plays(db, decks):
     it = g.chain[-1]
     assert any(n == "accelerate" for n, _ in g._optional_costs(it, it.ctx))
     h = give(g, 0, "Noxus Hopeful", db)
-    g.chain.clear(); g.pending = None; g.bump()
+    g.chain.clear(); g.pending = None; g.restruct()
     d = g.run()
     g.choose(next(o for o in d.options if o[0] == "play" and o[1] == h))
     it = next(x for x in g.chain if x.uid == h)
@@ -115,7 +115,7 @@ def test_lacerate_kills_3_might_or_less_and_spares_bigger(db, decks):
     g = main_phase(db, decks)
     small = unit_at(g, 1, ("bf", 0))
     g.objects[small].defn = next(c for c in db if c.is_unit and not c.is_token and (c.might or 0) == 2 and "[M]" not in c.text)
-    g.bump()
+    g.restruct()
     assert g.chars(small).might <= 3
     s = give(g, 0, "Lacerate", db)
     d = g.run()
@@ -130,7 +130,7 @@ def test_hunters_circle_first_unit_here_costs_1_less(db, decks):
     bf = g.battlefields[0]
     g.objects[bf.uid].defn = hc
     bf.controller = 0
-    g.bump()
+    g.restruct()
     u = give(g, 0, "Noxus Hopeful", db)
     base = g.card_cost(0, u, "hand", ("base", 0))[0]
     assert g.card_cost(0, u, "hand", ("bf", 0))[0] == max(0, base - 1)
@@ -142,7 +142,7 @@ def test_candlelit_sanctum_predicts_2_on_conquer_here(db, decks):
     g = main_phase(db, decks)
     bf = g.battlefields[0]
     g.objects[bf.uid].defn = next(c for c in db if c.name == "The Candlelit Sanctum")
-    g.bump()
+    g.restruct()
     g.emit("conquer", player=0, units=(), loc=("bf", 0))
     kinds = []
 

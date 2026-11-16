@@ -27,7 +27,7 @@ def _game(db):
 def _to_trash(g, db, p, name):
     u = give(g, p, name, db)
     g.put_in_trash(u)
-    g.bump()
+    g.restruct()
     return u
 
 
@@ -49,7 +49,7 @@ def test_last_rites_equip_needs_two_cards_in_the_trash_and_recycles_them(db):
     lr = put(g, db, 0, "Last Rites", ("base", 0))
     for u in list(g.players[0].trash):
         g._to_zone(g.objects[u], "deck")
-    g.bump()
+    g.restruct()
     equip = [a for a in g.legal_actions(0) if a[0] == "activate" and a[1] == lr]
     assert not equip, "Equip offered with an empty trash"
     t1 = _to_trash(g, db, 0, "Gust")
@@ -84,7 +84,7 @@ def test_veiled_temple_readies_a_gear_and_may_detach_equipment(db):
     eon = put(g, db, 0, "Edge of Night", ("base", 0))
     g.do_attach(eon, unit)
     g.objects[eon].exhausted = True
-    g.bump()
+    g.restruct()
     g._establish_control(0, 0)
     settle(g, yes=True, picks=[eon])
     assert not g.objects[eon].exhausted

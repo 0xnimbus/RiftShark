@@ -388,6 +388,7 @@ def lady_of_clockwork(defn):
         if old is not None and old in g.objects:            # "until you choose another gear with me"
             o = g.objects[old]
             o.mods = [m for m in o.mods if not (m.source == c.source and m.kind in ("type", "base_might"))]
+            g.restruct()
         lady.temp["clockwork"] = new
         g.add_mod(new, "type", "unit", duration="permanent", source=c.source)
         g.add_mod(new, "base_might", g.objects[new].base_defn().energy or 0, duration="permanent", source=c.source)
@@ -1526,7 +1527,7 @@ def akshan_mischievous(defn):
             if me.zone == "board":
                 from ..objects import Mod
                 o.mods.append(Mod("control", prev, ("until_leaves", c.source, me.entered_stamp), c.source, g.tick()))
-        g.bump()
+        g.restruct()
         g.dirty = True
         if o.base_defn().is_equipment and me.zone == "board":
             g.do_attach(t, c.source, c)
@@ -1593,7 +1594,7 @@ def neeko_blending_in(defn):
         o.exhausted = False
         o.entered_stamp = g.tick()
         o.temp["bound_to"] = (c.source, me.entered_stamp)
-        g.bump()
+        g.restruct()
         g.log("legend_added", uid=o.uid, name=n, player=c.controller)
         g.dirty = True
     return {"abilities": [Triggered("play_self", [

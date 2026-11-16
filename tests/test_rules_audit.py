@@ -109,7 +109,7 @@ def test_recycle_from_trash_is_not_truncated(db, decks):
     deck = g.players[0].deck
     for u in list(deck[:20]):
         g._to_zone(g.objects[u], "trash")
-    g.bump()
+    g.restruct()
     pool = [u for u, o in g.objects.items() if o.zone == "trash" and o.owner == 0]
     d = ops.Recycle(n=3).run(g, Context(0, None))
     from itertools import combinations
@@ -190,7 +190,7 @@ def test_bilgewater_bully_has_ganking_only_while_buffed(db, decks):
     u = put(g, db, 0, "Bilgewater Bully", ("base", 0))
     assert not g.chars(u).keywords.get("ganking")
     g.do_buff(u)
-    g.bump()
+    g.restruct()
     assert g.chars(u).keywords.get("ganking")
 
 
@@ -208,7 +208,7 @@ def _hide_and_wait(g, db, p, name, bf):
     g.set_bf_controller(bf, p)
     assert g.do_hide(p, u, ("bf", bf))
     g.objects[u].facedown_turn = g.turn - 1          # hidden on an earlier turn
-    g.bump()
+    g.restruct()
     return u
 
 
@@ -258,7 +258,7 @@ def _swap_hidden_hand(g, p):
     for u in new_deck:
         g.objects[u].zone = "deck"
     ps.hand, ps.deck = new_hand, new_deck
-    g.bump()
+    g.restruct()
 
 
 @pytest.mark.parametrize("spec", ["advanced", "expert", "mcts:30"])
@@ -302,12 +302,12 @@ def test_gold_pays_power_while_paying(db, decks):
     g = main_phase(db, decks)
     for r in list(g.players[0].runes):
         g._to_zone(g.objects[r], "rune_deck")
-    g.bump()
+    g.restruct()
     assert not g.can_pay(0, 0, ["any"], purpose={"kind": "play", "types": {"spell"}})
     gold = g.play_token(0, "Gold", ("base", 0))
     gold = gold[0] if isinstance(gold, (list, tuple)) else gold
     g.objects[gold].exhausted = False
-    g.bump()
+    g.restruct()
     plans = g.payment_plans(0, 0, ["fury"], {"kind": "play", "types": {"spell"}})
     assert plans and any(a[0] == "ab" for a in plans[0][0])
     g.apply_payment(0, plans[0], None, {"kind": "play", "types": {"spell"}})
@@ -325,7 +325,7 @@ def test_gold_pays_the_hide_cost(db, decks):
     card = give(g, 0, "Block", db)
     put(g, db, 0, "Shipyard Skulker", ("bf", 0))
     g.set_bf_controller(0, 0)
-    g.bump()
+    g.restruct()
     g.pending = None
     d = g.run()
     hides = [a for a in d.options if a[0] == "hide" and a[1] == card]
@@ -347,7 +347,7 @@ def test_switcheroo_playable_with_two_units_at_one_battlefield(db, decks):
     b = put(g, db, 1, "Stellacorn Herder", ("bf", 0), exclude=(a,))
     s = give(g, 0, "Switcheroo", db)
     assert ("play", s) in g.legal_actions(0)
-    g.do_kill([b], Context(0, None)); g.bump()
+    g.do_kill([b], Context(0, None)); g.restruct()
     assert ("play", s) not in g.legal_actions(0)          # no partner at the same battlefield
 
 
@@ -357,7 +357,7 @@ def test_not_so_fast_counters_an_enemy_spell_choosing_my_unit(db, decks):
     g = main_phase(db, decks)
     mine = put(g, db, 0, "Stellacorn Herder", ("bf", 0))
     sp = _card_in(g, db, 1, "Get Excited!", "hand")
-    g._to_zone(g.objects[sp], "chain"); g.bump()
+    g._to_zone(g.objects[sp], "chain"); g.restruct()
     ctx = Context(1, sp)
     ctx.vars["t"] = mine
     ctx.vars["__targets"] = [("t", None)]

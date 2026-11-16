@@ -1405,7 +1405,7 @@ class CopyAs(Instr):
         if t is not None and m is not None:
             game.objects[t].copy_of = game.objects[m].base_defn()      # copiable values (CR 712)
             game.objects[t].chars_cache = None
-            game.bump()
+            game.restruct()
         return None
 
 

@@ -28,7 +28,7 @@ def _ready_runes(g, p):
     for u in g.players[p].runes:
         g.objects[u].exhausted = False
     g.pending = None
-    g.bump()
+    g.restruct()
 
 
 def _drive(g, pick=None, stop=None, limit=60):
@@ -53,7 +53,7 @@ def _drive(g, pick=None, stop=None, limit=60):
 
 def _rockfall(g, db, idx):
     g.objects[g.battlefields[idx].uid].defn = next(c for c in db if c.name == "Rockfall Path")
-    g.bump()
+    g.restruct()
 
 
 def test_hidden_temporal_breach_on_brynhir_locks_the_opponent_on_their_turn(db):
@@ -65,7 +65,7 @@ def test_hidden_temporal_breach_on_brynhir_locks_the_opponent_on_their_turn(db):
     tb = give(g, 0, "Temporal Breach", db)
     assert g.do_hide(0, tb, ("bf", 0))
     g.objects[tb].facedown_turn = g.turn - 1
-    g.bump()
+    g.restruct()
     settle(g)
     g.choose(("end_turn",))
     _drive(g, stop=lambda d: g.turn_player == 1 and g.phase == "main" and d.kind == "action" and not g.chain)
@@ -192,7 +192,7 @@ def test_rockfall_path_stops_unit_tokens_and_hidden_units(db):
     g.set_bf_controller(0, 0)
     assert g.do_hide(0, fae, ("bf", 0))
     g.objects[fae].facedown_turn = g.turn - 1
-    g.bump()
+    g.restruct()
     assert g._play_locations(0, fae, "facedown") == []
 
 
@@ -313,7 +313,7 @@ def test_elnuk_herd_may_pump_itself_and_recycles_only_itself_from_face_down(db):
     assert g.do_hide(0, el, ("bf", 0))
     g.objects[el].facedown_turn = g.turn - 1
     g.pending = None
-    g.bump()
+    g.restruct()
     d = g.run()
     g.choose(next(o for o in d.options if o[0] == "play" and o[1] == el))
     seen = []
@@ -333,7 +333,7 @@ def test_portal_rescue_returns_a_borrowed_unit_to_its_owners_base(db):
     g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "riven_exile")])
     stolen = put(g, db, 1, "Stellacorn Herder", ("bf", 0))
     g.objects[stolen].controller = 0
-    g.bump()
+    g.restruct()
     pr = give(g, 0, "Portal Rescue", db)
     _ready_runes(g, 0)
     g.run()
@@ -350,11 +350,11 @@ def test_noxus_hopeful_costs_2_less_only_with_legion(db):
     g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "riven_exile")])
     nh = give(g, 0, "Noxus Hopeful", db)
     g.players[0].played_this_turn = []
-    g.bump()
+    g.restruct()
     assert g.card_cost(0, nh, "hand", ("base", 0)) == (4, [])
     other = give(g, 0, "Stupefy", db)
     g.players[0].played_this_turn = [other]
-    g.bump()
+    g.restruct()
     assert g.card_cost(0, nh, "hand", ("base", 0)) == (2, [])
 
 
@@ -364,14 +364,14 @@ def test_legion_activated_abilities_need_legion(db, name):
     g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "riven_exile")])
     u = put(g, db, 0, "Forecaster", ("base", 0))
     g.objects[u].defn = _card(db, name)
-    g.bump()
+    g.restruct()
     idx = next(i for i, a in enumerate(g.abilities(u)) if type(a).__name__ == "Activated")
     ab = g.abilities(u)[idx]
     g.players[0].played_this_turn = []
-    g.bump()
+    g.restruct()
     assert not g._can_activate(0, u, idx, ab)
     g.players[0].played_this_turn = [give(g, 0, "Stupefy", db)]
-    g.bump()
+    g.restruct()
     assert g._can_activate(0, u, idx, ab)
 
 
@@ -386,16 +386,16 @@ def test_level_3_enter_ready_needs_level_3(db):
             g.players[0].xp = xp
             u = put(g, db, 0, "Forecaster", ("base", 0))
             g.objects[u].defn = defn
-            g.bump()
+            g.restruct()
             flagged = [a for a in g.abilities(u) if "Level 3" in (a.source_text or "") + (a.label or "")]
             assert flagged, name
             assert all(a.active(g, u) == active for a in flagged), (name, xp)
         if name == "Scorchclaw":
             g.players[0].xp = 0
-            g.bump()
+            g.restruct()
             base = g.chars(u).might
             g.players[0].xp = 3
-            g.bump()
+            g.restruct()
             assert g.chars(u).might == base + 1
 
 
@@ -426,7 +426,7 @@ def _clear_bfs(g, db=None):
     for bf in g.battlefields:
         bf.controller = None
     g.pending = None
-    g.bump()
+    g.restruct()
 
 
 def _locs(g, p, uid):
@@ -440,20 +440,20 @@ def test_play_location_permissions_follow_the_printed_text(db):
     _clear_bfs(g, db)
     g.battlefields[1].controller = 1                         # bf 0 open, bf 1 enemy-controlled and empty
     scout, dog, rengar = (give(g, 0, n, db) for n in ("Sai Scout", "Deadbloom Predator", "Rengar, Pouncing"))
-    g.bump()
+    g.restruct()
     assert _locs(g, 0, scout) == [("bf", 0)]                 # open = unoccupied and uncontrolled (CR 170.11.c)
     assert _locs(g, 0, dog) == [] and _locs(g, 0, rengar) == []
     enemy = put(g, db, 1, "Forecaster", ("bf", 1))
     put(g, db, 1, "Forecaster", ("bf", 0))                   # bf 0 occupied, so no longer open
-    g.bump()
+    g.restruct()
     assert _locs(g, 0, scout) == []
     assert _locs(g, 0, dog) == [("bf", 1)]                   # occupied enemy battlefield only
     assert _locs(g, 0, rengar) == []
     g.combat = {"bf": 1, "attacker": 0, "defender": 1, "step": "showdown"}
-    g.bump()
+    g.restruct()
     assert _locs(g, 0, rengar) == [("bf", 1)]                # the battlefield you're attacking
     g.combat = {"bf": 1, "attacker": 1, "defender": 0, "step": "showdown"}
-    g.bump()
+    g.restruct()
     assert _locs(g, 0, rengar) == []                         # not while defending
     assert enemy in g.units_at(("bf", 1))
 
@@ -471,11 +471,11 @@ def test_hunters_circle_counts_a_token_as_the_first_unit_played_there(db):
     loc = ("bf", circle)
     g.battlefields[circle].controller = 0
     u = give(g, 0, "Hunting Dog", db)
-    g.bump()
+    g.restruct()
     full = _card(db, "Hunting Dog").energy
     assert g.card_cost(0, u, "hand", loc)[0] == full - 1
     g.play_token(0, "Recruit", loc, Context(0))
-    g.bump()
+    g.restruct()
     assert g.card_cost(0, u, "hand", loc)[0] == full
 
 
@@ -573,7 +573,7 @@ def test_when_you_play_me_here_means_the_battlefield_played_to(db, name):
         g.players[0].rune_deck.remove(r)
         g.players[0].runes.append(r)
         g.objects[r].zone, g.objects[r].exhausted = "board", False
-    g.bump()
+    g.restruct()
     d = g.run()
     g.choose(("play", u, ("bf", 0)))
     _drive(g, pick=lambda d: True if d.kind == "yesno" else (foe_base if foe_base in d.options else
@@ -648,7 +648,7 @@ def test_sudden_storm_and_monster_harpoon_deal_4_instead(db):
             hid = give(g, 0, "Tornado Warrior", db)
             g.set_bf_controller(1, 0)
             assert g.do_hide(0, hid, ("bf", 1))
-        g.bump()
+        g.restruct()
         _cast(g, db, 0, name, lambda d: foe if d.kind in ("choose", "choose_many") and foe in d.options else None)
         assert g.objects[foe].damage == want, (name, setup)
 
@@ -741,7 +741,7 @@ def test_that_player_is_the_player_whose_beginning_phase_it_is(db):
         g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
         g.objects[g.battlefields[0].uid].defn = _card(db, name)
         g.set_bf_controller(0, 0)
-        g.bump()
+        g.restruct()
         pts, runes = [p.points for p in g.players], [len(p.runes) for p in g.players]
         g.run()
         g.choose(("end_turn",))
@@ -946,7 +946,7 @@ def test_hidden_guards_plays_its_sand_soldier_at_that_battlefield(db):
     assert g.do_hide(0, u, ("bf", 1))
     g.objects[u].facedown_turn = g.turn - 1              # hidden last turn: it may be played now
     _ready_runes(g, 0)
-    g.bump()
+    g.restruct()
     d = g.run()
     opt = next(o for o in d.options if o[0] == "play" and o[1] == u)
     g.choose(opt)
@@ -971,7 +971,7 @@ def _set_runes(g, db, p, spec):
         o = g.objects[r]
         o.defn, o.domain, o.exhausted = rdefs[dom], dom, ex
     g.pending = None
-    g.bump()
+    g.restruct()
 
 
 def _play_from_hand(g, p, u, pick):
@@ -1140,7 +1140,7 @@ def test_that_battlefield_in_a_trigger_is_the_events_battlefield(db):
     e = put(g, db, 1, "Forecaster", ("base", 1))
     moved = []
     g.pending = None
-    g.bump()
+    g.restruct()
     d = g.run()
     g.choose(next(o for o in d.options if o[0] == "move" and f in o[1] and o[-1] == ("bf", 0)))
     for _ in range(40):
@@ -1193,7 +1193,7 @@ def test_modes_and_their_targets_are_chosen_as_the_ability_goes_on_the_chain(db)
     enemy = put(g, db, 1, "Forecaster", ("bf", 0))
     put(g, db, 1, "Forecaster", ("bf", 0), exclude=(enemy,))
     g.pending = None
-    g.bump()
+    g.restruct()
     d = g.run()
     g.choose(next(o for o in d.options if o[0] == "activate" and o[1] == udyr))
     order = []
@@ -1216,7 +1216,7 @@ def test_modes_and_their_targets_are_chosen_as_the_ability_goes_on_the_chain(db)
     udyr = put(g, db, 0, "Udyr, Wildman", ("base", 0))
     g.objects[udyr].buffs = 1
     g.pending = None
-    g.bump()
+    g.restruct()
     d = g.run()
     g.choose(next(o for o in d.options if o[0] == "activate" and o[1] == udyr))
     d = g.run()
@@ -1290,7 +1290,7 @@ def test_an_if_right_after_the_trigger_condition_is_not_checked_again_on_resolut
                 r = ps.runes.pop()
                 ps.rune_deck.append(r)
                 g.objects[r].zone = "rune_deck"
-            g.bump()
+            g.restruct()
             done.append(True)
         return gear if d.kind == "choose" and gear in d.options else None
     _play_from_hand(g, 0, barbara, pick)
@@ -1358,7 +1358,7 @@ def test_its_controller_is_the_controller_it_had_when_it_left_the_board(db):
     g = _fresh(db, "akali_rogue")
     u = put(g, db, 1, "Rhasa the Sunderer", ("bf", 0))
     g.objects[u].controller = 0                     # taken control of (Possession and the like)
-    g.bump()
+    g.restruct()
     hands = [len(g.players[0].hand), len(g.players[1].hand)]
     _cast_with(g, db, 0, "Hidden Blade", [("order", False)] * 3, lambda d: u if d.kind == "choose" and u in d.options else None)
     assert g.objects[u].zone == "trash"
@@ -1380,7 +1380,7 @@ def test_the_awaken_phase_readying_triggers_when_i_become_ready(db):
     ire = put(g, db, 1, "Irelia, Fervent", ("base", 1))
     for u in (cat, ire):
         g.objects[u].exhausted = True
-    g.bump()
+    g.restruct()
     base = g.chars(cat).might, g.chars(ire).might
     g.run()
     g.choose(("end_turn",))
@@ -1390,7 +1390,7 @@ def test_the_awaken_phase_readying_triggers_when_i_become_ready(db):
     # "When you ready a friendly unit" (Pirate's Haven) is about units: readying runes doesn't trigger it
     haven = [a for a in _card(db, "Pirate's Haven").abilities if type(a).__name__ == "Triggered"][0]
     g.set_bf_controller(0, 1)
-    g.bump()
+    g.restruct()
     r = g.players[1].runes[0]
     assert haven.matches(g, g.battlefields[0].uid, {"kind": "ready", "uid": cat, "player": 1})
     assert not haven.matches(g, g.battlefields[0].uid, {"kind": "ready", "uid": r, "player": 1})

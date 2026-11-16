@@ -23,7 +23,7 @@ def test_call_to_glory_is_free_when_you_spend_a_buff(db, decks):
     g.objects[u].buffs = 1
     for r in g.players[0].runes:
         g.objects[r].exhausted = True          # no resources: only the free way is legal
-    g.bump()
+    g.restruct()
     s = give(g, 0, "Call to Glory", db)
     base = g.chars(u).might
     _play(g, s, lambda d: u if d.kind == "choose" and u in d.options else None)
@@ -80,7 +80,7 @@ def test_get_excited_deals_the_discarded_cards_energy_cost(db, decks):
     fury = next(c for c in db if c.name == "Fury Rune")
     for r in g.players[0].runes[:2]:
         g.objects[r].defn, g.objects[r].domain = fury, "fury"
-    g.bump()
+    g.restruct()
     _play(g, s, lambda d: foe if d.kind == "choose" and foe in d.options else None)
     dmg = [e["amount"] for e in g.events if e["kind"] == "damage" and e.get("uid") == foe]
     assert g.objects[junk].zone == "trash" and dmg and dmg[0] >= g.objects[junk].defn.energy
@@ -152,7 +152,7 @@ def test_tianna_stops_opponents_scoring_while_at_a_battlefield(db, decks):
     p1 = g.players[1].points
     g.gain_points(1, 1)
     assert g.players[1].points == p1 + 1
-    g._to_zone(g.objects[t], "board", location=("bf", 0), controller=0); g.bump()
+    g._to_zone(g.objects[t], "board", location=("bf", 0), controller=0); g.restruct()
     g.gain_points(1, 1)
     p0 = g.players[0].points
     g.gain_points(0, 1)
@@ -187,7 +187,7 @@ def test_prepared_neophyte_and_combat_experience_levels(db, decks):
     g = main_phase(db, decks)
     n = put(g, db, 0, "Prepared Neophyte", ("base", 0))
     assert g.chars(n).might == 1
-    g.turn_memo[("spell_spent_4", 0)] = True; g.bump()
+    g.turn_memo[("spell_spent_4", 0)] = True; g.restruct()
     assert g.chars(n).might == 5
     from riftsim.core.vm import Context, Frame
     s = next(c for c in db if c.name == "Combat Experience")
@@ -205,7 +205,7 @@ def test_monch_costs_less_and_enters_ready_with_a_stunned_enemy(db, decks):
     m = _card_in(g, db, 0, "Monch", "hand")
     e0 = g.card_cost(0, m, "hand")[0]
     foe = put(g, db, 1, "Rell, Magnetic", ("bf", 0))
-    g.objects[foe].stunned = True; g.bump()
+    g.objects[foe].stunned = True; g.restruct()
     assert g.card_cost(0, m, "hand")[0] == e0 - 2
 
 
@@ -215,10 +215,10 @@ def test_undying_legion_plays_from_trash_only_with_legion(db, decks):
     fury = next(c for c in db if c.name == "Fury Rune")
     for r in g.players[0].runes[:2]:
         g.objects[r].defn, g.objects[r].domain = fury, "fury"
-    g.bump()
+    g.restruct()
     assert not any(o[0] == "play" and o[1] == ul for o in g.run().options)
     g.players[0].played_this_turn.append(-1)
-    g.bump(); g.pending = None
+    g.restruct(); g.pending = None
     assert any(o[0] == "play" and o[1] == ul for o in g.run().options)
     assert g.card_cost(0, ul, "trash") == (3, ["fury"])
 
@@ -269,7 +269,7 @@ def test_lilting_lullaby_counters_and_locks_spells(db, decks):
     from riftsim.core.objects import ChainItem
     g = main_phase(db, decks)
     sp = _card_in(g, db, 1, "Get Excited!", "hand")
-    g._to_zone(g.objects[sp], "chain"); g.bump()
+    g._to_zone(g.objects[sp], "chain"); g.restruct()
     it = ChainItem(900, "spell", 1, uid=sp, label="Get Excited!")
     it.finalized = True                 # only a finalized spell can be chosen (CR 355.9.a.2)
     g.chain.append(it)
@@ -300,7 +300,7 @@ def test_guttural_roar_empowered(db, decks):
     u = put(g, db, 0, "Rell, Magnetic", ("bf", 0))
     b = g.chars(u).might
     _run_spell(g, db, "Guttural Roar", picks=[u])
-    g.objects[u].empowered = 1; g.bump()
+    g.objects[u].empowered = 1; g.restruct()
     _run_spell(g, db, "Guttural Roar", picks=[u])
     assert g.chars(u).might == b + 6
 
@@ -309,7 +309,7 @@ def test_decree_of_rage_cannot_be_countered(db, decks):
     from riftsim.core.objects import ChainItem
     g = main_phase(db, decks)
     sp = _card_in(g, db, 0, "Decree of Rage", "hand")
-    g._to_zone(g.objects[sp], "chain"); g.bump()
+    g._to_zone(g.objects[sp], "chain"); g.restruct()
     it = ChainItem(901, "spell", 0, uid=sp, label="Decree of Rage")
     g.chain.append(it)
     assert g.do_counter(901) is False and it in g.chain
@@ -366,7 +366,7 @@ def _bf_card(g, db, name, i=0):
     """Turn battlefield i into `name` (re-using its object)."""
     bf = g.battlefields[i]
     g.objects[bf.uid].defn = next(c for c in db if c.name == name)
-    g.bump()
+    g.restruct()
     return bf.uid
 
 
@@ -428,7 +428,7 @@ def test_equipment_grants_its_keywords_to_the_unit(db, decks):
     n = put(g, db, 0, "Nazuman Ntofo", ("base", 0), exclude=(u,))
     p = put(g, db, 0, "Protector's Shield", ("base", 0), exclude=(u, n))
     assert not g.chars(u).kw("shield")
-    g.do_attach(n, u); g.do_attach(p, u); g.bump()
+    g.do_attach(n, u); g.do_attach(p, u); g.restruct()
     assert g.chars(u).kw("shield") == 2 and g.has_keyword(u, "tank")
 
 
@@ -438,7 +438,7 @@ def test_overloaded_traveler_with_a_deploy_gear_at_its_battlefield(db, decks):
     assert g.chars(t).might == 2
     gear = put(g, db, 0, "The Good Stuff", ("bf", 1), exclude=(t,))
     assert g.chars(t).might == 2                      # a different battlefield
-    g.objects[gear].location = ("bf", 0); g.bump()
+    g.objects[gear].location = ("bf", 0); g.restruct()
     assert g.chars(t).might == 3
 
 
@@ -529,7 +529,7 @@ def test_meticulous_restorationist_replays_from_trash(db, decks):
     for r in g.players[0].runes[:1]:
         g.objects[r].defn = next(c for c in db if c.name == "Order Rune")
         g.objects[r].domain = "order"
-    g.bump()
+    g.restruct()
     big = _card_in(g, db, 0, "Supernova", "hand")
     g.emit("play", uid=big, player=0, card_type="spell")
     settle(g)
@@ -550,7 +550,7 @@ def test_forge_of_the_future_recycles_up_to_four(db, decks):
     cards = [g.players[1].deck[i] for i in range(5)]
     for u in cards:
         g._to_zone(g.objects[u], "trash")
-    g.bump()
+    g.restruct()
     _fire(g, f, "Kill this: recycle up to 4")
     settle(g, picks=[(cards[0],), (cards[1],), ()])
     assert g.objects[cards[0]].zone == "deck" and g.objects[cards[1]].zone == "deck" and g.objects[cards[2]].zone == "trash"
@@ -579,7 +579,7 @@ def test_grand_plaza_and_hallowed_tomb(db, decks):
     _bf_card(g, db, "Hallowed Tomb", 0)
     g.set_bf_controller(0, 0)
     ch = g.players[0].chosen_champion
-    g._to_zone(g.objects[ch], "trash"); g.bump()
+    g._to_zone(g.objects[ch], "trash"); g.restruct()
     g.emit("hold", player=0, loc=("bf", 0), bf=0, units=())
     settle(g)
     assert g.objects[ch].zone == "champion" and g.players[0].champion == ch
@@ -614,7 +614,7 @@ def test_mistfall_readies_a_buffed_unit(db, decks):
     m = put(g, db, 0, "Mistfall", ("base", 0))
     u = put(g, db, 0, "Hunting Dog", ("base", 0), exclude=(m,))
     r = g.players[0].runes[0]
-    g.objects[r].defn = next(c for c in db if c.name == "Body Rune"); g.objects[r].domain = "body"; g.bump()
+    g.objects[r].defn = next(c for c in db if c.name == "Body Rune"); g.objects[r].domain = "body"; g.restruct()
     g.objects[u].exhausted = True
     g.do_buff(u)
     settle(g)
@@ -680,7 +680,7 @@ def test_riposte_counters_and_pumps(db, decks):
     g = main_phase(db, decks)
     u = put(g, db, 0, "Hunting Dog", ("base", 0))
     sp = _card_in(g, db, 1, "Get Excited!", "hand")
-    g._to_zone(g.objects[sp], "chain"); g.bump()
+    g._to_zone(g.objects[sp], "chain"); g.restruct()
     g.chain.append(ChainItem(900, "spell", 1, uid=sp, label="Get Excited!"))
     g.chain[-1].finalized = True        # only a finalized spell can be chosen (CR 355.9.a.2)
     base = g.chars(u).might
@@ -692,7 +692,7 @@ def test_strike_down_and_void_rush(db, decks):
     g = main_phase(db, decks)
     u = put(g, db, 0, "Elnuk Herd", ("base", 0))
     eq = put(g, db, 0, "Protector's Shield", ("base", 0), exclude=(u,))
-    g.do_attach(eq, u); g.bump()
+    g.do_attach(eq, u); g.restruct()
     foe = put(g, db, 1, "Elnuk Herd", ("bf", 0), exclude=(u, eq))
     _run_spell(g, db, "Strike Down", picks=[u, foe])
     assert g.objects[eq].attached_to is None and (g.objects[foe].damage > 0 or g.objects[foe].zone == "trash")
@@ -723,7 +723,7 @@ def test_abandon_returns_the_spell_to_hand(db, decks):
     from riftsim.core.objects import ChainItem
     g = main_phase(db, decks)
     sp = _card_in(g, db, 1, "Get Excited!", "hand")
-    g._to_zone(g.objects[sp], "chain"); g.bump()
+    g._to_zone(g.objects[sp], "chain"); g.restruct()
     g.chain.append(ChainItem(900, "spell", 1, uid=sp, label="Get Excited!"))
     g.chain[-1].finalized = True        # only a finalized spell can be chosen (CR 355.9.a.2)
     _run_spell(g, db, "Abandon", picks=[sp])
@@ -739,7 +739,7 @@ def test_suave_negotiator_and_disposal_order(db, decks):
     t = [g.players[1].deck[i] for i in range(4)]
     for u in t:
         g._to_zone(g.objects[u], "trash")
-    g.bump()
+    g.restruct()
     _run_spell(g, db, "Disposal Order", picks=[0, (t[0],), (t[1],), (t[2],)])
     assert [g.objects[u].zone for u in t] == ["deck", "deck", "deck", "trash"]
 
@@ -797,7 +797,7 @@ def test_steadfast_outrider_and_party_crasher(db, decks):
     assert g.chars(so).might == m + 2
     pc = _card_in(g, db, 0, "Party Crasher", "hand")
     e0 = g.card_cost(0, pc, "hand")[0]
-    g.objects[a].exhausted = True; g.objects[so].exhausted = True; g.bump()
+    g.objects[a].exhausted = True; g.objects[so].exhausted = True; g.restruct()
     assert g.card_cost(0, pc, "hand")[0] == max(0, e0 - 2)
 
 
@@ -877,7 +877,7 @@ def test_transpositionist_and_bottled_constellation(db, decks):
     g = main_phase(db, decks)
     t = put(g, db, 0, "Transpositionist", ("base", 0))
     r = g.players[0].runes[0]
-    g.objects[r].defn = next(c for c in db if c.name == "Chaos Rune"); g.objects[r].domain = "chaos"; g.bump()
+    g.objects[r].defn = next(c for c in db if c.name == "Chaos Rune"); g.objects[r].domain = "chaos"; g.restruct()
     big = put(g, db, 0, "Elnuk Herd", ("bf", 0), exclude=(t,))
     small = _card_in(g, db, 0, "Hunting Dog", "hand")
     _fire(g, t, "Transpositionist", ctx_vars={})
@@ -888,10 +888,10 @@ def test_transpositionist_and_bottled_constellation(db, decks):
     g = main_phase(db, decks)
     t = put(g, db, 0, "Transpositionist", ("base", 0))
     r = g.players[0].runes[0]
-    g.objects[r].defn = next(c for c in db if c.name == "Chaos Rune"); g.objects[r].domain = "chaos"; g.bump()
+    g.objects[r].defn = next(c for c in db if c.name == "Chaos Rune"); g.objects[r].domain = "chaos"; g.restruct()
     dog = put(g, db, 0, "Hunting Dog", ("bf", 0), exclude=(t,))
     g.do_buff(dog, None)
-    g.bump()
+    g.restruct()
     assert g.chars(dog).might == (g.objects[dog].defn.might or 0) + 1
     _fire(g, t, "Transpositionist", ctx_vars={})
     settle(g, picks=[dog, (dog,)])
@@ -919,7 +919,7 @@ def test_flame_chompers_from_discard(db, decks):
     g = main_phase(db, decks)
     fc = _card_in(g, db, 0, "Flame Chompers", "hand")
     r = g.players[0].runes[0]
-    g.objects[r].defn = next(c for c in db if c.name == "Fury Rune"); g.objects[r].domain = "fury"; g.bump()
+    g.objects[r].defn = next(c for c in db if c.name == "Fury Rune"); g.objects[r].domain = "fury"; g.restruct()
     g.do_discard(0, [fc]); settle(g)
     assert g.objects[fc].zone == "board"
 
@@ -948,7 +948,7 @@ def test_fox_fire_total_might_four(db, decks):
 def test_blind_fury_plays_the_opponents_top_card(db, decks):
     g = main_phase(db, decks)
     top = g.players[1].deck[0]
-    g.objects[top].defn = next(c for c in db if c.name == "Hunting Dog"); g.bump()
+    g.objects[top].defn = next(c for c in db if c.name == "Hunting Dog"); g.restruct()
     _run_spell(g, db, "Blind Fury")
     assert g.objects[top].zone == "board" and g.objects[top].controller == 0
 
@@ -957,7 +957,7 @@ def test_stand_united_and_spirits_refuge(db, decks):
     g = main_phase(db, decks)
     u = put(g, db, 0, "Hunting Dog", ("base", 0))
     v = put(g, db, 0, "Hunting Dog", ("base", 0), exclude=(u,))
-    g.objects[v].buffs = 1; g.bump()
+    g.objects[v].buffs = 1; g.restruct()
     base_u, base_v = g.chars(u).might, g.chars(v).might
     _run_spell(g, db, "Stand United", picks=[u])
     assert g.chars(u).might == base_u + 2 and g.chars(v).might == base_v + 1
@@ -1011,7 +1011,7 @@ def test_jagged_cutlass_unit_cant_be_moved_by_enemies(db, decks):
     g = main_phase(db, decks)
     u = put(g, db, 0, "Shipyard Skulker", ("bf", 0))
     gear = put(g, db, 0, "Jagged Cutlass", ("base", 0), exclude=(u,))
-    g.do_attach(gear, u); g.bump()
+    g.do_attach(gear, u); g.restruct()
     assert not g.do_move([u], ("base", 0), Context(1, None))      # an enemy effect
     assert g.objects[u].location == ("bf", 0)
     assert g.do_move([u], ("base", 0), Context(0, None))          # its controller's own effect still moves it
@@ -1021,7 +1021,7 @@ def test_blighted_battleaxe_hurts_a_unit_that_did_not_conquer(db, decks):
     g = main_phase(db, decks)
     u = put(g, db, 0, "Mega-Mech", ("base", 0))
     gear = put(g, db, 0, "Blighted Battleaxe", ("base", 0), exclude=(u,))
-    g.do_attach(gear, u); g.bump()
+    g.do_attach(gear, u); g.restruct()
     g.emit("ending_phase", player=0)
     settle(g)
     assert g.objects[gear].attached_to is None and g.objects[u].damage == 4
@@ -1051,7 +1051,7 @@ def test_dune_surfer_ignores_tank_here(db, decks):
 def _enemy_spell_on_chain(g, db, name="Get Excited!"):
     from riftsim.core.objects import ChainItem
     sp = _card_in(g, db, 1, name, "hand")
-    g._to_zone(g.objects[sp], "chain"); g.bump()
+    g._to_zone(g.objects[sp], "chain"); g.restruct()
     it = ChainItem(900, "spell", 1, uid=sp, label=name)
     from riftsim.core.vm import Context
     it.cost, it.finalized, it.ctx, it.code = {"energy": 0, "power": []}, True, Context(1, sp), []
@@ -1079,7 +1079,7 @@ def test_hard_bargain_counters_when_controller_cannot_pay(db, decks):
     sp, it = _enemy_spell_on_chain(g, db)
     for r in g.players[1].runes:
         g.objects[r].exhausted = True
-    g.bump()
+    g.restruct()
     _run_spell(g, db, "Hard Bargain", picks=[sp])
     assert it.countered
 
@@ -1093,7 +1093,7 @@ def test_marai_spire_repeat_costs_one_less(db, decks):
     rep = dict(g._optional_costs(it, Context(0, None)))["repeat"]
     assert rep[0] == 2
     _bf_card(g, db, "Marai Spire", 0)
-    g.set_bf_controller(0, 0); g.bump()
+    g.set_bf_controller(0, 0); g.restruct()
     rep = dict(g._optional_costs(it, Context(0, None)))["repeat"]
     assert rep[0] == 1
 
@@ -1104,7 +1104,7 @@ def test_ornns_forge_first_gear_each_turn_costs_one_less(db, decks):
     a = _card_in(g, db, 0, gear, "hand")
     base = g.card_cost(0, a, "hand")[0]
     _bf_card(g, db, "Ornn's Forge", 0)
-    g.set_bf_controller(0, 0); g.bump()
+    g.set_bf_controller(0, 0); g.restruct()
     assert g.card_cost(0, a, "hand")[0] == base - 1
     assert g.card_cost(1, _card_in(g, db, 1, gear, "hand"), "hand")[0] == base     # only friendly gear
     g.turn_memo[("gear_played", 0)] = 1
@@ -1132,7 +1132,7 @@ def test_gearhead_doubles_equipment_base_might(db, decks):
     eq = next(c.name for c in db if c.is_equipment and (c.might or 0) >= 1 and "Equip" in (c.text or ""))
     e = put(g, db, 0, eq, ("base", 0))
     base = g.chars(u).might
-    g.do_attach(e, u); g.bump()
+    g.do_attach(e, u); g.restruct()
     assert g.chars(u).might == base + 2 * g.objects[e].defn.might
 
 
@@ -1149,16 +1149,16 @@ def test_needlessly_large_yordle_cheaper_per_hold_point(db, decks):
 def test_mageseeker_warden_locks_play_locations_and_readying(db, decks):
     from riftsim.core.vm import Context
     g = main_phase(db, decks)
-    g.set_bf_controller(1, 1); g.bump()
+    g.set_bf_controller(1, 1); g.restruct()
     u = _card_in(g, db, 1, "Rell, Magnetic", "hand")
     assert ("bf", 1) in g._play_locations(1, u, "hand")
     w = put(g, db, 0, "Mageseeker Warden", ("base", 0))
     assert ("bf", 1) in g._play_locations(1, u, "hand")          # only while it's at a battlefield
-    g.objects[w].location = ("bf", 0); g.bump()
+    g.objects[w].location = ("bf", 0); g.restruct()
     assert g._play_locations(1, u, "hand") == [("base", 1)]
     foe = put(g, db, 1, "Hunting Dog", ("base", 1)); g.objects[foe].exhausted = True
     mine = put(g, db, 0, "Hunting Dog", ("base", 0), exclude=(foe,)); g.objects[mine].exhausted = True
-    g.bump()
+    g.restruct()
     assert not g.do_ready(foe, Context(1, None))
     assert g.do_ready(mine, Context(0, None))
 
@@ -1172,7 +1172,7 @@ def _rune_setup(g, db, p, domains):
             o.defn, o.domain, o.exhausted = rdefs[domains[i]], domains[i], False
         else:
             o.exhausted = True
-    g.bump()
+    g.restruct()
 
 
 def test_kraken_hunter_spends_buffs_to_reduce_body(db, decks):
@@ -1236,7 +1236,7 @@ def test_crescent_guardian_pays_chaos_after_a_spell_to_enter_ready(db, decks):
 
 def test_here_to_help_plays_a_unit_to_your_battlefield_for_three_less(db, decks):
     g = main_phase(db, decks)
-    g.set_bf_controller(0, 0); g.bump()
+    g.set_bf_controller(0, 0); g.restruct()
     u = _card_in(g, db, 0, "Rell, Magnetic", "hand")
     e, pw = g.card_cost(0, u, "hand")
     _rune_setup(g, db, 0, [g.objects[u].base_defn().domains[0]] * max(len(pw), max(0, e - 3)))
@@ -1264,7 +1264,7 @@ def test_the_academy_grants_repeat_equal_to_base_cost(db, decks):
     sp = _card_in(g, db, 0, "Get Excited!", "hand")
     d = g.objects[sp].base_defn()
     _bf_card(g, db, "The Academy", 0)
-    g.set_bf_controller(0, 0); g.bump()
+    g.set_bf_controller(0, 0); g.restruct()
     g.emit("hold", player=0, loc=("bf", 0), bf=0, units=()); settle(g)
     it = g._play(0, sp, None)
     rep = dict(g._optional_costs(it, it.ctx))["repeat_granted"]
@@ -1274,7 +1274,7 @@ def test_the_academy_grants_repeat_equal_to_base_cost(db, decks):
 def test_firelights_hideout_next_unit_has_accelerate(db, decks):
     g = main_phase(db, decks)
     _bf_card(g, db, "Firelights' Hideout", 0)
-    g.set_bf_controller(0, 0); g.bump()
+    g.set_bf_controller(0, 0); g.restruct()
     g.emit("conquer", player=0, loc=("bf", 0), bf=0, units=()); settle(g)
     u = next(c.name for c in db if c.is_unit and not c.keywords.get("accelerate") and c.domains)
     a = _card_in(g, db, 0, u, "hand")
@@ -1309,7 +1309,7 @@ def test_noxian_emissary_empowered_deathknell_plays_two_recruits(db, decks):
         g = main_phase(db, decks)
         u = put(g, db, 0, "Noxian Emissary", ("base", 0))
         assert any(getattr(a, "is_empower", False) for a in g.abilities(u))
-        g.objects[u].empowered = 1 if emp else 0; g.bump()
+        g.objects[u].empowered = 1 if emp else 0; g.restruct()
         n = sum(o.defn.name == "Recruit" and o.zone == "board" for o in g.objects.values())
         g.do_kill([u], Context(1, None)); settle(g)
         m = sum(o.defn.name == "Recruit" and o.zone == "board" for o in g.objects.values())

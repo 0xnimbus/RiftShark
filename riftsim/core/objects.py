@@ -5,7 +5,8 @@ NUMERIC_KEYWORDS = ("assault", "shield", "deflect", "disarm", "hunt")
 
 
 class Mod:
-    """A modification applied to a game object by an effect.
+    """A modification applied to a game object by an effect. Never changed after it is made: Game.clone shares Mods
+    between copies, so replace a Mod in its object's list instead of editing it.
 
     kind: 'might' (arithmetic) | 'base_might' (set) | 'keyword' ((kw, value)) | 'ability' (Ability) | 'tag' (str)
           | 'prevent' (int, consumed by damage) | 'control' (player)
@@ -62,7 +63,9 @@ class Chars:
 
 
 class GameObject:
-    __slots__ = ("uid", "defn", "owner", "controller", "zone", "location", "exhausted", "damage", "buffs",
+    # no __slots__: a plain instance dict makes Game.clone copy an object with one dict update (attribute reads cost
+    # the same in CPython 3.13). FIELDS lists every attribute.
+    FIELDS = ("uid", "defn", "owner", "controller", "zone", "location", "exhausted", "damage", "buffs",
                  "empowered", "stunned", "attached_to", "attachments", "designation", "mods", "copy_of",
                  "chars_cache", "chars_version", "entered_stamp", "facedown_turn", "hidden_at", "played_from",
                  "counters", "temp", "domain", "accel_paid", "token_source")

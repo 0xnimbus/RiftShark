@@ -3,13 +3,13 @@ replacement effects, costs and the rune pool. Turn structure, chain and combat a
 from __future__ import annotations
 
 import copy
+import os
 import random
 
 from .abilities import Static, Triggered, Activated, Replacement, PlayPermission, DelayedAbility, TRIGGERS
 from .cards import CardDB, DOMAINS
 from .objects import Mod, Chars, GameObject, PlayerState, BattlefieldState, ChainItem
 
-_OBJ_PLAIN_SLOTS = tuple(k for k in GameObject.__slots__ if k not in ("mods", "attachments", "counters", "temp", "chars_cache"))
 from .selectors import Sel
 from . import payment
 from .vm import Context, Decision, Frame, compile_effect, _copy_containers
@@ -22,6 +22,77 @@ MODES = {
 
 class RulesError(Exception):
     pass
+
+
+CACHE_CHECK = os.environ.get("RIFTSHARK_CACHE_CHECK") == "1"
+_DEFN_TRIGGERS = {}
+_KINDS = {}
+
+
+def _kinds_of(ab):
+    """event_kinds(ab), memoized per ability object (abilities are immutable once scripted)."""
+    r = _KINDS.get(id(ab))
+    if r is None or r[0] is not ab:
+        from .abilities import event_kinds
+        r = _KINDS[id(ab)] = (ab, event_kinds(ab))
+    return r[1]
+
+
+def _zone_ok(az, z):
+    """The zone part of Ability.active: can an ability with zone `az` work for an object in zone `z`?"""
+    if az == "any":
+        return True
+    if isinstance(az, (tuple, list, set)):
+        return z in az
+    return az == z
+
+
+_MOD_LAYER = {"type": 1, "tag": 1, "keyword": 2, "ability": 2, "might": 3, "base_might": 3}
+
+
+def _layer_stamp(t):
+    return (t[0], t[1])
+
+
+def _mod_stamp(m):
+    return m.stamp
+
+
+_TRIGGER_KEYWORDS = ("temporary", "vision", "hunt", "disarm")     # granting these adds abilities (_grant_keyword_trigger)
+
+
+def _prints_temporary(defn):
+    """Does the definition list the [Temporary] ability itself (so _compute_chars adds no second one)?"""
+    return any(getattr(ab, "keyword", None) == "temporary" for ab in defn.abilities)
+
+
+def _gear_may_grant(defn):
+    """Could this gear's equipment effect add an ability to the unit it is attached to?"""
+    return any(isinstance(ab, Static) and _may_grant_ability(ab) for ab in defn.effect_abilities)
+
+
+def _may_grant_ability(st):
+    """Could this Static add an ability to an object's characteristics (an ability, or [Temporary])?"""
+    k = st.mod_kind
+    if k in ("ability", "abilities"):
+        return True
+    if k == "keyword":
+        v = st.value
+        if callable(v):
+            return True
+        return (v[0] if isinstance(v, tuple) else v) in _TRIGGER_KEYWORDS
+    return False
+
+
+def _defn_triggers(defn, zone):
+    """[(Triggered, event kinds)] among a card definition's printed abilities that can work while the card is in `zone`,
+    in order (memoized per definition and zone). On the chain, board abilities are kept for "When you play me"."""
+    key = (id(defn), zone)
+    r = _DEFN_TRIGGERS.get(key)
+    if r is None or r[0] is not defn:
+        r = _DEFN_TRIGGERS[key] = (defn, [(ab, _kinds_of(ab)) for ab in defn.abilities if isinstance(ab, Triggered)
+                                          and (_zone_ok(ab.zone, zone) or (zone == "chain" and ab.zone == "board"))])
+    return r[1]
 
 
 class Game(flow.FlowMixin):
@@ -39,6 +110,7 @@ class Game(flow.FlowMixin):
         self.battlefields: list[BattlefieldState] = []
         self.stamp = 0                 # timestamp counter for layer ordering
         self.version = 0               # bumped whenever characteristics may change
+        self.struct = 0                # bumped on structural changes only (restruct)
         self.turn = 0
         self.turn_player = 0
         self.turn_queue = []
@@ -77,6 +149,10 @@ class Game(flow.FlowMixin):
         self.max_turns = 60
         self.deck_names = []
         self._computing = set()
+        self._grant_cache = None
+        self._board_cache = None
+        self._pao_cache = None
+        self._canpay_memo = None
         self._setup(decks)
 
     # ------------------------------------------------------------------ setup
@@ -84,6 +160,7 @@ class Game(flow.FlowMixin):
         o = GameObject(self.next_uid, defn, owner)
         self.objects[o.uid] = o
         self.next_uid += 1
+        self.restruct()
         return o
 
     def _setup(self, decks):
@@ -155,6 +232,12 @@ class Game(flow.FlowMixin):
     def bump(self):
         self.version += 1
 
+    def restruct(self):
+        """Bump after a structural change: objects created, zones, mods, attachments or copies. Caches that only
+        depend on those (board statics, the trigger and rule indexes when no layer adds abilities) key on `struct`."""
+        self.struct += 1
+        self.version += 1
+
     def tick(self):
         self.stamp += 1
         return self.stamp
@@ -182,15 +265,27 @@ class Game(flow.FlowMixin):
         """'I don't deal combat damage' (possibly conditional, e.g. Orianna, Exquisite)."""
         return self.has_keyword(uid, "no_combat_damage") or any(src == uid for src, _ in self.rules("no_combat_damage"))
 
+    def board_items(self):
+        """[(uid, obj)] of the objects on the board, in board (creation) order. Zones only change with restruct, so
+        this is cached per structure; don't mutate the list."""
+        cache = self._board_cache
+        if cache is not None and cache[0] == self.struct:
+            if CACHE_CHECK:
+                self._check_cache("board", cache[1], [(u, o) for u, o in self.objects.items() if o.zone == "board"])
+            return cache[1]
+        out = [(u, o) for u, o in self.objects.items() if o.zone == "board"]
+        self._board_cache = (self.struct, out)
+        return out
+
     def board_uids(self):
-        return [u for u, o in self.objects.items() if o.zone == "board"]
+        return [u for u, o in self.board_items()]
 
     def units_at(self, loc, player=None):
-        return [u for u, o in self.objects.items() if o.zone == "board" and o.location == loc and "unit" in self.chars(u).types
+        return [u for u, o in self.board_items() if o.location == loc and self.is_unit(u)
                 and (player is None or o.controller == player)]
 
     def permanents_at(self, loc, player=None):
-        return [u for u, o in self.objects.items() if o.zone == "board" and o.location == loc and self.defn_of(u).is_permanent
+        return [u for u, o in self.board_items() if o.location == loc and self.defn_of(u).is_permanent
                 and (player is None or o.controller == player)]
 
     def defn_of(self, uid):
@@ -270,16 +365,20 @@ class Game(flow.FlowMixin):
         """(src, obj, Static) for every printed/copied/mod-granted static ability of objects on the board, in board
         order. Depends only on the game state, so it is cached per state version (like chars)."""
         cache = getattr(self, "_statics_cache", None)
-        if cache is not None and cache[0] == self.version:
+        if cache is not None and cache[0] == self.struct:      # only zones, printed abilities and mods (restruct)
+            if CACHE_CHECK:
+                self._check_cache("statics", cache[1], self._build_statics())
             return cache[1]
+        out = self._build_statics()
+        self._statics_cache = (self.struct, out)
+        return out
+
+    def _build_statics(self):
         out = []
-        for src, so in self.objects.items():
-            if so.zone != "board":
-                continue
+        for src, so in self.board_items():
             for ab in self._abilities_of(src, so):
                 if isinstance(ab, Static):
                     out.append((src, so, ab))
-        self._statics_cache = (self.version, out)
         return out
 
     def _compute_chars(self, o):
@@ -310,16 +409,17 @@ class Game(flow.FlowMixin):
             for ab in ao.defn.effect_abilities:
                 if isinstance(ab, Static) and (ab.cond is None or ab.cond(self, a)) and ab.sel in ("attached", "self"):
                     statics.append((ab.layer, ao.entered_stamp, ab, a))
-        statics.sort(key=lambda t: (t[0], t[1]))
-        mods = sorted(o.mods, key=lambda m: m.stamp)
-        for layer in (1, 2, 3):
-            for m in mods:
-                if {"type": 1, "tag": 1, "keyword": 2, "ability": 2, "might": 3, "base_might": 3}.get(m.kind, 3) == layer:
-                    self._apply_mod(c, m)
-            for lay, _, ab, src in statics:
-                if lay != layer:
-                    continue
-                self._apply_static(c, ab, src, uid)
+        if statics or o.mods:
+            statics.sort(key=_layer_stamp)
+            mods = sorted(o.mods, key=_mod_stamp)
+            for layer in (1, 2, 3):
+                for m in mods:
+                    if _MOD_LAYER.get(m.kind, 3) == layer:
+                        self._apply_mod(c, m)
+                for lay, _, ab, src in statics:
+                    if lay != layer:
+                        continue
+                    self._apply_static(c, ab, src, uid)
         if c.keywords.get("temporary") and not any(getattr(a, "keyword", None) == "temporary" for a in c.abilities) \
                 and (o.attached_to is None or any(m.kind == "keyword" and m.value[0] == "temporary" for m in o.mods)):
             c.abilities.append(_temporary_ability())     # granted [Temporary] (CR: kill me at the start of my Beginning Phase)
@@ -341,11 +441,11 @@ class Game(flow.FlowMixin):
         unit's negative static might per source controller with the last check and emit 'might_reduced'."""
         if not self.rules("watch_might_reductions"):
             return
-        for uid, o in self.objects.items():
+        for uid, o in self.board_items():
             if o.zone != "board" or "unit" not in self.chars(uid).types:
                 continue
             neg = {}
-            for src, so in self.objects.items():
+            for src, so in self.board_items():
                 if so.zone != "board":
                     continue
                 for ab in self.abilities(src):
@@ -397,8 +497,86 @@ class Game(flow.FlowMixin):
         """All abilities including those granted by statics (uses computed chars)."""
         o = self.objects[uid]
         if o.zone == "board":
+            if self._printed_abilities_only(o):
+                return o.base_defn().abilities
             return self.chars(uid).abilities
         return self._abilities_of(uid, o)
+
+    def is_unit(self, uid):
+        """'unit' in chars(uid).types, without computing characteristics when nothing can change the object's types
+        (types are only added by 'type' mods, 'type' statics and attached gear; see _compute_chars)."""
+        o = self.objects[uid]
+        cc = o.chars_cache
+        if cc is not None and o.chars_version == self.version:
+            return "unit" in cc.types
+        if o.zone == "board" and (o.attachments or self._board_flags()[1] or any(m.kind == "type" for m in o.mods)):
+            return "unit" in self.chars(uid).types
+        if o.zone != "board" and any(m.kind == "type" and m.duration == "permanent" for m in o.mods):
+            return "unit" in self.chars(uid).types
+        return "unit" in o.base_defn().types
+
+    def _board_flags(self):
+        """Per state version: (some board static may grant abilities, some board static changes types)."""
+        cache = self._grant_cache
+        if cache is None or cache[0] != self.struct:
+            st = self._board_statics()
+            cache = self._grant_cache = (self.struct, (any(_may_grant_ability(ab) for _, _, ab in st),
+                                                        any(ab.mod_kind == "type" for _, _, ab in st)))
+        return cache[1]
+
+    def _build_rules_index(self):
+        idx = {}
+        layered = False
+        for src, so in self.board_items():
+            if not self._printed_abilities_only(so):
+                layered = True
+            for ab in self.abilities(src):
+                if isinstance(ab, Static) and ab.mod_kind == "rule":
+                    idx.setdefault(ab.value[0], []).append((src, so, ab))
+        return idx, layered
+
+    def _check_cache(self, what, cached, fresh):
+        """RIFTSHARK_CACHE_CHECK=1: a structure-keyed cache must equal a rebuild."""
+        def norm(x):
+            if isinstance(x, dict):
+                return {k: norm(v) for k, v in x.items()}
+            if isinstance(x, (list, tuple)):
+                return [norm(v) for v in x]
+            if isinstance(x, GameObject) or hasattr(x, "__call__") or type(x).__name__ in ("Static", "Triggered"):
+                return id(x)
+            return x
+        if norm(cached) != norm(fresh):
+            raise AssertionError(f"stale {what} cache at turn {self.turn} (struct {self.struct}, version {self.version})")
+
+    def _printed_abilities_only(self, o):
+        """True when layers can't add abilities to this board object, so its abilities are exactly the printed (or
+        copied) ones and its characteristics need not be computed to list them. Abilities are only added by
+        'ability' mods, statics granting abilities, attached gear, granted trigger keywords ([Temporary], [Vision],
+        [Hunt], [Disarm]); an attached card's printed text is inactive (see _compute_chars).
+        All of these are structural, so the answer is cached per structure."""
+        cache = self._pao_cache
+        if cache is None or cache[0] != self.struct:
+            cache = self._pao_cache = (self.struct, {})
+        r = cache[1].get(o.uid)
+        if r is None:
+            r = cache[1][o.uid] = self._printed_abilities_only_raw(o)
+        return r
+
+    def _printed_abilities_only_raw(self, o):
+        if self._board_flags()[0] or o.attached_to is not None:      # attached: printed text inactive (CR 135.4)
+            return False
+        bd = o.copy_of or o.defn
+        if bd.keywords.get("temporary") and not _prints_temporary(bd):
+            return False
+        for m in o.mods:
+            k = m.kind
+            if k == "ability" or (k == "keyword" and (m.value[0] if isinstance(m.value, tuple) else m.value) in _TRIGGER_KEYWORDS):
+                return False
+        for a in o.attachments:
+            ao = self.objects.get(a)
+            if ao is not None and ao.zone == "board" and _gear_may_grant(ao.defn):
+                return False
+        return True
 
     def has_keyword(self, uid, kw):
         return bool(self.chars(uid).keywords.get(kw))
@@ -410,16 +588,13 @@ class Game(flow.FlowMixin):
         """Collect active rule statics named `name` (kind='rule'). Returns list of (src, value)."""
         out = []
         cache = getattr(self, "_rules_cache", None)
-        if cache is None or cache[0] != self.version:
-            idx = {}
-            for src, so in self.objects.items():
-                if so.zone != "board":
-                    continue
-                for ab in self.abilities(src):
-                    if isinstance(ab, Static) and ab.mod_kind == "rule":
-                        idx.setdefault(ab.value[0], []).append((src, so, ab))
-            cache = self._rules_cache = (self.version, idx)
-        for src, so, ab in cache[1].get(name, ()):
+        if cache is not None and (cache[0] == self.version or (cache[1] is not None and cache[1] == self.struct)):
+            if CACHE_CHECK and cache[0] != self.version:
+                self._check_cache("rules", cache[2], self._build_rules_index()[0])
+        else:
+            idx, layered = self._build_rules_index()
+            cache = self._rules_cache = (self.version, None if layered else self.struct, idx)
+        for src, so, ab in cache[2].get(name, ()):
             if ab.active(self, src):
                 if player is not None and ab.sel == "self" and so.controller != player:
                     continue
@@ -435,7 +610,7 @@ class Game(flow.FlowMixin):
             return
         before = self.chars(uid).might if o.zone == "board" else None
         o.mods.append(Mod(kind, value, duration, source, self.tick(), loc=o.location))
-        self.bump()
+        self.restruct()
         self._check_mighty(uid, before)
 
     def _check_mighty(self, uid, before):
@@ -455,7 +630,7 @@ class Game(flow.FlowMixin):
         self.delayed = [d for d in self.delayed if d.expires != duration]
         self.turn_effects = [t for t in self.turn_effects if t["expires"] != duration]
         if changed:
-            self.bump()
+            self.restruct()
 
     def _on_leave_board(self, o):
         """Statuses and 'while on board' mods clear when an object leaves the board (CR 460/… snapshots)."""
@@ -471,11 +646,14 @@ class Game(flow.FlowMixin):
             self._detach_raw(a)
         if o.attached_to is not None:
             self._detach_raw(o.uid)
-        self.bump()
+        self.restruct()
 
     def _on_change_location(self, o):
-        o.mods = [m for m in o.mods if m.duration != "while_here"]
-        self.bump()
+        if any(m.duration == "while_here" for m in o.mods):
+            o.mods = [m for m in o.mods if m.duration != "while_here"]
+            self.restruct()
+        else:
+            self.bump()
 
     # ------------------------------------------------------------------ zones
     def _remove_from_zone(self, o):
@@ -508,6 +686,7 @@ class Game(flow.FlowMixin):
         elif z == "chain":
             pass
         o.zone = None
+        self.restruct()
 
     def _to_zone(self, o, zone, location=None, top=False, controller=None):
         """Low level zone change. Tokens leaving the board cease to exist (CR 187)."""
@@ -517,7 +696,7 @@ class Game(flow.FlowMixin):
         if o.defn.is_token and zone not in ("board", "chain"):
             o.zone = "gone"
             o.location = None
-            self.bump()
+            self.restruct()
             return
         p = self.players[o.owner]
         o.zone = zone
@@ -542,7 +721,7 @@ class Game(flow.FlowMixin):
                 o.location = ("runes", o.controller)
                 p.runes.append(o.uid)
             o.counters = {}
-        self.bump()
+        self.restruct()
 
     def _draw_raw(self, p):
         ps = self.players[p]
@@ -553,6 +732,7 @@ class Game(flow.FlowMixin):
         o.zone = "hand"
         ps.hand.append(u)
         o.entered_stamp = self.tick()
+        self.restruct()                 # zone change: the trigger index lists abilities by zone
         return u
 
     # ------------------------------------------------------------------ events, triggers, replacements
@@ -570,7 +750,8 @@ class Game(flow.FlowMixin):
                         for ab in self._abilities_of(u, self.objects[u]):
                             if isinstance(ab, PlayPermission) and ab.perm == "as_revealed_from_deck":
                                 ab.value(self, u, ctx)
-        self.log("event:" + kind, **{k: v for k, v in data.items() if k != "ctx"})
+        if self.log_enabled:
+            self.log("event:" + kind, **{k: v for k, v in data.items() if k != "ctx"})
         self._collect_triggers(ev)
         return ev
 
@@ -578,28 +759,57 @@ class Game(flow.FlowMixin):
         """Per state version: every triggered ability an object has, in board order, as
         (uid, obj, ability, event kinds or None, is_equipment_effect), grouped by event kind."""
         cache = getattr(self, "_trig_cache", None)
-        if cache is not None and cache[0] == self.version:
-            return cache[1]
-        from .abilities import event_kinds
+        if cache is not None and (cache[0] == self.version or (cache[1] is not None and cache[1] == self.struct)):
+            if CACHE_CHECK and cache[0] != self.version:
+                self._check_cache("triggers", cache[2], self._build_trigger_index()[0])
+            return cache[2]
+        index, layered = self._build_trigger_index()
+        # without layered objects the index only depends on structure; otherwise on the full state version
+        self._trig_cache = (self.version, None if layered else self.struct, index)
+        return index
+
+    def _build_trigger_index(self):
+        layered = False
         entries = []
+        add = entries.append
+        dtr = _DEFN_TRIGGERS
         for uid, o in list(self.objects.items()):
-            if o.zone in (None, "gone"):
+            z = o.zone
+            if z == "board":
+                bd = o.copy_of or o.defn
+                if not self._printed_abilities_only(o):
+                    # layers may add abilities (see _printed_abilities_only): use the computed characteristics
+                    layered = True
+                    for ab in self.chars(uid).abilities:
+                        if isinstance(ab, Triggered):
+                            add((uid, o, ab, _kinds_of(ab), False))
+                else:
+                    r = dtr.get((id(bd), z))
+                    for ab, kinds in (r[1] if r is not None and r[0] is bd else _defn_triggers(bd, z)):
+                        add((uid, o, ab, kinds, False))
+                if o.attached_to is not None:
+                    for ab in o.defn.effect_abilities:
+                        if isinstance(ab, Triggered):
+                            add((uid, o, ab, None, True))
                 continue
-            abl = self.abilities(uid) if o.zone == "board" else self._abilities_of(uid, o)
-            for ab in abl:
-                if isinstance(ab, Triggered):
-                    entries.append((uid, o, ab, event_kinds(ab), False))
-            if o.zone == "board" and o.attached_to is not None:
-                for ab in o.defn.effect_abilities:
-                    if isinstance(ab, Triggered):
-                        entries.append((uid, o, ab, None, True))
+            if z is None or z == "gone":
+                continue
+            # off the board: printed (or copied) + mod-granted abilities, no layers (as _abilities_of). Abilities that
+            # can't work in the object's zone are left out: Ability.active would reject them (every zone change bumps
+            # the version), except "When you play me" while the card is on the chain (see _collect_triggers).
+            bd = o.copy_of or o.defn
+            r = dtr.get((id(bd), z))
+            for ab, kinds in (r[1] if r is not None and r[0] is bd else _defn_triggers(bd, z)):
+                add((uid, o, ab, kinds, False))
+            if o.mods:
+                for m in o.mods:
+                    if m.kind == "ability" and isinstance(m.value, Triggered):
+                        add((uid, o, m.value, _kinds_of(m.value), False))
         by_kind = {}
         for k, e in enumerate(entries):
             for kind in (e[3] if e[3] is not None else ("*",)):
                 by_kind.setdefault(kind, []).append(k)
-        index = (entries, by_kind)
-        self._trig_cache = (self.version, index)
-        return index
+        return (entries, by_kind), layered
 
     def _collect_triggers(self, ev):
         pend = []
@@ -1101,13 +1311,15 @@ class Game(flow.FlowMixin):
             nxt = next((m for m in o.mods if m.kind == "prevent_next"), None)
             if nxt is not None:
                 o.mods.remove(nxt)
+                self.restruct()
                 self.log("prevent", uid=u, amount=amt)
                 continue
             # prevention shields (mods of kind 'prevent')
-            for m in o.mods:
+            for i, m in enumerate(o.mods):
                 if m.kind == "prevent" and m.value > 0 and amt > 0:
                     used = min(m.value, amt)
-                    m.value -= used
+                    # Mods are never changed in place (clones share them): replace the shield with a smaller one
+                    o.mods[i] = Mod(m.kind, m.value - used, m.duration, m.source, m.stamp, m.loc)
                     amt -= used
             if amt <= 0:
                 continue
@@ -1164,8 +1376,10 @@ class Game(flow.FlowMixin):
 
     def lethal_damage(self, uid):
         o = self.objects[uid]
+        if o.damage <= 0:
+            return False
         c = self.chars(uid)
-        if c.might is None or o.damage <= 0:
+        if c.might is None:
             return False
         if o.damage >= c.might:
             return True
@@ -1565,6 +1779,7 @@ class Game(flow.FlowMixin):
         o.zone = "board"
         o.location = loc if loc is not None else ("base", p)
         o.controller = p
+        self.restruct()
         if defn.is_unit:
             if self.consume_turn_effects("enter_ready", player=p):     # "friendly units enter ready this turn"
                 ready = True
@@ -1610,7 +1825,7 @@ class Game(flow.FlowMixin):
         o.entered_stamp = self.tick()
         self.battlefields.append(BattlefieldState(idx, o.uid, p))
         self.log("battlefield_token", uid=o.uid, name=name, idx=idx, player=p)
-        self.bump()
+        self.restruct()
         return idx
 
     def _create_battlefield_token(self, o, loc, ctx):
@@ -1622,7 +1837,7 @@ class Game(flow.FlowMixin):
         o.zone, o.location = "board", ("bfcard", loc[1])
         bf.replaced = old
         bf.uid = o.uid
-        self.bump()
+        self.restruct()
         return o.uid
 
     def replace_with_token(self, uid, token, ctx=None):
@@ -1636,7 +1851,7 @@ class Game(flow.FlowMixin):
                         self.objects[bf.replaced].zone = "board"
                         o.zone = "gone"
                         bf.uid, bf.replaced = bf.replaced, None
-                        self.bump()
+                        self.restruct()
                         return bf.uid
                     return self.play_token(ctx.controller if ctx else o.owner, token, ("bf", bf.idx), ctx=ctx)
             return None
@@ -1681,7 +1896,7 @@ class Game(flow.FlowMixin):
         g.temp["attached_turn"] = (self.turn, unit)
         u.attachments.append(gear)
         g.location = u.location
-        self.bump()
+        self.restruct()
         self.log("attach", gear=gear, unit=unit)
         self.emit("attach", uid=gear, to=unit, player=g.controller, loc=u.location, ctx=ctx)
         self.dirty = True
@@ -1695,7 +1910,7 @@ class Game(flow.FlowMixin):
         if u is not None and gear in u.attachments:
             u.attachments.remove(gear)
         g.attached_to = None
-        self.bump()
+        self.restruct()
 
     def do_detach(self, gear, ctx=None):
         g = self.objects.get(gear)
@@ -1743,12 +1958,12 @@ class Game(flow.FlowMixin):
             o.location = ("base", p)
         if duration != "permanent":
             o.mods.append(Mod("control", o.owner, duration, ctx.source if ctx else None, self.tick()))
-        self.bump()
+        self.restruct()
         self.dirty = True
 
     def _end_bound_legends(self):
         """A legend added by Neeko, Blending In exists only while that Neeko is on the board."""
-        for o in self.objects.values():
+        for _, o in self.board_items():
             b = o.temp.get("bound_to") if o.zone == "board" else None
             if b is None:
                 continue
@@ -1770,6 +1985,7 @@ class Game(flow.FlowMixin):
                 if so is not None and so.zone == "board" and so.entered_stamp == m.duration[2]:
                     continue
                 o.mods.remove(m)
+                self.restruct()
                 if o.zone == "board" and o.controller != m.value:
                     o.controller = m.value
                     if o.location is not None and o.location[0] == "base":
@@ -1834,6 +2050,15 @@ class Game(flow.FlowMixin):
             ps.energy, ps.power, ps.pool_r = 0, [], []
 
     def can_pay(self, p, energy=0, power=(), extra_exhaust=(), purpose=None):
+        memo = self._canpay_memo
+        if memo is not None:               # inside legal_actions: the state can't change between calls
+            key = (p, energy, tuple(power), tuple(extra_exhaust),
+                   None if purpose is None else tuple(sorted((k, frozenset(v) if isinstance(v, set) else v)
+                                                              for k, v in purpose.items())))
+            r = memo.get(key)
+            if r is None:
+                r = memo[key] = payment.can_pay(self, p, energy, list(power), purpose, extra_exhaust)
+            return r
         return payment.can_pay(self, p, energy, list(power), purpose, extra_exhaust)
 
     def payment_plans(self, p, energy=0, power=(), purpose=None):
@@ -1904,7 +2129,7 @@ class Game(flow.FlowMixin):
     # ------------------------------------------------------------------ cloning / snapshots
     def clone(self):
         g = copy.copy(self)
-        g._statics_cache = g._trig_cache = g._rules_cache = None      # caches hold this game's objects
+        g._statics_cache = g._trig_cache = g._rules_cache = g._grant_cache = g._board_cache = g._pao_cache = g._addsrc_cache = None      # caches hold this game's objects
         self._ctx_map = {}           # keep contexts shared between a chain item and its frames shared in the clone
         g.objects = {u: self._clone_obj(o) for u, o in self.objects.items()}
         g.players = [self._clone_player(p) for p in self.players]
@@ -1928,10 +2153,11 @@ class Game(flow.FlowMixin):
         g.history = []
         g.showdown = _copy_containers(self.showdown) if self.showdown else None
         g.combat = _copy_containers(self.combat) if self.combat else None
-        g.rng = random.Random()
+        g.rng = random.Random.__new__(random.Random)     # no seeding from the OS: the state is set right away
         g.rng.setstate(self.rng.getstate())
         g.pending = self._clone_decision(self.pending) if self.pending else None
         g._computing = set()
+        g._canpay_memo = None
         g.combat_result_memo = {}
         self.__dict__.pop("_ctx_map", None)
         g.__dict__.pop("_ctx_map", None)
@@ -1939,9 +2165,8 @@ class Game(flow.FlowMixin):
 
     def _clone_obj(self, o):
         c = GameObject.__new__(GameObject)
-        for k in _OBJ_PLAIN_SLOTS:
-            setattr(c, k, getattr(o, k))
-        c.mods = [Mod(m.kind, m.value, m.duration, m.source, m.stamp, m.loc) for m in o.mods] if o.mods else []
+        c.__dict__.update(o.__dict__)
+        c.mods = list(o.mods) if o.mods else []        # Mod objects are immutable once made
         c.attachments = list(o.attachments) if o.attachments else []
         c.counters = _copy_containers(o.counters) if o.counters else {}
         c.temp = _copy_containers(o.temp) if o.temp else {}

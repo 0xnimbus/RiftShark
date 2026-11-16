@@ -37,7 +37,7 @@ def setup(db, decks, bf_name, seed=0):
     g.do_channel(0, 6)
     for u in g.players[0].runes:
         g.objects[u].exhausted = False
-    g.bump()
+    g.restruct()
     return g, bf
 
 
@@ -47,7 +47,7 @@ def put_unit(g, p, loc, ready=True, min_might=1, exclude=()):
              and (g.objects[u].defn.might or 0) >= min_might and u not in exclude)
     g._to_zone(g.objects[u], "board", location=loc, controller=p)
     g.objects[u].exhausted = not ready
-    g.bump()
+    g.restruct()
     return u
 
 
@@ -56,7 +56,7 @@ def hand_unit(g, p, max_cost=8):
     u = next(u for u in ps.deck if g.objects[u].defn.is_unit and not g.objects[u].defn.is_champion
              and (g.objects[u].defn.energy or 0) <= max_cost and not g.objects[u].defn.power)
     g._to_zone(g.objects[u], "hand")
-    g.bump()
+    g.restruct()
     return u
 
 
@@ -189,7 +189,7 @@ def test_emperors_dais_does_not_offer_the_payment_without_energy(db, decks):
                         g.objects[r].exhausted = True
                     for r in list(g.players[0].runes):
                         g._to_zone(g.objects[r], "rune_deck")
-                    g.bump()
+                    g.restruct()
                     return o
         if d.kind == "yesno":
             asked.append(d.labels)

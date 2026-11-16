@@ -60,13 +60,38 @@ def add_sources(game, p):
     """Other permanents' Reaction Add abilities usable while paying: [(uid, idx, energy, power, restriction)].
     Abilities whose cost is exhausting their source (and possibly killing it, Gold: "Kill this, [T]: [Add] [A]")
     and whose effect is a single Add qualify."""
-    from .ops import Add
     from .vm import Context, val
     out = []
-    for u in list(game.objects):
-        o = game.objects[u]
-        if o.zone != "board" or o.controller != p or o.exhausted or o.defn.type == "rune":
+    for u, o, i, ab, add in _add_candidates(game):
+        if o.zone != "board" or o.controller != p or o.exhausted:
             continue
+        if not ab.active(game, u):
+            continue
+        if ab.restriction is not None and not ab.restriction(game, u):
+            continue
+        if ab.once_per_turn and o.temp.get(("act", i)) == game.turn:
+            continue
+        ctx = Context(p, u)
+        e = val(game, ctx, add.energy) or 0
+        pw = tuple(val(game, ctx, d) for d in add.power)
+        out.append((u, i, e, pw, add.restriction))
+    return out
+
+
+def _add_candidates(game):
+    """Board objects' (non-rune) abilities that could be add sources, by their fixed properties: (uid, obj, index,
+    ability, Add instruction). Cached like the trigger index (per structure unless layers add abilities)."""
+    cache = getattr(game, "_addsrc_cache", None)
+    if cache is not None and (cache[0] == game.version or (cache[1] is not None and cache[1] == game.struct)):
+        return cache[2]
+    from .ops import Add
+    out = []
+    layered = False
+    for u, o in game.board_items():
+        if o.defn.type == "rune":
+            continue
+        if not game._printed_abilities_only(o):
+            layered = True
         for i, ab in enumerate(game.abilities(u)):
             if not (isinstance(ab, Activated) and ab.is_add and ab.timing == "reaction"):
                 continue
@@ -75,19 +100,11 @@ def add_sources(game, p):
                 continue
             if any(c.get(k) for k in ("banish_self", "spend_buff", "xp", "discard", "sacrifice", "recycle")):
                 continue
-            if not ab.active(game, u):
-                continue
-            if ab.restriction is not None and not ab.restriction(game, u):
-                continue
-            if ab.once_per_turn and o.temp.get(("act", i)) == game.turn:
-                continue
             code = [ins for ins in ab.code]
             if len(code) != 1 or not isinstance(code[0], Add):
                 continue
-            ctx = Context(p, u)
-            e = val(game, ctx, code[0].energy) or 0
-            pw = tuple(val(game, ctx, d) for d in code[0].power)
-            out.append((u, i, e, pw, code[0].restriction))
+            out.append((u, o, i, ab, code[0]))
+    game._addsrc_cache = (game.version, None if layered else game.struct, out)
     return out
 
 
