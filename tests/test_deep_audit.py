@@ -1674,3 +1674,40 @@ def test_weaponmaster_can_take_an_equipment_already_attached_to_another_unit(db)
     g.choose(next(o for o in d.options if o[0] == "play" and o[1] == adept))
     _drive(g, pick=lambda d: sword if sword in d.options else (True if True in d.options else None))
     assert g.objects[sword].attached_to == adept
+
+
+def _set_rune_domains(g, p, doms):
+    """Make p's runes exactly the given domains, all ready."""
+    runes = g.players[p].runes
+    assert len(runes) >= len(doms)
+    for u in runes[len(doms):]:
+        g.objects[u].exhausted = True
+        g.objects[u].domain = "mind"          # no test card uses Mind; exhausted runes can still be recycled
+    for u, d in zip(runes, doms):
+        g.objects[u].domain = d
+        g.objects[u].exhausted = False
+    g.pending = None
+    g.restruct()
+
+
+def test_multi_domain_power_pips_take_any_of_the_cards_domains(db):
+    # CR 135.2.e.6.c: Defiant Dance (Calm/Chaos, [1][C]) can be paid with Chaos power; Tibbers (Fury/Chaos, two split
+    # pips) with two Fury, never Fury + Body.
+    from riftsim.core import payment
+    g = main_phase(db, [_deck(db, "irelia_blade_dancer"), _deck(db, "riven_exile")])
+    dd = give(g, 0, "Defiant Dance", db)
+    e, pw = g.card_cost(0, dd, "hand")
+    assert (e, pw) == (1, ["calm|chaos"])
+    _set_rune_domains(g, 0, ["chaos", "chaos"])
+    assert g.can_pay(0, e, pw) and payment.plans(g, 0, e, pw)
+    _set_rune_domains(g, 0, ["body", "body"])
+    assert not g.can_pay(0, e, pw) and not payment.plans(g, 0, e, pw)
+    tib = give(g, 0, "Tibbers, Annie", db)
+    e, pw = g.card_cost(0, tib, "hand")
+    assert pw == ["fury|chaos", "fury|chaos"]
+    assert g.can_pay(0, 0, pw) is False
+    _set_rune_domains(g, 0, ["fury", "fury"])
+    assert g.can_pay(0, 0, pw) and payment.plans(g, 0, 0, pw)
+    _set_rune_domains(g, 0, ["fury", "body"])
+    assert not g.can_pay(0, 0, pw)
+    assert payment.own_power(["fury", "chaos"]) == "fury|chaos" and payment.own_power([]) == "any"

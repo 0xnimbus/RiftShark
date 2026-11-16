@@ -1104,7 +1104,8 @@ class PayEquip(Instr):
         for ab in abl:
             if isinstance(ab, Activated) and ab.is_equip and ab.cost.get("exhaust_unit") is None:
                 d = game.objects[gear].base_defn()
-                pw = ["any" if x == "C" and not d.domains else (d.domains[0] if x == "C" else x) for x in ab.cost.get("power", ())]
+                from .payment import own_power
+                pw = [own_power(d.domains) if x == "C" else x for x in ab.cost.get("power", ())]
                 if pw:
                     pw = pw[1:]      # "reduced by [A]": one Power symbol of any domain is waived (CR 821.1.c.3)
                 return ab.cost.get("energy", 0), pw
