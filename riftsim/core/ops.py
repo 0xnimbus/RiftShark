@@ -1098,7 +1098,10 @@ class PayEquip(Instr):
         gear = val(game, ctx, self.gear)
         if gear is None or gear not in game.objects:
             return None
-        for ab in game.abilities(gear):
+        # CR 821.1.c: the Equip ability is read even while the gear is attached and its printed text is inactive
+        abl = list(game.abilities(gear))
+        abl += [a for a in game.objects[gear].base_defn().abilities if a not in abl]
+        for ab in abl:
             if isinstance(ab, Activated) and ab.is_equip and ab.cost.get("exhaust_unit") is None:
                 d = game.objects[gear].base_defn()
                 pw = ["any" if x == "C" and not d.domains else (d.domains[0] if x == "C" else x) for x in ab.cost.get("power", ())]

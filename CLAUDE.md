@@ -185,6 +185,9 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   2026-11-16 00:20: an attached card's printed rules text stayed active (CR 135.4): an equipped Spinning Axe died to
   its own [Temporary] and attached gear could [Equip] again; `game._active_printed` drops printed abilities while
   attached (keywords stay visible, 135.4.a; abilities scripted from effect text, e.g. Guardian Angel, stay).
+  05:20: that fix hid the Equip ability Weaponmaster reads (CR 821.1.c: "even if it's already attached"), so a
+  Weaponmaster unit could no longer take an Equipment from another unit; `ops.PayEquip` now reads the printed Equip.
+  Checked OK: Deathknell is skipped when Zhonya's/Guardian Angel replace the death (808.1.d.1), equipment Deathknell.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
