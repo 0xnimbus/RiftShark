@@ -188,6 +188,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   05:20: that fix hid the Equip ability Weaponmaster reads (CR 821.1.c: "even if it's already attached"), so a
   Weaponmaster unit could no longer take an Equipment from another unit; `ops.PayEquip` now reads the printed Equip.
   Checked OK: Deathknell is skipped when Zhonya's/Guardian Angel replace the death (808.1.d.1), equipment Deathknell.
+  10:20: multi-domain cards' split-colour power pips ([C], CR 135.2.e.6.c) took only the first domain (Defiant Dance
+  needed Calm, never Chaos) or one of each (Tibbers: Fury + Chaos, never Fury + Fury). Now a requirement "fury|chaos"
+  (`payment.own_power` / `req_ok`) used by card costs, [C] in ability costs and Accelerate. Cards checked against the
+  images. Round-robins before this underrate Irelia, Akali, Azir, Master Yi, Riven (Blade of the Exile) and Sett.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

@@ -1243,6 +1243,10 @@ class FlowMixin:
         for _ in range(k):
             if dom in pw:
                 pw.remove(dom)
+            else:
+                m = next((x for x in pw if "|" in x and dom in x.split("|")), None)
+                if m is not None:
+                    pw.remove(m)
         return pw
 
     def _variable_reduce_min(self, p, uid, e, pw, purpose):
@@ -1414,14 +1418,14 @@ class FlowMixin:
             granted = ctx.played_from not in ("hand", None) and \
                 bool(self.rules("accelerate_if_not_from_hand", player=it.controller))      # Rek'Sai, Breacher
             if c.keywords.get("accelerate") or granted or ctx.vars.get("__granted_accel"):
-                dom = [c.domains[0]] if len(c.domains) == 1 else (["any"] if not c.domains else [c.domains[0]])
+                dom = [payment.own_power(c.domains)]          # CR 805.1.b.1-2
                 out.append(("accelerate", (1, dom, "Accelerate [1][C]")))
         if it.kind in ("spell", "unit", "gear"):
             for ab in self._abilities_of(it.uid, self.objects[it.uid]):
                 pr = self._resource_additional_cost(ab)
                 if pr is not None and (ab.cond is None or ab.cond(self, it.uid)):
                     e, pw = val(self, ctx, pr.energy), [val(self, ctx, d) for d in pr.power]
-                    lbl = (f"[{e}]" if e else "") + "".join(f"[{d.capitalize() if d != 'any' else 'A'}]" for d in pw)
+                    lbl = (f"[{e}]" if e else "") + "".join(f"[{'/'.join(x.capitalize() for x in d.split('|')) if d != 'any' else 'A'}]" for d in pw)
                     out.append(("add", (e, pw, f"the additional cost {lbl}")))
                     break
         rc = getattr(it.ability, "repeat_cost", None) if it.ability is not None else None
@@ -1739,10 +1743,8 @@ class FlowMixin:
         n = d.power or 0
         if n == 0:
             power = []
-        elif len(doms) <= 1:
-            power = (doms or ["any"]) * n
         else:
-            power = list(doms[:n]) + [doms[0]] * max(0, n - len(doms))
+            power = [payment.own_power(doms)] * n      # multi-domain pips take any of its domains (CR 135.2.e.6.c)
         if from_zone == "facedown":
             energy, power = 0, []
         if from_zone == "trash":
@@ -2109,7 +2111,7 @@ class FlowMixin:
             return False
         e = self.ability_energy(ab, uid)
         pw = list(cost.get("power", ()))
-        pw = [o.base_defn().domains[0] if (d == "C" and o.base_defn().domains) else ("any" if d == "C" else d) for d in pw]
+        pw = [payment.own_power(o.base_defn().domains) if d == "C" else d for d in pw]
         if not self.can_pay(p, e, pw, purpose={"kind": "ability", "types": set(self.chars(uid).types), "uid": uid}):
             return False
         if ab.targets:
@@ -2320,7 +2322,7 @@ class FlowMixin:
         ctx = Context(p, uid, here=o.place)
         ctx.vars["self"] = uid
         cost = ab.cost
-        pw = [o.base_defn().domains[0] if (d == "C" and o.base_defn().domains) else ("any" if d == "C" else d) for d in cost.get("power", ())]
+        pw = [payment.own_power(o.base_defn().domains) if d == "C" else d for d in cost.get("power", ())]
         c = {"energy": self.ability_energy(ab, uid), "power": pw}
         if cost.get("exhaust"):
             c["exhaust"] = uid

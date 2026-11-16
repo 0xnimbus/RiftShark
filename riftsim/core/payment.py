@@ -28,6 +28,20 @@ from .ops import Add
 CAP = 400   # safety bound on enumerated plans (far above anything a real board produces)
 
 
+def own_power(domains):
+    """[C]: one Power of the card's own domain (CR 135.2.e.6). No domain: [A] (135.2.e.6.b). Several domains: a
+    Power of any of them (135.2.e.6.c; the split-colour pips on multi-domain cards), written "fury|chaos"."""
+    doms = list(domains or ())
+    if not doms:
+        return "any"
+    return doms[0] if len(doms) == 1 else "|".join(doms)
+
+
+def req_ok(req, dom):
+    """Can a Power of domain `dom` pay requirement `req` (a domain, 'any', or 'a|b' for one of several)?"""
+    return req == "any" or req == dom or ("|" in req and dom in req.split("|"))
+
+
 # ------------------------------------------------------------------ restrictions
 def purpose_of_card(game, uid, kind="play"):
     o = game.objects.get(uid)
@@ -140,7 +154,8 @@ def can_pay(game, p, energy, power, purpose=None, extra_exhaust=()):
     if e_tok + ready < energy:
         return False
     # power: specific domains first from same-domain sources, then universal, then 'any' from leftovers
-    spec = Counter(d for d in power if d != "any")
+    spec = Counter(d for d in power if d != "any" and "|" not in d)
+    multi = [d.split("|") for d in power if "|" in d]
     n_any = sum(1 for d in power if d == "any")
     dom_src = Counter()
     for (r, _), n in tok.items():
@@ -159,6 +174,20 @@ def can_pay(game, p, energy, power, purpose=None, extra_exhaust=()):
             dom_src[d] = 0
             if univ < 0:
                 return False
+    if multi:
+        # "one of several domains" requirements: exact search over the leftover domain sources, then universal
+        def fit(i, src, uni):
+            if i == len(multi):
+                return uni + sum(src.values()) >= n_any
+            for d in multi[i]:
+                if src.get(d, 0) > 0:
+                    src[d] -= 1
+                    if fit(i + 1, src, uni):
+                        src[d] += 1
+                        return True
+                    src[d] += 1
+            return uni > 0 and fit(i + 1, src, uni - 1)
+        return fit(0, Counter(dom_src), univ)
     left = univ + sum(dom_src.values())
     return left >= n_any
 
@@ -170,10 +199,10 @@ def _assign_power(reqs, tokens, groups):
         out = []
         for k, n in sorted(tokens.items(), key=lambda kv: (str(kv[0][0]), str(kv[0][1]))):
             r = k[0]
-            if n > 0 and r != "E" and (req == "any" or r == req or r == "any"):
+            if n > 0 and r != "E" and (r == "any" or req_ok(req, r)):
                 out.append(("tok", k))
         for g, n in sorted(groups.items(), key=lambda kv: (kv[0][0], kv[0][1])):
-            if n > 0 and (req == "any" or g[0] == req):
+            if n > 0 and req_ok(req, g[0]):
                 out.append(("rune", g))
         return out
 
@@ -233,7 +262,7 @@ def plans(game, p, energy, power, purpose=None):
     """Every distinct legal way for player p to pay `energy` and `power` (list of domains or 'any').
     Returns a list of plans (hashable tuples); the first is the engine's standard payment."""
     energy = energy or 0
-    power = sorted(power, key=lambda d: (d == "any", d))
+    power = sorted(power, key=lambda d: (d == "any", "|" in d, d))
     if energy <= 0 and not power:
         return [((), ())]
     ps = game.players[p]
