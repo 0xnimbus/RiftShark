@@ -286,6 +286,8 @@ class Game(flow.FlowMixin):
         c = Chars(o.base_defn())
         if o.copy_of is not None:
             c.abilities = list(o.copy_of.abilities)
+        if o.zone == "board" and o.attached_to is not None:
+            c.abilities = _active_printed(o, c.abilities)     # CR 135.4: printed rules text inactive while attached
         uid = o.uid
         if o.zone != "board":
             # CR 711: objects off the board use printed characteristics (+ granted mods that persist in zones)
@@ -318,7 +320,8 @@ class Game(flow.FlowMixin):
                 if lay != layer:
                     continue
                 self._apply_static(c, ab, src, uid)
-        if c.keywords.get("temporary") and not any(getattr(a, "keyword", None) == "temporary" for a in c.abilities):
+        if c.keywords.get("temporary") and not any(getattr(a, "keyword", None) == "temporary" for a in c.abilities) \
+                and (o.attached_to is None or any(m.kind == "keyword" and m.value[0] == "temporary" for m in o.mods)):
             c.abilities.append(_temporary_ability())     # granted [Temporary] (CR: kill me at the start of my Beginning Phase)
         if c.might is not None:
             c.might += o.buffs + self._buff_bonus(o)
@@ -383,6 +386,8 @@ class Game(flow.FlowMixin):
     def _abilities_of(self, uid, o, partial=None):
         """Abilities an object currently has: printed (or copied) + granted via mods (+ equipment)."""
         res = list(o.base_defn().abilities)
+        if o.zone == "board" and o.attached_to is not None:
+            res = _active_printed(o, res)                      # CR 135.4: printed rules text inactive while attached
         for m in o.mods:
             if m.kind == "ability":
                 res.append(m.value)
@@ -2023,6 +2028,14 @@ class Game(flow.FlowMixin):
                                                 "finalized": it.finalized, "card": self.objects[it.uid].defn.id if it.uid else None} for it in self.chain],
                 "showdown": self.showdown, "combat": self.combat, "winner": self.winner, "over": self.over,
                 "priority": self.priority, "focus": self.focus}
+
+
+def _active_printed(o, abilities):
+    """CR 135.4 / 721.2: an attached card's printed rules text is inactive (its abilities don't trigger, apply or
+    activate; its keywords can still be seen, 135.4.a). Abilities scripted from its effect text (source_text is the
+    effect text, e.g. Guardian Angel's replacement) belong to the unit it's attached to and stay."""
+    eff = o.defn.effect_text
+    return [a for a in abilities if eff and getattr(a, "source_text", None) == eff]
 
 
 _TEMPORARY = []

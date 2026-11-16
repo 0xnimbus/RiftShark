@@ -1633,3 +1633,28 @@ def test_predict_puts_the_kept_cards_back_in_the_order_the_player_picks(db):
     g.choose((c, a))
     g.run()
     assert deck[:2] == [c, a] and b not in deck[:2]
+
+
+def test_an_attached_cards_printed_rules_text_is_inactive(db):
+    # CR 135.4 / 722 example: Spinning Axe's [Temporary] doesn't trigger while it is attached, and its [Equip] can't be
+    # activated again to move it; the keyword can still be seen (135.4.a). Effect-text abilities stay (Guardian Angel).
+    g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "riven_exile")])
+    u = put(g, db, 0, "Stellacorn Herder", ("base", 0))
+    put(g, db, 0, "Stellacorn Herder", ("base", 0))
+    axe = put(g, db, 0, "Spinning Axe", ("base", 0))
+    loose = put(g, db, 0, "Long Sword", ("base", 0))
+    ga = put(g, db, 0, "Guardian Angel", ("base", 0))
+    g.do_attach(axe, u)
+    g.do_attach(ga, u)
+    _ready_runes(g, 0)
+    d = g.run()
+    assert any(o[0] == "activate" and o[1] == loose for o in d.options)
+    assert not any(o[0] == "activate" and o[1] in (axe, ga) for o in d.options)
+    assert g.has_keyword(axe, "temporary") and not g.abilities(axe)
+    assert any(getattr(a, "label", "") == "Guardian Angel" for a in g.abilities(ga))
+    g.choose(("end_turn",))
+    _drive(g, stop=lambda d: g.turn_player == 0 and g.phase == "main" and d.kind == "action" and not g.chain,
+           pick=lambda d: ("end_turn",) if ("end_turn",) in d.options and not g.chain else None)
+    assert g.objects[axe].zone == "board" and g.objects[axe].attached_to == u
+    g.do_detach(axe) if hasattr(g, "do_detach") else g._detach_raw(axe)
+    assert any(getattr(a, "keyword", None) == "temporary" for a in g.abilities(axe))
