@@ -1711,3 +1711,42 @@ def test_multi_domain_power_pips_take_any_of_the_cards_domains(db):
     _set_rune_domains(g, 0, ["fury", "body"])
     assert not g.can_pay(0, 0, pw)
     assert payment.own_power(["fury", "chaos"]) == "fury|chaos" and payment.own_power([]) == "any"
+
+
+def _enemy_items(g, src, target_sets):
+    from riftsim.core.objects import ChainItem
+    from riftsim.core.vm import Context
+    items = []
+    for i, tgts in enumerate(target_sets):
+        it = ChainItem(900 + i, "ability", 1, uid=src, label=f"ability {i}")
+        it.cost, it.finalized, it.ctx, it.code = {"energy": 0, "power": []}, True, Context(1, src), []
+        for k, t in enumerate(tgts):
+            it.ctx.vars[f"t{k}"] = t
+        it.ctx.vars["__targets"] = [(f"t{k}", None) for k in range(len(tgts))]
+        g.chain.append(it)
+        items.append(it)
+    g.priority = 0
+    return items
+
+
+def test_repulse_counters_an_enemy_item_choosing_only_that_friendly_unit(db):
+    """Repulse (Master Yi and Sett sideboards): "Choose a friendly unit at a battlefield. Counter an enemy spell or ability that
+    chooses it and no other friendly unit." It was unscripted. An item choosing two of my units can't be countered."""
+    def setup():
+        g = _fresh(db, "master_yi_wuju")
+        mine = put(g, db, 0, "Forecaster", ("bf", 0))
+        other = put(g, db, 0, "Forecaster", ("bf", 0), exclude=(mine,))
+        src = put(g, db, 1, "Forecaster", ("base", 1))
+        return g, mine, other, src
+    g, mine, other, src = setup()
+    items = _enemy_items(g, src, ((mine, other), (mine,)))   # older item chooses two of my units, newer one only `mine`
+    _cast(g, db, 0, "Repulse", lambda d: mine if d.kind == "choose" and mine in d.options
+          else (src if d.kind == "choose" and src in d.options else None))
+    assert items[1].countered and not items[0].countered
+    # with only the item that chooses both of my units on the chain, Repulse can't be played
+    g, mine, other, src = setup()
+    _enemy_items(g, src, ((mine, other),))
+    rp = give(g, 0, "Repulse", db)
+    _ready_runes(g, 0)
+    d = g.run()
+    assert d.player == 0 and not any(o[0] == "play" and o[1] == rp for o in d.options)
