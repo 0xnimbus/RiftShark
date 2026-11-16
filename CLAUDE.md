@@ -207,6 +207,11 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   2026-11-12 AI v2 (docs/plans/ai_v2.md, docs/results/ai_v2_2026-11-12.md): policy net `models/policy_g14.json`
   (`policy:REF`) + two-turn search `search-v2` (= `learned:gen_014:p=policy_g14:ps3:crn:b=0.3:d10`) beat gen 14 65-35
   and 60-37. ~15-20x slower per move; gates need `RIFTSHARK_GAME_LIMIT=4000`. Gen 14 stays the fast default.
+- Engine speed (2026-11-16, Derrick picked the refactor): caches that only depend on zones, printed abilities, mods and
+  attachments key on `Game.struct` (bumped by `Game.restruct()`, which also bumps `version`); board list, statics,
+  trigger/rule/replacement/add-source indexes. Anything that changes an object's zone, defn, mods, attachments or copy_of
+  must call `restruct()` (tests do after editing cards). `RIFTSHARK_CACHE_CHECK=1` compares every structure-keyed hit
+  with a rebuild. Games are move-for-move identical to before; gen 14 1.35x, expert 1.48x, search-v2 1.42x faster.
 - Main deck = 39 cards + chosen champion (CR 103.3). `When you play me` triggers fire from the chain.
 - `riftsim/` top level still holds the v1 simplified engine (engine.py, policies.py, replay.py, runner.py, cli.py).
   It will be replaced by v2 equivalents.
