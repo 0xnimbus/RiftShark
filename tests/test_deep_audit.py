@@ -1658,3 +1658,19 @@ def test_an_attached_cards_printed_rules_text_is_inactive(db):
     assert g.objects[axe].zone == "board" and g.objects[axe].attached_to == u
     g.do_detach(axe) if hasattr(g, "do_detach") else g._detach_raw(axe)
     assert any(getattr(a, "keyword", None) == "temporary" for a in g.abilities(axe))
+
+
+def test_weaponmaster_can_take_an_equipment_already_attached_to_another_unit(db):
+    # CR 821.1.c: Weaponmaster reads the chosen Equipment's Equip cost even though its printed text is inactive while
+    # attached (135.4), and moves it to the Weaponmaster unit.
+    g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "riven_exile")])
+    other = put(g, db, 0, "Stellacorn Herder", ("base", 0))
+    sword = put(g, db, 0, "Long Sword", ("base", 0))
+    g.do_attach(sword, other)
+    adept = give(g, 0, "Sentinel Adept", db)
+    _ready_runes(g, 0)
+    g.restruct()
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == adept))
+    _drive(g, pick=lambda d: sword if sword in d.options else (True if True in d.options else None))
+    assert g.objects[sword].attached_to == adept
