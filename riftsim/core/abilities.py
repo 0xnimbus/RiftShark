@@ -14,7 +14,7 @@ Trigger conditions
 """
 from __future__ import annotations
 
-from .vm import compile_effect
+from .vm import compile_effect, Context as _Context
 from .targeting import split_choices, split_trigger
 
 
@@ -247,9 +247,8 @@ class Static(Ability):
             return uid == src
         if self.sel == "attached":
             return g.objects[src].attached_to == uid
-        from .vm import Context
         o = g.objects[src]
-        ctx = Context(o.controller, src, here=o.place)
+        ctx = _Context(o.controller, src, here=o.place)
         return self.sel.matches(g, ctx, uid)
 
 

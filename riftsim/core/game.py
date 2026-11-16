@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import os
+import sys
 import random
 
 from .abilities import Static, Triggered, Activated, Replacement, PlayPermission, DelayedAbility, TRIGGERS
@@ -25,6 +26,20 @@ class RulesError(Exception):
 
 
 CACHE_CHECK = os.environ.get("RIFTSHARK_CACHE_CHECK") == "1"
+_PYPY = sys.implementation.name == "pypy"
+
+
+def _make_obj_copier():
+    """A function copying every GameObject field by plain attribute assignment: faster than a __dict__ update in
+    CPython and ~200x faster in PyPy (whose JIT handles direct attribute stores well)."""
+    src = "def copy_obj(o):\n    c = _new(GameObject)\n" + "".join(f"    c.{k} = o.{k}\n" for k in GameObject.FIELDS) \
+        + "    return c\n"
+    ns = {"GameObject": GameObject, "_new": object.__new__}
+    exec(src, ns)
+    return ns["copy_obj"]
+
+
+_copy_obj_fields = _make_obj_copier()
 _DEFN_TRIGGERS = {}
 _KINDS = {}
 
@@ -2127,9 +2142,16 @@ class Game(flow.FlowMixin):
         return cands
 
     # ------------------------------------------------------------------ cloning / snapshots
-    def clone(self):
-        g = copy.copy(self)
-        g._statics_cache = g._trig_cache = g._rules_cache = g._grant_cache = g._board_cache = g._pao_cache = g._addsrc_cache = None      # caches hold this game's objects
+    def clone(self, copy_rng=True):
+        """An independent copy of the game. copy_rng=False leaves `rng` unset for a caller that replaces it at once
+        (determinize): copying the generator's state is costly, above all in PyPy."""
+        if _PYPY:
+            g = Game.__new__(Game)
+            g.__dict__ = self.__dict__.copy()          # copy.copy and __dict__.update are ~40x slower in PyPy
+        else:
+            g = copy.copy(self)
+        g._statics_cache = g._trig_cache = g._rules_cache = g._grant_cache = g._board_cache = g._pao_cache = None
+        g._addsrc_cache = None                         # caches hold this game's objects
         self._ctx_map = {}           # keep contexts shared between a chain item and its frames shared in the clone
         g.objects = {u: self._clone_obj(o) for u, o in self.objects.items()}
         g.players = [self._clone_player(p) for p in self.players]
@@ -2153,8 +2175,11 @@ class Game(flow.FlowMixin):
         g.history = []
         g.showdown = _copy_containers(self.showdown) if self.showdown else None
         g.combat = _copy_containers(self.combat) if self.combat else None
-        g.rng = random.Random.__new__(random.Random)     # no seeding from the OS: the state is set right away
-        g.rng.setstate(self.rng.getstate())
+        if copy_rng:
+            g.rng = random.Random.__new__(random.Random)     # no seeding from the OS: the state is set right away
+            g.rng.setstate(self.rng.getstate())
+        else:
+            g.rng = None
         g.pending = self._clone_decision(self.pending) if self.pending else None
         g._computing = set()
         g._canpay_memo = None
@@ -2164,8 +2189,7 @@ class Game(flow.FlowMixin):
         return g
 
     def _clone_obj(self, o):
-        c = GameObject.__new__(GameObject)
-        c.__dict__.update(o.__dict__)
+        c = _copy_obj_fields(o)
         c.mods = list(o.mods) if o.mods else []        # Mod objects are immutable once made
         c.attachments = list(o.attachments) if o.attachments else []
         c.counters = _copy_containers(o.counters) if o.counters else {}

@@ -235,7 +235,7 @@ class _Node:
 def determinize(game, player, rng):
     """Hidden information: shuffle what `player` cannot see (opponent hand + deck + facedown cards, own deck order,
     rune decks) on a clone and return it. Cards revealed to `player` (Scuttle Crab, reveals) are kept."""
-    g = game.clone()
+    g = game.clone(copy_rng=False)                # g.rng is replaced below
     for q, ps in enumerate(g.players):
         # hidden orders/contents are sorted before shuffling, so the result depends only on what `player` knows
         if q == player:

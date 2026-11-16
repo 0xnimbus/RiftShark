@@ -22,6 +22,8 @@ from collections import Counter
 from itertools import permutations
 
 from .abilities import Activated
+from .vm import Context, val
+from .ops import Add
 
 CAP = 400   # safety bound on enumerated plans (far above anything a real board produces)
 
@@ -60,7 +62,6 @@ def add_sources(game, p):
     """Other permanents' Reaction Add abilities usable while paying: [(uid, idx, energy, power, restriction)].
     Abilities whose cost is exhausting their source (and possibly killing it, Gold: "Kill this, [T]: [Add] [A]")
     and whose effect is a single Add qualify."""
-    from .vm import Context, val
     out = []
     for u, o, i, ab, add in _add_candidates(game):
         if o.zone != "board" or o.controller != p or o.exhausted:
@@ -84,7 +85,6 @@ def _add_candidates(game):
     cache = getattr(game, "_addsrc_cache", None)
     if cache is not None and (cache[0] == game.version or (cache[1] is not None and cache[1] == game.struct)):
         return cache[2]
-    from .ops import Add
     out = []
     layered = False
     for u, o in game.board_items():
