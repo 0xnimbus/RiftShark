@@ -2090,7 +2090,10 @@ def titanic_shrine(defn):
             return False
         m = g.chars(u).might or 0
         return all((g.chars(x).might or 0) < m for x, o in g.objects.items() if x != u and o.zone == "board" and "unit" in g.chars(x).types)
-    return [Triggered(big, [O.If(lambda g, c: not g.objects[c.source].exhausted, [O.Exhaust(Ref("self")), O.Draw(1)])],
+    # "exhaust me to draw 1": exhausting is the base cost, paid as the trigger is finalized (CR 383.3.b)
+    from ..targeting import TriggerBaseCost
+    ready = lambda g, c: g.objects[c.source].zone == "board" and not g.objects[c.source].exhausted
+    return [Triggered(big, [O.Draw(1)], targets=[TriggerBaseCost(ready), O.Exhaust(Ref("self"))],
                       label=defn.name, source_text=defn.text)]
 
 

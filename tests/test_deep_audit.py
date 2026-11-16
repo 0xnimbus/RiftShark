@@ -1750,3 +1750,35 @@ def test_repulse_counters_an_enemy_item_choosing_only_that_friendly_unit(db):
     _ready_runes(g, 0)
     d = g.run()
     assert d.player == 0 and not any(o[0] == "play" and o[1] == rp for o in d.options)
+
+
+def test_a_cost_at_the_start_of_a_trigger_is_paid_as_it_is_finalized(db):
+    """CR 383.3.b: "Recycle me to ready your runes" (Ekko, Recurrent, the rule's own example), "banish a card from any
+    trash to ..." (Gust Monk) and "exhaust me to draw 1" (Titanic Shrine) are base costs paid as the trigger is
+    finalized, before anyone can respond. They were paid on resolution, so a response could stop the cost."""
+    g = _fresh(db)
+    ek = put(g, db, 0, "Ekko, Recurrent", ("base", 0))
+    g.do_kill([ek], Context(0))
+    for _ in range(10):                       # run until the Deathknell is a finalized chain item
+        d = g.run()
+        if g.chain and all(it.finalized for it in g.chain):
+            break
+        g.choose(d.options[0])
+    assert g.chain and g.objects[ek].zone == "deck"          # recycled before the Deathknell resolves
+    # Gust Monk with every trash empty: its trigger can't be finalized (no card to banish)
+    g = _fresh(db, "irelia_blade_dancer")
+    for p in g.players:
+        for u in list(p.trash):
+            g.objects[u].zone = "banish"
+            p.trash.remove(u)
+            p.banish.append(u) if hasattr(p, "banish") else None
+    g.restruct()
+    put(g, db, 0, "Forecaster", ("base", 0))
+    gm = give(g, 0, "Gust Monk", db)
+    _ready_runes(g, 0)
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == gm))
+    _drive(g, pick=lambda d: True if d.kind == "additional_cost" else None)
+    assert not any("Assault" in str(m.value) or m.kind == "keyword" and m.value[0] == "assault"
+                   for o in g.objects.values() for m in o.mods)
+    assert any(e["kind"] == "trigger_declined" for e in g.events)

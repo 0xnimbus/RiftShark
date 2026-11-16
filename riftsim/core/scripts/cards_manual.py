@@ -147,10 +147,12 @@ def _evd(c):
 @script("Ekko, Recurrent")
 def ekko_recurrent(defn):
     # [Accelerate]  [Deathknell] — Recycle me to ready your runes.
-    return [Triggered("die_self", [O.If(lambda g, c: g.objects[c.source].zone == "trash", [
+    # "Recycle me" is the base cost, paid as the trigger is finalized (CR 383.3.b, Ekko is the rule's example)
+    from ..targeting import TriggerBaseCost
+    return [Triggered("die_self", [O.Ready(Sel("rune", side="friendly"))], targets=[
+        TriggerBaseCost(lambda g, c: g.objects[c.source].zone == "trash"),
         O.Recycle(Ref("self")),
-        O.Ready(Sel("rune", side="friendly")),
-    ])], label="Deathknell", source_text=defn.text, keyword="deathknell")]
+    ], label="Deathknell", source_text=defn.text, keyword="deathknell")]
 
 
 @script("Miss Fortune, Captain")

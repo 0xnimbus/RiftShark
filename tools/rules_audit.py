@@ -283,7 +283,8 @@ def check_invariants(g, a, seed, last):
                 a.bad("lethal", f"{where}: {g.label(u)} has lethal damage on the board (CR 323 cleanup)")
         for b in g.battlefields:
             ctl = {g.objects[x].controller for x in g.units_at(("bf", b.idx))}
-            if len(ctl) > 1:
+            if len(ctl) > 1 and not (getattr(b, "staged_combat", False) or getattr(b, "staged_showdown", False)):
+                # a staged combat waits for the turn player to pick which contested battlefield goes first
                 a.bad("contested", f"{where}: units of two players at battlefield {b.idx} outside combat/showdown")
             if len(ctl) == 1 and b.controller not in ctl and not getattr(b, "staged_showdown", False):
                 a.bad("control", f"{where}: battlefield {b.idx} held only by P{next(iter(ctl))} but controlled by {b.controller}")
