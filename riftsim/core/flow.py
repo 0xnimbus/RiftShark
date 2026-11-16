@@ -1143,7 +1143,12 @@ class FlowMixin:
     def _task_combat_end(self):
         c = self.combat
         loc = ("bf", c["bf"])
-        survivors = tuple(self.units_at(loc))
+        # "When a combat that I was in ends" (Mournful Witness, Affectionate Poro): every unit that had a combat
+        # designation in this combat and is still the same object on the board, wherever it is now (attackers
+        # recalled after a tie were in the combat too, CR 740.2.c)
+        was_in = {(u, stamp) for u, stamp, _ in c.get("designated", ())}
+        survivors = tuple(u for u in self.units_at(loc)) + tuple(
+            u for u, o in self.objects.items() if o.zone == "board" and o.location != loc and (u, o.entered_stamp) in was_in)
         for o in self.objects.values():
             o.designation = None
         self.expire_mods("combat")

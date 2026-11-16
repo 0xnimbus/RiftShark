@@ -1394,3 +1394,267 @@ def test_the_awaken_phase_readying_triggers_when_i_become_ready(db):
     r = g.players[1].runes[0]
     assert haven.matches(g, g.battlefields[0].uid, {"kind": "ready", "uid": cat, "player": 1})
     assert not haven.matches(g, g.battlefields[0].uid, {"kind": "ready", "uid": r, "player": 1})
+
+
+def test_a_combat_i_was_in_ends_even_after_a_tie_recalled_me(db):
+    """Mournful Witness: "When a combat that I was in ends, empower me." After a tie the attackers are recalled before
+    the combat ends; Witness was still in that combat (CR 740.2.c: it had a combat designation), so it triggers. Only
+    units still at the battlefield counted."""
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    w = put(g, db, 0, "Mournful Witness", ("base", 0))
+    big = put(g, db, 1, "Elnuk Herd", ("bf", 0))
+    g.set_bf_controller(0, 1)
+    g.objects[big].stunned = True               # deals no damage; Witness's 2 doesn't kill it: a tie
+    g.bump()
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "move" and o[1] == (w,) and o[2] == ("bf", 0)))
+    _drive(g)
+    assert g.objects[big].zone == "board" and g.objects[w].location == ("base", 0)
+    assert g.objects[w].empowered
+
+
+def test_units_cant_move_to_base_is_every_unit_and_from_here_only_that_battlefield(db):
+    """Minotaur Reckoner: "Units can't move to base." stops every unit (it only stopped units at Reckoner's own
+    location). Vilemaw's Lair: "Units can't move from here to base." stops only units at that battlefield.
+    Recalls are not moves (CR 458.3)."""
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    put(g, db, 1, "Minotaur Reckoner", ("base", 1))
+    a = put(g, db, 0, "Forecaster", ("bf", 0))
+    b = put(g, db, 1, "Forecaster", ("bf", 1))
+    assert not g.valid_destination(a, ("base", 0)) and not g.valid_destination(b, ("base", 1))
+    g.do_recall(a)
+    assert g.objects[a].location == ("base", 0)
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    g.objects[g.battlefields[0].uid].defn = _card(db, "Vilemaw's Lair")
+    g.bump()
+    a = put(g, db, 0, "Forecaster", ("bf", 0))
+    b = put(g, db, 0, "Forecaster", ("bf", 1))
+    assert not g.valid_destination(a, ("base", 0)) and g.valid_destination(b, ("base", 0))
+
+
+def test_zhonyas_hourglass_saves_the_unit_its_controller_picks_when_two_die_together(db):
+    """Zhonya's Hourglass: "The next time a friendly unit would die, kill this instead. Recall that unit exhausted."
+    When two friendly units die at the same time its controller decides which death it replaces (CR 373); it always
+    saved the first one in the engine's list. Facedown (Hidden) it has no text and saves nobody."""
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    z = put(g, db, 0, "Zhonya's Hourglass", ("base", 0))
+    small = put(g, db, 0, "Forecaster", ("bf", 0))
+    baron = put(g, db, 0, "Baron Nashor", ("bf", 0))
+    g.do_kill([small, baron])
+    d = g.run()
+    assert d.kind == "order_replacement" and d.player == 0 and set(d.options) == {small, baron}
+    g.choose(baron)
+    g.run()
+    assert g.objects[small].zone == "trash" and g.objects[z].zone == "trash"
+    assert g.objects[baron].location == ("base", 0) and g.objects[baron].exhausted
+    # one friendly death: no question, it is saved
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    z = put(g, db, 0, "Zhonya's Hourglass", ("base", 0))
+    small = put(g, db, 0, "Forecaster", ("bf", 0))
+    enemy = put(g, db, 1, "Forecaster", ("bf", 1))
+    g.do_kill([small, enemy])
+    assert g.objects[small].location == ("base", 0) and g.objects[enemy].zone == "trash"
+    assert g.objects[z].zone == "trash"
+    # hidden facedown it does nothing
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    g.set_bf_controller(0, 0)
+    z = give(g, 0, "Zhonya's Hourglass", db)
+    assert g.do_hide(0, z, ("bf", 0))
+    small = put(g, db, 0, "Forecaster", ("bf", 0))
+    g.do_kill([small])
+    assert g.objects[small].zone == "trash" and g.objects[z].zone == "facedown"
+
+
+def _smite_on(g, db, caster, unit):
+    sm = give(g, caster, "Smite", db)
+    c = Context(caster, sm)
+    c.vars["t"] = unit
+    next(i for i in _card(db, "Smite").abilities[0].code if type(i).__name__ == "DelayedPassive").run(g, c)
+    return c
+
+
+def test_the_dying_units_controller_picks_which_replacement_saves_it(db):
+    """Smite ("If it would die this turn, banish it instead") on a unit whose controller has Zhonya's Hourglass: both
+    replace the same death, its controller picks one (CR 372), and a replaced death is no longer a death, so the other
+    doesn't apply. The engine applied Zhonya's (killing it) and then Smite's banish anyway."""
+    for pick_zhonya in (True, False):
+        g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+        _clear_bfs(g, db)
+        z = put(g, db, 1, "Zhonya's Hourglass", ("base", 1))
+        a = put(g, db, 1, "Forecaster", ("bf", 0))
+        c = _smite_on(g, db, 0, a)
+        g.do_deal([a], 5, c)
+        d = g.run()
+        assert d.kind == "order_replacement" and d.player == 1 and len(d.options) == 2
+        want = "Zhonya" if pick_zhonya else "Smite"
+        g.choose(next(o for o, l in zip(d.options, d.labels) if want in l))
+        g.run()
+        if pick_zhonya:
+            assert g.objects[a].location == ("base", 1) and g.objects[z].zone == "trash"
+        else:
+            assert g.objects[a].zone == "banish" and g.objects[z].zone == "board"
+    # Guardian Angel on the unit and Zhonya's: only the picked one is spent
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    z = put(g, db, 0, "Zhonya's Hourglass", ("base", 0))
+    a = put(g, db, 0, "Forecaster", ("bf", 0))
+    ga = put(g, db, 0, "Guardian Angel", ("bf", 0))
+    g.do_attach(ga, a)
+    g.bump()
+    g.do_kill([a])
+    d = g.run()
+    assert d.kind == "order_replacement"
+    g.choose(next(o for o, l in zip(d.options, d.labels) if "Guardian" in l))
+    g.run()
+    assert g.objects[a].location == ("base", 0) and g.objects[ga].zone == "trash" and g.objects[z].zone == "board"
+
+
+def test_stun_does_not_exhaust_and_a_stunned_unit_cant_be_stunned_again(db):
+    """CR 424.1.b: a stunned unit only deals no combat damage; stunning doesn't exhaust it (Vex, Apathetic adds "They
+    can't move it this turn" for that reason). The engine exhausted it, so a ready unit stunned in the main phase
+    could no longer move or pay exhaust costs. CR 424.1.a.1: stunning an already stunned unit does nothing, so "When
+    you stun" triggers don't fire again."""
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    u = put(g, db, 0, "Forecaster", ("base", 0))
+    stuns = []
+    g.do_stun(u, Context(1, None))
+    assert g.objects[u].stunned and not g.objects[u].exhausted
+    d = g.run()
+    assert any(o[0] == "move" and o[1] == (u,) for o in d.options)      # a stunned unit may still move
+    orig = g.emit
+
+    def spy(kind, **kw):
+        if kind == "stun":
+            stuns.append(kw.get("uid"))
+        return orig(kind, **kw)
+    g.emit = spy
+    g.do_stun(u, Context(1, None))
+    assert stuns == []
+    # nothing stops readying a stunned unit either (it stayed exhausted when an effect readied it)
+    g.objects[u].exhausted = True
+    assert g.do_ready(u, Context(0, None)) and not g.objects[u].exhausted and g.objects[u].stunned
+
+
+def test_heal_exhaust_and_recall_is_an_exhaust_action(db):
+    """Zhonya's Hourglass / Guardian Angel / Soraka: "heal it, exhaust it, and recall it". Exhausting is the Exhaust
+    action (CR 415), so "When I become exhausted" (Reckless Innovator, Riven, Broken Blade) triggers; the engine set
+    the flag without the event."""
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    put(g, db, 0, "Zhonya's Hourglass", ("base", 0))
+    r = put(g, db, 0, "Reckless Innovator", ("bf", 0))
+    seen = []
+    orig = g.emit
+
+    def spy(kind, **kw):
+        seen.append((kind, kw.get("uid")))
+        return orig(kind, **kw)
+    g.emit = spy
+    g.do_kill([r])
+    assert g.objects[r].location == ("base", 0) and g.objects[r].exhausted
+    assert ("exhaust", r) in seen
+    d = g.run()
+    assert g.chain or (d is not None and d.kind != "action")      # its trigger is waiting (mode pick or on the chain)
+
+
+def test_granted_vision_triggers_once_per_instance(db):
+    """Forecaster: "Your Mechs have [Vision]" (it is a Mech itself); Gemcraft Seer: "[Vision] Other friendly units have
+    [Vision]". Vision is a triggered ability ("When this is played, [Predict]", CR 817.1.b), so a granted Vision
+    triggers too, once per instance (817.2). Only printed Vision triggered: Kai'Sa's Forecasters never predicted."""
+    from riftsim.core.game import _granted_vision
+    g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    f = put(g, db, 0, "Forecaster", ("base", 0))
+    assert sum(1 for a in g.abilities(f) if a is _granted_vision()) == 1
+    put(g, db, 0, "Gemcraft Seer", ("base", 0))
+    assert sum(1 for a in g.abilities(f) if a is _granted_vision()) == 2       # Mech + "other friendly units"
+    _, ab = next((u, a) for u in [f] for a in g.abilities(f) if a is _granted_vision())
+    assert ab.matches(g, f, {"kind": "enter", "uid": f, "player": 0})
+    # playing Forecaster from hand: Vision's Predict is offered
+    g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    fh = give(g, 0, "Forecaster", db)
+    _ready_runes(g, 0)
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == fh))
+    kinds = []
+    _drive(g, pick=lambda d: kinds.append(d.kind) and None)
+    assert "predict" in kinds
+
+
+def test_granted_disarm_triggers_with_the_summed_value(db):
+    """Clanging Sentry: "Your Mechs have [Disarm]." Disarm is an attack trigger (CR 831.1.d); a granted Disarm
+    triggers too, once, with the summed value (831.1.d.1, 831.2: two Sentries give Disarm 2). Granted keywords were
+    keyword flags only and never triggered."""
+    from riftsim.core.scripts import disarm_ability, hunt_ability
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    s1 = put(g, db, 0, "Clanging Sentry", ("base", 0))
+    s2 = put(g, db, 0, "Clanging Sentry", ("base", 0))
+    assert g.keyword_value(s1, "disarm") == 2
+    assert [a for a in g.abilities(s1) if getattr(a, "keyword", None) == "disarm"] == [disarm_ability()]
+    enemy = put(g, db, 1, "Elnuk Herd", ("bf", 0))
+    g.set_bf_controller(0, 1)
+    g.bump()
+    before = g.chars(enemy).might
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "move" and o[1] == (s1,) and o[2] == ("bf", 0)))
+    _drive(g, pick=lambda d: enemy if d.kind == "choose" and enemy in d.options else None,
+           stop=lambda d: g.combat is not None and g.combat.get("step") == "damage")
+    assert g.chars(enemy).might == before - 2
+    # printed Hunt adds up with a granted one into one trigger (CR 823.2)
+    gromp = put(g, db, 0, "Voracious Gromp", ("base", 0))
+    assert [a for a in g.abilities(gromp) if getattr(a, "keyword", None) == "hunt"] == [hunt_ability()]
+    assert g.keyword_value(gromp, "hunt") == 3
+
+
+def test_predict_puts_the_kept_cards_back_in_the_order_the_player_picks(db):
+    """CR 437.1.a: "the Predicting player looks at that many cards and Recycles any number of them before putting the
+    rest back on top of their Main Deck in any order." The kept cards always went back in their old order (The
+    Empyrean's "[Predict] equal to its Power cost", any Predict 2+)."""
+    from riftsim.core import ops as O
+    from riftsim.core.vm import Frame
+    g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "vex_gloomist")])
+    deck = g.players[0].deck
+    a, b, c = deck[0], deck[1], deck[2]
+    g.vm_frames.append(Frame([O.Predict(3)], Context(0, None)))
+    d = g.run()
+    assert d.kind == "predict"
+    g.choose((b,))                                   # recycle the middle one
+    d = g.run()
+    assert d.kind == "predict_order" and set(d.options) == {(a, c), (c, a)}
+    g.choose((c, a))
+    g.run()
+    assert deck[:2] == [c, a] and b not in deck[:2]
+
+
+def test_an_attached_cards_printed_rules_text_is_inactive(db):
+    # CR 135.4 / 722 example: Spinning Axe's [Temporary] doesn't trigger while it is attached, and its [Equip] can't be
+    # activated again to move it; the keyword can still be seen (135.4.a). Effect-text abilities stay (Guardian Angel).
+    g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "riven_exile")])
+    u = put(g, db, 0, "Stellacorn Herder", ("base", 0))
+    put(g, db, 0, "Stellacorn Herder", ("base", 0))
+    axe = put(g, db, 0, "Spinning Axe", ("base", 0))
+    loose = put(g, db, 0, "Long Sword", ("base", 0))
+    ga = put(g, db, 0, "Guardian Angel", ("base", 0))
+    g.do_attach(axe, u)
+    g.do_attach(ga, u)
+    _ready_runes(g, 0)
+    d = g.run()
+    assert any(o[0] == "activate" and o[1] == loose for o in d.options)
+    assert not any(o[0] == "activate" and o[1] in (axe, ga) for o in d.options)
+    assert g.has_keyword(axe, "temporary") and not g.abilities(axe)
+    assert any(getattr(a, "label", "") == "Guardian Angel" for a in g.abilities(ga))
+    g.choose(("end_turn",))
+    _drive(g, stop=lambda d: g.turn_player == 0 and g.phase == "main" and d.kind == "action" and not g.chain,
+           pick=lambda d: ("end_turn",) if ("end_turn",) in d.options and not g.chain else None)
+    assert g.objects[axe].zone == "board" and g.objects[axe].attached_to == u
+    g.do_detach(axe) if hasattr(g, "do_detach") else g._detach_raw(axe)
+    assert any(getattr(a, "keyword", None) == "temporary" for a in g.abilities(axe))

@@ -1586,9 +1586,10 @@ def parse_static(line):
     m = re.match(r"friendly units may be played to open battlefields$", l)
     if m:
         return [Static("self", "rule", ("play_open_bf",), cond=cond, source_text=line)]
-    m = re.match(r"units can't move (?:from here )?to base$", l)
+    m = re.match(r"units can't move (from here )?to base$", l)
     if m:
-        return [Static("self", "rule", ("cant_move_to_base",), cond=cond, source_text=line)]
+        # Vilemaw's Lair: only units at that battlefield; Minotaur Reckoner: "Units can't move to base." - every unit
+        return [Static("self", "rule", ("cant_move_to_base", "here" if m.group(1) else "all"), cond=cond, source_text=line)]
     m = re.match(r"i have ([+\-]\d+) \[m\] for each (.+?)(?: at my battlefield| here)?$", l)
     if m:
         cnt = count_phrase(m.group(2))

@@ -58,6 +58,9 @@ def _mod_stamp(m):
     return m.stamp
 
 
+_TRIGGER_KEYWORDS = ("temporary", "vision", "hunt", "disarm")     # granting these adds abilities (_grant_keyword_trigger)
+
+
 def _prints_temporary(defn):
     """Does the definition list the [Temporary] ability itself (so _compute_chars adds no second one)?"""
     return any(getattr(ab, "keyword", None) == "temporary" for ab in defn.abilities)
@@ -77,7 +80,7 @@ def _may_grant_ability(st):
         v = st.value
         if callable(v):
             return True
-        return (v[0] if isinstance(v, tuple) else v) == "temporary"
+        return (v[0] if isinstance(v, tuple) else v) in _TRIGGER_KEYWORDS
     return False
 
 
@@ -148,7 +151,6 @@ class Game(flow.FlowMixin):
         self._computing = set()
         self._grant_cache = None
         self._board_cache = None
-        self._repl_cache = None
         self._pao_cache = None
         self._canpay_memo = None
         self._setup(decks)
@@ -351,6 +353,7 @@ class Game(flow.FlowMixin):
             c.might = m.value
         elif k == "keyword":
             c.add_keyword(*m.value)
+            _grant_keyword_trigger(c, m.value)
         elif k == "ability":
             c.abilities.append(m.value)
         elif k == "tag":
@@ -382,6 +385,8 @@ class Game(flow.FlowMixin):
         c = Chars(o.base_defn())
         if o.copy_of is not None:
             c.abilities = list(o.copy_of.abilities)
+        if o.zone == "board" and o.attached_to is not None:
+            c.abilities = _active_printed(o, c.abilities)     # CR 135.4: printed rules text inactive while attached
         uid = o.uid
         if o.zone != "board":
             # CR 711: objects off the board use printed characteristics (+ granted mods that persist in zones)
@@ -415,7 +420,8 @@ class Game(flow.FlowMixin):
                     if lay != layer:
                         continue
                     self._apply_static(c, ab, src, uid)
-        if c.keywords.get("temporary") and not any(getattr(a, "keyword", None) == "temporary" for a in c.abilities):
+        if c.keywords.get("temporary") and not any(getattr(a, "keyword", None) == "temporary" for a in c.abilities) \
+                and (o.attached_to is None or any(m.kind == "keyword" and m.value[0] == "temporary" for m in o.mods)):
             c.abilities.append(_temporary_ability())     # granted [Temporary] (CR: kill me at the start of my Beginning Phase)
         if c.might is not None:
             c.might += o.buffs + self._buff_bonus(o)
@@ -467,6 +473,7 @@ class Game(flow.FlowMixin):
             c.might = v
         elif k == "keyword":
             c.add_keyword(*v) if isinstance(v, tuple) else c.add_keyword(v, True)
+            _grant_keyword_trigger(c, v)
         elif k == "ability":
             c.abilities.append(v)
         elif k == "abilities":
@@ -479,6 +486,8 @@ class Game(flow.FlowMixin):
     def _abilities_of(self, uid, o, partial=None):
         """Abilities an object currently has: printed (or copied) + granted via mods (+ equipment)."""
         res = list(o.base_defn().abilities)
+        if o.zone == "board" and o.attached_to is not None:
+            res = _active_printed(o, res)                      # CR 135.4: printed rules text inactive while attached
         for m in o.mods:
             if m.kind == "ability":
                 res.append(m.value)
@@ -542,7 +551,8 @@ class Game(flow.FlowMixin):
     def _printed_abilities_only(self, o):
         """True when layers can't add abilities to this board object, so its abilities are exactly the printed (or
         copied) ones and its characteristics need not be computed to list them. Abilities are only added by
-        'ability' mods, statics granting abilities, attached gear, and [Temporary] (see _compute_chars).
+        'ability' mods, statics granting abilities, attached gear, granted trigger keywords ([Temporary], [Vision],
+        [Hunt], [Disarm]); an attached card's printed text is inactive (see _compute_chars).
         All of these are structural, so the answer is cached per structure."""
         cache = self._pao_cache
         if cache is None or cache[0] != self.struct:
@@ -553,14 +563,14 @@ class Game(flow.FlowMixin):
         return r
 
     def _printed_abilities_only_raw(self, o):
-        if self._board_flags()[0]:
+        if self._board_flags()[0] or o.attached_to is not None:      # attached: printed text inactive (CR 135.4)
             return False
         bd = o.copy_of or o.defn
         if bd.keywords.get("temporary") and not _prints_temporary(bd):
             return False
         for m in o.mods:
             k = m.kind
-            if k == "ability" or (k == "keyword" and (m.value[0] if isinstance(m.value, tuple) else m.value) == "temporary"):
+            if k == "ability" or (k == "keyword" and (m.value[0] if isinstance(m.value, tuple) else m.value) in _TRIGGER_KEYWORDS):
                 return False
         for a in o.attachments:
             ao = self.objects.get(a)
@@ -962,45 +972,68 @@ class Game(flow.FlowMixin):
                     self.turn_effects.remove(t)
         return out
 
-    def replace_event(self, ev, dry=False, skip=()):
+    def replace_event(self, ev, dry=False, skip=(), first=None):
         """Apply replacement effects to an event (CR 367-375). Returns the (possibly modified) event or
         None if it was prevented entirely. An optional replacement that applies stops the pass and returns the event
         with "deferred": (source uid, ability id) and "applied" (keys already used) for its controller to decide
         (do_kill asks; see abilities.Replacement). dry=True previews the result without using up once-per-turn or
         limited-use replacements, and without optional ones. `skip`: replacement keys already applied or declined."""
         applied = set(skip)
+        if first is not None and first[0] == "te" and isinstance(first[1], int) and first[1] < len(self.turn_effects):
+            first = ("te", id(self.turn_effects[first[1]]))         # chosen turn effect, by its index in turn_effects
         changed = True
         guard = 0
         while changed and ev is not None and guard < 10:
+            if ev["kind"] == "die" and ev.get("replaced_with"):
+                break           # the death was replaced (recall, banish): there is no death left to replace (CR 370)
             changed = False
             guard += 1
-            for uid, o, ab in self._replacement_index().get(ev["kind"], ()):
-                key = (uid, id(ab))
-                if key in applied or not ab.active(self, uid):
+            te_first = first is not None and first[0] == "te" and first not in applied
+            order = [] if te_first else list(self.objects.items())
+            if first is not None and first[0] in self.objects and first not in applied:
+                order.insert(0, (first[0], self.objects[first[0]]))      # the replacement chosen for this event
+            for uid, o in order:
+                if o.zone in (None, "gone"):
                     continue
-                if ab.once_per_turn and o.temp.get(("rpt", id(ab))) == self.turn:
-                    continue
-                try:
-                    if not ab.applies(self, uid, ev):
+                abl = self.abilities(uid) if o.zone == "board" else self._abilities_of(uid, o)
+                if first is not None and uid == first[0]:
+                    abl = sorted(abl, key=lambda a: id(a) != first[1])
+                for ab in abl:
+                    if not isinstance(ab, Replacement) or ab.event != ev["kind"]:
                         continue
-                    if ab.optional and (dry or not ab.options(self, uid, ev)):
+                    key = (uid, id(ab))
+                    if key in applied or not ab.active(self, uid):
                         continue
-                except (KeyError, AttributeError, TypeError):
-                    continue
-                if ab.optional:
-                    return dict(ev, deferred=key, applied=tuple(applied))
-                applied.add(key)
-                if not dry:
-                    if ab.once_per_turn:
-                        o.temp[("rpt", id(ab))] = self.turn
-                    self.log("replace", source=uid, event=ev["kind"], label=ab.label)
-                ev = ab.replace(self, uid, ev)
-                changed = True
-                if ev is None:
-                    return None
-                break
+                    if ab.once_per_turn and o.temp.get(("rpt", id(ab))) == self.turn:
+                        continue
+                    try:
+                        if not ab.applies(self, uid, ev):
+                            continue
+                        if ab.optional and (dry or not ab.options(self, uid, ev)):
+                            continue
+                    except (KeyError, AttributeError, TypeError):
+                        continue
+                    if ab.optional:
+                        return dict(ev, deferred=key, applied=tuple(applied))
+                    applied.add(key)
+                    if not dry:
+                        if ab.once_per_turn:
+                            o.temp[("rpt", id(ab))] = self.turn
+                        self.log("replace", source=uid, event=ev["kind"], label=ab.label)
+                    ev = ab.replace(self, uid, ev)
+                    changed = True
+                    if ev is None:
+                        return None
+                    break
+                if changed:
+                    break
             # turn effects acting as replacements
-            for t in list(self.turn_effects):
+            if changed:
+                continue
+            tes = list(self.turn_effects)
+            if te_first:
+                tes.sort(key=lambda t: id(t) != first[1])
+            for t in tes:
                 if t["kind"] != "replace:" + ev["kind"]:
                     continue
                 key = ("te", id(t))
@@ -1019,37 +1052,42 @@ class Game(flow.FlowMixin):
                 if ev is None:
                     return None
                 break
+            if te_first and not changed:
+                first, changed = None, True           # the chosen turn effect no longer applies: try the others
         return ev
 
-    def _replacement_index(self):
-        """{event kind: [(uid, obj, Replacement)]} in board order, for abilities that can work in their object's zone
-        (Ability.active rejects the rest). Cached like the trigger index: per structure unless layers add abilities."""
-        cache = self._repl_cache
-        if cache is not None and (cache[0] == self.version or (cache[1] is not None and cache[1] == self.struct)):
-            if CACHE_CHECK and cache[0] != self.version:
-                self._check_cache("replacements", cache[2], self._build_replacement_index()[0])
-            return cache[2]
-        idx, layered = self._build_replacement_index()
-        self._repl_cache = (self.version, None if layered else self.struct, idx)
-        return idx
-
-    def _build_replacement_index(self):
-        idx = {}
-        layered = False
-        for uid, o in self.objects.items():
-            z = o.zone
-            if z is None or z == "gone":
+    def die_replacements(self, ev):
+        """The replacement effects that could apply to death event `ev` now, as (key, label): object ones as
+        (uid, id(ability)), turn effects as ("te", index in turn_effects). Used to let the dying object's controller
+        pick which one applies first (CR 372)."""
+        out = []
+        for uid, o in list(self.objects.items()):
+            if o.zone in (None, "gone"):
                 continue
-            if z == "board":
-                if not self._printed_abilities_only(o):
-                    layered = True
-                abl = self.abilities(uid)
-            else:
-                abl = self._abilities_of(uid, o)
+            abl = self.abilities(uid) if o.zone == "board" else self._abilities_of(uid, o)
             for ab in abl:
-                if isinstance(ab, Replacement) and _zone_ok(ab.zone, z):
-                    idx.setdefault(ab.event, []).append((uid, o, ab))
-        return idx, layered
+                if not isinstance(ab, Replacement) or ab.event != "die" or not ab.active(self, uid):
+                    continue
+                if ab.once_per_turn and o.temp.get(("rpt", id(ab))) == self.turn:
+                    continue
+                try:
+                    if not ab.applies(self, uid, ev) or (ab.optional and not ab.options(self, uid, ev)):
+                        continue
+                except (KeyError, AttributeError, TypeError):
+                    continue
+                out.append(((uid, id(ab)), ab.label or self.label(uid)))
+        for i, t in enumerate(self.turn_effects):
+            if t["kind"] != "replace:die":
+                continue
+            f = t["data"].get("applies")
+            try:
+                if f is not None and not f(self, t["ctx"], ev):
+                    continue
+            except (KeyError, AttributeError, TypeError):
+                continue
+            src = t["ctx"].source
+            out.append((("te", i), self.label(src) if src in self.objects else "an effect"))
+        return out
 
     def activate_named_triggers(self, uid, event, ctx):
         """'Activate the conquer effects of units here': add matching triggers as if event happened."""
@@ -1141,8 +1179,6 @@ class Game(flow.FlowMixin):
         o = self.objects.get(uid)
         if o is None or o.zone != "board" or not o.exhausted:
             return False
-        if o.stunned:
-            return False
         if any(src == uid for src, _ in self.rules("cant_ready")):
             return False
         if ctx is not None and (o.defn.is_unit or o.defn.is_gear) and any(
@@ -1193,15 +1229,14 @@ class Game(flow.FlowMixin):
 
     def do_stun(self, uid, ctx=None):
         o = self.objects.get(uid)
-        if o is None or o.zone != "board":
-            return
+        if o is None or o.zone != "board" or o.stunned:
+            return            # CR 424.1.a.1: a stunned unit can't be stunned again (no "stun" event)
         if self._chosen_harm_redirect(uid, ctx):
             return
         ev = self.replace_event({"kind": "stun", "uid": uid, "player": o.controller, "loc": o.location})
         if ev is None:
             return
-        o.stunned = True
-        o.exhausted = True
+        o.stunned = True      # CR 424.1.b: it only stops its combat damage; stunning doesn't exhaust it
         self.bump()
         self.emit("stun", uid=uid, player=o.controller, loc=o.location, by=ctx.controller if ctx else None, ctx=ctx)
         self.dirty = True
@@ -1352,26 +1387,57 @@ class Game(flow.FlowMixin):
         return any(o.temp.get(("damaged_by", self.objects[src].controller)) and not self.is_friendly(self.objects[src].controller, o.controller)
                    for src, _ in self.rules("any_damage_kills_enemies"))
 
-    def do_kill(self, uids, ctx=None, by=None, in_combat=False):
-        """Kill permanents (CR 429): they are sent to their owner's trash; deathknell triggers first."""
+    def do_kill(self, uids, ctx=None, by=None, in_combat=False, _first=None):
+        """Kill permanents (CR 429): they are sent to their owner's trash; deathknell triggers first.
+        `_first`: {uid: replacement key} picked by _ReplacementOrderStep (those deaths are replaced first, by that key)."""
+        _first = dict(_first or {})
         alone = {}
         batch = self.tick()            # one id for everything killed at the same time ("one or more units die")
         for u in list(uids):
             o = self.objects.get(u)
             if o is not None and o.zone == "board" and o.location is not None:
                 alone[u] = len([x for x in self.units_at(o.location, o.controller)]) == 1
-        events = []
-        for u in list(uids):
-            o = self.objects.get(u)
-            if o is None or o.zone != "board" or not self.defn_of(u).is_permanent:
+        killer = ctx.controller if ctx is not None else None
+
+        def base_ev(u):
+            o = self.objects[u]
+            return {"kind": "die", "uid": u, "player": o.controller, "loc": o.location, "killer": killer,
+                    "in_combat": in_combat or self.combat is not None and o.location == ("bf", self.combat["bf"]),
+                    "card_type": "unit" if "unit" in self.chars(u).types else "gear", "by": by,
+                    "token": o.defn.is_token, "might": self.chars(u).might, "stunned": o.stunned, "buffed": o.buffs > 0, "empowered": bool(o.empowered),
+                    "alone": alone.get(u, False), "dmg_item": o.temp.get("dmg_item") if by == "damage" else None,
+                    "batch": batch}
+        dying = [u for u in dict.fromkeys(uids) if u in self.objects and self.objects[u].zone == "board"
+                 and self.defn_of(u).is_permanent]
+        # CR 373: a replacement that can be applied to only one event (Zhonya's Hourglass) and could replace several of
+        # these simultaneous deaths is applied where its controller chooses.
+        contest = self._contested_single_use(dying, base_ev, _first)
+        if contest is not None:
+            key, cands = contest
+            c = Context(self.objects[key[0]].controller, key[0], here=self.objects[key[0]].place)
+            c.vars["__rord"] = {"uids": tuple(dying), "key": key, "cands": tuple(cands), "first": _first, "by": by,
+                                "in_combat": in_combat, "ctx_controller": killer,
+                                "ctx_source": ctx.source if ctx is not None else None}
+            self.vm_frames.append(Frame([_ReplacementOrderStep()], c))
+            return
+        # CR 372: when several replacement effects could replace one death, the dying object's controller picks the
+        # one that applies (a replaced death is no longer a death, so the others then don't apply).
+        for u in dying:
+            if u in _first:
                 continue
-            killer = ctx.controller if ctx is not None else None
-            ev = self.replace_event({"kind": "die", "uid": u, "player": o.controller, "loc": o.location, "killer": killer,
-                                     "in_combat": in_combat or self.combat is not None and o.location == ("bf", self.combat["bf"]),
-                                     "card_type": "unit" if "unit" in self.chars(u).types else "gear", "by": by,
-                                     "token": o.defn.is_token, "might": self.chars(u).might, "stunned": o.stunned, "buffed": o.buffs > 0, "empowered": bool(o.empowered),
-                                     "alone": alone.get(u, False), "dmg_item": o.temp.get("dmg_item") if by == "damage" else None,
-                                     "batch": batch})
+            opts = self.die_replacements(base_ev(u))
+            if len(opts) >= 2:
+                c = Context(self.objects[u].controller, u, here=self.objects[u].place)
+                c.vars["__rord"] = {"uids": tuple(dying), "unit": u, "opts": tuple(k for k, _ in opts),
+                                    "labels": tuple(l for _, l in opts), "first": _first, "by": by,
+                                    "in_combat": in_combat, "ctx_controller": killer,
+                                    "ctx_source": ctx.source if ctx is not None else None}
+                self.vm_frames.append(Frame([_ReplacementChoiceStep()], c))
+                return
+        dying.sort(key=lambda u: (list(_first).index(u) if u in _first else len(_first)))
+        events = []
+        for u in dying:
+            ev = self.replace_event(base_ev(u), first=_first.get(u))
             if ev is not None:
                 events.append((u, ev))
         # CR 383.2.c.2: an object leaving the board at the same time as another one doesn't see that one leave
@@ -1388,6 +1454,35 @@ class Game(flow.FlowMixin):
                 self._finish_death(u, ev, ctx)
         finally:
             self._leaving = prev
+
+    def _contested_single_use(self, dying, base_ev, first):
+        """A single-use 'die' replacement (not yet assigned in `first`) that applies to 2+ of `dying`, as
+        (key, candidate uids), or None."""
+        if len(dying) < 2:
+            return None
+        done = set(first.values())
+        for src, o in list(self.objects.items()):
+            if o.zone in (None, "gone"):
+                continue
+            abl = self.abilities(src) if o.zone == "board" else self._abilities_of(src, o)
+            for ab in abl:
+                if not isinstance(ab, Replacement) or ab.event != "die" or not getattr(ab, "single_use", False):
+                    continue
+                key = (src, id(ab))
+                if key in done or not ab.active(self, src):
+                    continue
+                cands = []
+                for u in dying:
+                    if u in first:
+                        continue
+                    try:
+                        if ab.applies(self, src, base_ev(u)):
+                            cands.append(u)
+                    except (KeyError, AttributeError, TypeError):
+                        pass
+                if len(cands) >= 2:
+                    return key, cands
+        return None
 
     def _ask_optional_replacement(self, u, ev, ctx):
         """Keep u on the board and push a frame that asks the replacement's controller (runs before anything else)."""
@@ -1545,8 +1640,8 @@ class Game(flow.FlowMixin):
         if by and (o.controller if mover is None else mover) in by:
             return False          # Vex, Apathetic: "They can't move it this turn" (other players still may)
         if dest[0] == "base":
-            if any(self.objects[src].place == o.location for src, _ in self.rules("cant_move_to_base")):
-                return False          # "Units can't move from here to base"
+            if any(v == "all" or self.objects[src].place == o.location for src, v in self.rules("cant_move_to_base")):
+                return False          # "Units can't move from here to base" / "Units can't move to base."
             if any(src == uid for src, _ in self.rules("i_cant_move_to_base")):
                 return False          # Determined Sentry
             return dest[1] == o.controller
@@ -1625,17 +1720,17 @@ class Game(flow.FlowMixin):
                 o.damage = 0
                 o.temp = {k: v for k, v in o.temp.items() if not (isinstance(k, tuple) and k[0] == "damaged_by")}
             if exhaust:
-                o.exhausted = True
+                self.do_exhaust(uid, ctx)      # the Exhaust action: "When I become exhausted" triggers (CR 415)
             self.dirty = True
             return
         frm = o.location
-        o.location = base
-        self._on_change_location(o)
         if heal:
             o.damage = 0
             o.temp = {k: v for k, v in o.temp.items() if not (isinstance(k, tuple) and k[0] == "damaged_by")}
         if exhaust:
-            o.exhausted = True
+            self.do_exhaust(uid, ctx)          # "heal it, exhaust it, and recall it", in that order
+        o.location = base
+        self._on_change_location(o)
         o.designation = None
         self.log("recall", uid=uid, name=o.defn.name, frm=frm)
         self.emit("recall", uid=uid, player=o.controller, **{"from": frm}, ctx=ctx)
@@ -2034,7 +2129,7 @@ class Game(flow.FlowMixin):
     # ------------------------------------------------------------------ cloning / snapshots
     def clone(self):
         g = copy.copy(self)
-        g._statics_cache = g._trig_cache = g._rules_cache = g._grant_cache = g._board_cache = g._repl_cache = g._pao_cache = g._addsrc_cache = None      # caches hold this game's objects
+        g._statics_cache = g._trig_cache = g._rules_cache = g._grant_cache = g._board_cache = g._pao_cache = g._addsrc_cache = None      # caches hold this game's objects
         self._ctx_map = {}           # keep contexts shared between a chain item and its frames shared in the clone
         g.objects = {u: self._clone_obj(o) for u, o in self.objects.items()}
         g.players = [self._clone_player(p) for p in self.players]
@@ -2160,7 +2255,41 @@ class Game(flow.FlowMixin):
                 "priority": self.priority, "focus": self.focus}
 
 
+def _active_printed(o, abilities):
+    """CR 135.4 / 721.2: an attached card's printed rules text is inactive (its abilities don't trigger, apply or
+    activate; its keywords can still be seen, 135.4.a). Abilities scripted from its effect text (source_text is the
+    effect text, e.g. Guardian Angel's replacement) belong to the unit it's attached to and stay."""
+    eff = o.defn.effect_text
+    return [a for a in abilities if eff and getattr(a, "source_text", None) == eff]
+
+
 _TEMPORARY = []
+
+
+def _grant_keyword_trigger(c, v):
+    """A granted triggered-ability keyword is its trigger too. [Vision]: one instance per grant (CR 817.1.b, 817.2:
+    Forecaster's "Your Mechs have [Vision]", Gemcraft Seer). [Hunt]/[Disarm]: one trigger using the summed value
+    (CR 823.2, 831.1.d.1: Clanging Sentry's "Your Mechs have [Disarm]")."""
+    kw, val_ = (v[0], v[1]) if isinstance(v, tuple) else (v, True)
+    if val_ is False or val_ is None:
+        return
+    if kw == "vision":
+        c.abilities.append(_granted_vision())
+    elif kw in ("hunt", "disarm"):
+        if not any(getattr(a, "keyword", None) == kw for a in c.abilities):
+            from .scripts import hunt_ability, disarm_ability
+            c.abilities.append(hunt_ability() if kw == "hunt" else disarm_ability())
+
+
+_VISION = []
+
+
+def _granted_vision():
+    if not _VISION:
+        from .abilities import Triggered
+        from . import ops as O
+        _VISION.append(Triggered("enter_self", [O.Predict(1)], label="Vision", keyword="vision"))
+    return _VISION[0]
 
 
 def _temporary_ability():
@@ -2227,4 +2356,52 @@ class _OptionalReplacementStep:
             game._ask_optional_replacement(u, ev, dctx)
             return None
         game._finish_death(u, ev, dctx)
+        return None
+
+
+class _ReplacementOrderStep:
+    """VM step: the controller of a single-use death replacement picks which of several simultaneous deaths it
+    replaces (CR 373, e.g. Zhonya's Hourglass when two friendly units die together); then the deaths go on."""
+
+    def run(self, game, ctx):
+        info = ctx.vars["__rord"]
+        cands = [u for u in info["cands"] if u in game.objects and game.objects[u].zone == "board"]
+        if len(cands) < 2:
+            return self.resume(game, ctx, None)
+        src = info["key"][0]
+        name = game.label(src)
+        return Decision(ctx.controller, "order_replacement", cands, out="__rord_choice",
+                        labels=[f"{name} saves {game.label(u)}" for u in cands],
+                        info={"source": src, "label": name})
+
+    def resume(self, game, ctx, choice):
+        info = ctx.vars["__rord"]
+        first = dict(info["first"])
+        if choice is not None:
+            first[choice] = info["key"]
+        dctx = Context(info["ctx_controller"], info["ctx_source"]) if info["ctx_controller"] is not None else None
+        game.do_kill(info["uids"], dctx, by=info["by"], in_combat=info["in_combat"], _first=first)
+        return None
+
+
+class _ReplacementChoiceStep:
+    """VM step: several replacement effects could replace one death (Zhonya's Hourglass and Smite, Guardian Angel and
+    Zhonya's ...): the dying object's controller picks the one that applies (CR 372); then the deaths go on."""
+
+    def run(self, game, ctx):
+        info = ctx.vars["__rord"]
+        u = info["unit"]
+        if u not in game.objects or game.objects[u].zone != "board":
+            return self.resume(game, ctx, None)
+        return Decision(ctx.controller, "order_replacement", list(range(len(info["opts"]))), out="__rord_choice",
+                        labels=[f"{l} replaces {game.label(u)}'s death" for l in info["labels"]],
+                        info={"uid": u, "label": game.label(u)})
+
+    def resume(self, game, ctx, choice):
+        info = ctx.vars["__rord"]
+        first = dict(info["first"])
+        if choice is not None:
+            first[info["unit"]] = info["opts"][choice]      # options are indexes (ability ids differ between runs)
+        dctx = Context(info["ctx_controller"], info["ctx_source"]) if info["ctx_controller"] is not None else None
+        game.do_kill(info["uids"], dctx, by=info["by"], in_combat=info["in_combat"], _first=first)
         return None

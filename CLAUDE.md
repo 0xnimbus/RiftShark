@@ -150,6 +150,41 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   20:20: the Awaken Phase readied objects without the Ready action's event (CR 315.1.b, 416.3.a), so "When I become
   ready" (Jayce, Hammer in Hand; Fretful Feline), Irelia, Fervent and Pirate's Haven never triggered at the start of
   the turn; `flow._awaken` now emits "ready" per readied object. Pirate's Haven no longer triggers on runes.
+  2026-11-14 05:20: "When a combat that I was in ends" (Mournful Witness, Affectionate Poro) only saw units still at
+  the battlefield, so attackers recalled after a tie never triggered; combat_end's survivors now include every unit
+  designated in that combat that is still the same object on the board (CR 740.2.c). A trigger-fire count over 40
+  greedy games (scratch script, every tournament card with a trigger) found no other dead triggers.
+  10:20: Minotaur Reckoner ("Units can't move to base.") shared Vilemaw's Lair's "from here" rule, so it only stopped
+  units at Reckoner's own location; the rule now carries "all" or "here" (game.valid_destination, rules_audit).
+  15:20: Zhonya's Hourglass saved whichever friendly unit came first when two died together; its controller now picks
+  (CR 373, decision `order_replacement`, `Replacement(single_use=True)`, game._ReplacementOrderStep). Checked OK:
+  facedown Zhonya does nothing, Soraka's replacement sees units dying with her (CR 370.4), final point rule.
+  20:20: Smite on a unit whose controller had Zhonya's Hourglass spent Zhonya's and still banished the unit: a death
+  replaced by a recall/banish took more 'die' replacements. `replace_event` now stops once a death is replaced, and
+  when several could replace one death its controller picks (CR 372, `Game.die_replacements`, game._ReplacementChoiceStep,
+  decision `order_replacement` with index options). Guardian Angel vs Zhonya's is that player's pick too.
+  2026-11-15 00:20: [Stun] exhausted the unit, so a ready unit stunned in the main phase couldn't move or pay exhaust
+  costs; CR 424.1.b says stunned only stops its combat damage (Vex, Apathetic adds "They can't move it" for that). A
+  stunned unit is no longer stunned again (424.1.a.1): no second "stun" event for Eclipse Herald-style triggers.
+  Round-robins before this overrate stun decks (Vex, Kai'Sa's Stupefy, Riven, Broken Blade).
+  05:20: two more pieces of the old stun model: `do_ready` refused to ready a stunned unit (no such rule); removed.
+  "Heal it, exhaust it, and recall it" (Zhonya's, Guardian Angel, Soraka, Tactical Retreat) set the exhausted flag
+  without the Exhaust action, so "When I become exhausted" (Reckless Innovator, Riven, Broken Blade) never triggered;
+  `do_recall` now uses `do_exhaust`. rules_audit's move check now knows Vex's `cant_move_by`.
+  10:20: a granted [Vision] (Forecaster: "Your Mechs have [Vision]", a Mech itself, 3 in Kai'Sa; Gemcraft Seer: "Other
+  friendly units have [Vision]") was only a keyword, so it never predicted: Vision is a triggered ability (CR 817.1.b).
+  `_apply_static` now adds the Vision trigger per grant (817.2: instances trigger separately). Checked OK: Brynhir's
+  lock doesn't stop hiding (811.1.c.1), Temporal Breach on a token plays nothing, hidden cards at a lost battlefield
+  are trashed in the cleanup (107.3.d).
+  15:20: the same gap for [Disarm]/[Hunt]: Clanging Sentry's "Your Mechs have [Disarm]" never triggered, and printed
+  Hunt/Disarm used the printed number only. Now one trigger per unit with the summed value (CR 823.2, 831.1.d.1:
+  `scripts.hunt_ability/disarm_ability`, `game._grant_keyword_trigger` for statics and mods).
+  20:20: Predict 2+ put the kept cards back in their old order; CR 437.1.a says "in any order": a `predict_order`
+  decision (top to bottom) follows the recycle pick (ops.Predict). Checked OK: Legion counts only other cards
+  finalized this turn (tokens aren't cards), Tianna/Otterpus replace gaining points (CR 470.2), Blitzcrank's hold.
+  2026-11-16 00:20: an attached card's printed rules text stayed active (CR 135.4): an equipped Spinning Axe died to
+  its own [Temporary] and attached gear could [Equip] again; `game._active_printed` drops printed abilities while
+  attached (keywords stay visible, 135.4.a; abilities scripted from effect text, e.g. Guardian Angel, stay).
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

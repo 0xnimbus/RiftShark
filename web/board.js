@@ -89,6 +89,8 @@ window.RiftBoard = (function () {
       case "choose_player": return ["Choose a player", `${src}: ${pr || "choose a player."}`];
       case "mode": return ["Choose a mode", `${src} has several modes. Pick one.`];
       case "optional_replacement": return ["Save it instead?", `${src} would die. Its replacement effect lets you pick something to kill in its place, or let it die.`];
+      case "order_replacement": return ["Which one does it save?", `${src} can only replace one of the deaths happening together. Pick the unit it saves; the others die (CR 373).`];
+      case "predict_order": return ["Order the top of your deck", "Predict: the cards you kept go back on top of your deck in any order you choose (CR 437.1.a). The first one listed is drawn first."];
       case "yesno": return ["Optional effect", `${src} offers an optional effect. Do you want it?`];
       case "additional_cost": return ["Additional cost", `Pay the optional additional cost${d.prompt ? " (" + esc(d.prompt) + ")" : ""}? Paying it turns on the extra text of the card.`];
       case "assign_damage_step": return ["Assign combat damage", "So many splits are legal that you choose them one unit at a time (CR 467.2.c): pick how much of the damage left goes to this unit. Every amount shown can still be finished legally: Tanks first, Backline last, lethal in full before the next unit, and extra only once all have lethal."];

@@ -67,8 +67,8 @@ def expected_moves(g, p):
         ok = []
         for u in ready:
             o = g.objects[u]
-            if o.location == dest or g.cant_move(u):
-                continue
+            if o.location == dest or g.cant_move(u) or p in (g.keyword_value(u, "cant_move_by") or ()):
+                continue          # Vex, Apathetic: "They can't move it this turn"
             if dest[0] == "base":
                 good = o.location[0] == "bf"
             else:
@@ -77,7 +77,7 @@ def expected_moves(g, p):
                                             or any(g.objects[s].place == dest for s, _ in g.rules("move_here_from_anywhere")))
                 if any(g.objects[s].location == dest and v is True for s, v in g.rules("cant_move_here")):
                     good = False
-            if dest[0] == "base" and (any(g.objects[s].place == o.location for s, _ in g.rules("cant_move_to_base"))
+            if dest[0] == "base" and (any(v == "all" or g.objects[s].place == o.location for s, v in g.rules("cant_move_to_base"))
                                       or any(s == u for s, _ in g.rules("i_cant_move_to_base"))):
                 good = False
             if good:
@@ -276,7 +276,7 @@ def check_invariants(g, a, seed, last):
             a.bad("zones", f"{where}: {g.label(u)} is listed in {z} but its zone is {o.zone}")
     # state-based checks only when nothing is pending (no chain, combat or showdown)
     if not g.chain and g.combat is None and g.showdown is None and g.phase == "main":
-        waiting_replacement = g.pending is not None and g.pending.kind == "optional_replacement"
+        waiting_replacement = g.pending is not None and g.pending.kind in ("optional_replacement", "order_replacement")
         for u, o in g.objects.items():
             # a unit waiting on an optional 'die' replacement (Sett, The Boss) stays on the board until it is answered
             if o.zone == "board" and "unit" in g.chars(u).types and g.lethal_damage(u) and not waiting_replacement:

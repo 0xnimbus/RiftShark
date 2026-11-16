@@ -1286,15 +1286,34 @@ class Predict(Instr):
         opts = []
         for k in range(len(cards) + 1):
             opts += [tuple(c) for c in itertools.combinations(cards, k)]
+        ctx.vars["__pred_list"] = list(cards)
         return Decision(p, "predict", opts, out="__predict", labels=["recycle: " + (", ".join(game.label(u) for u in o) or "nothing") for o in opts])
 
     def resume(self, game, ctx, choice):
         if ctx.vars.pop("__pred_wait", False):
             _nocturne_apply(game, ctx, choice)
             return self.run(game, ctx)
+        p = _player(game, ctx, self.player)
+        deck = game.players[p].deck
+        if ctx.vars.pop("__pred_ordering", False):
+            # CR 437.1.a: the rest go back on top "in any order": choice is the new top-down order
+            ctx.vars.pop("__pred_list", None)
+            order = [u for u in (choice or ()) if u in deck]
+            if order:
+                rest = [u for u in deck if u not in order]
+                deck[:] = order + rest
+                game.bump()
+            return None
         if choice:
             game.do_recycle(list(choice), ctx)
-        return None
+        kept = [u for u in ctx.vars.get("__pred_list", ()) if u in deck and u not in (choice or ())]
+        if len(kept) < 2:
+            ctx.vars.pop("__pred_list", None)
+            return None
+        perms = list(itertools.permutations(kept))
+        ctx.vars["__pred_ordering"] = True
+        return Decision(p, "predict_order", perms, out="__predict_order",
+                        labels=["top to bottom: " + ", ".join(game.label(u) for u in o) for o in perms])
 
 
 class TakeControl(Instr):

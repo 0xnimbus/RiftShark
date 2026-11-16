@@ -59,7 +59,7 @@ def zhonyas(defn):
     def replace(g, s, ev):
         g.do_kill([s], None)
         return dict(ev, replaced_with="recall", exhaust=True)
-    return [Replacement("die", applies, replace, label=defn.name)]
+    return [Replacement("die", applies, replace, label=defn.name, single_use=True)]
 
 
 @script("Emperor's Dais")
