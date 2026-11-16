@@ -63,8 +63,7 @@ def add_sources(game, p):
     from .ops import Add
     from .vm import Context, val
     out = []
-    for u in list(game.objects):
-        o = game.objects[u]
+    for u, o in game.board_items():
         if o.zone != "board" or o.controller != p or o.exhausted or o.defn.type == "rune":
             continue
         for i, ab in enumerate(game.abilities(u)):

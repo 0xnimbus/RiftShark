@@ -24,9 +24,7 @@ def heuristic(g, p):
             v += 25
         elif b.controller is not None:
             v -= 25
-    for u, o in g.objects.items():
-        if o.zone != "board":
-            continue
+    for u, o in g.board_items():
         c = g.chars(u)
         if "unit" in c.types:
             w = (c.might or 0) + 1.5
@@ -276,7 +274,7 @@ def determinize(game, player, rng):
         ps.rune_deck = sorted(ps.rune_deck, key=str)
         rng.shuffle(ps.rune_deck)
     g.rng = random.Random(rng.random())      # future random events are unknown too
-    g.bump()
+    g.restruct()
     return g
 
 

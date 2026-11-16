@@ -66,7 +66,7 @@ class _ShowOff(Instr):
         ctx.shown_off = None
         ps = game.players[ctx.controller]
         cands = [u for u in ps.hand if u != it.uid]
-        cands += [u for u, o in game.objects.items() if o.zone == "board" and o.controller == ctx.controller
+        cands += [u for u, o in game.board_items() if o.controller == ctx.controller
                   and u != it.uid and o.location is not None and o.location[0] in ("base", "bf", "legend", "runes")
                   and o.defn.type != "battlefield"]
         opts = [None]
@@ -508,6 +508,7 @@ class FlowMixin:
         for u in aside:                                   # CR 117.1: set aside
             ps.hand.remove(u)
             self.objects[u].zone = "aside"
+            self.restruct()
         for _ in aside:                                   # CR 117.2: draw as many
             self._draw_raw(p)
         if aside:                                         # CR 117.3: recycle them (random order, CR 417.5)
@@ -682,7 +683,9 @@ class FlowMixin:
                         o.location = ("base", o.controller)
                 else:
                     keep.append(m)
-            o.mods = keep
+            if len(keep) != len(o.mods):
+                o.mods = keep
+                self.restruct()
         self.expire_mods("turn")
         self.empty_pools()
         self.bump()
@@ -721,8 +724,8 @@ class FlowMixin:
         # 2. designations
         if self.combat is not None:
             bfl = ("bf", self.combat["bf"])
-            for u, o in self.objects.items():
-                if o.zone != "board" or "unit" not in self.chars(u).types:
+            for u, o in self.board_items():
+                if o.zone != "board" or not self.is_unit(u):
                     continue
                 if o.location == bfl:
                     want = "attacker" if o.controller == self.combat["attacker"] else ("defender" if o.controller == self.combat["defender"] else None)
@@ -737,7 +740,7 @@ class FlowMixin:
                     o.designation = None
                     self.bump()
         # 3a. lethal damage
-        dead = [u for u, o in self.objects.items() if o.zone == "board" and "unit" in self.chars(u).types and self.lethal_damage(u)]
+        dead = [u for u, o in self.board_items() if o.damage > 0 and self.is_unit(u) and self.lethal_damage(u)]
         if dead:
             self.do_kill(dead, None, by="damage")
         # 4. lose control of empty battlefields (open state, no showdown/combat there)
@@ -753,11 +756,11 @@ class FlowMixin:
         self._end_control_durations()
         self._end_bound_legends()
         # 5. recalls
-        for u, o in list(self.objects.items()):
+        for u, o in self.board_items():
             if o.zone != "board" or o.location is None:
                 continue
-            c = self.chars(u)
             if o.location[0] == "bf":
+                c = self.chars(u)
                 if "gear" in c.types and "unit" not in c.types and o.attached_to is None and not c.keywords.get("deploy"):
                     self.do_recall(u)
             elif o.location[0] == "base" and o.location[1] != o.controller and o.attached_to is None:
@@ -1294,7 +1297,7 @@ class FlowMixin:
         for src, v in self.rules("spell_reduce_exhaust_units", player=p):
             n, _ = v
             o = self.objects[src]
-            ready_units = [u for u, x in self.objects.items() if x.zone == "board" and x.controller == p and not x.exhausted
+            ready_units = [u for u, x in self.board_items() if x.controller == p and not x.exhausted
                            and u != src and "unit" in self.chars(u).types]
             if not o.exhausted and len(ready_units) >= n:
                 out.append((src, v))
@@ -2114,8 +2117,8 @@ class FlowMixin:
         """CR 144: a Standard Move exhausts any number of the player's units and moves them to one destination; the
         origins need not be the same (144.3.b). Stunned units may move (stun only stops combat damage, CR 424.1.b)."""
         acts = []
-        ready = [u for u, o in self.objects.items() if o.zone == "board" and o.controller == p and not o.exhausted
-                 and o.location is not None and "unit" in self.chars(u).types]
+        ready = [u for u, o in self.board_items() if o.controller == p and not o.exhausted
+                 and o.location is not None and self.is_unit(u)]
         dests = [("bf", b.idx) for b in self.battlefields] + [("base", p)]
         for dest in dests:
             movable = [u for u in ready if self.valid_destination(u, dest, standard=True)]
@@ -2130,8 +2133,8 @@ class FlowMixin:
         return acts
 
     def _move_select_step(self, p, dest, chosen):
-        movable = [u for u, o in self.objects.items() if o.zone == "board" and o.controller == p and not o.exhausted
-                   and o.location is not None and "unit" in self.chars(u).types and u not in chosen
+        movable = [u for u, o in self.board_items() if o.controller == p and not o.exhausted
+                   and o.location is not None and self.is_unit(u) and u not in chosen
                    and self.valid_destination(u, dest, standard=True)]
         opts = movable + (["done"] if chosen else [])
         if not movable:
