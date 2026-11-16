@@ -33,7 +33,7 @@ def main_phase(db, decks, seed=0):
     for u in g.players[0].runes:
         g.objects[u].exhausted = False
     g.pending = None
-    g.bump()
+    g.restruct()
     return g
 
 
@@ -43,7 +43,7 @@ def give(g, p, name, db):
     u = ps.deck[-1]
     g.objects[u].defn = next(c for c in db if c.name == name)
     g._to_zone(g.objects[u], "hand")
-    g.bump()
+    g.restruct()
     return u
 
 
@@ -53,7 +53,7 @@ def unit_at(g, p, loc, exclude=()):
              and (g.objects[u].defn.might or 0) >= 3)
     g._to_zone(g.objects[u], "board", location=loc, controller=p)
     g.objects[u].exhausted = False
-    g.bump()
+    g.restruct()
     return u
 
 
@@ -99,7 +99,7 @@ def test_illegal_target_is_unaffected_but_rest_of_spell_happens(db, decks):
     g.do_kill([foe], None)                                 # e.g. killed by a reaction before Stupefy resolves
     g.objects[foe].zone == "trash"
     g._to_zone(g.objects[foe], "board", location=bf, controller=1)   # a new object, even if it comes back
-    g.bump()
+    g.restruct()
     while g.chain:
         d = g.run()
         g.choose(("pass",) if ("pass",) in d.options else d.options[0])

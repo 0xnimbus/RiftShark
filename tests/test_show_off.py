@@ -87,7 +87,7 @@ def test_empyrean_predicts_the_shown_off_cards_power_then_draws_2(db):
     for u in g.players[0].runes:
         g.objects[u].exhausted = False
     g.pending = None
-    g.bump()
+    g.restruct()
     e = give(g, 0, "The Empyrean", db)
     shown = give(g, 0, "Unchecked Power", db)               # Power cost 2
     assert g.objects[shown].defn.power == 2

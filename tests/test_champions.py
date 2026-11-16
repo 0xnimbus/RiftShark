@@ -28,7 +28,7 @@ def put(g, db, p, name, loc, exclude=()):
     g.objects[u].defn = next(c for c in db if c.name == name)
     g._to_zone(g.objects[u], "board", location=loc, controller=p)
     g.objects[u].exhausted = False
-    g.bump()
+    g.restruct()
     return u
 
 
@@ -56,11 +56,11 @@ def test_master_yi_meditative_needs_8_runes(db, decks):
     base = g.objects[u].defn.might
     ps = g.players[0]
     while len(ps.runes) > 7:
-        g._to_zone(g.objects[ps.runes[-1]], "rune_deck"); g.bump()
+        g._to_zone(g.objects[ps.runes[-1]], "rune_deck"); g.restruct()
     assert g.chars(u).might == base
     while len(ps.runes) < 8:
         g.channel(0, 1) if hasattr(g, "channel") else g._to_zone(g.objects[ps.rune_deck[0]], "board", controller=0)
-        g.bump()
+        g.restruct()
     assert g.chars(u).might == base + 4
 
 
@@ -70,12 +70,12 @@ def test_sett_kingpin_and_lee_sin_centered_count_buffed_units_at_their_battlefie
     lee = put(g, db, 0, "Lee Sin, Centered", ("bf", 0), exclude=(sett,))
     other = put(g, db, 0, "Sett, Kingpin", ("base", 0), exclude=(sett, lee))
     s0, l0 = g.chars(sett).might, g.chars(lee).might
-    g.objects[lee].buffs = 1; g.bump()
+    g.objects[lee].buffs = 1; g.restruct()
     assert g.chars(sett).might == s0 + 1            # one buffed unit there; Sett isn't buffed, so no +2 from Lee Sin
     assert g.chars(lee).might == l0 + 1             # the buff counter only; Lee Sin's static says "other"
-    g.objects[other].buffs = 1; g.bump()            # at base: doesn't count
+    g.objects[other].buffs = 1; g.restruct()            # at base: doesn't count
     assert g.chars(sett).might == s0 + 1
-    g.objects[sett].buffs = 1; g.bump()             # own buff +1, two buffed units +2, Lee Sin +2
+    g.objects[sett].buffs = 1; g.restruct()             # own buff +1, two buffed units +2, Lee Sin +2
     assert g.chars(sett).might == s0 + 5
 
 
@@ -132,7 +132,7 @@ def test_xin_zhao_enters_ready_with_two_other_units_in_base(db, decks):
     s1 = put(g, db, 0, "Sett, Kingpin", ("base", 0))
     u = next(u for u in g.players[0].deck if g.objects[u].zone == "deck")
     g.objects[u].defn = next(c for c in db if c.name == "Xin Zhao, Vigilant")
-    g._to_zone(g.objects[u], "hand"); g.bump()
+    g._to_zone(g.objects[u], "hand"); g.restruct()
     ev = {"kind": "enter_ready", "uid": u, "player": 0, "ready": False, "loc": ("base", 0)}
     assert g.replace_event(dict(ev))["ready"] is False      # only one other unit in base
     put(g, db, 0, "Sett, Kingpin", ("base", 0), exclude=(s1, u))
@@ -162,7 +162,7 @@ def test_riven_shattered_deals_2_per_equipment(db, decks):
         g.objects[e].defn = eq
         g.objects[riv].attachments.append(e)
         g.objects[e].attached_to = riv if hasattr(g.objects[e], "attached_to") else None
-    g.bump()
+    g.restruct()
     ab = next(a for a in g.abilities(riv) if a.label == "Riven, Shattered")
     from riftsim.core.vm import Context
     ctx = Context(0, riv, here=("bf", 0)); ctx.vars["self"] = riv; ctx.vars["t"] = foe
@@ -197,7 +197,7 @@ def _card_in(g, db, p, name, zone):
     u = next(u for u in g.players[p].deck if g.objects[u].zone == "deck")
     g.objects[u].defn = next(c for c in db if c.name == name)
     g._to_zone(g.objects[u], zone)
-    g.bump()
+    g.restruct()
     return u
 
 
@@ -262,7 +262,7 @@ def test_fizz_replays_a_cheap_spell_from_trash_and_recycles_it(db, decks):
                  and set(c.domains) <= have)
     u = next(u for u in g.players[0].deck if g.objects[u].zone == "deck")
     g.objects[u].defn = cheap
-    g._to_zone(g.objects[u], "trash"); g.bump()
+    g._to_zone(g.objects[u], "trash"); g.restruct()
     _fire(g, fz, "Fizz, Trickster")
     settle(g, picks=[(u,)])
     assert g.objects[u].zone == "deck" and g.players[0].deck[-1] == u
@@ -304,7 +304,7 @@ def test_ambessa_empowered_ignores_damage_outside_combat(db, decks):
     a = put(g, db, 0, "Ambessa, The Wolf", ("base", 0))
     m = g.chars(a).might
     assert g.replace_event({"kind": "damage", "uid": a, "amount": 3}) is not None
-    g.objects[a].empowered = 1; g.bump()
+    g.objects[a].empowered = 1; g.restruct()
     assert g.chars(a).might == m + 3
     assert g.replace_event({"kind": "damage", "uid": a, "amount": 3}) is None
 
@@ -314,7 +314,7 @@ def test_sona_readies_four_runes_at_end_of_turn_at_a_battlefield(db, decks):
     put(g, db, 0, "Sona, Harmonious", ("bf", 0))
     for r in g.players[0].runes:
         g.objects[r].exhausted = True
-    g.bump()
+    g.restruct()
     g.pending = None
     g.run()
     g.choose(("end_turn",))
@@ -338,7 +338,7 @@ def test_vex_cheerless_changes_spell_costs_only_in_combat(db, decks):
     e0, p0 = g.card_cost(0, mine, "hand")
     assert g.card_cost(1, theirs, "hand") == (e0, p0)
     g.combat = {"bf": 0, "attacker": 0, "defender": 1, "step": "showdown"}
-    g.bump()
+    g.restruct()
     e1, p1 = g.card_cost(0, mine, "hand")
     assert e1 == e0 - 1 and len(p1) == max(0, len(p0) - 1)
     e2, p2 = g.card_cost(1, theirs, "hand")
@@ -364,7 +364,7 @@ def test_zed_swaps_with_a_shadow_clone(db, decks):
     g = main_phase(db, decks)
     z = put(g, db, 0, "Zed, Without a Sound", ("bf", 0))
     c = g.play_token(0, "Shadow Clone", ("base", 0))
-    g.bump()
+    g.restruct()
     ab = next(a for a in g.abilities(z) if a.label == "swap with a Shadow Clone")
     from riftsim.core.vm import Context, Frame
     ctx = Context(0, z); ctx.vars["self"] = z; ctx.vars["t"] = c
@@ -411,7 +411,7 @@ def test_akali_silent_can_be_chosen_only_in_combat(db, decks):
     ak = put(g, db, 0, "Akali, Silent", ("bf", 0))
     assert g.chars(ak).keywords.get("untargetable")
     g.combat = {"bf": 0, "attacker": 1, "defender": 0, "step": "showdown"}
-    g.bump()
+    g.restruct()
     assert not g.chars(ak).keywords.get("untargetable")
 
 
@@ -482,9 +482,9 @@ def test_sivir_mercenary_after_spending_two_power(db, decks):
     g = main_phase(db, decks)
     s = put(g, db, 0, "Sivir, Mercenary", ("base", 0))
     m = g.chars(s).might
-    g.turn_memo[("spent", 0)] = [3, 1]; g.bump()
+    g.turn_memo[("spent", 0)] = [3, 1]; g.restruct()
     assert g.chars(s).might == m
-    g.turn_memo[("spent", 0)] = [3, 2]; g.bump()
+    g.turn_memo[("spent", 0)] = [3, 2]; g.restruct()
     assert g.chars(s).might == m + 2 and g.chars(s).keywords.get("ganking")
 
 
@@ -630,7 +630,7 @@ def test_gangplank_naval_empowered_turns_chosen_stun_minus_might_and_bounce_into
     assert g.objects[gp].stunned
     g.objects[gp].stunned = False
     g.objects[gp].empowered = 1
-    g.bump()
+    g.restruct()
     g.do_stun(gp, ctx)
     assert not g.objects[gp].stunned and g.chars(gp).might == base + 3
     g.give_might(gp, -2, "turn", ctx)
@@ -650,7 +650,7 @@ def test_mel_empowered_extra_minus_might_and_uncounterable(db, decks):
     g.give_might(foe, -1, "turn", _spell_ctx(g, 0, [foe]))
     assert g.chars(foe).might == base - 1
     g.objects[mel].empowered = 1
-    g.bump()
+    g.restruct()
     g.give_might(foe, -1, "turn", _spell_ctx(g, 0, [foe]))
     assert g.chars(foe).might == base - 3
     g.give_might(foe, -1, "turn", _spell_ctx(g, 1, [foe]))     # the opponent's effects get no bonus
@@ -731,7 +731,7 @@ def test_ashe_focused_banishes_a_card_until_they_hold(db, decks):
             break
         g.choose(("pass",) if ("pass",) in d.options else d.options[0])
     assert g.objects[target].zone == "banish"
-    g._to_zone(g.objects[ashe], "trash"); g.bump()            # even if Ashe left the board
+    g._to_zone(g.objects[ashe], "trash"); g.restruct()            # even if Ashe left the board
     g.emit("hold", player=0, loc=("bf", 0), bf=0, units=())    # my hold: nothing
     settle(g)
     assert g.objects[target].zone == "banish"
@@ -907,7 +907,7 @@ def test_nocturne_can_be_banished_and_played_for_any_power_when_looked_at(db, de
     deck = g.players[0].deck
     noc = deck[1]
     g.objects[noc].defn = next(c for c in db if c.name == "Nocturne, Horrifying")
-    g.bump()
+    g.restruct()
     other = deck[0]
     ctx = Context(0, None)
     g.vm_frames.append(Frame(compile_effect([O.Look(3, out="looked")]), ctx))

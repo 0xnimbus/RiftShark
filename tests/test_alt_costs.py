@@ -28,7 +28,7 @@ def test_blade_of_the_exile_equip_by_exhausting_a_friendly_unit(db, decks):
     b = unit_at(g, 0, ("base", 0), exclude=(a,))
     blade = give(g, 0, "Blade of the Exile", db)
     g._to_zone(g.objects[blade], "board", location=("base", 0), controller=0)
-    g.bump()
+    g.restruct()
     d = g.run()
     equips = [o for o in d.options if o[0] == "activate" and o[1] == blade]
     labels = [d.labels[d.options.index(o)] for o in equips]
@@ -63,7 +63,7 @@ def test_baron_nashor_adds_the_baron_pit_and_enters_there(db, decks):
     for u in g.players[0].runes:
         g.objects[u].exhausted = False
     g.pending = None
-    g.bump()
+    g.restruct()
     n = len(g.battlefields)
     baron = give(g, 0, "Baron Nashor", db)
     d = g.run()
@@ -95,7 +95,7 @@ def test_scuttle_crab_reveal_and_facedown_look_are_real_information(db, decks):
     g = main_phase(db, decks)
     crab = unit_at(g, 0, ("base", 0))
     g.objects[crab].defn = next(c for c in db if c.name == "Scuttle Crab")
-    g.bump()
+    g.restruct()
     opp_hand = list(g.players[1].hand)
     assert not any(g.knows(0, u) for u in opp_hand)
     g.do_kill([crab], None)

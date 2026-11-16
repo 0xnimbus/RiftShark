@@ -37,7 +37,7 @@ def _setup(db, decks, morde_loc=("base", 0)):
     recruit = g.play_token(0, "Recruit", ("base", 0))
     if isinstance(recruit, (list, tuple)):
         recruit = recruit[0]
-    g.bump()
+    g.restruct()
     return g, morde, twirl, recruit
 
 
@@ -137,7 +137,7 @@ def test_once_each_turn(db, decks):
 def test_no_other_friendly_unit_means_no_question(db, decks):
     g, morde, twirl, recruit = _setup(db, decks)
     g._to_zone(g.objects[recruit], "trash")
-    g.bump()
+    g.restruct()
     kinds = []
     g.do_kill([morde])
     _drive(g, lambda d: kinds.append(d.kind) or None)

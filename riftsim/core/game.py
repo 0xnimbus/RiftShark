@@ -2008,7 +2008,7 @@ class Game(flow.FlowMixin):
     # ------------------------------------------------------------------ cloning / snapshots
     def clone(self):
         g = copy.copy(self)
-        g._statics_cache = g._trig_cache = g._rules_cache = g._grant_cache = g._board_cache = g._repl_cache = g._pao_cache = None      # caches hold this game's objects
+        g._statics_cache = g._trig_cache = g._rules_cache = g._grant_cache = g._board_cache = g._repl_cache = g._pao_cache = g._addsrc_cache = None      # caches hold this game's objects
         self._ctx_map = {}           # keep contexts shared between a chain item and its frames shared in the clone
         g.objects = {u: self._clone_obj(o) for u, o in self.objects.items()}
         g.players = [self._clone_player(p) for p in self.players]

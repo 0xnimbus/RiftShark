@@ -26,7 +26,7 @@ def legend(g, db, cid):
     u = g.players[0].legend
     g.objects[u].defn = next(c for c in db if c.id == cid)
     g.objects[u].exhausted = False
-    g.bump()
+    g.restruct()
     return u
 
 
@@ -65,7 +65,7 @@ def test_yasuo_moves_a_unit_from_base_to_a_battlefield_and_back(db, decks):
     for r in g.players[0].runes:
         g.objects[r].exhausted = False
     g.pending = None
-    g.bump()
+    g.restruct()
     activate(g, lg, [u])
     assert g.objects[u].location == ("base", 0)
 
@@ -77,7 +77,7 @@ def test_lucian_equipment_each_give_assault(db, decks):
     blade = give(g, 0, "Blade of the Exile", db)
     g._to_zone(g.objects[blade], "board", location=("base", 0), controller=0)
     g.do_attach(blade, u, None)
-    g.bump()
+    g.restruct()
     assert g.chars(u).kw("assault") >= 1
 
 
@@ -87,7 +87,7 @@ def test_jax_attaches_a_detached_equipment(db, decks):
     u = unit_at(g, 0, ("base", 0))
     blade = give(g, 0, "Blade of the Exile", db)
     g._to_zone(g.objects[blade], "board", location=("base", 0), controller=0)
-    g.bump()
+    g.restruct()
     activate(g, lg, [blade, u])
     assert g.objects[blade].attached_to == u
 
@@ -99,7 +99,7 @@ def test_ezreal_needs_two_enemy_choices_this_turn(db, decks):
     assert not any(o[0] == "activate" and o[1] == lg for o in d.options)
     g.turn_memo[("chose_enemy", 0)] = 2
     g.pending = None
-    g.bump()
+    g.restruct()
     d = g.run()
     assert any(o[0] == "activate" and o[1] == lg for o in d.options)
 
@@ -140,7 +140,7 @@ def test_renata_gold_adds_an_extra_energy_near_victory(db, decks):
     Add(energy=0, power=["any"]).run(g, Context(0, gold))
     assert ps.energy == e                                   # far from victory: no bonus
     ps.points = g.cfg["victory"] - 3
-    g.bump()
+    g.restruct()
     Add(energy=0, power=["any"]).run(g, Context(0, gold))
     assert ps.energy == e + 1
 
@@ -151,7 +151,7 @@ def test_bashful_bloom_costs_less_per_temporary_unit(db, decks):
     ab = next(a for a in g.abilities(lg) if getattr(a, "cost", {}).get("energy") == 4)
     assert g.ability_energy(ab, lg) == 4
     g.play_token(0, "Sprite", ("base", 0), ready=True)
-    g.bump()
+    g.restruct()
     assert g.ability_energy(ab, lg) == 3
 
 
@@ -167,7 +167,7 @@ def _hand_unit(g, db, p=0, min_cost=3):
     u = next(u for u in ps.deck if g.objects[u].defn.is_unit and not g.objects[u].defn.is_champion
              and (g.objects[u].defn.energy or 0) >= min_cost and g.objects[u].zone == "deck")
     g._to_zone(g.objects[u], "hand")
-    g.bump()
+    g.restruct()
     return u
 
 
@@ -186,7 +186,7 @@ def test_boy_who_shattered_time_next_unit_costs_less_and_dies_at_end_of_turn(db,
     g = main_phase(db, decks)
     lg = legend(g, db, "RAD-139")
     g.objects[lg].empowered = 1
-    g.bump()
+    g.restruct()
     u = _hand_unit(g, db)
     u2 = _hand_unit(g, db)
     e0, p0 = g.card_cost(0, u, "hand", ("base", 0))
@@ -246,7 +246,7 @@ def test_songstress_exhausts_herself_and_three_units_to_reduce_a_spell_by_2(db, 
     assert g._exhaust_reducers(0)
     sp = next(u for u in g.players[0].deck if g.objects[u].defn.type == "spell" and g.objects[u].defn.energy >= 2
               and not g.objects[u].defn.text.lower().startswith("choose"))
-    g._to_zone(g.objects[sp], "hand"); g.bump()
+    g._to_zone(g.objects[sp], "hand"); g.restruct()
     it = g._play(0, sp, None)
     g.pending = None
     asked = False
@@ -309,7 +309,7 @@ def _gear_on_board(g, db, p=0, exclude=()):
     u = next(u for u in ps.deck if u not in exclude and g.objects[u].zone == "deck")
     g.objects[u].defn = next(c for c in db if c.type == "gear" and (c.energy or 0) >= 2 and "Equipment" not in c.tags)
     g._to_zone(g.objects[u], "board", location=("base", p), controller=p)
-    g.bump()
+    g.restruct()
     return u
 
 

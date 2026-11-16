@@ -29,7 +29,7 @@ def decks(db):
 def fresh(g):
     g.pending = None
     g.dirty = True
-    g.bump()
+    g.restruct()
     return g.run()
 
 
