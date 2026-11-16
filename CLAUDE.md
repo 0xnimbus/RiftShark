@@ -196,6 +196,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   hand-scripted in cards_manual.py: counters an enemy item that chooses the friendly unit and no other friendly unit.
   Checked OK: a Temporary unit killed before scoring loses the hold (CR 190.4.c), Sprite Fountain's Deathknell
   replays its Sprite when Temporary kills it, Defy reads printed costs (CR 356.1.c).
+  20:20: a cost at the start of a non-"may" trigger ("Recycle me to ...", Ekko, Recurrent; "banish a card from any
+  trash to ...", Gust Monk; "exhaust me to draw 1", Titanic Shrine) was paid on resolution; CR 383.3.b makes it the
+  base cost, paid as the trigger is finalized: `targeting.TriggerBaseCost` in the finalize code. rules_audit no
+  longer reports a staged combat waiting on choose_showdown as contested (CR 463.1).
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

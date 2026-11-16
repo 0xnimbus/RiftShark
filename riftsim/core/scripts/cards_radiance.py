@@ -215,10 +215,15 @@ def evelynn_entrancing(defn):
 def gust_monk(defn):
     # You may pay [1] as an additional cost to play me.   (auto: the additional cost)
     # When you play me, if you paid the additional cost, banish a card from any trash to give a unit [Assault 2] this turn.
-    return _keep(defn, [Triggered("play_self", [
-        O.Choose(Sel("card", zone="trash"), out="__b", targeted=True),
+    # "banish a card from any trash to ..." is the trigger's base cost, paid as it is finalized (CR 383.3.b): the
+    # card is picked then (a cost, not a target) and the trigger can't be finalized with every trash empty.
+    from ..targeting import TriggerBaseCost
+    any_trash = lambda g, c: any(p.trash for p in g.players)
+    return _keep(defn, [Triggered("play_self", [O.GiveKeyword(Ref("t"), "assault", 2)], targets=[
         O.Choose(Sel("unit"), out="t"),
-        O.If(O.has_var("__b"), [O.Banish(Ref("__b")), O.GiveKeyword(Ref("t"), "assault", 2)]),
+        TriggerBaseCost(any_trash),
+        O.Choose(Sel("card", zone="trash"), out="__b", targeted=False),
+        O.Banish(Ref("__b")),
     ], filt=lambda g, s, ev: bool((ev.get("paid") or {}).get("add")),
         label="Gust Monk: Assault 2", source_text=defn.text)])
 
