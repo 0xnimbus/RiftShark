@@ -47,6 +47,17 @@ def _zone_ok(az, z):
     return az == z
 
 
+_MOD_LAYER = {"type": 1, "tag": 1, "keyword": 2, "ability": 2, "might": 3, "base_might": 3}
+
+
+def _layer_stamp(t):
+    return (t[0], t[1])
+
+
+def _mod_stamp(m):
+    return m.stamp
+
+
 def _prints_temporary(defn):
     """Does the definition list the [Temporary] ability itself (so _compute_chars adds no second one)?"""
     return any(getattr(ab, "keyword", None) == "temporary" for ab in defn.abilities)
@@ -139,6 +150,7 @@ class Game(flow.FlowMixin):
         self._board_cache = None
         self._repl_cache = None
         self._pao_cache = None
+        self._canpay_memo = None
         self._setup(decks)
 
     # ------------------------------------------------------------------ setup
@@ -392,16 +404,17 @@ class Game(flow.FlowMixin):
             for ab in ao.defn.effect_abilities:
                 if isinstance(ab, Static) and (ab.cond is None or ab.cond(self, a)) and ab.sel in ("attached", "self"):
                     statics.append((ab.layer, ao.entered_stamp, ab, a))
-        statics.sort(key=lambda t: (t[0], t[1]))
-        mods = sorted(o.mods, key=lambda m: m.stamp)
-        for layer in (1, 2, 3):
-            for m in mods:
-                if {"type": 1, "tag": 1, "keyword": 2, "ability": 2, "might": 3, "base_might": 3}.get(m.kind, 3) == layer:
-                    self._apply_mod(c, m)
-            for lay, _, ab, src in statics:
-                if lay != layer:
-                    continue
-                self._apply_static(c, ab, src, uid)
+        if statics or o.mods:
+            statics.sort(key=_layer_stamp)
+            mods = sorted(o.mods, key=_mod_stamp)
+            for layer in (1, 2, 3):
+                for m in mods:
+                    if _MOD_LAYER.get(m.kind, 3) == layer:
+                        self._apply_mod(c, m)
+                for lay, _, ab, src in statics:
+                    if lay != layer:
+                        continue
+                    self._apply_static(c, ab, src, uid)
         if c.keywords.get("temporary") and not any(getattr(a, "keyword", None) == "temporary" for a in c.abilities):
             c.abilities.append(_temporary_ability())     # granted [Temporary] (CR: kill me at the start of my Beginning Phase)
         if c.might is not None:
@@ -626,8 +639,11 @@ class Game(flow.FlowMixin):
         self.restruct()
 
     def _on_change_location(self, o):
-        o.mods = [m for m in o.mods if m.duration != "while_here"]
-        self.restruct()
+        if any(m.duration == "while_here" for m in o.mods):
+            o.mods = [m for m in o.mods if m.duration != "while_here"]
+            self.restruct()
+        else:
+            self.bump()
 
     # ------------------------------------------------------------------ zones
     def _remove_from_zone(self, o):
@@ -724,7 +740,8 @@ class Game(flow.FlowMixin):
                         for ab in self._abilities_of(u, self.objects[u]):
                             if isinstance(ab, PlayPermission) and ab.perm == "as_revealed_from_deck":
                                 ab.value(self, u, ctx)
-        self.log("event:" + kind, **{k: v for k, v in data.items() if k != "ctx"})
+        if self.log_enabled:
+            self.log("event:" + kind, **{k: v for k, v in data.items() if k != "ctx"})
         self._collect_triggers(ev)
         return ev
 
@@ -1938,6 +1955,15 @@ class Game(flow.FlowMixin):
             ps.energy, ps.power, ps.pool_r = 0, [], []
 
     def can_pay(self, p, energy=0, power=(), extra_exhaust=(), purpose=None):
+        memo = self._canpay_memo
+        if memo is not None:               # inside legal_actions: the state can't change between calls
+            key = (p, energy, tuple(power), tuple(extra_exhaust),
+                   None if purpose is None else tuple(sorted((k, frozenset(v) if isinstance(v, set) else v)
+                                                              for k, v in purpose.items())))
+            r = memo.get(key)
+            if r is None:
+                r = memo[key] = payment.can_pay(self, p, energy, list(power), purpose, extra_exhaust)
+            return r
         return payment.can_pay(self, p, energy, list(power), purpose, extra_exhaust)
 
     def payment_plans(self, p, energy=0, power=(), purpose=None):
@@ -2036,6 +2062,7 @@ class Game(flow.FlowMixin):
         g.rng.setstate(self.rng.getstate())
         g.pending = self._clone_decision(self.pending) if self.pending else None
         g._computing = set()
+        g._canpay_memo = None
         g.combat_result_memo = {}
         self.__dict__.pop("_ctx_map", None)
         g.__dict__.pop("_ctx_map", None)

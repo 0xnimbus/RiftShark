@@ -1875,6 +1875,15 @@ class FlowMixin:
 
     def legal_actions(self, p):
         """Discretionary actions available to player p right now."""
+        if self._canpay_memo is not None:
+            return self._legal_actions(p)
+        self._canpay_memo = {}
+        try:
+            return self._legal_actions(p)
+        finally:
+            self._canpay_memo = None
+
+    def _legal_actions(self, p):
         acts = []
         main = (not self.closed) and self.neutral and self.phase == "main" and p == self.turn_player
         if self.closed or self.showdown is not None or self.combat is not None:
