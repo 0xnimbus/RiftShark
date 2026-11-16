@@ -192,6 +192,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   needed Calm, never Chaos) or one of each (Tibbers: Fury + Chaos, never Fury + Fury). Now a requirement "fury|chaos"
   (`payment.own_power` / `req_ok`) used by card costs, [C] in ability costs and Accelerate. Cards checked against the
   images. Round-robins before this underrate Irelia, Akali, Azir, Master Yi, Riven (Blade of the Exile) and Sett.
+  15:20: Repulse (Master Yi and Sett sideboards, the only unscripted card in any tournament list or sideboard) is
+  hand-scripted in cards_manual.py: counters an enemy item that chooses the friendly unit and no other friendly unit.
+  Checked OK: a Temporary unit killed before scoring loses the hold (CR 190.4.c), Sprite Fountain's Deathknell
+  replays its Sprite when Temporary kills it, Defy reads printed costs (CR 356.1.c).
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

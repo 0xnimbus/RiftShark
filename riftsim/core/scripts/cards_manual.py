@@ -175,6 +175,33 @@ def royal_entourage(defn):
     ])], label=defn.name, source_text=defn.text)]
 
 
+@script("Repulse")
+def repulse(defn):
+    # [Reaction]  Choose a friendly unit at a battlefield. Counter an enemy spell or ability that chooses it and no
+    # other friendly unit.
+    def item_ok(g, c, it, u):
+        if it.controller == c.controller or it.ctx is None or it.removed or not it.finalized:
+            return False
+        chosen = [x for x in g._target_uids(it.ctx) if isinstance(x, int) and x in g.objects]
+        if u not in chosen:
+            return False
+        return not any(x != u and g.objects[x].zone == "board" and g.objects[x].controller == c.controller
+                       and g.is_unit(x) for x in chosen)
+
+    def unit_ok(g, c, u):
+        return any(item_ok(g, c, it, u) for it in g.chain)
+
+    def source_ok(g, c, s):
+        u = c.vars.get("__ru")
+        return u is not None and any(it.uid == s and item_ok(g, c, it, u) for it in g.chain)
+    second = O.Choose(Sel("any", zone="any", pred=source_ok), out="__sp", targeted=True)
+    second.depends = True          # legality is checked through the unit choice
+    return [SpellEffect([O.Choose(Sel("unit", side="friendly", where="battlefield", pred=unit_ok), out="__ru"), second,
+                         O.CounterItem(lambda g, c: next((it.id for it in reversed(g.chain) if it.uid == c.vars.get("__sp")
+                                                          and item_ok(g, c, it, c.vars.get("__ru"))), None))],
+                        label=defn.name, source_text=defn.text)]
+
+
 @script("Sudden Storm")
 def sudden_storm(defn):
     # [Hidden] [Action]  Deal 2 to a unit at a battlefield. If it's attacking, deal 4 to it instead.
