@@ -10,8 +10,10 @@ import itertools
 
 from .abilities import Activated, PlayPermission, Static
 from .objects import ChainItem
-from .vm import Context, Decision, Frame, Instr, Ref, compile_effect, relocate, run_vm, resume_vm, val
-from .ops import Choose, ChooseMode, May, SetVar, Do, PayResources
+from .vm import Context, Decision, Frame, Instr, Ref, compile_effect, relocate, run_vm, resume_vm, val, _copy_containers
+from .ops import Choose, ChooseMode, May, SetVar, Do, PayResources, ChooseFromList, Exhaust, Recycle
+from .selectors import Sel
+from .payment import plan_label
 from . import payment
 
 PHASES = ["awaken", "beginning", "scoring", "channel", "draw", "main", "ending", "expiration"]
@@ -108,7 +110,6 @@ class _SnapChoices(Instr):
 
     def run(self, game, ctx):
         snaps = ctx.vars.setdefault("__rep_choices", {})
-        from .vm import _copy_containers
         snaps[self.k] = _copy_containers({n: v for n, v in ctx.vars.items() if not n.startswith("__rep") and n not in ("__costs", "__ask")})
         return None
 
@@ -128,7 +129,6 @@ class _RestoreChoices(Instr):
     def run(self, game, ctx):
         snap = (ctx.vars.get("__rep_choices") or {}).get(self.k)
         if snap:
-            from .vm import _copy_containers
             ctx.vars.update(_copy_containers(snap))
             # the earlier executions may have made these choices illegal (Hard Bargain countering the same spell
             # twice): instructions that can't be performed are ignored (CR 820.1.d.2)
@@ -270,7 +270,6 @@ class _FinalizeCosts(Instr):
         ctx.vars["__pay_total"] = (e, list(p))
         if len(totals) > 1:
             ctx.vars["__pay_totals"] = plan_total
-        from .payment import plan_label
         return Decision(ctx.controller, "pay", plans, labels=[plan_label(game, pl) for pl in plans],
                         info={"item": it.id, "for": it.label, "energy": e, "power": list(p)})
 
@@ -302,7 +301,6 @@ class _RepeatDeflect(Instr):
         if len(plans) == 1:
             game.apply_payment(ctx.controller, plans[0], ctx, purpose)
             return None
-        from .payment import plan_label
         return Decision(ctx.controller, "pay", plans, labels=[plan_label(game, pl) for pl in plans],
                         info={"item": it.id, "for": it.label + " (Deflect, repeat)", "energy": 0, "power": list(p)})
 
@@ -1260,7 +1258,6 @@ class FlowMixin:
         return None
 
     def _variable_reduce_code(self, it, ab):
-        from .ops import ChooseFromList
         cands, dom, act = ab.value
         p, uid = it.controller, it.uid
         opts = lambda g, c: list(cands(g, p, uid))
@@ -1311,8 +1308,6 @@ class FlowMixin:
     def _exhaust_reducer_code(self, it):
         """The optional cost is offered as a yes/no; when the spell was only affordable with it, it is paid without asking
         (declining would make the play illegal, CR 357)."""
-        from .ops import Exhaust
-        from .selectors import Sel
         p = it.controller
         code = []
         e, pw = it.cost["energy"], it.cost["power"]
@@ -1447,7 +1442,6 @@ class FlowMixin:
         """The PayResources of an optional "pay [X] as an additional cost" (Crescent Guardian, Sea Monkey, Rampage),
         or None. Such a cost is added to the total cost and paid with it (CR 357), so it is only offered when the
         whole cost can be paid, and Ezreal, Prodigy reduces it."""
-        from .ops import PayResources
         if not (isinstance(ab, PlayPermission) and ab.perm == "additional_cost"):
             return None
         req, ins, mandatory = ab.value
@@ -1691,7 +1685,6 @@ class FlowMixin:
             if len(plans) == 1:
                 self._hide_paid(plans[0], None, hide=(a[1], a[2]), player=p)
             else:
-                from .payment import plan_label
                 self.ask(p, "pay", plans, [plan_label(self, pl) for pl in plans], "_hide_paid", hide=(a[1], a[2]), hider=p,
                          **{"for": "hide " + self.objects[a[1]].defn.name})
         elif k == "rune":
@@ -2380,12 +2373,10 @@ class FlowMixin:
             out.append(_C(cost["exhaust_unit"], out="__exh", targeted=False))
             out.append(Do(lambda g, c: g.do_exhaust(c.vars["__exh"], c)))
         if cost.get("recycle"):
-            from .ops import Recycle
             out.append(Recycle(n=cost["recycle"], zone=cost.get("recycle_zone", "trash")))
         return out
 
 
 def Sel_hand(card_type=None):
-    from .selectors import Sel
     return Sel("card", zone="hand", pred=lambda g, c, u: g.objects[u].owner == c.controller and u != c.source and (
         card_type is None or card_type in g.chars(u).types))
