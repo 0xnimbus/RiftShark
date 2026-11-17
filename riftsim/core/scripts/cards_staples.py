@@ -734,14 +734,19 @@ def ivern_nurturer(defn):
 def diana_lunari(defn):
     # When a showdown begins here, you may pay [1]. If you do, [Predict], then reveal the top card of your Main Deck.
     # If it's a spell, draw it.
-    def reveal_top(g, c):
+    def top(g, c):
         deck = g.players[c.controller].deck
         c.vars["__top"] = deck[0] if deck else None
-        if deck:
-            g.emit("reveal", player=c.controller, cards=[deck[0]], ctx=c)
+
+    def reveal_top(g, c):
+        u = c.vars.get("__top")
+        if u is None or g.objects[u].zone != "deck":      # Nocturne, Horrifying banished as he was revealed
+            c.vars["__top"] = None
+            return
+        g.emit("reveal", player=c.controller, cards=[u], ctx=c)
     return {"abilities": [Triggered("showdown_start_here", [
         O.PayResources(1, out="__dp"),
-        O.If(Ref("__dp"), [O.Predict(1), O.Do(reveal_top),
+        O.If(Ref("__dp"), [O.Predict(1), O.Do(top), O.SeeFromDeck(lambda g, c: [c.vars.get("__top")]), O.Do(reveal_top),
                            O.If(lambda g, c: c.vars.get("__top") in g.objects and g.objects[c.vars["__top"]].base_defn().type == "spell",
                                 [O.ToHand(Ref("__top"))])])], label=defn.name, source_text=defn.text)], "replace": True}
 

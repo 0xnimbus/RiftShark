@@ -1746,19 +1746,45 @@ def overt_operation(defn):
 
 
 # ---------------------------------------------------------------- batch 2026-11-06 16:00
+class _RevealUntilUnit(O.Instr):
+    """Dazzling Aurora: reveal cards from the top of your Main Deck until you reveal a unit (__du; the rest in __dr).
+    A Nocturne, Horrifying banished as he is revealed is not revealed (CR 370), so the reveals go on past him."""
+    label = "reveal until a unit"
+
+    def run(self, g, c):
+        c.vars["__dr"], c.vars["__du"], c.vars["__noct_done"] = [], None, []
+        return self._go(g, c)
+
+    def _go(self, g, c):
+        for u in list(g.players[c.controller].deck):
+            if u in c.vars["__dr"]:
+                continue
+            if not g.objects[u].base_defn().is_unit:
+                c.vars["__dr"].append(u)
+                continue
+            d = O._nocturne_step(g, c, [u], viewer=c.controller)
+            if d is not None:
+                return d
+            if g.objects[u].zone == "deck":
+                c.vars["__du"] = u
+                break
+        shown = c.vars["__dr"] + ([c.vars["__du"]] if c.vars["__du"] is not None else [])
+        if shown:
+            g.emit("reveal", cards=tuple(shown), player=c.controller, ctx=c)
+        return None
+
+    def resume(self, g, c, choice):
+        d = O._nocturne_apply(g, c, choice)
+        if d is not None:
+            return d
+        return self._go(g, c)
+
+
 @script("Dazzling Aurora")
 def dazzling_aurora(defn):
     # At the end of your turn, reveal cards from the top of your Main Deck until you reveal a unit. Play it, ignoring its
     # cost, and recycle the rest.
-    def reveal(g, c):
-        deck = g.players[c.controller].deck
-        i = next((k for k, u in enumerate(deck) if g.objects[u].base_defn().is_unit), None)
-        shown = list(deck[: (i + 1) if i is not None else len(deck)])
-        if shown:
-            g.emit("reveal", cards=tuple(shown), player=c.controller, ctx=c)
-        c.vars["__du"] = deck[i] if i is not None else None
-        c.vars["__dr"] = [u for u in shown if u != c.vars["__du"]]
-    return [Triggered("end_turn", [O.Do(reveal, label="reveal until a unit"),
+    return [Triggered("end_turn", [_RevealUntilUnit(),
                                    O.If(Ref("__du"), [O.PlayCard(Ref("__du"), ignore="all")]),
                                    O.Recycle(lambda g, c: [u for u in c.vars.get("__dr", []) if g.objects[u].zone == "deck"])],
                       label=defn.name, source_text=defn.text)]
@@ -2215,8 +2241,12 @@ def cataclysm(defn):
 def mechanical_bandit(defn):
     # At the start of your Beginning Phase, each player reveals the top card of their Main Deck. If you revealed a card
     # with the lowest Energy cost, draw it. Recycle the rest.
+    def top_cards(g, c):
+        c.vars["__mb"] = [g.players[q].deck[0] for q in range(len(g.players)) if g.players[q].deck]
+
     def run(g, c):
-        tops = {q: g.players[q].deck[0] for q in range(len(g.players)) if g.players[q].deck}
+        # a Nocturne, Horrifying banished as he was revealed is not revealed (CR 370: the event was replaced)
+        tops = {g.objects[u].owner: u for u in c.vars.get("__mb", []) if g.objects[u].zone == "deck"}
         if not tops:
             return
         for q, u in tops.items():
@@ -2230,7 +2260,8 @@ def mechanical_bandit(defn):
             else:
                 rest.append(tops[me])
         g.do_recycle(rest, c)
-    return [Triggered("start_beginning", [O.Do(run, label="reveal top cards")], label=defn.name, source_text=defn.text)]
+    return [Triggered("start_beginning", [O.Do(top_cards), O.SeeFromDeck(Ref("__mb")), O.Do(run, label="reveal top cards")],
+                      label=defn.name, source_text=defn.text)]
 
 
 # ---------------------------------------------------------------- batch 2026-11-06 16:40
@@ -2402,13 +2433,15 @@ def kings_edict(defn):
 def blind_fury(defn):
     # [Action]  Each opponent reveals the top card of their Main Deck. Choose one and banish it, then play it, ignoring
     # its cost. Then recycle the rest.
+    def tops(g, c):
+        c.vars["__bf"] = [g.players[q].deck[0] for q in g.opponents(c.controller) if g.players[q].deck]
+
     def reveal(g, c):
-        tops = [g.players[q].deck[0] for q in g.opponents(c.controller) if g.players[q].deck]
-        for u in tops:
+        c.vars["__bf"] = [u for u in c.vars["__bf"] if g.objects[u].zone == "deck"]     # minus a banished Nocturne
+        for u in c.vars["__bf"]:
             g.emit("reveal", cards=(u,), player=g.objects[u].owner, ctx=c)
-        c.vars["__bf"] = tops
     rest = lambda g, c: [u for u in c.vars.get("__bf", []) if u != c.vars.get("__bfp") and g.objects[u].zone == "deck"]
-    return [SpellEffect([O.Do(reveal, label="opponents reveal their top card"),
+    return [SpellEffect([O.Do(tops), O.SeeFromDeck(Ref("__bf")), O.Do(reveal, label="opponents reveal their top card"),
                          O.ChooseFromList(lambda g, c: c.vars.get("__bf", []), out="__bfp", label="banish it, then play it"),
                          O.If(Ref("__bfp"), [O.Banish(Ref("__bfp")), O.PlayCard(Ref("__bfp"), ignore="all")]),
                          O.Recycle(rest)], label=defn.name, source_text=defn.text)]

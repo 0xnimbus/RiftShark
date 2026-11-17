@@ -200,6 +200,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   trash to ...", Gust Monk; "exhaust me to draw 1", Titanic Shrine) was paid on resolution; CR 383.3.b makes it the
   base cost, paid as the trigger is finalized: `targeting.TriggerBaseCost` in the finalize code. rules_audit no
   longer reports a staged combat waiting on choose_showdown as contested (CR 463.1).
+  2026-11-17 00:20: Nocturne, Horrifying (errata: "As you look at or reveal me from the top of your deck, you may banish
+  me ...", 3 in Kennen) was always played to base (or the looking effect's battlefield); now his owner picks base or a
+  battlefield they control (CR 355.2.a). Reveals from the top (Dazzling Aurora, Mechanical Bandit, Blind Fury, Diana,
+  Lunari) never offered him: `ops.SeeFromDeck` asks each card's owner; Aurora reveals on past a banished Nocturne.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
