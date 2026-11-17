@@ -1957,3 +1957,36 @@ def test_a_unit_becomes_mighty_whatever_raises_its_might(db):
     g.bump()
     g._cleanup_once()
     assert seen == [u, u]
+
+
+def test_a_deflect_target_needs_the_tax_on_top_of_the_cost(db):
+    """CR 809.1.c / 355.16: Deflect adds [A] to the cost of a spell choosing that unit, and no choice may make the
+    costs unpayable. The check only asked whether the tax alone was payable: with one Fury rune, Hextech Ray ([1] and
+    Fury) could choose Vex, Apathetic ([Deflect]), then failed to pay and went to the trash with no effect."""
+    g = main_phase(db, [_deck(db, "sett_the_boss"), _deck(db, "kennen_tempest")])
+    _clear_bfs(g, db)
+    _set_runes(g, db, 0, [("fury", False)])
+    vx = put(g, db, 1, "Vex, Apathetic", ("bf", 0))
+    hr = give(g, 0, "Hextech Ray", db)
+    d = g.run()
+    assert ("play", hr) not in d.options                   # Vex is the only target and the tax can't be paid too
+    other = put(g, db, 1, "Stellacorn Herder", ("bf", 1))
+    g.pending = None
+    d = g.run()
+    assert ("play", hr) in d.options
+    offered = []
+
+    def pick(d):
+        if d.kind == "choose":
+            offered.extend(d.options)
+    g.choose(("play", hr))
+    _drive(g, pick)
+    assert vx not in offered and g.objects[vx].damage == 0
+    assert g.objects[hr].zone == "trash" and (g.objects[other].zone != "board" or g.objects[other].damage == 3)
+    _set_runes(g, db, 0, [("fury", False), ("fury", False)])  # cost and tax both payable: Vex can be chosen
+    hr2 = give(g, 0, "Hextech Ray", db)
+    g.pending = None
+    d = g.run()
+    g.choose(("play", hr2))
+    _drive(g, lambda d: vx if d.kind == "choose" and vx in d.options else None)
+    assert g.objects[vx].damage == 3

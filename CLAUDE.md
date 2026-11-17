@@ -217,6 +217,11 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   as it attacks, [Shield] as it defends, a static (Sett, Kingpin) or a -[M] effect expiring never triggered Fiora,
   Worthy or the Grand Duelist legend. The cleanup now compares each unit with the last state seen
   (`Game._check_becomes_mighty`, temp `__mighty`; only while something can trigger on it).
+  20:20: a Deflect target was allowed when the tax alone was payable, ignoring the cost of the spell or ability
+  choosing it (and the tax of targets already chosen; `__deflect_cost` was never set): Hextech Ray with one Fury rune
+  could choose Vex, Apathetic, then failed to pay and went to the trash. CR 355.16: `Game._unpaid_base_cost` adds the
+  unpaid cost to the check (finalize: the item's cost; legal actions: `_spell_has_targets(cost=)`, activations), and
+  rules_audit's missing-play check does the same. Skipped (tax only) while a later cost reduction could apply.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
