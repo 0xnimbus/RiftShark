@@ -1898,3 +1898,27 @@ def test_bedeviling_stranger_chooses_the_enemy_unit_as_the_trigger_goes_on_the_c
     _cast(g, db, 0, "Bedeviling Stranger", pick)
     assert seen == {"finalized": False}
     assert g.objects[a].zone == "hand" and g.objects[b].zone == "board"
+
+
+def test_fiora_victorious_layers_are_reapplied_until_nothing_changes(db):
+    """Fiora, Victorious (4 [M]): "While I'm [Mighty], I have [Deflect], [Ganking], and [Shield]." Layers are applied
+    again until nothing changes (CR 478.3): a defender with Hunting Blind's [Shield 2] is 6 [M], so Mighty, so she
+    gains Deflect and Shield too (7 [M]). Her own condition only saw her printed Might and buffs. Without Shield
+    from elsewhere she stays 4 [M] with none of them (CR 478.4 example)."""
+    g = main_phase(db, [_deck(db, "sett_the_boss"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    f = put(g, db, 0, "Fiora, Victorious", ("base", 0))
+
+    def state():
+        g.restruct()
+        ch = g.chars(f)
+        return ch.might, ch.kw("deflect"), ch.kw("shield"), bool(ch.keywords.get("ganking"))
+    g.objects[f].designation = "defender"
+    assert state() == (4, 0, 0, False)
+    g.objects[f].buffs = 1
+    assert state() == (6, 1, 1, True)              # the CR 478.4 example: 5 [M], then Shield while defending
+    g.objects[f].buffs = 0
+    put(g, db, 0, "Hunting Blind", ("base", 0))
+    assert state() == (7, 1, 3, True)
+    g.objects[f].designation = None
+    assert state() == (4, 0, 2, False)             # Hunting Blind's Shield only adds Might while defending

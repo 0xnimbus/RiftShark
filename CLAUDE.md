@@ -209,6 +209,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   choices of "spend a buff to" / "kill|exhaust|banish a ... to"; only Riven changed). Bedeviling Stranger's enemy unit
   is now chosen with the battlefield as the trigger goes on the chain (355.12). A scan of every card finds no other
   targeted choice left for resolution except Battle Preparations' runes.
+  10:20: Fiora, Victorious ("While I'm [Mighty], I have [Deflect], [Ganking], and [Shield]", Sett deck) read her own
+  Might from printed Might + buffs only, so Shield from elsewhere (Hunting Blind, 6 [M] defending) never made her
+  Mighty. `Game.chars` now re-applies the layers until nothing changes when an object's effects read the object
+  itself (CR 478.3; partial chars in `_partial`). Smoke games are unchanged and run at the same speed.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
