@@ -1782,3 +1782,69 @@ def test_a_cost_at_the_start_of_a_trigger_is_paid_as_it_is_finalized(db):
     assert not any("Assault" in str(m.value) or m.kind == "keyword" and m.value[0] == "assault"
                    for o in g.objects.values() for m in o.mods)
     assert any(e["kind"] == "trigger_declined" for e in g.events)
+
+
+def _nocturne_on_top(g, db, p, at=0):
+    u = g.players[p].deck[at]
+    g.objects[u].defn = next(c for c in db if c.name == "Nocturne, Horrifying")
+    g.restruct()
+    return u
+
+
+def test_nocturne_seen_by_a_look_is_played_where_his_owner_chooses(db):
+    # Errata: "As you look at or reveal me from the top of your deck, you may banish me. If you do, you may play me
+    # for [A]." He is played like any unit (CR 355.2.a): to base or a battlefield his owner controls, not always base.
+    from riftsim.core.vm import Frame, compile_effect
+    from riftsim.core import ops as O
+    g = main_phase(db, [_deck(db, "kennen_tempest"), _deck(db, "riven_exile")])
+    _ready_runes(g, 0)
+    g.set_bf_controller(0, 0)
+    noc = _nocturne_on_top(g, db, 0, at=1)
+    g.vm_frames.append(Frame(compile_effect([O.Look(3, out="looked")]), Context(0, None)))
+    seen = []
+
+    def pick(d):
+        if d.kind == "seen_from_deck":
+            seen.append(d.player); return "banish_play"
+        if d.kind == "choose_location":
+            assert ("bf", 0) in d.options and ("base", 0) in d.options
+            return ("bf", 0)
+    _drive(g, pick)
+    assert seen == [0]
+    assert g.objects[noc].zone == "board" and g.objects[noc].place == ("bf", 0)
+
+
+def test_nocturne_revealed_from_the_top_is_offered_to_his_owner(db):
+    # "or reveal": Blind Fury makes the opponent reveal their top card; Nocturne's owner may banish and play him, and
+    # Blind Fury then has nothing of theirs to banish and play.
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "kennen_tempest")])
+    _set_runes(g, db, 1, [("chaos", False)] * 2)
+    noc = _nocturne_on_top(g, db, 1)
+    seen = []
+
+    def pick(d):
+        if d.kind == "seen_from_deck":
+            seen.append(d.player); return "banish_play"
+    _cast_with(g, db, 0, "Blind Fury", [("fury", False)] * 6, pick)
+    assert seen == [1]
+    assert g.objects[noc].zone == "board" and g.objects[noc].controller == 1
+
+
+def test_dazzling_aurora_reveals_past_a_banished_nocturne(db):
+    # Reveal until a unit: a Nocturne banished as he is revealed was not revealed, so Aurora goes on to the next unit.
+    g = main_phase(db, [_deck(db, "kennen_tempest"), _deck(db, "riven_exile")])
+    _ready_runes(g, 0)
+    put(g, db, 0, "Dazzling Aurora", ("base", 0))
+    deck = g.players[0].deck
+    noc = _nocturne_on_top(g, db, 0, at=0)
+    nxt = next(u for u in deck[1:] if g.objects[u].base_defn().is_unit)
+    settle(g)
+    seen = []
+
+    def pick(d):
+        if d.kind == "seen_from_deck":
+            seen.append(d.info["uid"]); return "banish"
+    g.choose(("end_turn",))
+    _drive(g, pick, stop=lambda d: g.turn_player == 1)
+    assert seen == [noc] and g.objects[noc].zone == "banish"
+    assert g.objects[nxt].zone == "board"
