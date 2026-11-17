@@ -653,7 +653,26 @@ class Game(flow.FlowMixin):
             return
         c = self.chars(uid)
         if before is not None and before < 5 and c.might is not None and c.might >= 5:
+            o.temp["__mighty"] = True
             self.emit("becomes_mighty", uid=uid, player=o.controller, loc=o.location)
+
+    def _check_becomes_mighty(self):
+        """CR 709: a unit becomes Mighty whenever its Might goes from under 5 to 5 or more, whatever the cause: a
+        static (Sett, Kingpin; Shield or Assault as a designation is set), a -[M] effect expiring, ... Mods and buffs
+        announce it at once (_check_mighty); this catches the rest, comparing with the last state seen. Only run while
+        something could trigger on it."""
+        _, by_kind = self._trigger_index()
+        if not by_kind.get("becomes_mighty") and not by_kind.get("*"):
+            return
+        for uid, o in self.board_items():
+            if o.zone != "board" or not self.is_unit(uid):
+                continue
+            m = self.chars(uid).might
+            now = m is not None and m >= 5
+            prev = o.temp.get("__mighty")
+            o.temp["__mighty"] = now
+            if prev is False and now:
+                self.emit("becomes_mighty", uid=uid, player=o.controller, loc=o.location)
 
     def expire_mods(self, duration):
         changed = False

@@ -1922,3 +1922,38 @@ def test_fiora_victorious_layers_are_reapplied_until_nothing_changes(db):
     assert state() == (7, 1, 3, True)
     g.objects[f].designation = None
     assert state() == (4, 0, 2, False)             # Hunting Blind's Shield only adds Might while defending
+
+
+def test_a_unit_becomes_mighty_whatever_raises_its_might(db):
+    """CR 709: a unit becomes Mighty when its Might goes from under 5 to 5 or more, whatever the cause. Only mods and
+    buffs announced it, so [Assault] as a unit attacks, a static (Hunting Blind's Shield while defending) or a -[M]
+    effect expiring never triggered Fiora, Worthy ("When a unit you control becomes [Mighty], you may pay [Order] to
+    ready it")."""
+    g = main_phase(db, [_deck(db, "sett_the_boss"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    put(g, db, 0, "Fiora, Worthy", ("base", 0))
+    u = put(g, db, 0, "Fiora, Worthy", ("bf", 0))             # 3 [M]
+    g.add_mod(u, "keyword", ("assault", 2), duration="turn")
+    seen = []
+    orig = g.emit
+
+    def spy(kind, **kw):
+        if kind == "becomes_mighty":
+            seen.append(kw.get("uid"))
+        return orig(kind, **kw)
+    g.emit = spy
+    g._cleanup_once()
+    assert seen == []                                          # 3 [M] at rest
+    g.objects[u].designation = "attacker"
+    g.bump()
+    g._cleanup_once()
+    assert seen == [u]                                         # 5 [M] while attacking: becomes Mighty
+    g._cleanup_once()
+    assert seen == [u]                                         # already Mighty: no second event
+    g.objects[u].designation = None
+    g.bump()
+    g._cleanup_once()
+    g.objects[u].designation = "attacker"
+    g.bump()
+    g._cleanup_once()
+    assert seen == [u, u]
