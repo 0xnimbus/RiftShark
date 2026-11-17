@@ -32,10 +32,14 @@ def _play_here_first_each_turn(g, s, ev, non_token=False, kinds=("unit", "gear")
 @script("Bedeviling Stranger")
 def bedeviling_stranger(defn):
     # When you play me, choose a battlefield. If there are 4 or more units there, you may return an enemy unit there to its owner's hand.
+    # The enemy unit is a target (CR 355.10, 355.12: chosen independently of the "may"), so it is chosen with the
+    # battlefield as the trigger goes on the chain (up to one: there may be none there); the count is checked and
+    # the "may" decided on resolution (383.3.a.3).
     return [Triggered("play_self", [
         O.ChooseLocation(out="__bl"),
-        O.If(lambda g, c: c.vars.get("__bl") is not None and len(g.units_at(c.vars["__bl"])) >= 4,
-             [O.May([O.Choose(Sel("unit", side="enemy", where="loc:__bl"), out="t"), O.ToHand(Ref("t"))], label="return an enemy unit there")]),
+        O.Choose(Sel("unit", side="enemy", where="loc:__bl"), out="t", up_to=True),
+        O.If(lambda g, c: c.vars.get("t") is not None and c.vars.get("__bl") is not None and len(g.units_at(c.vars["__bl"])) >= 4,
+             [O.May([O.ToHand(Ref("t"))], label="return an enemy unit there")]),
     ], label=defn.name, source_text=defn.text)]
 
 
