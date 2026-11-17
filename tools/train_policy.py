@@ -56,13 +56,23 @@ def run(a):
     val_games = set(rs.choice(games, size=max(1, len(games) // 10), replace=False).tolist())
     vmask = np.isin(G, np.array(sorted(val_games)))
     offs = np.concatenate([[0], np.cumsum(N)])
-    mean = X[~vmask].mean(0)
-    std = X[~vmask].std(0) + 1e-3
-    Z = ((X - mean) / std).astype(np.float32)
-    H = a.hidden
     A = PHI.shape[1]
-    params = [rs.randn(H, W).astype(np.float32) * (0.5 / np.sqrt(W)), rs.randn(H, A).astype(np.float32) * (0.5 / np.sqrt(8)),
-              np.zeros(H, np.float32), rs.randn(H).astype(np.float32) * 0.1, np.float32(0.0)]
+    src = a.eval or a.init
+    if src:   # an existing model: its normalisation and weights
+        with open(src) as f:
+            d = json.load(f)
+        mean, std = np.array(d["mean"], np.float32), np.array(d["std"], np.float32)
+        w1 = np.array(d["w1"], np.float32)
+        H = w1.shape[0]
+        params = [w1[:, :W].copy(), w1[:, W:].copy(), np.array(d["b1"], np.float32), np.array(d["w2"], np.float32),
+                  np.float32(d["b2"])]
+    else:
+        mean = X[~vmask].mean(0)
+        std = X[~vmask].std(0) + 1e-3
+        H = a.hidden
+        params = [rs.randn(H, W).astype(np.float32) * (0.5 / np.sqrt(W)), rs.randn(H, A).astype(np.float32) * (0.5 / np.sqrt(8)),
+                  np.zeros(H, np.float32), rs.randn(H).astype(np.float32) * 0.1, np.float32(0.0)]
+    Z = ((X - mean) / std).astype(np.float32)
     m = [np.zeros_like(p) for p in params]
     v = [np.zeros_like(p) for p in params]
     tr_idx = np.where(~vmask)[0]
@@ -90,8 +100,14 @@ def run(a):
                 c = per.setdefault(KINDS[kk], [0, 0]); c[0] += int(o); c[1] += 1
         return loss / cnt, correct / cnt, {k: round(c[0] / c[1], 3) for k, c in per.items() if c[1] >= 50}
 
+    if a.eval:
+        vl, va, per = evaluate(np.arange(len(N)))
+        print(json.dumps({"model": a.eval, "val_loss": round(float(vl), 4), "val_agreement": round(float(va), 4),
+                          "per_kind": per}))
+        return
     step = 0
     lr = a.lr
+    best = (float("inf"), None, 0)
     for ep in range(a.epochs):
         rs.shuffle(tr_idx)
         for s0 in range(0, len(tr_idx), a.batch):
@@ -119,7 +135,11 @@ def run(a):
                 params[i] = (params[i] - lr * mh / (np.sqrt(vh) + 1e-8)).astype(np.float32)
         vl, va, per = evaluate(va_idx)
         print(f"epoch {ep + 1}: val loss {vl:.4f}, val agreement {va:.4f} {per}", file=sys.stderr)
+        if vl < best[0]:
+            best = (vl, [np.array(q, copy=True) for q in params], ep + 1)
         lr *= a.decay
+    params = best[1]   # the epoch with the lowest validation loss
+    print(f"keeping epoch {best[2]}", file=sys.stderr)
     tl, ta, _ = evaluate(tr_idx[:20000])
     vl, va, per = evaluate(va_idx)
     # chance level: picking uniformly at random
@@ -130,7 +150,7 @@ def run(a):
            "w2": w2.astype(float).tolist(), "b2": float(b2),
            "meta": {"files": [os.path.basename(f) for f in a.files], "decisions": int(len(N)), "hidden": H,
                     "train_agreement": round(float(ta), 4), "val_agreement": round(float(va), 4),
-                    "val_loss": round(float(vl), 4), "chance": round(chance, 4), "per_kind": per}}
+                    "val_loss": round(float(vl), 4), "epoch": best[2], "chance": round(chance, 4), "per_kind": per}}
     with open(a.out, "w") as f:
         json.dump(out, f, separators=(",", ":"))
     print(json.dumps(out["meta"]))
@@ -148,6 +168,8 @@ def main():
     ap.add_argument("--l2", type=float, default=1e-5)
     ap.add_argument("--width", type=int)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--init", help="start from this model (its normalisation too) and fine-tune")
+    ap.add_argument("--eval", help="only report this model's loss/agreement on every decision of the files")
     run(ap.parse_args())
 
 
