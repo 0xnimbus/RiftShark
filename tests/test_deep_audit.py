@@ -1848,3 +1848,53 @@ def test_dazzling_aurora_reveals_past_a_banished_nocturne(db):
     _drive(g, pick, stop=lambda d: g.turn_player == 1)
     assert seen == [noc] and g.objects[noc].zone == "banish"
     assert g.objects[nxt].zone == "board"
+
+
+def test_riven_spend_my_buff_to_stun_picks_the_unit_as_the_mode_is_chosen(db):
+    """Riven, Broken Blade: "When I become exhausted, choose one ... — Spend my buff to [Stun] an enemy unit."
+    "[do X] to [do Y]": X is a cost, the enemy unit in Y is a target (CR 355.10.c.1), chosen with the mode as the
+    trigger goes on the chain (355.5), so the opponent can answer it (Not So Fast counters abilities that choose a
+    friendly unit). It was chosen at resolution, after the buff was spent."""
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    rv = put(g, db, 0, "Riven, Broken Blade", ("base", 0))
+    g.objects[rv].buffs = 1
+    foe = put(g, db, 1, "Stellacorn Herder", ("base", 1))
+    put(g, db, 1, "Stellacorn Herder", ("base", 1))         # two enemy units: the pick is a real decision
+    g.restruct()
+    g.do_exhaust(rv, Context(0, None))
+    seen = {}
+
+    def pick(d):
+        if d.kind == "mode":
+            return next(o for o, lab in zip(d.options, d.labels) if "Stun" in lab)
+        if d.kind == "choose" and foe in d.options:
+            seen["at"] = "finalize" if not any(it.finalized for it in g.chain if it.uid == rv) else "resolution"
+            seen["buffs"] = g.objects[rv].buffs
+            return foe
+    _drive(g, pick)
+    assert seen == {"at": "finalize", "buffs": 1}
+    assert g.objects[foe].stunned and g.objects[rv].buffs == 0
+
+
+def test_bedeviling_stranger_chooses_the_enemy_unit_as_the_trigger_goes_on_the_chain(db):
+    """Bedeviling Stranger: "When you play me, choose a battlefield. If there are 4 or more units there, you may return
+    an enemy unit there to its owner's hand." The enemy unit is a target (CR 355.10, 355.12): chosen with the
+    battlefield as the trigger is finalized, not on resolution."""
+    g = main_phase(db, [_deck(db, "kennen_tempest"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    put(g, db, 0, "Traveling Merchant", ("bf", 0)); put(g, db, 0, "Traveling Merchant", ("bf", 0))
+    a = put(g, db, 1, "Stellacorn Herder", ("bf", 0)); b = put(g, db, 1, "Stellacorn Herder", ("bf", 0))
+    seen = {}
+
+    def pick(d):
+        if d.kind == "choose_location":
+            return ("bf", 0) if ("bf", 0) in d.options else None
+        if d.kind == "choose_many" and (a,) in d.options:        # up to one enemy unit there
+            seen["finalized"] = any(it.finalized for it in g.chain if it.kind == "trigger")
+            return (a,)
+        if d.kind in ("yesno", "may"):
+            return True if True in d.options else d.options[0]
+    _cast(g, db, 0, "Bedeviling Stranger", pick)
+    assert seen == {"finalized": False}
+    assert g.objects[a].zone == "hand" and g.objects[b].zone == "board"

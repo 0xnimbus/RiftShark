@@ -660,7 +660,9 @@ def parse_sentence(s, state):
         return [O.ToHand(Ref("self"))]
     m = re.match(r"spend (?:a|my) buff to (.+)$", sl)
     if m:
-        return [O.SetVar("__did", lambda g, c: g.do_spend_buff(c.source, c)), O.If(O.has_var("__did"), parse_sentence(m.group(1), state))]
+        # CR 355.10.c.1: "[do X] to [do Y]": X is a cost, Y's choices are targets chosen as the item is finalized
+        lead, eff = _lift_choices(parse_sentence(m.group(1), state))
+        return lead + [O.SetVar("__did", lambda g, c: g.do_spend_buff(c.source, c)), O.If(O.has_var("__did"), eff)]
     m = re.match(r"buff me and ready me$", sl)
     if m:
         return [O.Buff(Ref("self")), O.Ready(Ref("self"))]
@@ -774,7 +776,8 @@ def parse_sentence(s, state):
         if m.group(1) == "exhaust":
             sel.ready = True
         op = {"kill": O.Kill, "exhaust": O.Exhaust, "banish": O.Banish}[m.group(1)]
-        return [O.Choose(sel, out="__cost", targeted=False), O.If(O.has_var("__cost"), [op(Ref("__cost"))] + parse_sentence(m.group(3), state))]
+        lead, eff = _lift_choices(parse_sentence(m.group(3), state))      # CR 355.10.c.1, as above
+        return lead + [O.Choose(sel, out="__cost", targeted=False), O.If(O.has_var("__cost"), [op(Ref("__cost"))] + eff)]
     m = re.match(r"(.+?) and (pay (?:\[[^\]]+\])+ to .+)$", sl)
     if m:
         return parse_sentence(m.group(1), state) + parse_sentence(m.group(2), state)

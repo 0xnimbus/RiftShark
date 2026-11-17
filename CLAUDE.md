@@ -204,6 +204,11 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   me ...", 3 in Kennen) was always played to base (or the looking effect's battlefield); now his owner picks base or a
   battlefield they control (CR 355.2.a). Reveals from the top (Dazzling Aurora, Mechanical Bandit, Blind Fury, Diana,
   Lunari) never offered him: `ops.SeeFromDeck` asks each card's owner; Aurora reveals on past a banished Nocturne.
+  05:20: Riven, Broken Blade's "Spend my buff to [Stun] an enemy unit" chose the unit on resolution, after spending the
+  buff; "[do X] to [do Y]" makes the unit a target (CR 355.10.c.1), now picked with the mode (auto_grammar lifts the
+  choices of "spend a buff to" / "kill|exhaust|banish a ... to"; only Riven changed). Bedeviling Stranger's enemy unit
+  is now chosen with the battlefield as the trigger goes on the chain (355.12). A scan of every card finds no other
+  targeted choice left for resolution except Battle Preparations' runes.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
