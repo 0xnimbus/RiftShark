@@ -164,6 +164,8 @@ class Game(flow.FlowMixin):
         self.max_turns = 60
         self.deck_names = []
         self._computing = set()
+        self._partial = {}             # uid -> chars so far, while its layers are re-applied (CR 478.3)
+        self._recursed = set()
         self._grant_cache = None
         self._board_cache = None
         self._pao_cache = None
@@ -340,12 +342,29 @@ class Game(flow.FlowMixin):
         if o.chars_cache is not None and o.chars_version == self.version:
             return o.chars_cache
         if uid in self._computing:
-            return self._local_chars(o)
+            # an effect on this object reads this object (Fiora, Victorious: "While I'm [Mighty], I have ... [Shield]"):
+            # answer with what is known so far, then re-apply the layers until nothing changes (CR 478.3)
+            self._recursed.add(uid)
+            p = self._partial.get(uid)
+            return p if p is not None else self._local_chars(o)
         self._computing.add(uid)
         try:
             c = self._compute_chars(o)
+            for _ in range(4):
+                if uid not in self._recursed:
+                    break
+                self._recursed.discard(uid)
+                self._partial[uid] = c
+                c2 = self._compute_chars(o)
+                same = (c2.might == c.might and c2.keywords == c.keywords and c2.tags == c.tags and c2.types == c.types
+                        and len(c2.abilities) == len(c.abilities))
+                c = c2
+                if same:
+                    break
         finally:
             self._computing.discard(uid)
+            self._partial.pop(uid, None)
+            self._recursed.discard(uid)
         o.chars_cache, o.chars_version = c, self.version
         return c
 
@@ -2182,6 +2201,7 @@ class Game(flow.FlowMixin):
             g.rng = None
         g.pending = self._clone_decision(self.pending) if self.pending else None
         g._computing = set()
+        g._partial, g._recursed = {}, set()
         g._canpay_memo = None
         g.combat_result_memo = {}
         self.__dict__.pop("_ctx_map", None)
