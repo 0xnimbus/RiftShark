@@ -216,8 +216,9 @@ def check_missing(g, d, a, where, main_open, played):
             e, pw = g.card_cost(p, u, z, loc)
             if not g.can_pay(p, e, pw, purpose=payment.purpose_of_card(g, u)):
                 continue
-            if loc is None and not g._spell_has_targets(p, u, z):
-                continue
+            direct = not g._variable_reduce_perm(u) and not g._exhaust_reducers(p)
+            if loc is None and not g._spell_has_targets(p, u, z, cost=(e, list(pw), payment.purpose_of_card(g, u)) if direct else None):
+                continue                      # CR 355.16: a Deflect tax must be payable on top of the cost
             if loc not in offered:
                 a.bad("play missing", f"{where}: {g.label(u)} from {z} to {loc} not offered ({state})")
         for loc in offered:

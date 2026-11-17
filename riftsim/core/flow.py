@@ -1930,7 +1930,9 @@ class FlowMixin:
                             and self._variable_reduce_min(p, u, e, pw, purpose) is None:
                         continue
                 if loc is None:
-                    if not self._spell_has_targets(p, u, z):
+                    direct = self.can_pay(p, e, pw, purpose=purpose) and not self._variable_reduce_perm(u) \
+                        and not self._exhaust_reducers(p)
+                    if not self._spell_has_targets(p, u, z, cost=(e, list(pw), purpose) if direct else None):
                         continue
                     acts.append(("play", u))
                 else:
@@ -2033,14 +2035,17 @@ class FlowMixin:
                     return False
         return True
 
-    def _spell_has_targets(self, p, uid, z):
-        """Spells that require a target must have one (CR 355.6)."""
+    def _spell_has_targets(self, p, uid, z, cost=None):
+        """Spells that require a target must have one (CR 355.6). cost: the play's cost, so a Deflect target whose
+        tax can't be paid on top of it doesn't count (CR 355.16)."""
         d = self.objects[uid].base_defn()
         for ab in d.abilities:
             tc = getattr(ab, "target_code", None)
             if not tc:
                 continue
             ctx = Context(p, uid, here=None)
+            if cost is not None:
+                ctx.vars["__base_cost"] = cost
             if z == "facedown":
                 ctx.target_bf = self.objects[uid].hidden_at
             if not self._targets_possible(ctx, getattr(ab, "targets", None), tc):
@@ -2117,6 +2122,7 @@ class FlowMixin:
             return False
         if ab.targets:
             ctx = Context(p, uid, here=o.place)
+            ctx.vars["__base_cost"] = (e, pw, {"kind": "ability", "types": set(self.chars(uid).types), "uid": uid})
             if not self._targets_possible(ctx, ab.targets, ab.target_code):
                 return False
         return True
