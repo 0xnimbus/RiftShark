@@ -751,6 +751,7 @@ class FlowMixin:
                     self.set_bf_controller(bf.idx, None)
                     self.dirty = True
         self._check_static_might_reductions()
+        self._check_becomes_mighty()
         self._end_control_durations()
         self._end_bound_legends()
         # 5. recalls
@@ -1243,6 +1244,10 @@ class FlowMixin:
         for _ in range(k):
             if dom in pw:
                 pw.remove(dom)
+            else:
+                m = next((x for x in pw if "|" in x and dom in x.split("|")), None)
+                if m is not None:
+                    pw.remove(m)
         return pw
 
     def _variable_reduce_min(self, p, uid, e, pw, purpose):
@@ -1414,14 +1419,14 @@ class FlowMixin:
             granted = ctx.played_from not in ("hand", None) and \
                 bool(self.rules("accelerate_if_not_from_hand", player=it.controller))      # Rek'Sai, Breacher
             if c.keywords.get("accelerate") or granted or ctx.vars.get("__granted_accel"):
-                dom = [c.domains[0]] if len(c.domains) == 1 else (["any"] if not c.domains else [c.domains[0]])
+                dom = [payment.own_power(c.domains)]          # CR 805.1.b.1-2
                 out.append(("accelerate", (1, dom, "Accelerate [1][C]")))
         if it.kind in ("spell", "unit", "gear"):
             for ab in self._abilities_of(it.uid, self.objects[it.uid]):
                 pr = self._resource_additional_cost(ab)
                 if pr is not None and (ab.cond is None or ab.cond(self, it.uid)):
                     e, pw = val(self, ctx, pr.energy), [val(self, ctx, d) for d in pr.power]
-                    lbl = (f"[{e}]" if e else "") + "".join(f"[{d.capitalize() if d != 'any' else 'A'}]" for d in pw)
+                    lbl = (f"[{e}]" if e else "") + "".join(f"[{'/'.join(x.capitalize() for x in d.split('|')) if d != 'any' else 'A'}]" for d in pw)
                     out.append(("add", (e, pw, f"the additional cost {lbl}")))
                     break
         rc = getattr(it.ability, "repeat_cost", None) if it.ability is not None else None
@@ -1739,10 +1744,8 @@ class FlowMixin:
         n = d.power or 0
         if n == 0:
             power = []
-        elif len(doms) <= 1:
-            power = (doms or ["any"]) * n
         else:
-            power = list(doms[:n]) + [doms[0]] * max(0, n - len(doms))
+            power = [payment.own_power(doms)] * n      # multi-domain pips take any of its domains (CR 135.2.e.6.c)
         if from_zone == "facedown":
             energy, power = 0, []
         if from_zone == "trash":
@@ -1927,7 +1930,9 @@ class FlowMixin:
                             and self._variable_reduce_min(p, u, e, pw, purpose) is None:
                         continue
                 if loc is None:
-                    if not self._spell_has_targets(p, u, z):
+                    direct = self.can_pay(p, e, pw, purpose=purpose) and not self._variable_reduce_perm(u) \
+                        and not self._exhaust_reducers(p)
+                    if not self._spell_has_targets(p, u, z, cost=(e, list(pw), purpose) if direct else None):
                         continue
                     acts.append(("play", u))
                 else:
@@ -2030,14 +2035,17 @@ class FlowMixin:
                     return False
         return True
 
-    def _spell_has_targets(self, p, uid, z):
-        """Spells that require a target must have one (CR 355.6)."""
+    def _spell_has_targets(self, p, uid, z, cost=None):
+        """Spells that require a target must have one (CR 355.6). cost: the play's cost, so a Deflect target whose
+        tax can't be paid on top of it doesn't count (CR 355.16)."""
         d = self.objects[uid].base_defn()
         for ab in d.abilities:
             tc = getattr(ab, "target_code", None)
             if not tc:
                 continue
             ctx = Context(p, uid, here=None)
+            if cost is not None:
+                ctx.vars["__base_cost"] = cost
             if z == "facedown":
                 ctx.target_bf = self.objects[uid].hidden_at
             if not self._targets_possible(ctx, getattr(ab, "targets", None), tc):
@@ -2109,11 +2117,12 @@ class FlowMixin:
             return False
         e = self.ability_energy(ab, uid)
         pw = list(cost.get("power", ()))
-        pw = [o.base_defn().domains[0] if (d == "C" and o.base_defn().domains) else ("any" if d == "C" else d) for d in pw]
+        pw = [payment.own_power(o.base_defn().domains) if d == "C" else d for d in pw]
         if not self.can_pay(p, e, pw, purpose={"kind": "ability", "types": set(self.chars(uid).types), "uid": uid}):
             return False
         if ab.targets:
             ctx = Context(p, uid, here=o.place)
+            ctx.vars["__base_cost"] = (e, pw, {"kind": "ability", "types": set(self.chars(uid).types), "uid": uid})
             if not self._targets_possible(ctx, ab.targets, ab.target_code):
                 return False
         return True
@@ -2320,7 +2329,7 @@ class FlowMixin:
         ctx = Context(p, uid, here=o.place)
         ctx.vars["self"] = uid
         cost = ab.cost
-        pw = [o.base_defn().domains[0] if (d == "C" and o.base_defn().domains) else ("any" if d == "C" else d) for d in cost.get("power", ())]
+        pw = [payment.own_power(o.base_defn().domains) if d == "C" else d for d in cost.get("power", ())]
         c = {"energy": self.ability_energy(ab, uid), "power": pw}
         if cost.get("exhaust"):
             c["exhaust"] = uid

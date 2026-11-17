@@ -164,6 +164,8 @@ class Game(flow.FlowMixin):
         self.max_turns = 60
         self.deck_names = []
         self._computing = set()
+        self._partial = {}             # uid -> chars so far, while its layers are re-applied (CR 478.3)
+        self._recursed = set()
         self._grant_cache = None
         self._board_cache = None
         self._pao_cache = None
@@ -340,12 +342,29 @@ class Game(flow.FlowMixin):
         if o.chars_cache is not None and o.chars_version == self.version:
             return o.chars_cache
         if uid in self._computing:
-            return self._local_chars(o)
+            # an effect on this object reads this object (Fiora, Victorious: "While I'm [Mighty], I have ... [Shield]"):
+            # answer with what is known so far, then re-apply the layers until nothing changes (CR 478.3)
+            self._recursed.add(uid)
+            p = self._partial.get(uid)
+            return p if p is not None else self._local_chars(o)
         self._computing.add(uid)
         try:
             c = self._compute_chars(o)
+            for _ in range(4):
+                if uid not in self._recursed:
+                    break
+                self._recursed.discard(uid)
+                self._partial[uid] = c
+                c2 = self._compute_chars(o)
+                same = (c2.might == c.might and c2.keywords == c.keywords and c2.tags == c.tags and c2.types == c.types
+                        and len(c2.abilities) == len(c.abilities))
+                c = c2
+                if same:
+                    break
         finally:
             self._computing.discard(uid)
+            self._partial.pop(uid, None)
+            self._recursed.discard(uid)
         o.chars_cache, o.chars_version = c, self.version
         return c
 
@@ -634,7 +653,26 @@ class Game(flow.FlowMixin):
             return
         c = self.chars(uid)
         if before is not None and before < 5 and c.might is not None and c.might >= 5:
+            o.temp["__mighty"] = True
             self.emit("becomes_mighty", uid=uid, player=o.controller, loc=o.location)
+
+    def _check_becomes_mighty(self):
+        """CR 709: a unit becomes Mighty whenever its Might goes from under 5 to 5 or more, whatever the cause: a
+        static (Sett, Kingpin; Shield or Assault as a designation is set), a -[M] effect expiring, ... Mods and buffs
+        announce it at once (_check_mighty); this catches the rest, comparing with the last state seen. Only run while
+        something could trigger on it."""
+        _, by_kind = self._trigger_index()
+        if not by_kind.get("becomes_mighty") and not by_kind.get("*"):
+            return
+        for uid, o in self.board_items():
+            if o.zone != "board" or not self.is_unit(uid):
+                continue
+            m = self.chars(uid).might
+            now = m is not None and m >= 5
+            prev = o.temp.get("__mighty")
+            o.temp["__mighty"] = now
+            if prev is False and now:
+                self.emit("becomes_mighty", uid=uid, player=o.controller, loc=o.location)
 
     def expire_mods(self, duration):
         changed = False
@@ -2116,6 +2154,20 @@ class Game(flow.FlowMixin):
             return False          # arbitrary conditions ("at another location", Tideturner): cannot tell, keep free
         return True
 
+    def _unpaid_base_cost(self, ctx):
+        """(energy, power[, purpose]) the item being finalized still has to pay, for the Deflect check; None when it
+        is already paid or a cost reduction chosen later could lower it (then only the tax is checked)."""
+        if "__base_cost" in ctx.vars:
+            return ctx.vars["__base_cost"]
+        if ctx.item is None:
+            return None
+        it = next((x for x in self.chain if x.id == ctx.item), None)
+        if it is None or it.finalized or not it.cost or it.cost.get("paid") is not None:
+            return None
+        if self._exhaust_reducers(it.controller) or (it.uid in self.objects and self._variable_reduce_perm(it.uid)):
+            return None
+        return (it.cost.get("energy", 0), list(it.cost.get("power", ())))
+
     def choice_candidates(self, ctx, sel, targeted=True):
         if isinstance(sel, (list, tuple)):
             return [u for u in sel if u in self.objects]
@@ -2127,16 +2179,24 @@ class Game(flow.FlowMixin):
                 if here or self._could_target_at_bf(sel):
                     cands = here          # no valid target at that battlefield -> no target (CR 811.1.d)
             # Deflect (CR 809): opponents' targeting costs [A] per deflect value; drop unaffordable targets
+            # CR 355.16: no choice that makes the play's costs unpayable, so the tax is checked together with the
+            # cost still to pay (spell or ability cost, plus the Deflect of targets already chosen)
             out = []
-            paid = ctx.vars.get("__deflect_cost", 0)
+            base = self._unpaid_base_cost(ctx)
+            purpose = base[2] if base is not None and len(base) > 2 else self.ctx_purpose(ctx)
+            chosen = [x for x in self._target_uids(ctx) if x in self.objects]
             for u in cands:
                 o = self.objects[u]
                 if o.zone == "board" and not self.is_friendly(o.controller, ctx.controller):
                     if self.chars(u).keywords.get("untargetable"):
                         continue
                     d = self.keyword_value(u, "deflect")
-                    if d and not self.can_pay(ctx.controller, 0, ["any"] * (d + paid), purpose=self.ctx_purpose(ctx)):
-                        continue
+                    if d:
+                        prior = sum(self.keyword_value(x, "deflect") for x in chosen if x != u
+                                    and self.objects[x].zone == "board" and not self.is_friendly(self.objects[x].controller, ctx.controller))
+                        e0, p0 = (base[0], list(base[1])) if base is not None else (0, [])
+                        if not self.can_pay(ctx.controller, e0, p0 + ["any"] * (d + prior), purpose=purpose):
+                            continue
                 out.append(u)
             cands = out
         return cands
@@ -2182,6 +2242,7 @@ class Game(flow.FlowMixin):
             g.rng = None
         g.pending = self._clone_decision(self.pending) if self.pending else None
         g._computing = set()
+        g._partial, g._recursed = {}, set()
         g._canpay_memo = None
         g.combat_result_memo = {}
         self.__dict__.pop("_ctx_map", None)

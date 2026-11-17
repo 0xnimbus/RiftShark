@@ -32,10 +32,14 @@ def _play_here_first_each_turn(g, s, ev, non_token=False, kinds=("unit", "gear")
 @script("Bedeviling Stranger")
 def bedeviling_stranger(defn):
     # When you play me, choose a battlefield. If there are 4 or more units there, you may return an enemy unit there to its owner's hand.
+    # The enemy unit is a target (CR 355.10, 355.12: chosen independently of the "may"), so it is chosen with the
+    # battlefield as the trigger goes on the chain (up to one: there may be none there); the count is checked and
+    # the "may" decided on resolution (383.3.a.3).
     return [Triggered("play_self", [
         O.ChooseLocation(out="__bl"),
-        O.If(lambda g, c: c.vars.get("__bl") is not None and len(g.units_at(c.vars["__bl"])) >= 4,
-             [O.May([O.Choose(Sel("unit", side="enemy", where="loc:__bl"), out="t"), O.ToHand(Ref("t"))], label="return an enemy unit there")]),
+        O.Choose(Sel("unit", side="enemy", where="loc:__bl"), out="t", up_to=True),
+        O.If(lambda g, c: c.vars.get("t") is not None and c.vars.get("__bl") is not None and len(g.units_at(c.vars["__bl"])) >= 4,
+             [O.May([O.ToHand(Ref("t"))], label="return an enemy unit there")]),
     ], label=defn.name, source_text=defn.text)]
 
 
@@ -147,10 +151,12 @@ def _evd(c):
 @script("Ekko, Recurrent")
 def ekko_recurrent(defn):
     # [Accelerate]  [Deathknell] — Recycle me to ready your runes.
-    return [Triggered("die_self", [O.If(lambda g, c: g.objects[c.source].zone == "trash", [
+    # "Recycle me" is the base cost, paid as the trigger is finalized (CR 383.3.b, Ekko is the rule's example)
+    from ..targeting import TriggerBaseCost
+    return [Triggered("die_self", [O.Ready(Sel("rune", side="friendly"))], targets=[
+        TriggerBaseCost(lambda g, c: g.objects[c.source].zone == "trash"),
         O.Recycle(Ref("self")),
-        O.Ready(Sel("rune", side="friendly")),
-    ])], label="Deathknell", source_text=defn.text, keyword="deathknell")]
+    ], label="Deathknell", source_text=defn.text, keyword="deathknell")]
 
 
 @script("Miss Fortune, Captain")
@@ -173,6 +179,33 @@ def royal_entourage(defn):
         ("ready a legend", [O.Choose(leg, out="__l", targeted=False), O.Ready(Ref("__l"))]),
         ("exhaust a legend", [O.Choose(leg, out="__l", targeted=False), O.Exhaust(Ref("__l"))]),
     ])], label=defn.name, source_text=defn.text)]
+
+
+@script("Repulse")
+def repulse(defn):
+    # [Reaction]  Choose a friendly unit at a battlefield. Counter an enemy spell or ability that chooses it and no
+    # other friendly unit.
+    def item_ok(g, c, it, u):
+        if it.controller == c.controller or it.ctx is None or it.removed or not it.finalized:
+            return False
+        chosen = [x for x in g._target_uids(it.ctx) if isinstance(x, int) and x in g.objects]
+        if u not in chosen:
+            return False
+        return not any(x != u and g.objects[x].zone == "board" and g.objects[x].controller == c.controller
+                       and g.is_unit(x) for x in chosen)
+
+    def unit_ok(g, c, u):
+        return any(item_ok(g, c, it, u) for it in g.chain)
+
+    def source_ok(g, c, s):
+        u = c.vars.get("__ru")
+        return u is not None and any(it.uid == s and item_ok(g, c, it, u) for it in g.chain)
+    second = O.Choose(Sel("any", zone="any", pred=source_ok), out="__sp", targeted=True)
+    second.depends = True          # legality is checked through the unit choice
+    return [SpellEffect([O.Choose(Sel("unit", side="friendly", where="battlefield", pred=unit_ok), out="__ru"), second,
+                         O.CounterItem(lambda g, c: next((it.id for it in reversed(g.chain) if it.uid == c.vars.get("__sp")
+                                                          and item_ok(g, c, it, c.vars.get("__ru"))), None))],
+                        label=defn.name, source_text=defn.text)]
 
 
 @script("Sudden Storm")

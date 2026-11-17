@@ -216,8 +216,9 @@ def check_missing(g, d, a, where, main_open, played):
             e, pw = g.card_cost(p, u, z, loc)
             if not g.can_pay(p, e, pw, purpose=payment.purpose_of_card(g, u)):
                 continue
-            if loc is None and not g._spell_has_targets(p, u, z):
-                continue
+            direct = not g._variable_reduce_perm(u) and not g._exhaust_reducers(p)
+            if loc is None and not g._spell_has_targets(p, u, z, cost=(e, list(pw), payment.purpose_of_card(g, u)) if direct else None):
+                continue                      # CR 355.16: a Deflect tax must be payable on top of the cost
             if loc not in offered:
                 a.bad("play missing", f"{where}: {g.label(u)} from {z} to {loc} not offered ({state})")
         for loc in offered:
@@ -283,7 +284,8 @@ def check_invariants(g, a, seed, last):
                 a.bad("lethal", f"{where}: {g.label(u)} has lethal damage on the board (CR 323 cleanup)")
         for b in g.battlefields:
             ctl = {g.objects[x].controller for x in g.units_at(("bf", b.idx))}
-            if len(ctl) > 1:
+            if len(ctl) > 1 and not (getattr(b, "staged_combat", False) or getattr(b, "staged_showdown", False)):
+                # a staged combat waits for the turn player to pick which contested battlefield goes first
                 a.bad("contested", f"{where}: units of two players at battlefield {b.idx} outside combat/showdown")
             if len(ctl) == 1 and b.controller not in ctl and not getattr(b, "staged_showdown", False):
                 a.bad("control", f"{where}: battlefield {b.idx} held only by P{next(iter(ctl))} but controlled by {b.controller}")

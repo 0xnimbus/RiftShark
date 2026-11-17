@@ -1658,3 +1658,335 @@ def test_an_attached_cards_printed_rules_text_is_inactive(db):
     assert g.objects[axe].zone == "board" and g.objects[axe].attached_to == u
     g.do_detach(axe) if hasattr(g, "do_detach") else g._detach_raw(axe)
     assert any(getattr(a, "keyword", None) == "temporary" for a in g.abilities(axe))
+
+
+def test_weaponmaster_can_take_an_equipment_already_attached_to_another_unit(db):
+    # CR 821.1.c: Weaponmaster reads the chosen Equipment's Equip cost even though its printed text is inactive while
+    # attached (135.4), and moves it to the Weaponmaster unit.
+    g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "riven_exile")])
+    other = put(g, db, 0, "Stellacorn Herder", ("base", 0))
+    sword = put(g, db, 0, "Long Sword", ("base", 0))
+    g.do_attach(sword, other)
+    adept = give(g, 0, "Sentinel Adept", db)
+    _ready_runes(g, 0)
+    g.restruct()
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == adept))
+    _drive(g, pick=lambda d: sword if sword in d.options else (True if True in d.options else None))
+    assert g.objects[sword].attached_to == adept
+
+
+def _set_rune_domains(g, p, doms):
+    """Make p's runes exactly the given domains, all ready."""
+    runes = g.players[p].runes
+    assert len(runes) >= len(doms)
+    for u in runes[len(doms):]:
+        g.objects[u].exhausted = True
+        g.objects[u].domain = "mind"          # no test card uses Mind; exhausted runes can still be recycled
+    for u, d in zip(runes, doms):
+        g.objects[u].domain = d
+        g.objects[u].exhausted = False
+    g.pending = None
+    g.restruct()
+
+
+def test_multi_domain_power_pips_take_any_of_the_cards_domains(db):
+    # CR 135.2.e.6.c: Defiant Dance (Calm/Chaos, [1][C]) can be paid with Chaos power; Tibbers (Fury/Chaos, two split
+    # pips) with two Fury, never Fury + Body.
+    from riftsim.core import payment
+    g = main_phase(db, [_deck(db, "irelia_blade_dancer"), _deck(db, "riven_exile")])
+    dd = give(g, 0, "Defiant Dance", db)
+    e, pw = g.card_cost(0, dd, "hand")
+    assert (e, pw) == (1, ["calm|chaos"])
+    _set_rune_domains(g, 0, ["chaos", "chaos"])
+    assert g.can_pay(0, e, pw) and payment.plans(g, 0, e, pw)
+    _set_rune_domains(g, 0, ["body", "body"])
+    assert not g.can_pay(0, e, pw) and not payment.plans(g, 0, e, pw)
+    tib = give(g, 0, "Tibbers, Annie", db)
+    e, pw = g.card_cost(0, tib, "hand")
+    assert pw == ["fury|chaos", "fury|chaos"]
+    assert g.can_pay(0, 0, pw) is False
+    _set_rune_domains(g, 0, ["fury", "fury"])
+    assert g.can_pay(0, 0, pw) and payment.plans(g, 0, 0, pw)
+    _set_rune_domains(g, 0, ["fury", "body"])
+    assert not g.can_pay(0, 0, pw)
+    assert payment.own_power(["fury", "chaos"]) == "fury|chaos" and payment.own_power([]) == "any"
+
+
+def _enemy_items(g, src, target_sets):
+    from riftsim.core.objects import ChainItem
+    from riftsim.core.vm import Context
+    items = []
+    for i, tgts in enumerate(target_sets):
+        it = ChainItem(900 + i, "ability", 1, uid=src, label=f"ability {i}")
+        it.cost, it.finalized, it.ctx, it.code = {"energy": 0, "power": []}, True, Context(1, src), []
+        for k, t in enumerate(tgts):
+            it.ctx.vars[f"t{k}"] = t
+        it.ctx.vars["__targets"] = [(f"t{k}", None) for k in range(len(tgts))]
+        g.chain.append(it)
+        items.append(it)
+    g.priority = 0
+    return items
+
+
+def test_repulse_counters_an_enemy_item_choosing_only_that_friendly_unit(db):
+    """Repulse (Master Yi and Sett sideboards): "Choose a friendly unit at a battlefield. Counter an enemy spell or ability that
+    chooses it and no other friendly unit." It was unscripted. An item choosing two of my units can't be countered."""
+    def setup():
+        g = _fresh(db, "master_yi_wuju")
+        mine = put(g, db, 0, "Forecaster", ("bf", 0))
+        other = put(g, db, 0, "Forecaster", ("bf", 0), exclude=(mine,))
+        src = put(g, db, 1, "Forecaster", ("base", 1))
+        return g, mine, other, src
+    g, mine, other, src = setup()
+    items = _enemy_items(g, src, ((mine, other), (mine,)))   # older item chooses two of my units, newer one only `mine`
+    _cast(g, db, 0, "Repulse", lambda d: mine if d.kind == "choose" and mine in d.options
+          else (src if d.kind == "choose" and src in d.options else None))
+    assert items[1].countered and not items[0].countered
+    # with only the item that chooses both of my units on the chain, Repulse can't be played
+    g, mine, other, src = setup()
+    _enemy_items(g, src, ((mine, other),))
+    rp = give(g, 0, "Repulse", db)
+    _ready_runes(g, 0)
+    d = g.run()
+    assert d.player == 0 and not any(o[0] == "play" and o[1] == rp for o in d.options)
+
+
+def test_a_cost_at_the_start_of_a_trigger_is_paid_as_it_is_finalized(db):
+    """CR 383.3.b: "Recycle me to ready your runes" (Ekko, Recurrent, the rule's own example), "banish a card from any
+    trash to ..." (Gust Monk) and "exhaust me to draw 1" (Titanic Shrine) are base costs paid as the trigger is
+    finalized, before anyone can respond. They were paid on resolution, so a response could stop the cost."""
+    g = _fresh(db)
+    ek = put(g, db, 0, "Ekko, Recurrent", ("base", 0))
+    g.do_kill([ek], Context(0))
+    for _ in range(10):                       # run until the Deathknell is a finalized chain item
+        d = g.run()
+        if g.chain and all(it.finalized for it in g.chain):
+            break
+        g.choose(d.options[0])
+    assert g.chain and g.objects[ek].zone == "deck"          # recycled before the Deathknell resolves
+    # Gust Monk with every trash empty: its trigger can't be finalized (no card to banish)
+    g = _fresh(db, "irelia_blade_dancer")
+    for p in g.players:
+        for u in list(p.trash):
+            g.objects[u].zone = "banish"
+            p.trash.remove(u)
+            p.banish.append(u) if hasattr(p, "banish") else None
+    g.restruct()
+    put(g, db, 0, "Forecaster", ("base", 0))
+    gm = give(g, 0, "Gust Monk", db)
+    _ready_runes(g, 0)
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == gm))
+    _drive(g, pick=lambda d: True if d.kind == "additional_cost" else None)
+    assert not any("Assault" in str(m.value) or m.kind == "keyword" and m.value[0] == "assault"
+                   for o in g.objects.values() for m in o.mods)
+    assert any(e["kind"] == "trigger_declined" for e in g.events)
+
+
+def _nocturne_on_top(g, db, p, at=0):
+    u = g.players[p].deck[at]
+    g.objects[u].defn = next(c for c in db if c.name == "Nocturne, Horrifying")
+    g.restruct()
+    return u
+
+
+def test_nocturne_seen_by_a_look_is_played_where_his_owner_chooses(db):
+    # Errata: "As you look at or reveal me from the top of your deck, you may banish me. If you do, you may play me
+    # for [A]." He is played like any unit (CR 355.2.a): to base or a battlefield his owner controls, not always base.
+    from riftsim.core.vm import Frame, compile_effect
+    from riftsim.core import ops as O
+    g = main_phase(db, [_deck(db, "kennen_tempest"), _deck(db, "riven_exile")])
+    _ready_runes(g, 0)
+    g.set_bf_controller(0, 0)
+    noc = _nocturne_on_top(g, db, 0, at=1)
+    g.vm_frames.append(Frame(compile_effect([O.Look(3, out="looked")]), Context(0, None)))
+    seen = []
+
+    def pick(d):
+        if d.kind == "seen_from_deck":
+            seen.append(d.player); return "banish_play"
+        if d.kind == "choose_location":
+            assert ("bf", 0) in d.options and ("base", 0) in d.options
+            return ("bf", 0)
+    _drive(g, pick)
+    assert seen == [0]
+    assert g.objects[noc].zone == "board" and g.objects[noc].place == ("bf", 0)
+
+
+def test_nocturne_revealed_from_the_top_is_offered_to_his_owner(db):
+    # "or reveal": Blind Fury makes the opponent reveal their top card; Nocturne's owner may banish and play him, and
+    # Blind Fury then has nothing of theirs to banish and play.
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "kennen_tempest")])
+    _set_runes(g, db, 1, [("chaos", False)] * 2)
+    noc = _nocturne_on_top(g, db, 1)
+    seen = []
+
+    def pick(d):
+        if d.kind == "seen_from_deck":
+            seen.append(d.player); return "banish_play"
+    _cast_with(g, db, 0, "Blind Fury", [("fury", False)] * 6, pick)
+    assert seen == [1]
+    assert g.objects[noc].zone == "board" and g.objects[noc].controller == 1
+
+
+def test_dazzling_aurora_reveals_past_a_banished_nocturne(db):
+    # Reveal until a unit: a Nocturne banished as he is revealed was not revealed, so Aurora goes on to the next unit.
+    g = main_phase(db, [_deck(db, "kennen_tempest"), _deck(db, "riven_exile")])
+    _ready_runes(g, 0)
+    put(g, db, 0, "Dazzling Aurora", ("base", 0))
+    deck = g.players[0].deck
+    noc = _nocturne_on_top(g, db, 0, at=0)
+    nxt = next(u for u in deck[1:] if g.objects[u].base_defn().is_unit)
+    settle(g)
+    seen = []
+
+    def pick(d):
+        if d.kind == "seen_from_deck":
+            seen.append(d.info["uid"]); return "banish"
+    g.choose(("end_turn",))
+    _drive(g, pick, stop=lambda d: g.turn_player == 1)
+    assert seen == [noc] and g.objects[noc].zone == "banish"
+    assert g.objects[nxt].zone == "board"
+
+
+def test_riven_spend_my_buff_to_stun_picks_the_unit_as_the_mode_is_chosen(db):
+    """Riven, Broken Blade: "When I become exhausted, choose one ... — Spend my buff to [Stun] an enemy unit."
+    "[do X] to [do Y]": X is a cost, the enemy unit in Y is a target (CR 355.10.c.1), chosen with the mode as the
+    trigger goes on the chain (355.5), so the opponent can answer it (Not So Fast counters abilities that choose a
+    friendly unit). It was chosen at resolution, after the buff was spent."""
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "vex_gloomist")])
+    _clear_bfs(g, db)
+    rv = put(g, db, 0, "Riven, Broken Blade", ("base", 0))
+    g.objects[rv].buffs = 1
+    foe = put(g, db, 1, "Stellacorn Herder", ("base", 1))
+    put(g, db, 1, "Stellacorn Herder", ("base", 1))         # two enemy units: the pick is a real decision
+    g.restruct()
+    g.do_exhaust(rv, Context(0, None))
+    seen = {}
+
+    def pick(d):
+        if d.kind == "mode":
+            return next(o for o, lab in zip(d.options, d.labels) if "Stun" in lab)
+        if d.kind == "choose" and foe in d.options:
+            seen["at"] = "finalize" if not any(it.finalized for it in g.chain if it.uid == rv) else "resolution"
+            seen["buffs"] = g.objects[rv].buffs
+            return foe
+    _drive(g, pick)
+    assert seen == {"at": "finalize", "buffs": 1}
+    assert g.objects[foe].stunned and g.objects[rv].buffs == 0
+
+
+def test_bedeviling_stranger_chooses_the_enemy_unit_as_the_trigger_goes_on_the_chain(db):
+    """Bedeviling Stranger: "When you play me, choose a battlefield. If there are 4 or more units there, you may return
+    an enemy unit there to its owner's hand." The enemy unit is a target (CR 355.10, 355.12): chosen with the
+    battlefield as the trigger is finalized, not on resolution."""
+    g = main_phase(db, [_deck(db, "kennen_tempest"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    put(g, db, 0, "Traveling Merchant", ("bf", 0)); put(g, db, 0, "Traveling Merchant", ("bf", 0))
+    a = put(g, db, 1, "Stellacorn Herder", ("bf", 0)); b = put(g, db, 1, "Stellacorn Herder", ("bf", 0))
+    seen = {}
+
+    def pick(d):
+        if d.kind == "choose_location":
+            return ("bf", 0) if ("bf", 0) in d.options else None
+        if d.kind == "choose_many" and (a,) in d.options:        # up to one enemy unit there
+            seen["finalized"] = any(it.finalized for it in g.chain if it.kind == "trigger")
+            return (a,)
+        if d.kind in ("yesno", "may"):
+            return True if True in d.options else d.options[0]
+    _cast(g, db, 0, "Bedeviling Stranger", pick)
+    assert seen == {"finalized": False}
+    assert g.objects[a].zone == "hand" and g.objects[b].zone == "board"
+
+
+def test_fiora_victorious_layers_are_reapplied_until_nothing_changes(db):
+    """Fiora, Victorious (4 [M]): "While I'm [Mighty], I have [Deflect], [Ganking], and [Shield]." Layers are applied
+    again until nothing changes (CR 478.3): a defender with Hunting Blind's [Shield 2] is 6 [M], so Mighty, so she
+    gains Deflect and Shield too (7 [M]). Her own condition only saw her printed Might and buffs. Without Shield
+    from elsewhere she stays 4 [M] with none of them (CR 478.4 example)."""
+    g = main_phase(db, [_deck(db, "sett_the_boss"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    f = put(g, db, 0, "Fiora, Victorious", ("base", 0))
+
+    def state():
+        g.restruct()
+        ch = g.chars(f)
+        return ch.might, ch.kw("deflect"), ch.kw("shield"), bool(ch.keywords.get("ganking"))
+    g.objects[f].designation = "defender"
+    assert state() == (4, 0, 0, False)
+    g.objects[f].buffs = 1
+    assert state() == (6, 1, 1, True)              # the CR 478.4 example: 5 [M], then Shield while defending
+    g.objects[f].buffs = 0
+    put(g, db, 0, "Hunting Blind", ("base", 0))
+    assert state() == (7, 1, 3, True)
+    g.objects[f].designation = None
+    assert state() == (4, 0, 2, False)             # Hunting Blind's Shield only adds Might while defending
+
+
+def test_a_unit_becomes_mighty_whatever_raises_its_might(db):
+    """CR 709: a unit becomes Mighty when its Might goes from under 5 to 5 or more, whatever the cause. Only mods and
+    buffs announced it, so [Assault] as a unit attacks, a static (Hunting Blind's Shield while defending) or a -[M]
+    effect expiring never triggered Fiora, Worthy ("When a unit you control becomes [Mighty], you may pay [Order] to
+    ready it")."""
+    g = main_phase(db, [_deck(db, "sett_the_boss"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    put(g, db, 0, "Fiora, Worthy", ("base", 0))
+    u = put(g, db, 0, "Fiora, Worthy", ("bf", 0))             # 3 [M]
+    g.add_mod(u, "keyword", ("assault", 2), duration="turn")
+    seen = []
+    orig = g.emit
+
+    def spy(kind, **kw):
+        if kind == "becomes_mighty":
+            seen.append(kw.get("uid"))
+        return orig(kind, **kw)
+    g.emit = spy
+    g._cleanup_once()
+    assert seen == []                                          # 3 [M] at rest
+    g.objects[u].designation = "attacker"
+    g.bump()
+    g._cleanup_once()
+    assert seen == [u]                                         # 5 [M] while attacking: becomes Mighty
+    g._cleanup_once()
+    assert seen == [u]                                         # already Mighty: no second event
+    g.objects[u].designation = None
+    g.bump()
+    g._cleanup_once()
+    g.objects[u].designation = "attacker"
+    g.bump()
+    g._cleanup_once()
+    assert seen == [u, u]
+
+
+def test_a_deflect_target_needs_the_tax_on_top_of_the_cost(db):
+    """CR 809.1.c / 355.16: Deflect adds [A] to the cost of a spell choosing that unit, and no choice may make the
+    costs unpayable. The check only asked whether the tax alone was payable: with one Fury rune, Hextech Ray ([1] and
+    Fury) could choose Vex, Apathetic ([Deflect]), then failed to pay and went to the trash with no effect."""
+    g = main_phase(db, [_deck(db, "sett_the_boss"), _deck(db, "kennen_tempest")])
+    _clear_bfs(g, db)
+    _set_runes(g, db, 0, [("fury", False)])
+    vx = put(g, db, 1, "Vex, Apathetic", ("bf", 0))
+    hr = give(g, 0, "Hextech Ray", db)
+    d = g.run()
+    assert ("play", hr) not in d.options                   # Vex is the only target and the tax can't be paid too
+    other = put(g, db, 1, "Stellacorn Herder", ("bf", 1))
+    g.pending = None
+    d = g.run()
+    assert ("play", hr) in d.options
+    offered = []
+
+    def pick(d):
+        if d.kind == "choose":
+            offered.extend(d.options)
+    g.choose(("play", hr))
+    _drive(g, pick)
+    assert vx not in offered and g.objects[vx].damage == 0
+    assert g.objects[hr].zone == "trash" and (g.objects[other].zone != "board" or g.objects[other].damage == 3)
+    _set_runes(g, db, 0, [("fury", False), ("fury", False)])  # cost and tax both payable: Vex can be chosen
+    hr2 = give(g, 0, "Hextech Ray", db)
+    g.pending = None
+    d = g.run()
+    g.choose(("play", hr2))
+    _drive(g, lambda d: vx if d.kind == "choose" and vx in d.options else None)
+    assert g.objects[vx].damage == 3

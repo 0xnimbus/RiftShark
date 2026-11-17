@@ -185,6 +185,43 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   2026-11-16 00:20: an attached card's printed rules text stayed active (CR 135.4): an equipped Spinning Axe died to
   its own [Temporary] and attached gear could [Equip] again; `game._active_printed` drops printed abilities while
   attached (keywords stay visible, 135.4.a; abilities scripted from effect text, e.g. Guardian Angel, stay).
+  05:20: that fix hid the Equip ability Weaponmaster reads (CR 821.1.c: "even if it's already attached"), so a
+  Weaponmaster unit could no longer take an Equipment from another unit; `ops.PayEquip` now reads the printed Equip.
+  Checked OK: Deathknell is skipped when Zhonya's/Guardian Angel replace the death (808.1.d.1), equipment Deathknell.
+  10:20: multi-domain cards' split-colour power pips ([C], CR 135.2.e.6.c) took only the first domain (Defiant Dance
+  needed Calm, never Chaos) or one of each (Tibbers: Fury + Chaos, never Fury + Fury). Now a requirement "fury|chaos"
+  (`payment.own_power` / `req_ok`) used by card costs, [C] in ability costs and Accelerate. Cards checked against the
+  images. Round-robins before this underrate Irelia, Akali, Azir, Master Yi, Riven (Blade of the Exile) and Sett.
+  15:20: Repulse (Master Yi and Sett sideboards, the only unscripted card in any tournament list or sideboard) is
+  hand-scripted in cards_manual.py: counters an enemy item that chooses the friendly unit and no other friendly unit.
+  Checked OK: a Temporary unit killed before scoring loses the hold (CR 190.4.c), Sprite Fountain's Deathknell
+  replays its Sprite when Temporary kills it, Defy reads printed costs (CR 356.1.c).
+  20:20: a cost at the start of a non-"may" trigger ("Recycle me to ...", Ekko, Recurrent; "banish a card from any
+  trash to ...", Gust Monk; "exhaust me to draw 1", Titanic Shrine) was paid on resolution; CR 383.3.b makes it the
+  base cost, paid as the trigger is finalized: `targeting.TriggerBaseCost` in the finalize code. rules_audit no
+  longer reports a staged combat waiting on choose_showdown as contested (CR 463.1).
+  2026-11-17 00:20: Nocturne, Horrifying (errata: "As you look at or reveal me from the top of your deck, you may banish
+  me ...", 3 in Kennen) was always played to base (or the looking effect's battlefield); now his owner picks base or a
+  battlefield they control (CR 355.2.a). Reveals from the top (Dazzling Aurora, Mechanical Bandit, Blind Fury, Diana,
+  Lunari) never offered him: `ops.SeeFromDeck` asks each card's owner; Aurora reveals on past a banished Nocturne.
+  05:20: Riven, Broken Blade's "Spend my buff to [Stun] an enemy unit" chose the unit on resolution, after spending the
+  buff; "[do X] to [do Y]" makes the unit a target (CR 355.10.c.1), now picked with the mode (auto_grammar lifts the
+  choices of "spend a buff to" / "kill|exhaust|banish a ... to"; only Riven changed). Bedeviling Stranger's enemy unit
+  is now chosen with the battlefield as the trigger goes on the chain (355.12). A scan of every card finds no other
+  targeted choice left for resolution except Battle Preparations' runes.
+  10:20: Fiora, Victorious ("While I'm [Mighty], I have [Deflect], [Ganking], and [Shield]", Sett deck) read her own
+  Might from printed Might + buffs only, so Shield from elsewhere (Hunting Blind, 6 [M] defending) never made her
+  Mighty. `Game.chars` now re-applies the layers until nothing changes when an object's effects read the object
+  itself (CR 478.3; partial chars in `_partial`). Smoke games are unchanged and run at the same speed.
+  15:20: "becomes [Mighty]" (CR 709) was only announced by mods and buffs, so a unit reaching 5 [M] through [Assault]
+  as it attacks, [Shield] as it defends, a static (Sett, Kingpin) or a -[M] effect expiring never triggered Fiora,
+  Worthy or the Grand Duelist legend. The cleanup now compares each unit with the last state seen
+  (`Game._check_becomes_mighty`, temp `__mighty`; only while something can trigger on it).
+  20:20: a Deflect target was allowed when the tax alone was payable, ignoring the cost of the spell or ability
+  choosing it (and the tax of targets already chosen; `__deflect_cost` was never set): Hextech Ray with one Fury rune
+  could choose Vex, Apathetic, then failed to pay and went to the trash. CR 355.16: `Game._unpaid_base_cost` adds the
+  unpaid cost to the check (finalize: the item's cost; legal actions: `_spell_has_targets(cost=)`, activations), and
+  rules_audit's missing-play check does the same. Skipped (tax only) while a later cost reduction could apply.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

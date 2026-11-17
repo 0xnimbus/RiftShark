@@ -316,7 +316,7 @@
     const n = Object.keys(paySel).length;
     const m = matchPlan(j, d);
     const pw = (d.cost && d.cost.power) || [];
-    const cost = d.cost ? `${d.cost.energy || 0} energy${pw.length ? " + " + pw.length + " " + esc(pw.join("/")) + " power" : ""}` : "";
+    const cost = d.cost ? `${d.cost.energy || 0} energy${pw.length ? " + " + pw.length + " " + esc(pw.map(x => x.split("|").join(" or ")).join(", ")) + " power" : ""}` : "";
     let html = `<div class="pay-tap"><b>Tap your runes</b> on the board to pay${cost ? " <b>" + cost + "</b>" : ""}. Click a glowing rune once to exhaust it (1 energy), again to recycle it (1 power of its domain), and again to undo.
       <div class="pay-now">${n ? `${n} rune${n === 1 ? "" : "s"} chosen` : "No runes chosen yet"}${m >= 0 ? `: <span class="ok">${B.say(d.labels[m])}</span>` : n ? ' <span class="muted">(not a complete payment yet)</span>' : ""}</div>
       <button class="opt primary" id="pay-go" ${m >= 0 ? "" : "disabled"}>Pay</button></div>`;

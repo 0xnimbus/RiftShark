@@ -1098,10 +1098,14 @@ class PayEquip(Instr):
         gear = val(game, ctx, self.gear)
         if gear is None or gear not in game.objects:
             return None
-        for ab in game.abilities(gear):
+        # CR 821.1.c: the Equip ability is read even while the gear is attached and its printed text is inactive
+        abl = list(game.abilities(gear))
+        abl += [a for a in game.objects[gear].base_defn().abilities if a not in abl]
+        for ab in abl:
             if isinstance(ab, Activated) and ab.is_equip and ab.cost.get("exhaust_unit") is None:
                 d = game.objects[gear].base_defn()
-                pw = ["any" if x == "C" and not d.domains else (d.domains[0] if x == "C" else x) for x in ab.cost.get("power", ())]
+                from .payment import own_power
+                pw = [own_power(d.domains) if x == "C" else x for x in ab.cost.get("power", ())]
                 if pw:
                     pw = pw[1:]      # "reduced by [A]": one Power symbol of any domain is waived (CR 821.1.c.3)
                 return ab.cost.get("energy", 0), pw
@@ -1150,33 +1154,67 @@ class SpendXP(Instr):
         return None
 
 
-def _nocturne_step(game, ctx, cards):
+def _nocturne_step(game, ctx, cards, viewer=None):
     """Nocturne, Horrifying (errata): "As you look at or reveal me from the top of your deck, you may banish me. If
-    you do, you may play me for [A]." A replacement in a secret zone (CR 370.1.c.1): asked as the cards are seen."""
+    you do, you may play me for [A]." A replacement in a secret zone (CR 370.1.c.1): asked as the cards are seen.
+    viewer: the player looking (Look: the effect's controller); None for a reveal, which each card's owner makes."""
     from .abilities import PlayPermission
     done = ctx.vars.setdefault("__noct_done", [])
     for u in cards:
         o = game.objects.get(u)
-        if u in done or o is None or o.zone != "deck" or o.owner != ctx.controller:
+        if u in done or o is None or o.zone != "deck" or (viewer is not None and o.owner != viewer):
             continue
         if not any(isinstance(ab, PlayPermission) and ab.perm == "as_seen_from_deck" for ab in game._abilities_of(u, o)):
             continue
         done.append(u)
         ctx.vars["__noct"] = u
         nm = game.label(u)
-        return Decision(ctx.controller, "seen_from_deck", ["keep", "banish_play", "banish"], out="__noct_ans",
+        return Decision(o.owner, "seen_from_deck", ["keep", "banish_play", "banish"], out="__noct_ans",
                         labels=[f"leave {nm} in the deck", f"banish {nm} and play it for [A]", f"banish {nm}"],
                         info={"uid": u, "label": "As you look at or reveal me: you may banish me, then play me for [A]"})
     return None
 
 
 def _nocturne_apply(game, ctx, choice):
+    """Resolve a seen_from_deck answer, or the play location asked after it. Returns a Decision or None."""
     u = ctx.vars.get("__noct")
-    if u is None or choice == "keep":
-        return
+    if u is None:
+        return None
+    p = game.objects[u].owner
+    if ctx.vars.pop("__noct_loc_wait", False):
+        game.limited_play(p, u, ctx, alt_cost=(0, ["any"]), loc=choice)
+        return None
+    if choice == "keep":
+        return None
     game.do_banish([u], ctx)
     if choice == "banish_play" and game.objects[u].zone == "banish":
-        game.limited_play(ctx.controller, u, ctx, alt_cost=(0, ["any"]))
+        # CR 355.2.a: played like any unit, to its owner's base or a battlefield they control (not the effect's place)
+        locs = game._play_locations(p, u, "banish")
+        if len(locs) > 1:
+            ctx.vars["__noct_loc_wait"] = True
+            return Decision(p, "choose_location", locs, out="__noct_loc", labels=[game.loc_name(l) for l in locs],
+                            info={"label": f"Play {game.label(u)} where?"})
+        if locs:
+            game.limited_play(p, u, ctx, alt_cost=(0, ["any"]), loc=locs[0])
+    return None
+
+
+class SeeFromDeck(Instr):
+    """Cards just revealed from the top of their owners' decks (cards: Ref/callable -> uids): each owner may use
+    Nocturne, Horrifying's replacement on them. Later steps must check the cards are still in the deck."""
+
+    def __init__(self, cards):
+        self.cards = cards
+
+    def run(self, game, ctx):
+        ctx.vars["__noct_done"] = []
+        return _nocturne_step(game, ctx, [u for u in (val(game, ctx, self.cards) or ()) if u is not None])
+
+    def resume(self, game, ctx, choice):
+        d = _nocturne_apply(game, ctx, choice)
+        if d is not None:
+            return d
+        return _nocturne_step(game, ctx, [u for u in (val(game, ctx, self.cards) or ()) if u is not None])
 
 
 class Look(Instr):
@@ -1193,13 +1231,15 @@ class Look(Instr):
         ctx.vars["__noct_done"] = []
         if self.reveal:
             game.emit("reveal", player=p, cards=list(cards), ctx=ctx)
-        return _nocturne_step(game, ctx, cards)
+        return _nocturne_step(game, ctx, cards, viewer=ctx.controller)
 
     def resume(self, game, ctx, choice):
-        _nocturne_apply(game, ctx, choice)
+        d = _nocturne_apply(game, ctx, choice)
+        if d is not None:
+            return d
         cards = ctx.vars.get(self.out) or []
         ctx.vars[self.out] = [u for u in cards if game.objects[u].zone == "deck"]
-        return _nocturne_step(game, ctx, cards)
+        return _nocturne_step(game, ctx, cards, viewer=ctx.controller)
 
 
 class Mill(Instr):
@@ -1276,7 +1316,7 @@ class Predict(Instr):
         if "__pred_cards" not in ctx.vars:
             ctx.vars["__pred_cards"] = list(cards)
             ctx.vars["__noct_done"] = []
-        d = _nocturne_step(game, ctx, ctx.vars["__pred_cards"])
+        d = _nocturne_step(game, ctx, ctx.vars["__pred_cards"], viewer=p)
         if d is not None:
             ctx.vars["__pred_wait"] = True
             return d
@@ -1291,7 +1331,10 @@ class Predict(Instr):
 
     def resume(self, game, ctx, choice):
         if ctx.vars.pop("__pred_wait", False):
-            _nocturne_apply(game, ctx, choice)
+            d = _nocturne_apply(game, ctx, choice)
+            if d is not None:
+                ctx.vars["__pred_wait"] = True
+                return d
             return self.run(game, ctx)
         p = _player(game, ctx, self.player)
         deck = game.players[p].deck

@@ -196,6 +196,22 @@ def _remove_trigger(game, ctx):
 _END = 10 ** 9          # jump past the end of the finalize program
 
 
+class TriggerBaseCost(Instr):
+    """CR 383.3.b / 204.1.c: a cost within instructions at the start of a triggered ability's effect ("Recycle me to
+    ready your runes", "exhaust me to draw 1", "banish a card from any trash to ...") is its base cost, paid as the
+    trigger is finalized. Put this in the finalize code before the cost instructions; `ok(game, ctx)` says whether
+    the cost can be paid. If it can't, the trigger leaves the chain (383.3.b.1)."""
+
+    def __init__(self, ok):
+        self.ok = ok
+
+    def run(self, game, ctx):
+        if not self.ok(game, ctx):
+            _remove_trigger(game, ctx)
+            return _END
+        return None
+
+
 class _TriggerMay(Instr):
     """"When ..., you may ...": whether to perform the triggered ability is decided as it is finalized (CR 383.3.a)."""
 
