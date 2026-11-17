@@ -508,9 +508,11 @@ def _gate_game(args):
     return {"specs": specs, "winner": g.winner, "decks": [os.path.basename(p) for p in paths]}
 
 
-def gate(cand, best, games, workers, seed, mirror=False):
+def gate(cand, best, games, workers, seed, mirror=False, log=None):
     """mirror=True: both AIs play the same deck (each pair of games swaps seats on the same shuffle), so the
-    matchup between two different decks adds no noise and a smaller skill edge shows up in fewer games."""
+    matchup between two different decks adds no noise and a smaller skill edge shows up in fewer games.
+    log: a jsonl file that gets one line per finished game; a rerun with the same arguments resumes from it
+    (container restarts kill long search gates)."""
     rng = random.Random(seed)
     jobs = []
     for i in range(games // 2):
@@ -522,8 +524,24 @@ def gate(cand, best, games, workers, seed, mirror=False):
     per_deck = {}
     timeouts = []
     t = time.time()
-    with ProcessPoolExecutor(max_workers=workers) as ex:
-        for k, r in enumerate(ex.map(_gate_timed, jobs)):
+    done = []
+    if log and os.path.exists(log):
+        with open(log) as f:
+            done = [json.loads(line) for line in f if line.strip()]
+        done = done[:len(jobs)]
+        print(f"resuming gate at game {len(done)}", file=sys.stderr)
+    logf = open(log, "a") if log else None
+
+    def results():
+        yield from done
+        with ProcessPoolExecutor(max_workers=workers) as ex:
+            for r in ex.map(_gate_timed, jobs[len(done):]):
+                if logf:
+                    logf.write(json.dumps(r) + "\n")
+                    logf.flush()
+                yield r
+    if True:
+        for k, r in enumerate(results()):
             if r.get("timeout"):
                 timeouts.append(r["args"])      # dropped from the score (neither AI is credited)
                 continue
@@ -683,6 +701,7 @@ def main():
     q.add_argument("best")
     q.add_argument("--games", type=int, default=200)
     q.add_argument("--mirror", action="store_true", help="both AIs play the same deck (less matchup noise)")
+    q.add_argument("--log", help="jsonl of finished games; rerun the same command to resume after a restart")
     q.add_argument("--record", metavar="NOTE", help="append the result to models/baselines.json (control matches)")
     for p in (g, s, q):
         p.add_argument("--workers", type=int, default=os.cpu_count() or 2)
@@ -706,7 +725,7 @@ def main():
                         mask=[i for r in (a.mask or "").split(",") if r
                               for i in range(int(r.split("-")[0]), int(r.split("-")[-1]) + 1)]))
     elif a.cmd == "gate":
-        res = gate(a.candidate, a.best, a.games, a.workers, a.seed, mirror=a.mirror)
+        res = gate(a.candidate, a.best, a.games, a.workers, a.seed, mirror=a.mirror, log=a.log)
         print(json.dumps(res, indent=1))
         if a.record is not None:
             record_baseline(res, a.record)
