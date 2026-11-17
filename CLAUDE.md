@@ -213,6 +213,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   Might from printed Might + buffs only, so Shield from elsewhere (Hunting Blind, 6 [M] defending) never made her
   Mighty. `Game.chars` now re-applies the layers until nothing changes when an object's effects read the object
   itself (CR 478.3; partial chars in `_partial`). Smoke games are unchanged and run at the same speed.
+  15:20: "becomes [Mighty]" (CR 709) was only announced by mods and buffs, so a unit reaching 5 [M] through [Assault]
+  as it attacks, [Shield] as it defends, a static (Sett, Kingpin) or a -[M] effect expiring never triggered Fiora,
+  Worthy or the Grand Duelist legend. The cleanup now compares each unit with the last state seen
+  (`Game._check_becomes_mighty`, temp `__mighty`; only while something can trigger on it).
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

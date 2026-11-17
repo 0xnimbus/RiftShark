@@ -751,6 +751,7 @@ class FlowMixin:
                     self.set_bf_controller(bf.idx, None)
                     self.dirty = True
         self._check_static_might_reductions()
+        self._check_becomes_mighty()
         self._end_control_durations()
         self._end_bound_legends()
         # 5. recalls
