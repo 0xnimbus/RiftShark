@@ -24,7 +24,8 @@ KINDS = ("action", "choose", "assign_damage", "yesno", "order_triggers", "choose
 
 
 def _game(args):
-    paths, seed, spec = args
+    paths, seed, spec = args[:3]
+    values = len(args) > 3 and args[3]
     from riftsim.core.deck import Deck
     from riftsim.core.game import Game
     from riftsim.core.learn.features import encode
@@ -33,6 +34,9 @@ def _game(args):
     db = T._db()
     decks = [Deck.load(p, db) for p in paths]
     pols = [make_policy(spec, seed=seed * 7 + i) for i in range(2)]
+    if values:
+        for q in pols:
+            q.recorder = []
     g = Game(db, decks, seed=seed, log=False)
     g.max_turns = 60
     xs, phis, nopt, pick, seat, kind = [], [], [], [], [], []
@@ -57,8 +61,13 @@ def _game(args):
             seat.append(d.player)
             kind.append(KINDS.index(d.kind) if d.kind in KINDS else len(KINDS) - 1)
         g.choose(o)
+    vx, vy = [], []
+    for q in (pols if values else ()):
+        for rows, y in q.recorder:
+            vx += rows
+            vy += [y] * len(rows)
     return {"x": xs, "phi": phis, "n": nopt, "pick": pick, "seat": seat, "kind": kind, "winner": g.winner,
-            "secs": time.time() - t}
+            "vx": vx, "vy": vy, "secs": time.time() - t}
 
 
 def _timed(args):
@@ -74,26 +83,29 @@ def main():
     ap.add_argument("--seed", type=int, default=7000000)
     ap.add_argument("--workers", type=int, default=os.cpu_count() or 2)
     ap.add_argument("--max-minutes", type=float)
+    ap.add_argument("--values", action="store_true",
+                    help="also record the two-turn search's value of each searched candidate (vx: features of each "
+                         "one-turn sample, vy: two-turn win probability, vgame) to train a judge on")
     a = ap.parse_args()
     rng = random.Random(a.seed)
     jobs = []
     for i in range(a.games // 2):
         pair = rng.sample(T.DECKS, 2)
-        jobs.append((pair, a.seed + 2 * i, a.policy))
-        jobs.append((pair[::-1], a.seed + 2 * i + 1, a.policy))
-    keys = ("x", "phi", "n", "pick", "seat", "kind", "game", "res")
+        jobs.append((pair, a.seed + 2 * i, a.policy, a.values))
+        jobs.append((pair[::-1], a.seed + 2 * i + 1, a.policy, a.values))
+    keys = ("x", "phi", "n", "pick", "seat", "kind", "game", "res") + (("vx", "vy", "vgame") if a.values else ())
     acc = {k: [] for k in keys}
     part = a.out + ".partial.npz"
     start = 0
     if os.path.exists(part):
         d = np.load(part)
-        acc = {k: [d[k]] for k in keys}
+        acc = {k: ([d[k]] if len(d[k]) else []) for k in keys}
         start = int(d["done"])
         print(f"resuming at game {start}", file=sys.stderr)
 
     def save(path, done=None):
         arrs = {k: (np.concatenate(acc[k]) if acc[k] else np.zeros((0,), np.float32)).astype(
-            np.float32 if k in ("x", "phi", "res") else np.int32) for k in keys}
+            np.float32 if k in ("x", "phi", "res", "vx", "vy") else np.int32) for k in keys}
         if done is None:
             np.savez_compressed(path, **arrs)
         else:
@@ -111,6 +123,10 @@ def main():
                 for key in ("n", "pick", "seat", "kind"):
                     acc[key].append(np.array(r[key], dtype=np.int32))
                 acc["game"].append(np.full(len(r["n"]), k, dtype=np.int32))
+                if a.values and r["vy"]:
+                    acc["vx"].append(np.array(r["vx"], dtype=np.float32))
+                    acc["vy"].append(np.array(r["vy"], dtype=np.float32))
+                    acc["vgame"].append(np.full(len(r["vy"]), k, dtype=np.int32))
                 w = r["winner"]
                 acc["res"].append(np.array([0.5 if w is None else (1.0 if s == w else 0.0) for s in r["seat"]],
                                            dtype=np.float32))
