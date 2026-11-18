@@ -229,6 +229,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   05:20: Fiora, Peerless checked "one on one" on resolution; it is the trigger condition (CR 383.2.a, 740.2.b), now a
   `filt` checked as she attacks/defends. Open: Lotus Trap's doubling and Ki Barrier's prevention on one unit are both
   replacement effects whose order its controller picks (CR 372, 433.1.b); `do_deal` always doubles first.
+  10:20: a hidden card's targets must be at its battlefield unless the text makes that impossible (CR 811.1.d.2-3);
+  any selector condition counted as making it impossible, so Facebreaker and Switcheroo played from facedown targeted
+  anywhere when their battlefield had no legal pair (no valid target: can't be played). Only `Sel(elsewhere=True)`
+  ("at another/a different location": Tideturner, Evelynn, Entrancing, Resonating Strike) chooses freely now.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

@@ -1040,7 +1040,7 @@ def resonating_strike(defn):
     # [Hidden] [Reaction]  Choose a battlefield you control and a unit you control at a different location. Move that
     # unit to that battlefield and give it +2 [M] this turn.
     mine = lambda g, c, l: g.battlefields[l[1]].controller == c.controller
-    elsewhere = Sel("unit", side="friendly", pred=lambda g, c, u: g.objects[u].location != c.vars.get("loc"))
+    elsewhere = Sel("unit", side="friendly", pred=lambda g, c, u: g.objects[u].location != c.vars.get("loc"), elsewhere=True)
     return [SpellEffect([O.ChooseLocation(out="loc", pred=mine), O.Choose(elsewhere, out="t"),
                          O.Move(Ref("t"), Ref("loc")), O.GiveMight(Ref("t"), 2)], label=defn.name, source_text=defn.text)]
 
