@@ -670,15 +670,16 @@ def ornn_blacksmith(defn):
 @script("Fiora, Peerless")
 def fiora_peerless(defn):
     # When I attack or defend one on one, double my Might this combat.
-    def one_on_one(g, c):
-        me = g.objects[c.source]
-        if me.zone != "board" or g.combat is None:
+    # "one on one" is part of the trigger condition (CR 383.2.a), checked as I attack or defend: I and the one enemy
+    # unit here are both alone (CR 740.2.a-b). Nothing re-checks it on resolution.
+    def one_on_one(g, s, ev):
+        me = g.objects[s]
+        if me.zone != "board" or ev.get("uid") != s:
             return False
-        here = [u for u, o in g.objects.items() if o.zone == "board" and o.location == me.location and "unit" in g.chars(u).types]
-        mine = [u for u in here if g.objects[u].controller == me.controller]
-        theirs = [u for u in here if g.objects[u].controller != me.controller]
-        return len(mine) == 1 and len(theirs) == 1
-    return {"abilities": [Triggered(ev, [O.If(one_on_one, [O.DoubleMight(Ref("self"), duration="combat")])],
+        here = g.units_at(me.location)
+        mine = [u for u in here if g.is_friendly(g.objects[u].controller, me.controller)]
+        return len(mine) == 1 and len(here) == 2
+    return {"abilities": [Triggered(ev, [O.DoubleMight(Ref("self"), duration="combat")], filt=one_on_one,
                                     label=defn.name, source_text=defn.text) for ev in ("attack_self", "defend_self")],
             "replace": True}
 

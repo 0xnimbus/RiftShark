@@ -2032,3 +2032,45 @@ def test_no_bonus_damage_when_no_damage_is_dealt(db):
     assert g.objects[foe].damage == 0
     g.do_deal([foe], 1, Context(0, g.players[0].deck[0]))
     assert g.objects[foe].damage == 2
+
+
+# ----------------------------------------------------------------------------- 2026-11-18 05:20 run
+def _fiora_attack(db, foes, change):
+    """Fiora, Peerless (4 [M]) attacks bf 0 into `foes` enemy units; `change(g, enemies)` runs while her trigger waits
+    on the chain. Returns her highest Might seen during the combat."""
+    g = _fresh(db)
+    fi = put(g, db, 0, "Fiora, Peerless", ("base", 0))
+    bf = ("bf", g.battlefields[0].idx)
+    enemies = []
+    for _ in range(foes):
+        enemies.append(put(g, db, 1, "Mountain Drake", bf, exclude=enemies))
+    base = g.chars(fi).might
+    seen = {"max": base, "changed": False}
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "move" and o[1] == (fi,) and o[2] == bf))
+
+    def pick(d):
+        if g.combat is not None and g.objects[fi].zone == "board":
+            seen["max"] = max(seen["max"], g.chars(fi).might)
+        if not seen["changed"] and any(it.uid == fi or getattr(it, "source", None) == fi for it in g.chain):
+            seen["changed"] = True
+            change(g, enemies)
+            return "rerun"
+        return None
+    _drive(g, pick=pick)
+    return base, seen
+
+
+def test_fiora_peerless_checks_one_on_one_as_she_attacks(db):
+    # "When I attack or defend one on one, double my Might this combat." One on one is the trigger condition (CR 383.2.a,
+    # 740.2.b), checked as she attacks; the hand script re-checked it on resolution. A unit joining the fight before the
+    # trigger resolves doesn't stop the doubling, and killing one of two defenders in response doesn't start it.
+    def add_enemy(g, enemies):
+        put(g, db, 1, "Mountain Drake", g.objects[enemies[0]].location, exclude=enemies)
+    base, seen = _fiora_attack(db, 1, add_enemy)
+    assert seen["changed"] and seen["max"] == 2 * base
+
+    def kill_one(g, enemies):
+        g.do_kill([enemies[1]], Context(1))
+    base, seen = _fiora_attack(db, 2, kill_one)
+    assert not seen["changed"] and seen["max"] == base
