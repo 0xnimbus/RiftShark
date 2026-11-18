@@ -16,7 +16,7 @@ class Sel:
     def __init__(self, kind="unit", side=None, where=None, zone="board", tags=None, not_tags=None, keyword=None,
                  min_might=None, max_might=None, exhausted=None, ready=None, buffed=None, empowered=None, stunned=None,
                  name=None, not_self=False, other=False, pred=None, owner=None, supertype=None, types=None, attached=None,
-                 damaged=None, mighty=None, token=None, label=None):
+                 damaged=None, mighty=None, token=None, label=None, elsewhere=False):
         self.kind, self.side, self.where, self.zone = kind, side, where, zone
         self.tags = tuple(tags) if isinstance(tags, (list, tuple)) else ((tags,) if tags else ())
         self.not_tags = tuple(not_tags or ())
@@ -25,6 +25,8 @@ class Sel:
         self.name, self.not_self, self.other, self.pred, self.owner = name, not_self or other, other, pred, owner
         self.supertype, self.types, self.attached, self.damaged, self.mighty, self.token = supertype, types, attached, damaged, mighty, token
         self.label = label
+        # pred demands another location than a hidden card's battlefield ("at another location"): CR 811.1.d.2-3
+        self.elsewhere = elsewhere
 
     def __repr__(self):
         parts = [self.kind]

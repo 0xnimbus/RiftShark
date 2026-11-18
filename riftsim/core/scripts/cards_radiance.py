@@ -205,7 +205,7 @@ def evelynn_entrancing(defn):
     def mine(g, c):
         return _ev(c).get("loc")
     return [Triggered("play_self", [O.May([
-        O.Choose(Sel("unit", side="enemy", pred=lambda g, c, u: g.objects[u].location != _ev(c).get("loc")), out="t"),
+        O.Choose(Sel("unit", side="enemy", pred=lambda g, c, u: g.objects[u].location != _ev(c).get("loc"), elsewhere=True), out="t"),
         O.Move(Ref("t"), mine)], label="move an enemy unit to Evelynn's battlefield")],
         filt=lambda g, s, ev: ev.get("from_zone") == "facedown" and g.turn_player == ev.get("player"),
         label=defn.name, source_text=defn.text)]

@@ -2167,9 +2167,9 @@ class Game(flow.FlowMixin):
             return False
         if sel.where in ("base", "own_base") or (isinstance(sel.where, str) and sel.where.startswith("loc:")):
             return False
-        if sel.pred is not None:
-            return False          # arbitrary conditions ("at another location", Tideturner): cannot tell, keep free
-        return True
+        # a pred restricting to another location ("at another location": Tideturner, Evelynn, Resonating Strike) can never
+        # be met there, so the choice stays free; any other condition (Facebreaker, Switcheroo) must be met there
+        return not getattr(sel, "elsewhere", False)
 
     def _unpaid_base_cost(self, ctx):
         """(energy, power[, purpose]) the item being finalized still has to pay, for the Deflect check; None when it

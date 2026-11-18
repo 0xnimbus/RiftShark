@@ -2074,3 +2074,51 @@ def test_fiora_peerless_checks_one_on_one_as_she_attacks(db):
         g.do_kill([enemies[1]], Context(1))
     base, seen = _fiora_attack(db, 2, kill_one)
     assert not seen["changed"] and seen["max"] == base
+
+
+# ----------------------------------------------------------------------------- 2026-11-18 10:20 run
+def test_hidden_facebreaker_needs_its_targets_at_its_battlefield(db):
+    # CR 811.1.d.2: a spell played from facedown chooses its targets at that battlefield "unless it explicitly restricts
+    # targeting in such a way that makes this impossible"; with no legal target there it can't be played (811.1.d).
+    # Facebreaker ("Stun a friendly unit and an enemy unit at the same battlefield") was free to pick at any battlefield
+    # when its own battlefield had no friendly unit facing an enemy, because any selector condition counted as such a
+    # restriction. Only "at another location" conditions (Tideturner, Evelynn, Resonating Strike) do.
+    for enemy_here in (False, True):
+        g = _fresh(db)
+        g.set_bf_controller(0, 0)
+        mine = put(g, db, 0, "Mountain Drake", ("bf", 0))
+        put(g, db, 0, "Mountain Drake", ("bf", 1), exclude=[mine])
+        foe_there = put(g, db, 1, "Mountain Drake", ("bf", 1))
+        foe_here = put(g, db, 1, "Mountain Drake", ("bf", 0), exclude=[foe_there]) if enemy_here else None
+        fb = give(g, 0, "Facebreaker", db)
+        assert g.do_hide(0, fb, ("bf", 0))
+        g.objects[fb].facedown_turn = g.turn - 1
+        _ready_runes(g, 0)
+        g.restruct()
+        offered = ("play", fb) in g.legal_actions(0)
+        assert offered == enemy_here
+        if enemy_here:
+            g.pending = None
+            g.run()
+            g.choose(("play", fb))
+            _drive(g)
+            assert g.objects[mine].stunned and g.objects[foe_here].stunned and not g.objects[foe_there].stunned
+
+
+def test_hidden_tideturner_still_swaps_with_a_unit_elsewhere(db):
+    # 811.1.d.3 example: Tideturner's "a unit you control at another location" can never be met at its battlefield,
+    # so it chooses freely when played from facedown.
+    g = _fresh(db)
+    g.set_bf_controller(0, 0)
+    tt = give(g, 0, "Tideturner", db)
+    other = put(g, db, 0, "Mountain Drake", ("base", 0))
+    assert g.do_hide(0, tt, ("bf", 0))
+    g.objects[tt].facedown_turn = g.turn - 1
+    _ready_runes(g, 0)
+    g.restruct()
+    g.pending = None
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == tt))
+    _drive(g, pick=lambda d: other if d.kind == "choose" and other in d.options
+           else (True if d.kind == "yesno" else None))
+    assert g.objects[tt].location == ("base", 0) and g.objects[other].location == ("bf", 0)
