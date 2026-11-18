@@ -226,6 +226,9 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   split three ways dealt 8); it now joins the amount to split once and raises the target cap (715.3, `ops.split_cap`,
   `Game.split_bonus`, parts dealt with `do_deal(bonus=False)`). A Deal of 0 (0-Might fight, "1 for each" with none) no
   longer gets Bonus Damage (715.4). Split targets were capped at 5 whatever the amount (Scorched Earth now its 5 + bonus).
+  05:20: Fiora, Peerless checked "one on one" on resolution; it is the trigger condition (CR 383.2.a, 740.2.b), now a
+  `filt` checked as she attacks/defends. Open: Lotus Trap's doubling and Ki Barrier's prevention on one unit are both
+  replacement effects whose order its controller picks (CR 372, 433.1.b); `do_deal` always doubles first.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
