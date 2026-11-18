@@ -529,8 +529,9 @@ class Stun(Instr):
         self.targets = targets
 
     def run(self, game, ctx):
+        batch = game.tick()             # the units this instruction stuns are stunned together
         for u in _uids(game, ctx, self.targets):
-            game.do_stun(u, ctx)
+            game.do_stun(u, ctx, batch=batch)
         return None
 
 

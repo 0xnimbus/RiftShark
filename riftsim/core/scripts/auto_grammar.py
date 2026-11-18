@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 
-from ..abilities import Static, Triggered, Activated, PlayPermission, Replacement
+from ..abilities import Static, Triggered, Activated, PlayPermission, Replacement, _by_me, _first_in_batch
 from ..selectors import Sel
 from .. import ops as O
 from ..vm import Ref
@@ -1276,7 +1276,7 @@ TRIGGER_PATTERNS = [
     (r"when you play a unit that costs \[(\d+)\] or more", "you_play_unit"),
     (r"when you play a card that costs \[(\d+)\] or more", "you_play_card"),
     (r"when i become empowered", "empowered_self"),
-    (r"when you buff me", "buffed_self"),
+    (r"when you buff me", lambda g, s, ev: ev.get("kind") == "buff" and ev.get("uid") == s and _by_me(g, s, ev)),
     (r"when you ready a friendly unit", lambda g, s, ev: ev.get("kind") == "ready" and ev.get("player") == g.objects[s].controller
      and ev.get("uid") in g.objects and g.objects[ev["uid"]].zone == "board" and "unit" in g.chars(ev["uid"]).types),
     (r"when you spend a buff", lambda g, s, ev: ev.get("kind") == "spend_buff" and ev.get("player") == g.objects[s].controller),
@@ -1290,7 +1290,14 @@ TRIGGER_PATTERNS = [
     (r"when an opponent plays a unit", lambda g, s, ev: ev.get("kind") == "play" and ev.get("player") != g.objects[s].controller and ev.get("card_type") == "unit"),
     (r"when you kill a stunned enemy unit", lambda g, s, ev: ev.get("kind") == "die" and ev.get("player") != g.objects[s].controller and ev.get("stunned")),
     (r"when you stun an enemy unit at a battlefield", lambda g, s, ev: ev.get("kind") == "stun" and ev.get("by") == g.objects[s].controller and ev.get("loc", (None,))[0] == "bf"),
-    (r"when you stun (?:a|an|one or more) (?:enemy )?units?", lambda g, s, ev: ev.get("kind") == "stun" and ev.get("by") == g.objects[s].controller),
+    # "one or more": once per Stun action (its batch); "enemy": not a unit of your own
+    (r"when you stun one or more enemy units", lambda g, s, ev: ev.get("kind") == "stun" and ev.get("by") == g.objects[s].controller
+     and not g.is_friendly(ev.get("player"), g.objects[s].controller) and _first_in_batch(g, s, ev, "you_stun")),
+    (r"when you stun one or more units", lambda g, s, ev: ev.get("kind") == "stun" and ev.get("by") == g.objects[s].controller
+     and _first_in_batch(g, s, ev, "you_stun")),
+    (r"when you stun an enemy unit", lambda g, s, ev: ev.get("kind") == "stun" and ev.get("by") == g.objects[s].controller
+     and not g.is_friendly(ev.get("player"), g.objects[s].controller)),
+    (r"when you stun (?:a|an) units?", lambda g, s, ev: ev.get("kind") == "stun" and ev.get("by") == g.objects[s].controller),
     (r"when i move from a battlefield", lambda g, s, ev: ev.get("kind") == "move" and ev.get("uid") == s and ev.get("from") is not None and ev["from"][0] == "bf"),
     (r"when a friendly unit moves from my location", lambda g, s, ev: ev.get("kind") == "leave_loc" and ev.get("player") == g.objects[s].controller and ev.get("from") == g.objects[s].place and ev.get("uid") != s),
     (r"when a unit moves from here", lambda g, s, ev: ev.get("kind") == "leave_loc" and ev.get("from") == g.objects[s].place and ev.get("uid") != s),
@@ -1373,7 +1380,6 @@ TRIGGER_PATTERNS = [
     (r"when another friendly unit attacks", "friendly_unit_attacks"),
     (r"when you buff a unit", "you_buff"),
     (r"when you buff a friendly unit", "you_buff"),
-    (r"when you stun (?:a|an|one or more) (?:enemy )?units?", "you_stun"),
     (r"when you discard a card", "you_discard"),
     (r"when you draw a card", "you_draw"),
     (r"when you channel a rune", "you_channel"),
@@ -1403,7 +1409,7 @@ TRIGGER_PATTERNS = [
     (r"when a showdown starts here", "showdown_start_here"),
     (r"when combat ends here", "combat_end_here"),
     (r"when you empower (?:a|an) (?:friendly )?(?:unit|gear|permanent)", "you_empower"),
-    (r"when you empower me", "empowered_self"),
+    (r"when you empower me", lambda g, s, ev: ev.get("kind") == "empower" and ev.get("uid") == s and _by_me(g, s, ev)),
     (r"the first time i move each turn", "move_self"),
     (r"the first time you play a spell each turn", "you_play_spell"),
     (r"the first time you play a unit each turn", "you_play_unit"),

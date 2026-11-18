@@ -2142,3 +2142,43 @@ def test_when_you_choose_me_needs_its_controller_to_choose(db):
         assert g.chars(ire).might == base_m + 2 + (1 if mine else 0), owner
         # P0 draws 1 per Discipline; Jae's owner draws 1 more only when it's P0's own Jae
         assert len(g.players[owner].hand) - hand == (2 + 1 if mine else 0), owner
+
+
+# ----------------------------------------------------------------------------- 2026-11-18 20:20 run
+def test_when_you_stun_an_enemy_unit_reads_who_stunned(db):
+    # Eclipse Herald ("When you stun an enemy unit, ready me and give me +1 [M] this turn") and Leona, Radiant Dawn read
+    # the stunned unit's controller as "you": stunning an enemy never triggered them, an enemy stunning your unit did.
+    from riftsim.core import ops as O
+    for stunner, victim_side, want in ((0, 1, True), (1, 0, False), (0, 0, False)):
+        g = _fresh(db)
+        eh = put(g, db, 0, "Eclipse Herald", ("base", 0))
+        g.objects[eh].exhausted = True
+        victim = put(g, db, victim_side, "Mountain Drake", ("base", victim_side), exclude=[eh])
+        m = g.chars(eh).might
+        O.Stun(lambda g, c: [victim]).run(g, Context(stunner, None))
+        settle(g)
+        assert g.objects[victim].stunned
+        assert (g.chars(eh).might == m + 1 and not g.objects[eh].exhausted) == want, (stunner, victim_side)
+
+
+def test_one_or_more_stuns_trigger_once_per_stun(db):
+    # Leona, Radiant Dawn: "When you stun one or more enemy units, buff a friendly unit." Two units stunned by one
+    # instruction trigger it once; each stun was its own trigger.
+    from riftsim.core import ops as O
+    leona = next(c for c in db if c.name == "Leona, Radiant Dawn")
+    ab = next(a for a in leona.abilities if type(a).__name__ == "Triggered")
+    g = _fresh(db)
+    me = put(g, db, 0, "Mountain Drake", ("base", 0))
+    g.objects[me].defn = leona
+    foes = [put(g, db, 1, "Mountain Drake", ("base", 1))]
+    foes.append(put(g, db, 1, "Mountain Drake", ("base", 1), exclude=foes))
+    seen = []
+    orig = g.emit
+
+    def spy(kind, **kw):
+        if kind == "stun":
+            seen.append(ab.matches(g, me, dict(kw, kind=kind)))
+        return orig(kind, **kw)
+    g.emit = spy
+    O.Stun(lambda g, c: list(foes)).run(g, Context(0, None))
+    assert seen == [True, False]
