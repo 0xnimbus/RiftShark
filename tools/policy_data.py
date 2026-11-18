@@ -15,7 +15,7 @@ import os
 import random
 import sys
 import time
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import train_loop as T   # noqa: E402
@@ -96,26 +96,32 @@ def main():
     keys = ("x", "phi", "n", "pick", "seat", "kind", "game", "res") + (("vx", "vy", "vgame") if a.values else ())
     acc = {k: [] for k in keys}
     part = a.out + ".partial.npz"
-    start = 0
+    done_idx = set()
     if os.path.exists(part):
         d = np.load(part)
         acc = {k: ([d[k]] if len(d[k]) else []) for k in keys}
-        start = int(d["done"])
-        print(f"resuming at game {start}", file=sys.stderr)
+        done_idx = set(d["done_idx"].tolist()) if "done_idx" in d else set(range(int(d["done"])))
+        print(f"resuming with {len(done_idx)} games done", file=sys.stderr)
 
-    def save(path, done=None):
+    def save(path, partial=False):
         arrs = {k: (np.concatenate(acc[k]) if acc[k] else np.zeros((0,), np.float32)).astype(
             np.float32 if k in ("x", "phi", "res", "vx", "vy") else np.int32) for k in keys}
-        if done is None:
+        if not partial:
             np.savez_compressed(path, **arrs)
-        else:
-            np.savez(path, done=done, **arrs)
+            return
+        tmp = path + ".tmp.npz"            # a restart during the write must not destroy the last checkpoint
+        np.savez(tmp, done=len(done_idx), done_idx=np.array(sorted(done_idx), np.int32), **arrs)
+        os.replace(tmp, path)
     t = time.time()
     ex = ProcessPoolExecutor(max_workers=a.workers)
+    # games finish in any order; each one is checkpointed as it finishes, so a container restart loses only the
+    # games still running (in order, one long game held back every later result and a restart lost them all)
+    futs = {ex.submit(_timed, jobs[k]): k for k in range(len(jobs)) if k not in done_idx}
     try:
-        for k, r in enumerate(ex.map(_timed, jobs[start:]), start):
+        for f in as_completed(futs):
+            k, r = futs[f], f.result()
             if a.max_minutes and time.time() - t > a.max_minutes * 60:
-                print(f"time budget reached after {k} games", file=sys.stderr)
+                print(f"time budget reached after {len(done_idx)} games", file=sys.stderr)
                 break
             if not r.get("timeout") and r["n"]:
                 for key in ("x", "phi"):
@@ -130,11 +136,11 @@ def main():
                 w = r["winner"]
                 acc["res"].append(np.array([0.5 if w is None else (1.0 if s == w else 0.0) for s in r["seat"]],
                                            dtype=np.float32))
-            if (k + 1) % 20 == 0:
-                print(f"policy data {k + 1}/{len(jobs)} games, {sum(len(v) for v in acc['n'])} decisions ({time.time() - t:.0f}s)",
+            done_idx.add(k)
+            if len(done_idx) % 20 == 0:
+                print(f"policy data {len(done_idx)}/{len(jobs)} games, {sum(len(v) for v in acc['n'])} decisions ({time.time() - t:.0f}s)",
                       file=sys.stderr)
-            if (k + 1) % 10 == 0:
-                save(part, done=k + 1)
+            save(part, partial=True)
     finally:
         ex.shutdown(wait=False, cancel_futures=True)
     save(a.out)
