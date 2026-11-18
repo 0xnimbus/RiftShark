@@ -245,7 +245,7 @@ class LearnedGreedy(GreedyPolicy):
                         v += self.net.predict(g, d.player)
                     dv = 1000.0 * (v / self.deep_samples - 0.5)
                     if rec is not None and rec[i]:
-                        self.recorder.append((rec[i], v / self.deep_samples))
+                        self.recorder.append((rec[i], v / self.deep_samples, self.p_calls, i))
                     vals[i] = 1e6 + dv if self.blend is None else vals[i] + self.blend * (dv - vals[i])
                 return vals
         if (self.hold and d.kind == "action" and len(opts) >= 2 and game.turn_player == d.player

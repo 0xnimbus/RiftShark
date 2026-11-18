@@ -61,13 +61,16 @@ def _game(args):
             seat.append(d.player)
             kind.append(KINDS.index(d.kind) if d.kind in KINDS else len(KINDS) - 1)
         g.choose(o)
-    vx, vy = [], []
-    for q in (pols if values else ()):
-        for rows, y in q.recorder:
+    vx, vy, vdec, vopt, vpo = [], [], [], [], []
+    for qs, q in enumerate(pols if values else ()):
+        for rows, y, dec, opt in q.recorder:
             vx += rows
             vy += [y] * len(rows)
+            vdec += [qs * 100000 + dec] * len(rows)     # one searched decision of one seat
+            vopt += [opt] * len(rows)                     # its candidate
+            vpo += list(range(len(rows)))                 # which one-turn sample
     return {"x": xs, "phi": phis, "n": nopt, "pick": pick, "seat": seat, "kind": kind, "winner": g.winner,
-            "vx": vx, "vy": vy, "secs": time.time() - t}
+            "vx": vx, "vy": vy, "vdec": vdec, "vopt": vopt, "vpo": vpo, "secs": time.time() - t}
 
 
 def _timed(args):
@@ -85,7 +88,8 @@ def main():
     ap.add_argument("--max-minutes", type=float)
     ap.add_argument("--values", action="store_true",
                     help="also record the two-turn search's value of each searched candidate (vx: features of each "
-                         "one-turn sample, vy: two-turn win probability, vgame) to train a judge on")
+                         "one-turn sample, vy: two-turn win probability, vgame; vdec/vopt/vpo: decision (per game), "
+                         "candidate and sample ids, -1 for games recorded before them) to train a judge on")
     a = ap.parse_args()
     rng = random.Random(a.seed)
     jobs = []
@@ -93,13 +97,16 @@ def main():
         pair = rng.sample(T.DECKS, 2)
         jobs.append((pair, a.seed + 2 * i, a.policy, a.values))
         jobs.append((pair[::-1], a.seed + 2 * i + 1, a.policy, a.values))
-    keys = ("x", "phi", "n", "pick", "seat", "kind", "game", "res") + (("vx", "vy", "vgame") if a.values else ())
+    keys = ("x", "phi", "n", "pick", "seat", "kind", "game", "res") + (("vx", "vy", "vgame", "vdec", "vopt", "vpo") if a.values else ())
     acc = {k: [] for k in keys}
     part = a.out + ".partial.npz"
     done_idx = set()
     if os.path.exists(part):
         d = np.load(part)
-        acc = {k: ([d[k]] if len(d[k]) else []) for k in keys}
+        acc = {k: ([d[k]] if k in d and len(d[k]) else []) for k in keys}
+        if a.values and "vdec" not in d and len(d["vy"]):    # recorded before decision ids: -1
+            for key in ("vdec", "vopt", "vpo"):
+                acc[key] = [np.full(len(d["vy"]), -1, np.int32)]
         done_idx = set(d["done_idx"].tolist()) if "done_idx" in d else set(range(int(d["done"])))
         print(f"resuming with {len(done_idx)} games done", file=sys.stderr)
 
@@ -133,6 +140,8 @@ def main():
                     acc["vx"].append(np.array(r["vx"], dtype=np.float32))
                     acc["vy"].append(np.array(r["vy"], dtype=np.float32))
                     acc["vgame"].append(np.full(len(r["vy"]), k, dtype=np.int32))
+                    for key in ("vdec", "vopt", "vpo"):
+                        acc[key].append(np.array(r[key], dtype=np.int32))
                 w = r["winner"]
                 acc["res"].append(np.array([0.5 if w is None else (1.0 if s == w else 0.0) for s in r["seat"]],
                                            dtype=np.float32))
