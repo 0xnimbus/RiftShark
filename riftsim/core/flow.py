@@ -1352,7 +1352,8 @@ class FlowMixin:
             # one event per chosen object: "When you choose a friendly unit" triggers once for each friendly unit a
             # spell chooses (only "the Nth time" triggers collapse simultaneous conditions, CR 383.1.b)
             for u in dict.fromkeys(targets):
-                self.emit("target", targets=(u,), all_targets=tuple(targets), player=it.controller, item=it.id, ctx=ctx)
+                self.emit("target", targets=(u,), all_targets=tuple(targets), player=it.controller, item=it.id,
+                          item_kind=it.kind, ctx=ctx)
             src = self.objects.get(it.uid) if it.uid is not None else None
             by_unit_ability = it.kind in ("ability", "trigger", "reflexive") and src is not None and \
                 "unit" in (self.chars(it.uid).types if src.zone == "board" else src.defn.types)
