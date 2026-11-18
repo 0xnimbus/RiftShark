@@ -829,10 +829,10 @@ def parse_sentence(s, state):
         tgt = m.group(1)
         if "at a single battlefield" in m.group(2) or "at one battlefield" in m.group(2):
             return [O.ChooseLocation(out="__bf"),
-                    O.Choose(Sel("unit", where="loc:__bf"), out="__split", n=5, up_to=True),
+                    O.Choose(Sel("unit", where="loc:__bf"), out="__split", n=O.split_cap(parse_amount(tgt)), up_to=True),
                     O.Split(parse_amount(tgt), Ref("__split"))]
         if m.group(2).startswith("enemy units here") or m.group(2) == "units here":
-            return [O.Choose(Sel("unit", side="enemy" if "enemy" in m.group(2) else None, where="here"), out="__split", n=5, up_to=True),
+            return [O.Choose(Sel("unit", side="enemy" if "enemy" in m.group(2) else None, where="here"), out="__split", n=O.split_cap(parse_amount(tgt)), up_to=True),
                     O.Split(parse_amount(tgt), Ref("__split"))]
         raise ParseError("split target")
     m = re.match(r"kill (.+)$", sl)
