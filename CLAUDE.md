@@ -233,6 +233,9 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   any selector condition counted as making it impossible, so Facebreaker and Switcheroo played from facedown targeted
   anywhere when their battlefield had no legal pair (no valid target: can't be played). Only `Sel(elsewhere=True)`
   ("at another/a different location": Tideturner, Evelynn, Entrancing, Resonating Strike) chooses freely now.
+  15:20: "When you choose or ready me" (Irelia, Fervent: Master Yi and Irelia decks) and "When you choose me with a
+  spell" (Jae Medarda) triggered when an opponent chose the unit (an enemy Discipline gave Irelia +3); they now need its
+  controller's spell/ability (the "target" event carries `item_kind`). Round-robins before this overrate Irelia, Fervent.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

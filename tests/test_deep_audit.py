@@ -2122,3 +2122,23 @@ def test_hidden_tideturner_still_swaps_with_a_unit_elsewhere(db):
     _drive(g, pick=lambda d: other if d.kind == "choose" and other in d.options
            else (True if d.kind == "yesno" else None))
     assert g.objects[tt].location == ("base", 0) and g.objects[other].location == ("bf", 0)
+
+
+# ----------------------------------------------------------------------------- 2026-11-18 15:20 run
+def test_when_you_choose_me_needs_its_controller_to_choose(db):
+    # Irelia, Fervent ("When you choose or ready me, give me +1 [M] this turn"; Master Yi and Irelia decks) and Jae Medarda
+    # ("When you choose me with a spell, draw 1") triggered when an opponent chose them: an enemy Discipline gave
+    # Irelia +3. "You" is the unit's controller (and Jae's needs a spell).
+    for owner in (0, 1):
+        g = _fresh(db)
+        ire = put(g, db, owner, "Irelia, Fervent", ("base", owner))
+        jae = put(g, db, owner, "Jae Medarda", ("base", owner), exclude=[ire])
+        base_m = g.chars(ire).might
+        hand = len(g.players[owner].hand)
+        for t in (ire, jae):
+            _cast_with(g, db, 0, "Discipline", [("calm", False)] * 4,
+                       lambda d, t=t: t if d.kind == "choose" and t in d.options else None)
+        mine = owner == 0
+        assert g.chars(ire).might == base_m + 2 + (1 if mine else 0), owner
+        # P0 draws 1 per Discipline; Jae's owner draws 1 more only when it's P0's own Jae
+        assert len(g.players[owner].hand) - hand == (2 + 1 if mine else 0), owner

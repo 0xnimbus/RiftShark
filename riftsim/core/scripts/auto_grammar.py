@@ -1300,8 +1300,11 @@ TRIGGER_PATTERNS = [
     (r"when you conquer here with one or more mighty units", lambda g, s, ev: ev.get("kind") == "conquer" and ev.get("player") == g.objects[s].controller and ev.get("loc") == g.objects[s].place and any(g.chars(u).mighty for u in ev.get("units", ()))),
     (r"when you defend at a battlefield", "you_defend"),
     (r"when i'?m dealt damage", "damaged_self"),
-    (r"when you choose me with a spell", "targeted_self"),
-    (r"when you choose or ready me", lambda g, s, ev: (ev.get("kind") == "target" and s in ev.get("targets", ())) or (ev.get("kind") == "ready" and ev.get("uid") == s)),
+    (r"when you choose me with a spell", lambda g, s, ev: ev.get("kind") == "target" and s in ev.get("targets", ())
+     and ev.get("player") == g.objects[s].controller and ev.get("item_kind") == "spell"),
+    # "you choose": only my controller's spells and abilities (an opponent choosing me doesn't trigger it)
+    (r"when you choose or ready me", lambda g, s, ev: (ev.get("kind") == "target" and s in ev.get("targets", ())
+     and ev.get("player") == g.objects[s].controller) or (ev.get("kind") == "ready" and ev.get("uid") == s)),
     (r"when a buffed friendly unit dies", lambda g, s, ev: ev.get("kind") == "die" and ev.get("player") == g.objects[s].controller and ev.get("buffed")),
     (r"when another non-recruit unit you control dies", lambda g, s, ev: ev.get("kind") == "die" and ev.get("player") == g.objects[s].controller and ev.get("uid") != s and "Recruit" not in g.objects[ev["uid"]].defn.tags),
     (r"when you empower something else", lambda g, s, ev: ev.get("kind") == "empower" and ev.get("player") == g.objects[s].controller and ev.get("uid") != s),
@@ -1404,7 +1407,8 @@ TRIGGER_PATTERNS = [
     (r"the first time i move each turn", "move_self"),
     (r"the first time you play a spell each turn", "you_play_spell"),
     (r"the first time you play a unit each turn", "you_play_unit"),
-    (r"when i'?m chosen by an enemy spell or ability", "targeted_self"),
+    (r"when i'?m chosen by an enemy spell or ability", lambda g, s, ev: ev.get("kind") == "target" and s in ev.get("targets", ())
+     and ev.get("player") is not None and not g.is_friendly(ev["player"], g.objects[s].controller)),
     (r"when you reveal a card", "you_reveal"),
     (r"when i'?m discarded", "discard_self"),
     (r"when you discard me", "discard_self"),
