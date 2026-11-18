@@ -236,6 +236,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   15:20: "When you choose or ready me" (Irelia, Fervent: Master Yi and Irelia decks) and "When you choose me with a
   spell" (Jae Medarda) triggered when an opponent chose the unit (an enemy Discipline gave Irelia +3); they now need its
   controller's spell/ability (the "target" event carries `item_kind`). Round-robins before this overrate Irelia, Fervent.
+  20:20: "When you stun/buff/empower ..." read the affected unit's controller as "you": Eclipse Herald and Leona, Radiant
+  Dawn never triggered on stunning enemies but did when an enemy stunned your unit. The stun/buff/empower events carry
+  `by` (`abilities._by_me`); "one or more" stuns trigger once per Stun instruction (event `batch`), "enemy" is checked.
+  No tournament card uses these triggers.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

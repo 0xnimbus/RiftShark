@@ -42,6 +42,13 @@ def _mine(g, src, ev):
     return s is not None and ev.get("player") == s.controller
 
 
+def _by_me(g, src, ev):
+    """The event was done by src's controller: its `by` player, else (no effect behind it) the object's controller."""
+    s = g.objects.get(src)
+    who = ev.get("by") if ev.get("by") is not None else ev.get("player")
+    return s is not None and who == s.controller
+
+
 def _first_in_batch(g, src, ev, key):
     """True for the first matching event of a batch (events with the same `batch` id happened together)."""
     s = g.objects.get(src)
@@ -121,11 +128,12 @@ TRIGGERS = {
     "you_discard": lambda g, s, ev: _ev_is(ev, "discard") and _mine(g, s, ev),
     "you_recycle": lambda g, s, ev: _ev_is(ev, "recycle") and _mine(g, s, ev),
     "you_channel": lambda g, s, ev: _ev_is(ev, "channel") and _mine(g, s, ev),
-    "you_buff": lambda g, s, ev: _ev_is(ev, "buff") and _mine(g, s, ev),
-    "you_stun": lambda g, s, ev: _ev_is(ev, "stun") and _mine(g, s, ev),
+    # "you buff/stun/empower": the player whose effect did it (`by`), not the affected object's controller
+    "you_buff": lambda g, s, ev: _ev_is(ev, "buff") and _by_me(g, s, ev),
+    "you_stun": lambda g, s, ev: _ev_is(ev, "stun") and _by_me(g, s, ev),
     "you_gain_xp": lambda g, s, ev: _ev_is(ev, "xp") and _mine(g, s, ev),
     "you_hide": lambda g, s, ev: _ev_is(ev, "hide") and _mine(g, s, ev),
-    "you_empower": lambda g, s, ev: _ev_is(ev, "empower") and _mine(g, s, ev),
+    "you_empower": lambda g, s, ev: _ev_is(ev, "empower") and _by_me(g, s, ev),
     "you_showoff": lambda g, s, ev: _ev_is(ev, "showoff") and _mine(g, s, ev),
     "you_win_combat": lambda g, s, ev: _ev_is(ev, "combat_result") and ev.get("winner") is not None and _mine(g, s, {"player": ev.get("winner")}),
     "you_lose_combat": lambda g, s, ev: _ev_is(ev, "combat_result") and ev.get("loser") is not None and _mine(g, s, {"player": ev.get("loser")}),

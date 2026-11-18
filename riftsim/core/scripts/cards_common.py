@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from . import script, SpellEffect
-from ..abilities import Static, Triggered, PlayPermission
+from ..abilities import Static, Triggered, PlayPermission, _by_me
 from ..selectors import Sel
 from .. import ops as O
 from ..vm import Ref
@@ -1721,7 +1721,7 @@ def albus_ferros(defn):
 def mistfall(defn):
     # When you buff a friendly unit, you may pay [Body] and exhaust this to ready it.
     def buffed(g, s, ev):
-        return ev.get("kind") == "buff" and ev.get("player") == g.objects[s].controller
+        return ev.get("kind") == "buff" and _by_me(g, s, ev) and ev.get("player") == g.objects[s].controller
     ready_me = lambda g, c: not g.objects[c.source].exhausted
     return [Triggered(buffed, [O.If(ready_me, [O.PayResources(0, ["body"], out="__mf"),
                                                O.If(Ref("__mf"), [O.Exhaust(Ref("self")), O.Ready(lambda g, c: c.event.get("uid"))])])],

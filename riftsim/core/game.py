@@ -1280,7 +1280,7 @@ class Game(flow.FlowMixin):
             self.emit("might_reduced", uid=uid, player=o.controller, by=ctx.controller if ctx else None,
                       loc=o.location, amount=-amt, ctx=ctx)
 
-    def do_stun(self, uid, ctx=None):
+    def do_stun(self, uid, ctx=None, batch=None):
         o = self.objects.get(uid)
         if o is None or o.zone != "board" or o.stunned:
             return            # CR 424.1.a.1: a stunned unit can't be stunned again (no "stun" event)
@@ -1291,7 +1291,8 @@ class Game(flow.FlowMixin):
             return
         o.stunned = True      # CR 424.1.b: it only stops its combat damage; stunning doesn't exhaust it
         self.bump()
-        self.emit("stun", uid=uid, player=o.controller, loc=o.location, by=ctx.controller if ctx else None, ctx=ctx)
+        self.emit("stun", uid=uid, player=o.controller, loc=o.location, by=ctx.controller if ctx else None, ctx=ctx,
+                  batch=batch if batch is not None else self.tick())       # one Stun action: "one or more" triggers once
         self.dirty = True
 
     def do_buff(self, uid, ctx=None):
@@ -1307,7 +1308,7 @@ class Game(flow.FlowMixin):
         before = self.chars(uid).might
         o.buffs = o.buffs + 1 if many else 1
         self.bump()
-        self.emit("buff", uid=uid, player=o.controller, loc=o.location, ctx=ctx)
+        self.emit("buff", uid=uid, player=o.controller, loc=o.location, by=ctx.controller if ctx else None, ctx=ctx)
         self._check_mighty(uid, before)
         self.dirty = True
 
@@ -1686,7 +1687,7 @@ class Game(flow.FlowMixin):
             return False
         o.empowered += 1
         self.bump()
-        self.emit("empower", uid=uid, player=o.controller, loc=o.location, ctx=ctx)
+        self.emit("empower", uid=uid, player=o.controller, loc=o.location, by=ctx.controller if ctx else None, ctx=ctx)
         self.dirty = True
         return True
 
