@@ -42,7 +42,7 @@ def _hoistable_choose(ins, outs):
     w = ins.sel.where or ""
     if w.startswith("loc:") and w[4:] not in outs:
         return False
-    if isinstance(ins.n, Ref) or (callable(ins.n) and not isinstance(ins.n, int)):
+    if isinstance(ins.n, Ref) or (callable(ins.n) and not isinstance(ins.n, int) and not getattr(ins.n, "at_finalize", False)):
         return False            # "for each ..." counts depend on the state at resolution
     return True
 

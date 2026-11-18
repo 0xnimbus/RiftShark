@@ -1990,3 +1990,45 @@ def test_a_deflect_target_needs_the_tax_on_top_of_the_cost(db):
     g.choose(("play", hr2))
     _drive(g, lambda d: vx if d.kind == "choose" and vx in d.options else None)
     assert g.objects[vx].damage == 3
+
+
+# ----------------------------------------------------------------------------- 2026-11-18 00:20 run: Bonus Damage
+def test_bonus_damage_is_added_once_to_the_amount_a_split_divides(db):
+    # CR 715.3: with Annie, Fiery ("Your spells and abilities deal 1 Bonus Damage"), Scorched Earth's 5 damage split
+    # becomes 6 damage to split, and it can now choose 6 units (355.14.c). Each part of the split used to get the bonus
+    # again (5 split three ways dealt 8).
+    g = _fresh(db)
+    put(g, db, 0, "Annie, Fiery", ("base", 0))
+    bf = ("bf", g.battlefields[0].idx)
+    foes = []
+    for _ in range(3):
+        foes.append(put(g, db, 1, "Mountain Drake", bf, exclude=foes))
+    seen = {}
+
+    def pick(d):
+        if d.kind == "choose_location":
+            return bf if bf in d.options else None
+        if d.kind == "choose_many":
+            seen["cap"] = max(len(o) for o in d.options)
+            return next(o for o in d.options if set(o) == set(foes))
+        if d.kind == "split_damage":
+            seen["plans"] = d.options
+            return next(o for o in d.options if tuple(o) == (2, 2, 2))
+        return None
+    _cast_with(g, db, 0, "Scorched Earth", [("fury", False)] * 5, pick)
+    assert all(sum(p) == 6 for p in seen["plans"])
+    from riftsim.core import ops as O
+    assert O.split_cap(5)(g, Context(0, g.players[0].deck[0])) == 6       # up to 6 targets with Annie
+    assert sorted(g.objects[u].damage for u in foes) == [2, 2, 2]
+
+
+def test_no_bonus_damage_when_no_damage_is_dealt(db):
+    # CR 715.4: a Deal of 0 (a 0-Might unit fighting, "deal 1 for each ..." with none) deals nothing, so Annie, Fiery
+    # and Void Gate add nothing to it.
+    g = _fresh(db)
+    put(g, db, 0, "Annie, Fiery", ("base", 0))
+    foe = put(g, db, 1, "Mountain Drake", ("bf", g.battlefields[0].idx))
+    g.do_deal([foe], 0, Context(0, g.players[0].deck[0]))
+    assert g.objects[foe].damage == 0
+    g.do_deal([foe], 1, Context(0, g.players[0].deck[0]))
+    assert g.objects[foe].damage == 2

@@ -222,6 +222,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   could choose Vex, Apathetic, then failed to pay and went to the trash. CR 355.16: `Game._unpaid_base_cost` adds the
   unpaid cost to the check (finalize: the item's cost; legal actions: `_spell_has_targets(cost=)`, activations), and
   rules_audit's missing-play check does the same. Skipped (tax only) while a later cost reduction could apply.
+  2026-11-18 00:20: Bonus Damage (CR 712-715) was added to each part of a Split (Annie, Fiery + Scorched Earth's 5
+  split three ways dealt 8); it now joins the amount to split once and raises the target cap (715.3, `ops.split_cap`,
+  `Game.split_bonus`, parts dealt with `do_deal(bonus=False)`). A Deal of 0 (0-Might fight, "1 for each" with none) no
+  longer gets Bonus Damage (715.4). Split targets were capped at 5 whatever the amount (Scorched Earth now its 5 + bonus).
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

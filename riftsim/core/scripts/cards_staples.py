@@ -817,7 +817,7 @@ def volibear_furious(defn):
     # [Deflect 2]   (keyword)
     # When I attack, deal 5 damage split among any number of enemy units here.
     return {"abilities": [Triggered("attack_self", [O.Split(5, Ref("t"))],
-                                    targets=[O.Choose(Sel("unit", side="enemy", where="here"), out="t", n=5, up_to=True)],
+                                    targets=[O.Choose(Sel("unit", side="enemy", where="here"), out="t", n=O.split_cap(5), up_to=True)],
                                     label=defn.name, source_text=defn.text)], "replace": True}
 
 

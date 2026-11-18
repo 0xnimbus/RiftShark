@@ -413,7 +413,7 @@ def alpha_strike(defn):
     ], targets=[
         O.Choose(Sel("unit", side="friendly"), out="__f"),
         O.Choose(Sel("unit", side="enemy", where="battlefield"), out="t",
-                 n=lambda g, c: max(1, might(g, c)), up_to=True),
+                 n=lambda g, c: max(1, might(g, c) + (g.split_bonus(c) if might(g, c) > 0 else 0)), up_to=True),
     ], label=defn.name, source_text=defn.text)]
 
 
