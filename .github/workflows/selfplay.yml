@@ -7,7 +7,7 @@ on:
     inputs:
       policy:
         description: "AI that plays the self-play games (learned = current best model)"
-        default: "learned"
+        default: "learned:gen_014"
       games_per_shard:
         description: "Self-play games per runner"
         default: "850"
@@ -17,6 +17,12 @@ on:
       hidden:
         description: "Hidden units of the wide-and-deep model"
         default: "32"
+      mask:
+        description: "Feature ranges the models may not use (gen 14: 106-233, our own card identities)"
+        default: "106-233"
+      seed:
+        description: "Base seed (each shard adds shard * 100000)"
+        default: "1000000"
 permissions:
   contents: write
 jobs:
@@ -43,13 +49,29 @@ jobs:
       - run: pip install numpy
       - run: >
           python tools/train_loop.py selfplay --games ${{ inputs.games_per_shard }} --policy ${{ inputs.policy }}
-          --labels outcome --workers $(nproc) --max-minutes 300 --seed $((1000000 + ${{ matrix.shard }} * 100000))
+          --labels outcome --workers $(nproc) --max-minutes 300 --seed $((${{ inputs.seed }} + ${{ matrix.shard }} * 100000))
           --out out/sp_${{ matrix.shard }}.npz
       - uses: actions/upload-artifact@v4
         with:
           name: selfplay-${{ matrix.shard }}
           path: out/sp_${{ matrix.shard }}.npz
           retention-days: 14
+      - name: Push to the data branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          B=selfplay-data-${{ github.run_id }}
+          for i in $(seq 1 20); do
+            if git fetch -q origin "$B" 2>/dev/null; then
+              git checkout -qf -B "$B" FETCH_HEAD
+            else
+              git checkout -q --orphan "$B" && git rm -rq --cached .
+            fi
+            mkdir -p data_out && cp out/sp_${{ matrix.shard }}.npz data_out/
+            git add -f data_out/sp_${{ matrix.shard }}.npz
+            git commit -qm "self-play data shard ${{ matrix.shard }}" && git push origin "$B" && break
+            sleep $((RANDOM % 30 + 5))
+          done
   merge:
     needs: play
     if: ${{ !cancelled() }}
@@ -66,9 +88,10 @@ jobs:
       - name: Train
         run: |
           ls -la shards/*/
-          python tools/train_loop.py train shards/*/*.npz --linear --out models/sp_linear.json | tee out_linear.txt
+          M="${{ inputs.mask }}"
+          python tools/train_loop.py train shards/*/*.npz --linear ${M:+--mask $M} --out models/sp_linear.json | tee out_linear.txt
           python tools/train_loop.py train shards/*/*.npz --wide models/sp_linear.json --hidden ${{ inputs.hidden }} \
-            --out models/sp_wide.json | tee out_wide.txt
+            ${M:+--mask $M} --out models/sp_wide.json | tee out_wide.txt
           {
             echo "## Self-play training"
             echo "Linear: \`$(tail -1 out_linear.txt)\`"
