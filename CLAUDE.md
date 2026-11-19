@@ -244,6 +244,11 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   trigger resolved; CR 359.3's example says the control effect is never generated. The gear is still moved and the
   cleanup recalls it to its controller's base (323.6). Checked OK: the "you ..." trigger table (draw, discard, recycle,
   channel, reveal, conquer/hold) reads the right player.
+  05:20: a trigger's "it"/"me" followed the uid, so a unit returned to hand and played again with the trigger on the
+  chain was still hit (Imperial Decree killed the replayed unit); CR 124 makes it a new object. Triggers remember the
+  entry stamps of their event object and source while on the board (`Game._stamp_trigger_objects`, ctx `__ev_stamps`)
+  and `ops._uids` drops a replaced one. Checked OK: Gust re-checks 3 [M] on resolution, Star-Crossed still returns the
+  enemy when the friendly unit is gone, Traveling Merchant draws with an empty hand, "to a minimum of" snapshots.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
