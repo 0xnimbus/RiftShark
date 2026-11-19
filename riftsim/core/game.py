@@ -2201,6 +2201,14 @@ class Game(flow.FlowMixin):
             return None
         return (it.cost.get("energy", 0), list(it.cost.get("power", ())))
 
+    def hidden_source_gone(self, ctx, stamp=None):
+        """CR 811.1.d.3.a: a play effect of a permanent played from facedown reads where it was played from its source;
+        once the source is off the board (or a new object), its battlefield-restricted choices have no legal target."""
+        o = self.objects.get(ctx.source) if ctx.source is not None else None
+        if o is None or ctx.target_bf is None or o.base_defn().type not in ("unit", "gear"):
+            return False
+        return o.zone != "board" or (stamp is not None and o.entered_stamp != stamp)
+
     def choice_candidates(self, ctx, sel, targeted=True):
         if isinstance(sel, (list, tuple)):
             return [u for u in sel if u in self.objects]
@@ -2209,6 +2217,8 @@ class Game(flow.FlowMixin):
             # Hidden (CR 811.1.d): targets of a card played from facedown must be at that battlefield when possible
             if ctx.target_bf is not None:
                 here = [u for u in cands if self.objects[u].location == ctx.target_bf]
+                if self.hidden_source_gone(ctx):
+                    here = []     # CR 811.1.d.3.a: its source left the board, so it can't choose at that battlefield
                 if here or self._could_target_at_bf(sel):
                     cands = here          # no valid target at that battlefield -> no target (CR 811.1.d)
             # Deflect (CR 809): opponents' targeting costs [A] per deflect value; drop unaffordable targets
