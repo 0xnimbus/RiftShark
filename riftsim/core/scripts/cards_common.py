@@ -1358,7 +1358,7 @@ def esteemed_hierophant(defn):
 
     def applies(g, s, ev):
         o = g.objects[s]
-        return (ev.get("uid") == s and not ev.get("combat") and ev.get("by") is not None
+        return (ev.get("uid") == s and not ev.get("combat") and not ev.get("unit_source") and ev.get("by") is not None
                 and not g.is_friendly(ev["by"], o.controller) and len(g.players[o.controller].runes) >= 7)
     return [Replacement("damage", applies, lambda g, s, ev: None, label="prevent enemy spell damage", source_text=defn.text)]
 
