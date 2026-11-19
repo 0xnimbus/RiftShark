@@ -111,6 +111,7 @@ def main():
         print(f"resuming with {len(done_idx)} games done", file=sys.stderr)
 
     def save(path, partial=False):
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
         arrs = {k: (np.concatenate(acc[k]) if acc[k] else np.zeros((0,), np.float32)).astype(
             np.float32 if k in ("x", "phi", "res", "vx", "vy") else np.int32) for k in keys}
         if not partial:
