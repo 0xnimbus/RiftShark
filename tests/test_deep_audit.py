@@ -2182,3 +2182,30 @@ def test_one_or_more_stuns_trigger_once_per_stun(db):
     g.emit = spy
     O.Stun(lambda g, c: list(foes)).run(g, Context(0, None))
     assert seen == [True, False]
+
+
+# ----------------------------------------------------------------------------- 2026-11-19 00:20 run
+def test_akshan_gone_before_his_trigger_resolves_takes_no_control(db):
+    # CR 359.3 example: "If Akshan leaves the board in reaction to his play effect, the delayed passive ability 'You
+    # control it until I leave the board' will not be generated. You will not gain control of the targeted gear even
+    # for a moment." The script still handed the gear over, for good (no duration to end it).
+    g = _fresh(db)
+    ak = put(g, db, 0, "Akshan, Mischievous", ("base", 0))
+    blade = put(g, db, 1, "Doran's Blade", ("base", 1))
+    g.emit("play", uid=ak, player=0, card_type="unit", paid={"add": True}, ctx=Context(0, ak))
+    g.dirty = True
+    g.pending = None
+    killed = []
+
+    def pick(d):
+        if d.kind == "choose" and blade in d.options:
+            return blade
+        if not killed and g.chain and any(it.uid == ak for it in g.chain if it.finalized):
+            killed.append(1)
+            g.do_kill([ak], Context(1))
+            return "rerun"
+        return None
+    _drive(g, pick=pick)
+    assert killed and g.objects[ak].zone == "trash"
+    assert g.objects[blade].controller == 1 and g.objects[blade].location == ("base", 1)
+    assert g.objects[blade].attached_to is None
