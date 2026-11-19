@@ -2240,3 +2240,39 @@ def test_imperial_decree_does_not_kill_a_unit_that_left_and_came_back(db):
         _drive(g, pick=pick)
         assert done
         assert g.objects[foe].zone == ("board" if replay else "trash")
+
+
+# ----------------------------------------------------------------------------- 2026-11-19 10:20 run
+def test_hidden_play_effect_mistargets_when_its_unit_left_the_board(db):
+    # CR 811.1.d.3.a: a play effect of a permanent played from facedown reads where it was played from its source. If
+    # the unit is no longer on the board when the effect resolves, it mistargets. Kennen, Keeper of Balance (Azir and
+    # Viktor decks) played from facedown, pays [2] to stun an enemy there; killed in response, the stun does nothing.
+    for kill in (False, True):
+        g = _fresh(db)
+        g.set_bf_controller(0, 0)
+        k = give(g, 0, "Kennen, Keeper of Balance", db)
+        put(g, db, 0, "Mountain Drake", ("bf", 0))
+        foe = put(g, db, 1, "Mountain Drake", ("bf", 0))
+        assert g.do_hide(0, k, ("bf", 0))
+        g.objects[k].facedown_turn = g.turn - 1
+        for _ in range(4):
+            g.do_channel(0, 1)
+        _ready_runes(g, 0)
+        g.restruct()
+        g.pending = None
+        d = g.run()
+        g.choose(next(o for o in d.options if o[0] == "play" and o[1] == k))
+        done = []
+
+        def pick(d):
+            if d.kind == "choose" and foe in d.options:
+                return foe
+            if d.kind == "yesno":
+                return True
+            if kill and not done and any(it.uid == k and it.kind == "trigger" for it in g.chain):
+                done.append(1)
+                g.do_kill([k], Context(1, None))
+                return "rerun"
+        _drive(g, pick=pick)
+        assert done or not kill
+        assert g.objects[foe].stunned is (not kill)

@@ -115,7 +115,9 @@ class _Stamp(Instr):
         st[self.out] = {"sel": self.sel, "targeted": self.targeted,
                         "stamps": {u: game.objects[u].entered_stamp for u in uids if u in game.objects},
                         "at_bf": {u: game.objects[u].location == ctx.target_bf for u in uids if u in game.objects}
-                        if ctx.target_bf is not None else {}}
+                        if ctx.target_bf is not None else {},
+                        "src_stamp": game.objects[ctx.source].entered_stamp
+                        if ctx.target_bf is not None and ctx.source in game.objects else None}
         if self.targeted:
             tl = ctx.vars.setdefault("__targets", [])
             if all(n != self.out for n, _ in tl):
@@ -146,6 +148,8 @@ class _Recheck(Instr):
                     continue
                 if rec["at_bf"].get(u) and o.location != ctx.target_bf:
                     continue       # Hidden: chosen at the battlefield it was played from (CR 359.3.e.2.a)
+                if rec["at_bf"].get(u) and game.hidden_source_gone(ctx, rec.get("src_stamp")):
+                    continue       # its permanent left the board: it can't tell where it was played from (811.1.d.3.a)
                 if rec["targeted"] and o.zone == "board" and not game.is_friendly(o.controller, ctx.controller) \
                         and game.chars(u).keywords.get("untargetable"):
                     continue

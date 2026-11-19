@@ -249,6 +249,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   entry stamps of their event object and source while on the board (`Game._stamp_trigger_objects`, ctx `__ev_stamps`)
   and `ops._uids` drops a replaced one. Checked OK: Gust re-checks 3 [M] on resolution, Star-Crossed still returns the
   enemy when the friendly unit is gone, Traveling Merchant draws with an empty hand, "to a minimum of" snapshots.
+  10:20: a play effect of a unit played from facedown still hit its battlefield target after the unit left the board
+  (Kennen, Keeper of Balance killed in response still stunned); CR 811.1.d.3.a says it mistargets, since it reads
+  where it was played from its source. `Game.hidden_source_gone` empties those choices at finalize and `_Recheck`
+  drops them at resolution. Checked OK: Blood Rush follows its errata ("this turn"), Lingering Animus counts gear.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
