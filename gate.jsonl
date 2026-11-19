@@ -1,0 +1,7 @@
+{"specs": ["learned:judge_s2:p=policy_g14:ps3:crn:b=0.3:d10", "search-v2"], "winner": 0, "decks": ["akali_rogue.json", "akali_rogue.json"]}
+{"specs": ["search-v2", "learned:judge_s2:p=policy_g14:ps3:crn:b=0.3:d10"], "winner": 0, "decks": ["akali_rogue.json", "akali_rogue.json"]}
+{"specs": ["learned:judge_s2:p=policy_g14:ps3:crn:b=0.3:d10", "search-v2"], "winner": 0, "decks": ["riven_exile.json", "riven_exile.json"]}
+{"specs": ["learned:judge_s2:p=policy_g14:ps3:crn:b=0.3:d10", "search-v2"], "winner": 1, "decks": ["master_yi_wuju.json", "master_yi_wuju.json"]}
+{"specs": ["search-v2", "learned:judge_s2:p=policy_g14:ps3:crn:b=0.3:d10"], "winner": 1, "decks": ["master_yi_wuju.json", "master_yi_wuju.json"]}
+{"specs": ["learned:judge_s2:p=policy_g14:ps3:crn:b=0.3:d10", "search-v2"], "winner": 0, "decks": ["kaisa_void.json", "kaisa_void.json"]}
+{"specs": ["search-v2", "learned:judge_s2:p=policy_g14:ps3:crn:b=0.3:d10"], "winner": 1, "decks": ["kaisa_void.json", "kaisa_void.json"]}
