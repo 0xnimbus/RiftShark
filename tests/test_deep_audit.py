@@ -1990,3 +1990,222 @@ def test_a_deflect_target_needs_the_tax_on_top_of_the_cost(db):
     g.choose(("play", hr2))
     _drive(g, lambda d: vx if d.kind == "choose" and vx in d.options else None)
     assert g.objects[vx].damage == 3
+
+
+# ----------------------------------------------------------------------------- 2026-11-18 00:20 run: Bonus Damage
+def test_bonus_damage_is_added_once_to_the_amount_a_split_divides(db):
+    # CR 715.3: with Annie, Fiery ("Your spells and abilities deal 1 Bonus Damage"), Scorched Earth's 5 damage split
+    # becomes 6 damage to split, and it can now choose 6 units (355.14.c). Each part of the split used to get the bonus
+    # again (5 split three ways dealt 8).
+    g = _fresh(db)
+    put(g, db, 0, "Annie, Fiery", ("base", 0))
+    bf = ("bf", g.battlefields[0].idx)
+    foes = []
+    for _ in range(3):
+        foes.append(put(g, db, 1, "Mountain Drake", bf, exclude=foes))
+    seen = {}
+
+    def pick(d):
+        if d.kind == "choose_location":
+            return bf if bf in d.options else None
+        if d.kind == "choose_many":
+            seen["cap"] = max(len(o) for o in d.options)
+            return next(o for o in d.options if set(o) == set(foes))
+        if d.kind == "split_damage":
+            seen["plans"] = d.options
+            return next(o for o in d.options if tuple(o) == (2, 2, 2))
+        return None
+    _cast_with(g, db, 0, "Scorched Earth", [("fury", False)] * 5, pick)
+    assert all(sum(p) == 6 for p in seen["plans"])
+    from riftsim.core import ops as O
+    assert O.split_cap(5)(g, Context(0, g.players[0].deck[0])) == 6       # up to 6 targets with Annie
+    assert sorted(g.objects[u].damage for u in foes) == [2, 2, 2]
+
+
+def test_no_bonus_damage_when_no_damage_is_dealt(db):
+    # CR 715.4: a Deal of 0 (a 0-Might unit fighting, "deal 1 for each ..." with none) deals nothing, so Annie, Fiery
+    # and Void Gate add nothing to it.
+    g = _fresh(db)
+    put(g, db, 0, "Annie, Fiery", ("base", 0))
+    foe = put(g, db, 1, "Mountain Drake", ("bf", g.battlefields[0].idx))
+    g.do_deal([foe], 0, Context(0, g.players[0].deck[0]))
+    assert g.objects[foe].damage == 0
+    g.do_deal([foe], 1, Context(0, g.players[0].deck[0]))
+    assert g.objects[foe].damage == 2
+
+
+# ----------------------------------------------------------------------------- 2026-11-18 05:20 run
+def _fiora_attack(db, foes, change):
+    """Fiora, Peerless (4 [M]) attacks bf 0 into `foes` enemy units; `change(g, enemies)` runs while her trigger waits
+    on the chain. Returns her highest Might seen during the combat."""
+    g = _fresh(db)
+    fi = put(g, db, 0, "Fiora, Peerless", ("base", 0))
+    bf = ("bf", g.battlefields[0].idx)
+    enemies = []
+    for _ in range(foes):
+        enemies.append(put(g, db, 1, "Mountain Drake", bf, exclude=enemies))
+    base = g.chars(fi).might
+    seen = {"max": base, "changed": False}
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "move" and o[1] == (fi,) and o[2] == bf))
+
+    def pick(d):
+        if g.combat is not None and g.objects[fi].zone == "board":
+            seen["max"] = max(seen["max"], g.chars(fi).might)
+        if not seen["changed"] and any(it.uid == fi or getattr(it, "source", None) == fi for it in g.chain):
+            seen["changed"] = True
+            change(g, enemies)
+            return "rerun"
+        return None
+    _drive(g, pick=pick)
+    return base, seen
+
+
+def test_fiora_peerless_checks_one_on_one_as_she_attacks(db):
+    # "When I attack or defend one on one, double my Might this combat." One on one is the trigger condition (CR 383.2.a,
+    # 740.2.b), checked as she attacks; the hand script re-checked it on resolution. A unit joining the fight before the
+    # trigger resolves doesn't stop the doubling, and killing one of two defenders in response doesn't start it.
+    def add_enemy(g, enemies):
+        put(g, db, 1, "Mountain Drake", g.objects[enemies[0]].location, exclude=enemies)
+    base, seen = _fiora_attack(db, 1, add_enemy)
+    assert seen["changed"] and seen["max"] == 2 * base
+
+    def kill_one(g, enemies):
+        g.do_kill([enemies[1]], Context(1))
+    base, seen = _fiora_attack(db, 2, kill_one)
+    assert not seen["changed"] and seen["max"] == base
+
+
+# ----------------------------------------------------------------------------- 2026-11-18 10:20 run
+def test_hidden_facebreaker_needs_its_targets_at_its_battlefield(db):
+    # CR 811.1.d.2: a spell played from facedown chooses its targets at that battlefield "unless it explicitly restricts
+    # targeting in such a way that makes this impossible"; with no legal target there it can't be played (811.1.d).
+    # Facebreaker ("Stun a friendly unit and an enemy unit at the same battlefield") was free to pick at any battlefield
+    # when its own battlefield had no friendly unit facing an enemy, because any selector condition counted as such a
+    # restriction. Only "at another location" conditions (Tideturner, Evelynn, Resonating Strike) do.
+    for enemy_here in (False, True):
+        g = _fresh(db)
+        g.set_bf_controller(0, 0)
+        mine = put(g, db, 0, "Mountain Drake", ("bf", 0))
+        put(g, db, 0, "Mountain Drake", ("bf", 1), exclude=[mine])
+        foe_there = put(g, db, 1, "Mountain Drake", ("bf", 1))
+        foe_here = put(g, db, 1, "Mountain Drake", ("bf", 0), exclude=[foe_there]) if enemy_here else None
+        fb = give(g, 0, "Facebreaker", db)
+        assert g.do_hide(0, fb, ("bf", 0))
+        g.objects[fb].facedown_turn = g.turn - 1
+        _ready_runes(g, 0)
+        g.restruct()
+        offered = ("play", fb) in g.legal_actions(0)
+        assert offered == enemy_here
+        if enemy_here:
+            g.pending = None
+            g.run()
+            g.choose(("play", fb))
+            _drive(g)
+            assert g.objects[mine].stunned and g.objects[foe_here].stunned and not g.objects[foe_there].stunned
+
+
+def test_hidden_tideturner_still_swaps_with_a_unit_elsewhere(db):
+    # 811.1.d.3 example: Tideturner's "a unit you control at another location" can never be met at its battlefield,
+    # so it chooses freely when played from facedown.
+    g = _fresh(db)
+    g.set_bf_controller(0, 0)
+    tt = give(g, 0, "Tideturner", db)
+    other = put(g, db, 0, "Mountain Drake", ("base", 0))
+    assert g.do_hide(0, tt, ("bf", 0))
+    g.objects[tt].facedown_turn = g.turn - 1
+    _ready_runes(g, 0)
+    g.restruct()
+    g.pending = None
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == tt))
+    _drive(g, pick=lambda d: other if d.kind == "choose" and other in d.options
+           else (True if d.kind == "yesno" else None))
+    assert g.objects[tt].location == ("base", 0) and g.objects[other].location == ("bf", 0)
+
+
+# ----------------------------------------------------------------------------- 2026-11-18 15:20 run
+def test_when_you_choose_me_needs_its_controller_to_choose(db):
+    # Irelia, Fervent ("When you choose or ready me, give me +1 [M] this turn"; Master Yi and Irelia decks) and Jae Medarda
+    # ("When you choose me with a spell, draw 1") triggered when an opponent chose them: an enemy Discipline gave
+    # Irelia +3. "You" is the unit's controller (and Jae's needs a spell).
+    for owner in (0, 1):
+        g = _fresh(db)
+        ire = put(g, db, owner, "Irelia, Fervent", ("base", owner))
+        jae = put(g, db, owner, "Jae Medarda", ("base", owner), exclude=[ire])
+        base_m = g.chars(ire).might
+        hand = len(g.players[owner].hand)
+        for t in (ire, jae):
+            _cast_with(g, db, 0, "Discipline", [("calm", False)] * 4,
+                       lambda d, t=t: t if d.kind == "choose" and t in d.options else None)
+        mine = owner == 0
+        assert g.chars(ire).might == base_m + 2 + (1 if mine else 0), owner
+        # P0 draws 1 per Discipline; Jae's owner draws 1 more only when it's P0's own Jae
+        assert len(g.players[owner].hand) - hand == (2 + 1 if mine else 0), owner
+
+
+# ----------------------------------------------------------------------------- 2026-11-18 20:20 run
+def test_when_you_stun_an_enemy_unit_reads_who_stunned(db):
+    # Eclipse Herald ("When you stun an enemy unit, ready me and give me +1 [M] this turn") and Leona, Radiant Dawn read
+    # the stunned unit's controller as "you": stunning an enemy never triggered them, an enemy stunning your unit did.
+    from riftsim.core import ops as O
+    for stunner, victim_side, want in ((0, 1, True), (1, 0, False), (0, 0, False)):
+        g = _fresh(db)
+        eh = put(g, db, 0, "Eclipse Herald", ("base", 0))
+        g.objects[eh].exhausted = True
+        victim = put(g, db, victim_side, "Mountain Drake", ("base", victim_side), exclude=[eh])
+        m = g.chars(eh).might
+        O.Stun(lambda g, c: [victim]).run(g, Context(stunner, None))
+        settle(g)
+        assert g.objects[victim].stunned
+        assert (g.chars(eh).might == m + 1 and not g.objects[eh].exhausted) == want, (stunner, victim_side)
+
+
+def test_one_or_more_stuns_trigger_once_per_stun(db):
+    # Leona, Radiant Dawn: "When you stun one or more enemy units, buff a friendly unit." Two units stunned by one
+    # instruction trigger it once; each stun was its own trigger.
+    from riftsim.core import ops as O
+    leona = next(c for c in db if c.name == "Leona, Radiant Dawn")
+    ab = next(a for a in leona.abilities if type(a).__name__ == "Triggered")
+    g = _fresh(db)
+    me = put(g, db, 0, "Mountain Drake", ("base", 0))
+    g.objects[me].defn = leona
+    foes = [put(g, db, 1, "Mountain Drake", ("base", 1))]
+    foes.append(put(g, db, 1, "Mountain Drake", ("base", 1), exclude=foes))
+    seen = []
+    orig = g.emit
+
+    def spy(kind, **kw):
+        if kind == "stun":
+            seen.append(ab.matches(g, me, dict(kw, kind=kind)))
+        return orig(kind, **kw)
+    g.emit = spy
+    O.Stun(lambda g, c: list(foes)).run(g, Context(0, None))
+    assert seen == [True, False]
+
+
+# ----------------------------------------------------------------------------- 2026-11-19 00:20 run
+def test_akshan_gone_before_his_trigger_resolves_takes_no_control(db):
+    # CR 359.3 example: "If Akshan leaves the board in reaction to his play effect, the delayed passive ability 'You
+    # control it until I leave the board' will not be generated. You will not gain control of the targeted gear even
+    # for a moment." The script still handed the gear over, for good (no duration to end it).
+    g = _fresh(db)
+    ak = put(g, db, 0, "Akshan, Mischievous", ("base", 0))
+    blade = put(g, db, 1, "Doran's Blade", ("base", 1))
+    g.emit("play", uid=ak, player=0, card_type="unit", paid={"add": True}, ctx=Context(0, ak))
+    g.dirty = True
+    g.pending = None
+    killed = []
+
+    def pick(d):
+        if d.kind == "choose" and blade in d.options:
+            return blade
+        if not killed and g.chain and any(it.uid == ak for it in g.chain if it.finalized):
+            killed.append(1)
+            g.do_kill([ak], Context(1))
+            return "rerun"
+        return None
+    _drive(g, pick=pick)
+    assert killed and g.objects[ak].zone == "trash"
+    assert g.objects[blade].controller == 1 and g.objects[blade].location == ("base", 1)
+    assert g.objects[blade].attached_to is None

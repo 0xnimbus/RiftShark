@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 
-from ..abilities import Static, Triggered, Activated, PlayPermission, Replacement
+from ..abilities import Static, Triggered, Activated, PlayPermission, Replacement, _by_me, _first_in_batch
 from ..selectors import Sel
 from .. import ops as O
 from ..vm import Ref
@@ -829,10 +829,10 @@ def parse_sentence(s, state):
         tgt = m.group(1)
         if "at a single battlefield" in m.group(2) or "at one battlefield" in m.group(2):
             return [O.ChooseLocation(out="__bf"),
-                    O.Choose(Sel("unit", where="loc:__bf"), out="__split", n=5, up_to=True),
+                    O.Choose(Sel("unit", where="loc:__bf"), out="__split", n=O.split_cap(parse_amount(tgt)), up_to=True),
                     O.Split(parse_amount(tgt), Ref("__split"))]
         if m.group(2).startswith("enemy units here") or m.group(2) == "units here":
-            return [O.Choose(Sel("unit", side="enemy" if "enemy" in m.group(2) else None, where="here"), out="__split", n=5, up_to=True),
+            return [O.Choose(Sel("unit", side="enemy" if "enemy" in m.group(2) else None, where="here"), out="__split", n=O.split_cap(parse_amount(tgt)), up_to=True),
                     O.Split(parse_amount(tgt), Ref("__split"))]
         raise ParseError("split target")
     m = re.match(r"kill (.+)$", sl)
@@ -1276,7 +1276,7 @@ TRIGGER_PATTERNS = [
     (r"when you play a unit that costs \[(\d+)\] or more", "you_play_unit"),
     (r"when you play a card that costs \[(\d+)\] or more", "you_play_card"),
     (r"when i become empowered", "empowered_self"),
-    (r"when you buff me", "buffed_self"),
+    (r"when you buff me", lambda g, s, ev: ev.get("kind") == "buff" and ev.get("uid") == s and _by_me(g, s, ev)),
     (r"when you ready a friendly unit", lambda g, s, ev: ev.get("kind") == "ready" and ev.get("player") == g.objects[s].controller
      and ev.get("uid") in g.objects and g.objects[ev["uid"]].zone == "board" and "unit" in g.chars(ev["uid"]).types),
     (r"when you spend a buff", lambda g, s, ev: ev.get("kind") == "spend_buff" and ev.get("player") == g.objects[s].controller),
@@ -1290,7 +1290,14 @@ TRIGGER_PATTERNS = [
     (r"when an opponent plays a unit", lambda g, s, ev: ev.get("kind") == "play" and ev.get("player") != g.objects[s].controller and ev.get("card_type") == "unit"),
     (r"when you kill a stunned enemy unit", lambda g, s, ev: ev.get("kind") == "die" and ev.get("player") != g.objects[s].controller and ev.get("stunned")),
     (r"when you stun an enemy unit at a battlefield", lambda g, s, ev: ev.get("kind") == "stun" and ev.get("by") == g.objects[s].controller and ev.get("loc", (None,))[0] == "bf"),
-    (r"when you stun (?:a|an|one or more) (?:enemy )?units?", lambda g, s, ev: ev.get("kind") == "stun" and ev.get("by") == g.objects[s].controller),
+    # "one or more": once per Stun action (its batch); "enemy": not a unit of your own
+    (r"when you stun one or more enemy units", lambda g, s, ev: ev.get("kind") == "stun" and ev.get("by") == g.objects[s].controller
+     and not g.is_friendly(ev.get("player"), g.objects[s].controller) and _first_in_batch(g, s, ev, "you_stun")),
+    (r"when you stun one or more units", lambda g, s, ev: ev.get("kind") == "stun" and ev.get("by") == g.objects[s].controller
+     and _first_in_batch(g, s, ev, "you_stun")),
+    (r"when you stun an enemy unit", lambda g, s, ev: ev.get("kind") == "stun" and ev.get("by") == g.objects[s].controller
+     and not g.is_friendly(ev.get("player"), g.objects[s].controller)),
+    (r"when you stun (?:a|an) units?", lambda g, s, ev: ev.get("kind") == "stun" and ev.get("by") == g.objects[s].controller),
     (r"when i move from a battlefield", lambda g, s, ev: ev.get("kind") == "move" and ev.get("uid") == s and ev.get("from") is not None and ev["from"][0] == "bf"),
     (r"when a friendly unit moves from my location", lambda g, s, ev: ev.get("kind") == "leave_loc" and ev.get("player") == g.objects[s].controller and ev.get("from") == g.objects[s].place and ev.get("uid") != s),
     (r"when a unit moves from here", lambda g, s, ev: ev.get("kind") == "leave_loc" and ev.get("from") == g.objects[s].place and ev.get("uid") != s),
@@ -1300,8 +1307,11 @@ TRIGGER_PATTERNS = [
     (r"when you conquer here with one or more mighty units", lambda g, s, ev: ev.get("kind") == "conquer" and ev.get("player") == g.objects[s].controller and ev.get("loc") == g.objects[s].place and any(g.chars(u).mighty for u in ev.get("units", ()))),
     (r"when you defend at a battlefield", "you_defend"),
     (r"when i'?m dealt damage", "damaged_self"),
-    (r"when you choose me with a spell", "targeted_self"),
-    (r"when you choose or ready me", lambda g, s, ev: (ev.get("kind") == "target" and s in ev.get("targets", ())) or (ev.get("kind") == "ready" and ev.get("uid") == s)),
+    (r"when you choose me with a spell", lambda g, s, ev: ev.get("kind") == "target" and s in ev.get("targets", ())
+     and ev.get("player") == g.objects[s].controller and ev.get("item_kind") == "spell"),
+    # "you choose": only my controller's spells and abilities (an opponent choosing me doesn't trigger it)
+    (r"when you choose or ready me", lambda g, s, ev: (ev.get("kind") == "target" and s in ev.get("targets", ())
+     and ev.get("player") == g.objects[s].controller) or (ev.get("kind") == "ready" and ev.get("uid") == s)),
     (r"when a buffed friendly unit dies", lambda g, s, ev: ev.get("kind") == "die" and ev.get("player") == g.objects[s].controller and ev.get("buffed")),
     (r"when another non-recruit unit you control dies", lambda g, s, ev: ev.get("kind") == "die" and ev.get("player") == g.objects[s].controller and ev.get("uid") != s and "Recruit" not in g.objects[ev["uid"]].defn.tags),
     (r"when you empower something else", lambda g, s, ev: ev.get("kind") == "empower" and ev.get("player") == g.objects[s].controller and ev.get("uid") != s),
@@ -1370,7 +1380,6 @@ TRIGGER_PATTERNS = [
     (r"when another friendly unit attacks", "friendly_unit_attacks"),
     (r"when you buff a unit", "you_buff"),
     (r"when you buff a friendly unit", "you_buff"),
-    (r"when you stun (?:a|an|one or more) (?:enemy )?units?", "you_stun"),
     (r"when you discard a card", "you_discard"),
     (r"when you draw a card", "you_draw"),
     (r"when you channel a rune", "you_channel"),
@@ -1400,11 +1409,12 @@ TRIGGER_PATTERNS = [
     (r"when a showdown starts here", "showdown_start_here"),
     (r"when combat ends here", "combat_end_here"),
     (r"when you empower (?:a|an) (?:friendly )?(?:unit|gear|permanent)", "you_empower"),
-    (r"when you empower me", "empowered_self"),
+    (r"when you empower me", lambda g, s, ev: ev.get("kind") == "empower" and ev.get("uid") == s and _by_me(g, s, ev)),
     (r"the first time i move each turn", "move_self"),
     (r"the first time you play a spell each turn", "you_play_spell"),
     (r"the first time you play a unit each turn", "you_play_unit"),
-    (r"when i'?m chosen by an enemy spell or ability", "targeted_self"),
+    (r"when i'?m chosen by an enemy spell or ability", lambda g, s, ev: ev.get("kind") == "target" and s in ev.get("targets", ())
+     and ev.get("player") is not None and not g.is_friendly(ev["player"], g.objects[s].controller)),
     (r"when you reveal a card", "you_reveal"),
     (r"when i'?m discarded", "discard_self"),
     (r"when you discard me", "discard_self"),

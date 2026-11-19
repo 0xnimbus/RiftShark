@@ -422,6 +422,14 @@ class Deal(Instr):
         return None
 
 
+def split_cap(amount):
+    """Most targets a Split can choose: its initial damage, Bonus Damage included (CR 355.14.c, 715.3)."""
+    def cap(g, c):
+        return max(1, (val(g, c, amount) or 0) + g.split_bonus(c))
+    cap.at_finalize = True            # the initial damage when the item is played: chosen as it's finalized (355.14.b)
+    return cap
+
+
 class Split(Instr):
     """Deal `amount` damage split among chosen targets (targets chosen earlier into Ref). Splits
     as evenly-lethal as the controller decides; the AI uses a greedy lethal-first split."""
@@ -432,8 +440,9 @@ class Split(Instr):
     def run(self, game, ctx):
         us = [u for u in _uids(game, ctx, self.targets) if game.objects[u].zone == "board"]
         amt = val(game, ctx, self.amount)
-        if not us or not amt:
+        if not us or not amt or amt <= 0:
             return None
+        amt += game.split_bonus(ctx, us)      # Bonus Damage is added to the amount to split (CR 715.3)
         ctx.vars["__split_amt"] = amt
         if len(us) > amt:
             # CR 355.14.h: more targets than damage: the controller picks which stay targets (exactly `amt` of them)
@@ -457,7 +466,7 @@ class Split(Instr):
         src = val(game, ctx, self.source) if self.source is not None else None
         for u, a in zip(us, plan):
             if a > 0:
-                game.do_deal([u], a, ctx, source_uid=src)
+                game.do_deal([u], a, ctx, source_uid=src, bonus=False)
         return None
 
     def resume(self, game, ctx, choice):
@@ -520,8 +529,9 @@ class Stun(Instr):
         self.targets = targets
 
     def run(self, game, ctx):
+        batch = game.tick()             # the units this instruction stuns are stunned together
         for u in _uids(game, ctx, self.targets):
-            game.do_stun(u, ctx)
+            game.do_stun(u, ctx, batch=batch)
         return None
 
 

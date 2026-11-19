@@ -222,6 +222,28 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   could choose Vex, Apathetic, then failed to pay and went to the trash. CR 355.16: `Game._unpaid_base_cost` adds the
   unpaid cost to the check (finalize: the item's cost; legal actions: `_spell_has_targets(cost=)`, activations), and
   rules_audit's missing-play check does the same. Skipped (tax only) while a later cost reduction could apply.
+  2026-11-18 00:20: Bonus Damage (CR 712-715) was added to each part of a Split (Annie, Fiery + Scorched Earth's 5
+  split three ways dealt 8); it now joins the amount to split once and raises the target cap (715.3, `ops.split_cap`,
+  `Game.split_bonus`, parts dealt with `do_deal(bonus=False)`). A Deal of 0 (0-Might fight, "1 for each" with none) no
+  longer gets Bonus Damage (715.4). Split targets were capped at 5 whatever the amount (Scorched Earth now its 5 + bonus).
+  05:20: Fiora, Peerless checked "one on one" on resolution; it is the trigger condition (CR 383.2.a, 740.2.b), now a
+  `filt` checked as she attacks/defends. Open: Lotus Trap's doubling and Ki Barrier's prevention on one unit are both
+  replacement effects whose order its controller picks (CR 372, 433.1.b); `do_deal` always doubles first.
+  10:20: a hidden card's targets must be at its battlefield unless the text makes that impossible (CR 811.1.d.2-3);
+  any selector condition counted as making it impossible, so Facebreaker and Switcheroo played from facedown targeted
+  anywhere when their battlefield had no legal pair (no valid target: can't be played). Only `Sel(elsewhere=True)`
+  ("at another/a different location": Tideturner, Evelynn, Entrancing, Resonating Strike) chooses freely now.
+  15:20: "When you choose or ready me" (Irelia, Fervent: Master Yi and Irelia decks) and "When you choose me with a
+  spell" (Jae Medarda) triggered when an opponent chose the unit (an enemy Discipline gave Irelia +3); they now need its
+  controller's spell/ability (the "target" event carries `item_kind`). Round-robins before this overrate Irelia, Fervent.
+  20:20: "When you stun/buff/empower ..." read the affected unit's controller as "you": Eclipse Herald and Leona, Radiant
+  Dawn never triggered on stunning enemies but did when an enemy stunned your unit. The stun/buff/empower events carry
+  `by` (`abilities._by_me`); "one or more" stuns trigger once per Stun instruction (event `batch`), "enemy" is checked.
+  No tournament card uses these triggers.
+  2026-11-19 00:20: Akshan, Mischievous (Sett deck) took the gear for good when he left the board before his play
+  trigger resolved; CR 359.3's example says the control effect is never generated. The gear is still moved and the
+  cleanup recalls it to its controller's base (323.6). Checked OK: the "you ..." trigger table (draw, discard, recycle,
+  channel, reveal, conquer/hold) reads the right player.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

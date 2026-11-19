@@ -1280,7 +1280,7 @@ class Game(flow.FlowMixin):
             self.emit("might_reduced", uid=uid, player=o.controller, by=ctx.controller if ctx else None,
                       loc=o.location, amount=-amt, ctx=ctx)
 
-    def do_stun(self, uid, ctx=None):
+    def do_stun(self, uid, ctx=None, batch=None):
         o = self.objects.get(uid)
         if o is None or o.zone != "board" or o.stunned:
             return            # CR 424.1.a.1: a stunned unit can't be stunned again (no "stun" event)
@@ -1291,7 +1291,8 @@ class Game(flow.FlowMixin):
             return
         o.stunned = True      # CR 424.1.b: it only stops its combat damage; stunning doesn't exhaust it
         self.bump()
-        self.emit("stun", uid=uid, player=o.controller, loc=o.location, by=ctx.controller if ctx else None, ctx=ctx)
+        self.emit("stun", uid=uid, player=o.controller, loc=o.location, by=ctx.controller if ctx else None, ctx=ctx,
+                  batch=batch if batch is not None else self.tick())       # one Stun action: "one or more" triggers once
         self.dirty = True
 
     def do_buff(self, uid, ctx=None):
@@ -1307,7 +1308,7 @@ class Game(flow.FlowMixin):
         before = self.chars(uid).might
         o.buffs = o.buffs + 1 if many else 1
         self.bump()
-        self.emit("buff", uid=uid, player=o.controller, loc=o.location, ctx=ctx)
+        self.emit("buff", uid=uid, player=o.controller, loc=o.location, by=ctx.controller if ctx else None, ctx=ctx)
         self._check_mighty(uid, before)
         self.dirty = True
 
@@ -1328,23 +1329,40 @@ class Game(flow.FlowMixin):
         o.temp = {k: v for k, v in o.temp.items() if not (isinstance(k, tuple) and k[0] == "damaged_by")}
         self.bump()
 
-    def do_deal(self, uids, amount, ctx, source_uid=None, combat=False):
-        """Deal `amount` damage to each target. A single Deal action (CR 418)."""
+    def deal_bonus(self, ctx, combat=False):
+        """Bonus Damage granted to a Deal action of ctx (CR 712-715): (bonus for every target, {location: extra
+        bonus for targets there}) - Annie, Fiery / Ziggs / Ravenborn Tome, and Void Gate ("units here")."""
+        bonus, here_bonus = 0, {}
+        if ctx is None or combat:
+            return bonus, here_bonus
+        for src_r, v in self.rules("bonus_damage", player=ctx.controller):
+            bonus += v
+        so = self.objects.get(ctx.source)
+        if so is not None and so.zone == "board" and "gear" in self.chars(ctx.source).types:
+            for src_r, v in self.rules("bonus_damage_gear_abilities", player=ctx.controller):    # Ziggs, Short-Fused
+                bonus += v
+        bonus += ctx.vars.get("__spell_bonus", 0)       # the next spell you play deals N Bonus Damage (flow)
+        for src_r, v in self.rules("bonus_damage_here"):
+            here_bonus[self.objects[src_r].place] = here_bonus.get(self.objects[src_r].place, 0) + v
+        return bonus, here_bonus
+
+    def split_bonus(self, ctx, uids=None):
+        """Bonus Damage added to the amount a Split divides (CR 715.3): the ctx bonus, plus a location's bonus
+        (Void Gate) when the split affects a unit there. uids=None: the most any target set could get."""
+        bonus, here = self.deal_bonus(ctx)
+        if uids is None:
+            return bonus + max(here.values(), default=0)
+        locs = {self.objects[u].location for u in uids if u in self.objects}
+        return bonus + max((v for l, v in here.items() if l in locs), default=0)
+
+    def do_deal(self, uids, amount, ctx, source_uid=None, combat=False, bonus=True):
+        """Deal `amount` damage to each target. A single Deal action (CR 418). bonus=False: the amount already
+        includes its Bonus Damage (a Split, CR 715.3)."""
         src = source_uid if source_uid is not None else (ctx.source if ctx else None)
         by = ctx.controller if ctx else None
-        bonus = 0
-        if ctx is not None and not combat:
-            for src_r, v in self.rules("bonus_damage", player=ctx.controller):
-                bonus += v
-            so = self.objects.get(ctx.source)
-            if so is not None and so.zone == "board" and "gear" in self.chars(ctx.source).types:
-                for src_r, v in self.rules("bonus_damage_gear_abilities", player=ctx.controller):    # Ziggs, Short-Fused
-                    bonus += v
-            bonus += ctx.vars.get("__spell_bonus", 0)       # the next spell you play deals N Bonus Damage (flow)
-        here_bonus = {}
-        if ctx is not None and not combat:
-            for src_r, v in self.rules("bonus_damage_here"):
-                here_bonus[self.objects[src_r].place] = here_bonus.get(self.objects[src_r].place, 0) + v
+        if amount is None or amount <= 0:
+            return                                       # no damage dealt: Bonus Damage doesn't apply (CR 715.4)
+        bonus, here_bonus = self.deal_bonus(ctx, combat) if bonus else (0, {})
         for u in list(uids):
             o = self.objects.get(u)
             if o is None or o.zone != "board":
@@ -1669,7 +1687,7 @@ class Game(flow.FlowMixin):
             return False
         o.empowered += 1
         self.bump()
-        self.emit("empower", uid=uid, player=o.controller, loc=o.location, ctx=ctx)
+        self.emit("empower", uid=uid, player=o.controller, loc=o.location, by=ctx.controller if ctx else None, ctx=ctx)
         self.dirty = True
         return True
 
@@ -2150,9 +2168,9 @@ class Game(flow.FlowMixin):
             return False
         if sel.where in ("base", "own_base") or (isinstance(sel.where, str) and sel.where.startswith("loc:")):
             return False
-        if sel.pred is not None:
-            return False          # arbitrary conditions ("at another location", Tideturner): cannot tell, keep free
-        return True
+        # a pred restricting to another location ("at another location": Tideturner, Evelynn, Resonating Strike) can never
+        # be met there, so the choice stays free; any other condition (Facebreaker, Switcheroo) must be met there
+        return not getattr(sel, "elsewhere", False)
 
     def _unpaid_base_cost(self, ctx):
         """(energy, power[, purpose]) the item being finalized still has to pay, for the Deflect check; None when it
