@@ -1383,6 +1383,15 @@ class Game(flow.FlowMixin):
         includes its Bonus Damage (a Split, CR 715.3)."""
         src = source_uid if source_uid is not None else (ctx.source if ctx else None)
         by = ctx.controller if ctx else None
+        # CR 418.6.b.3: when a spell or ability names a unit as the source ("They deal damage equal to their Mights to
+        # each other", Alpha Strike), the damage is dealt by that unit, not by the spell or ability: it isn't spell or
+        # ability damage (Unyielding Spirit), gets no spell/ability Bonus Damage, and the unit's controller is
+        # responsible for it (418.6.b.4)
+        so = self.objects.get(source_uid) if source_uid is not None and not combat else None
+        unit_source = so is not None and "unit" in (self.chars(source_uid).types if so.zone == "board" else so.defn.types)
+        if unit_source:
+            by = so.controller if so.zone == "board" else so.temp.get("__lk_controller", so.owner)
+            bonus = False
         if amount is None or amount <= 0:
             return                                       # no damage dealt: Bonus Damage doesn't apply (CR 715.4)
         bonus, here_bonus = self.deal_bonus(ctx, combat) if bonus else (0, {})
@@ -1393,7 +1402,7 @@ class Game(flow.FlowMixin):
             bonus_u = bonus + here_bonus.get(o.location, 0)
             amt = amount + bonus_u
             ev = self.replace_event({"kind": "damage", "uid": u, "amount": amt, "source": src, "player": o.controller,
-                                     "loc": o.location, "by": by, "combat": combat})
+                                     "loc": o.location, "by": by, "combat": combat, "unit_source": unit_source})
             if ev is None or ev.get("amount", 0) <= 0:
                 continue
             amt = ev["amount"]
@@ -1426,7 +1435,8 @@ class Game(flow.FlowMixin):
                 o.temp[("damaged_by", by)] = True                # Elder Dragon: "any amount of your damage"
             self.bump()
             self.log("damage", uid=u, amount=amt, source=src, combat=combat)
-            self.emit("damage", uid=u, amount=amt, source=src, player=o.controller, loc=o.location, by=by, combat=combat, ctx=ctx)
+            self.emit("damage", uid=u, amount=amt, source=src, player=o.controller, loc=o.location, by=by, combat=combat,
+                      unit_source=unit_source, ctx=ctx)
             self.dirty = True
 
     def preview_damage(self, u, amount, by, combat=True):

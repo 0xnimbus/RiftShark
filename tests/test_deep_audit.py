@@ -2298,3 +2298,26 @@ def test_attached_gear_moves_with_its_unit(db):
     g.do_kill([u], Context(1, None))
     # CR 436.4.b: it detaches where the unit last was; the cleanup recalls gear at a battlefield (436.4.a)
     assert g.objects[sword].attached_to is None and g.objects[sword].location == ("bf", 0)
+
+
+# ----------------------------------------------------------------------------- 2026-11-19 20:20 run
+def test_units_named_as_the_source_deal_unit_damage_not_spell_damage(db):
+    # CR 418.6.b.3: "They deal damage equal to their Mights to each other" (Challenge; Rampage in the Sett and Master Yi
+    # decks) is dealt by the chosen units, not by the spell. Unyielding Spirit ("Prevent all spell and ability damage
+    # this turn", Master Yi deck) prevented it, and Annie's "Your spells and abilities deal 1 Bonus Damage" added to it.
+    # A spell's own Deal is still prevented.
+    for spirit in (False, True):
+        g = _fresh(db)
+        mine = put(g, db, 0, "Mountain Drake", ("bf", 0))
+        foe = put(g, db, 1, "Stellacorn Herder", ("bf", 0))
+        put(g, db, 0, "Annie, Fiery", ("base", 0), exclude=[mine])
+        small = g.chars(foe).might
+        if spirit:
+            _cast_with(g, db, 0, "Unyielding Spirit", [("body", False)] * 2, None)
+        order = [mine, foe]
+        _cast_with(g, db, 0, "Challenge", [("body", False)] * 3,
+                   lambda d: order.pop(0) if d.kind == "choose" and order and order[0] in d.options else None)
+        assert g.objects[mine].damage == small and g.objects[foe].zone == "trash", spirit   # no prevention, no bonus
+        if spirit:
+            g.do_deal([mine], 2, Context(1, None))     # a spell or ability's own damage: prevented
+            assert g.objects[mine].damage == small

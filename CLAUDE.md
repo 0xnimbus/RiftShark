@@ -257,6 +257,12 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   with the top-most card), so Orianna, Exquisite (Irelia deck) dealt no combat damage beside an equipped unit that had
   moved in, and a dead unit's Equipment detached in base instead of where the unit died (436.4.b, then recalled).
   `Game._sync_attachments` runs on every location change (move, recall, control change in base).
+  20:20: "They deal damage equal to their Mights to each other" (Challenge, Rampage, Marching Orders ...) and "It deals
+  damage equal to its Might" (Alpha Strike, Last Breath) are dealt by the units, not the spell (CR 418.6.b.3), but were
+  treated as spell damage: Unyielding Spirit (Master Yi deck) prevented them and Annie/Ravenborn Tome/Void Gate Bonus
+  Damage was added. `do_deal(source_uid=<unit>)` now marks the event `unit_source` (no spell/ability prevention or
+  bonus, the unit's controller is responsible, 418.6.b.4). "Deal damage equal to my Might" (Yasuo, Graves, Caitlyn,
+  Ezreal, Dashing) is ability damage and no longer passes the unit as the source.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
