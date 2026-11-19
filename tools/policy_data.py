@@ -127,9 +127,6 @@ def main():
     try:
         for f in as_completed(futs):
             k, r = futs[f], f.result()
-            if a.max_minutes and time.time() - t > a.max_minutes * 60:
-                print(f"time budget reached after {len(done_idx)} games", file=sys.stderr)
-                break
             if not r.get("timeout") and r["n"]:
                 for key in ("x", "phi"):
                     acc[key].append(np.array(r[key], dtype=np.float32))
@@ -150,6 +147,9 @@ def main():
                 print(f"policy data {len(done_idx)}/{len(jobs)} games, {sum(len(v) for v in acc['n'])} decisions ({time.time() - t:.0f}s)",
                       file=sys.stderr)
             save(part, partial=True)
+            if a.max_minutes and time.time() - t > a.max_minutes * 60:
+                print(f"time budget reached after {len(done_idx)} games", file=sys.stderr)
+                break
     finally:
         ex.shutdown(wait=False, cancel_futures=True)
     save(a.out)
@@ -157,6 +157,9 @@ def main():
         os.remove(part)
     print(json.dumps({"decisions": sum(len(v) for v in acc["n"]), "options": sum(len(v) for v in acc["phi"]),
                       "secs": round(time.time() - t)}))
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(0)     # don't wait for games still running in the workers when the time budget ended the run
 
 
 if __name__ == "__main__":
