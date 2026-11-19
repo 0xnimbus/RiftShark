@@ -20,9 +20,19 @@ def _uids(game, ctx, t):
         return v.candidates(game, ctx)
     if v is None:
         return []
+    st = ctx.vars.get("__ev_stamps") if ctx is not None else None
     if isinstance(v, (list, tuple, set)):
-        return [u for u in v if u is not None and u in game.objects]
-    return [v] if v in game.objects else []
+        return [u for u in v if u is not None and u in game.objects and not (st and _new_object(game, st, u))]
+    return [v] if v in game.objects and not (st and _new_object(game, st, v)) else []
+
+
+def _new_object(game, stamps, u):
+    """The trigger's event object left the board and came back since the trigger happened (CR 124)."""
+    s = stamps.get(u)
+    if s is None:
+        return False
+    o = game.objects[u]
+    return o.zone == "board" and o.entered_stamp != s
 
 
 def _player(game, ctx, p):

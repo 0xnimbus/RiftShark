@@ -941,6 +941,7 @@ class Game(flow.FlowMixin):
             # "it" in a delayed trigger refers back to what the creating effect chose; it is not chosen again, so the
             # creator's targets are not re-checked against this trigger's event (that dropped them, e.g. Tornado Warrior)
             ctx.vars.pop("__targets", None)
+            self._stamp_trigger_objects(ctx, ev)
             item = ChainItem(self.next_item_id, "trigger", ctx.controller, uid, None, ctx, label=ab.label or "delayed", code=ab.code)
             self.next_item_id += 1
             self.chain.append(item)
@@ -979,6 +980,7 @@ class Game(flow.FlowMixin):
             ctx.here = ev.get("loc")
         if ab.once_per_turn:
             o.temp[("opt", id(ab))] = self.turn
+        self._stamp_trigger_objects(ctx, ev)
         item = ChainItem(self.next_item_id, "trigger", ctrl, uid, ab, ctx, label=ab.label or ab.source_text[:40] or ab.event,
                          code=ab.code, target_code=ab.target_code)
         self.next_item_id += 1
@@ -987,6 +989,19 @@ class Game(flow.FlowMixin):
         self.log("trigger", item=item.id, source=uid, label=item.label, controller=ctrl)
         self.dirty = True
         return item
+
+    def _stamp_trigger_objects(self, ctx, ev):
+        """CR 124: an object that leaves the board and comes back is a new object. A trigger's "it"/"me" (the event's
+        object, its source) means the object as it was when the trigger happened, so remember the board objects'
+        entry stamps; `ops._uids` drops one that has since been replaced by a new object (Imperial Decree's "kill it"
+        on a unit returned to hand and played again)."""
+        st = {}
+        for u in (ev.get("uid"), ctx.vars.get("self"), *(ev.get("uids") or ())):
+            o = self.objects.get(u) if isinstance(u, int) else None
+            if o is not None and o.zone == "board":
+                st[u] = o.entered_stamp
+        if st:
+            ctx.vars["__ev_stamps"] = st
 
     def add_reflexive(self, ctx, effect, label="do this"):
         c = ctx.clone()

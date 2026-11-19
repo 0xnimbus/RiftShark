@@ -2209,3 +2209,34 @@ def test_akshan_gone_before_his_trigger_resolves_takes_no_control(db):
     assert killed and g.objects[ak].zone == "trash"
     assert g.objects[blade].controller == 1 and g.objects[blade].location == ("base", 1)
     assert g.objects[blade].attached_to is None
+
+
+def test_imperial_decree_does_not_kill_a_unit_that_left_and_came_back(db):
+    # CR 124: a unit returned to hand and played again is a new object. Imperial Decree's "When any unit takes damage
+    # this turn, kill it" means the damaged object; if it was bounced and replayed with the trigger on the chain, the
+    # new unit lives. A unit that stayed on the board is still killed.
+    for replay in (True, False):
+        g = main_phase(db, [_deck(db, "viktor_herald"), _deck(db, "riven_exile")])
+        foe = put(g, db, 1, "Mountain Drake", ("bf", 1))
+        sp = give(g, 0, "Imperial Decree", db)
+        _ready_runes(g, 0)
+        g.run()
+        g.choose(("play", sp))
+        _drive(g)
+        g.do_deal([foe], 1, Context(0, None))
+        g.dirty, g.pending = True, None
+        done = []
+
+        def pick(d):
+            if g.chain and not done:
+                done.append(1)
+                assert g.chain[-1].label.startswith("Imperial Decree")
+                if replay:
+                    o = g.objects[foe]
+                    g._to_zone(o, "hand")
+                    g._to_zone(o, "board", location=("bf", 1), controller=1)
+                    g.restruct()
+                return "rerun"
+        _drive(g, pick=pick)
+        assert done
+        assert g.objects[foe].zone == ("board" if replay else "trash")
