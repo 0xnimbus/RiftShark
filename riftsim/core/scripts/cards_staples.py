@@ -1527,12 +1527,13 @@ def akshan_mischievous(defn):
             g.do_detach(t, c)
         o.location = ("base", c.controller)
         g.log("move", uid=t, to=o.location)
-        if o.controller != c.controller:
+        # CR 359.3 example: if Akshan already left the board, "You control it until I leave the board" is never
+        # generated: the gear is still moved, and the cleanup recalls it to its controller's base (CR 323.6)
+        if o.controller != c.controller and me.zone == "board":
             prev = o.controller
             o.controller = c.controller
-            if me.zone == "board":
-                from ..objects import Mod
-                o.mods.append(Mod("control", prev, ("until_leaves", c.source, me.entered_stamp), c.source, g.tick()))
+            from ..objects import Mod
+            o.mods.append(Mod("control", prev, ("until_leaves", c.source, me.entered_stamp), c.source, g.tick()))
         g.restruct()
         g.dirty = True
         if o.base_defn().is_equipment and me.zone == "board":
