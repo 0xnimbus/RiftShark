@@ -15,7 +15,7 @@ import os
 import random
 import sys
 import time
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import train_loop as T   # noqa: E402
@@ -24,7 +24,8 @@ KINDS = ("action", "choose", "assign_damage", "yesno", "order_triggers", "choose
 
 
 def _game(args):
-    paths, seed, spec = args
+    paths, seed, spec = args[:3]
+    values = len(args) > 3 and args[3]
     from riftsim.core.deck import Deck
     from riftsim.core.game import Game
     from riftsim.core.learn.features import encode
@@ -33,6 +34,9 @@ def _game(args):
     db = T._db()
     decks = [Deck.load(p, db) for p in paths]
     pols = [make_policy(spec, seed=seed * 7 + i) for i in range(2)]
+    if values:
+        for q in pols:
+            q.recorder = []
     g = Game(db, decks, seed=seed, log=False)
     g.max_turns = 60
     xs, phis, nopt, pick, seat, kind = [], [], [], [], [], []
@@ -57,8 +61,16 @@ def _game(args):
             seat.append(d.player)
             kind.append(KINDS.index(d.kind) if d.kind in KINDS else len(KINDS) - 1)
         g.choose(o)
+    vx, vy, vdec, vopt, vpo = [], [], [], [], []
+    for qs, q in enumerate(pols if values else ()):
+        for rows, y, dec, opt in q.recorder:
+            vx += rows
+            vy += [y] * len(rows)
+            vdec += [qs * 100000 + dec] * len(rows)     # one searched decision of one seat
+            vopt += [opt] * len(rows)                     # its candidate
+            vpo += list(range(len(rows)))                 # which one-turn sample
     return {"x": xs, "phi": phis, "n": nopt, "pick": pick, "seat": seat, "kind": kind, "winner": g.winner,
-            "secs": time.time() - t}
+            "vx": vx, "vy": vy, "vdec": vdec, "vopt": vopt, "vpo": vpo, "secs": time.time() - t}
 
 
 def _timed(args):
@@ -74,51 +86,70 @@ def main():
     ap.add_argument("--seed", type=int, default=7000000)
     ap.add_argument("--workers", type=int, default=os.cpu_count() or 2)
     ap.add_argument("--max-minutes", type=float)
+    ap.add_argument("--values", action="store_true",
+                    help="also record the two-turn search's value of each searched candidate (vx: features of each "
+                         "one-turn sample, vy: two-turn win probability, vgame; vdec/vopt/vpo: decision (per game), "
+                         "candidate and sample ids, -1 for games recorded before them) to train a judge on")
     a = ap.parse_args()
     rng = random.Random(a.seed)
     jobs = []
     for i in range(a.games // 2):
         pair = rng.sample(T.DECKS, 2)
-        jobs.append((pair, a.seed + 2 * i, a.policy))
-        jobs.append((pair[::-1], a.seed + 2 * i + 1, a.policy))
-    keys = ("x", "phi", "n", "pick", "seat", "kind", "game", "res")
+        jobs.append((pair, a.seed + 2 * i, a.policy, a.values))
+        jobs.append((pair[::-1], a.seed + 2 * i + 1, a.policy, a.values))
+    keys = ("x", "phi", "n", "pick", "seat", "kind", "game", "res") + (("vx", "vy", "vgame", "vdec", "vopt", "vpo") if a.values else ())
     acc = {k: [] for k in keys}
     part = a.out + ".partial.npz"
-    start = 0
+    done_idx = set()
     if os.path.exists(part):
         d = np.load(part)
-        acc = {k: [d[k]] for k in keys}
-        start = int(d["done"])
-        print(f"resuming at game {start}", file=sys.stderr)
+        acc = {k: ([d[k]] if k in d and len(d[k]) else []) for k in keys}
+        if a.values and "vdec" not in d and len(d["vy"]):    # recorded before decision ids: -1
+            for key in ("vdec", "vopt", "vpo"):
+                acc[key] = [np.full(len(d["vy"]), -1, np.int32)]
+        done_idx = set(d["done_idx"].tolist()) if "done_idx" in d else set(range(int(d["done"])))
+        print(f"resuming with {len(done_idx)} games done", file=sys.stderr)
 
-    def save(path, done=None):
+    def save(path, partial=False):
         arrs = {k: (np.concatenate(acc[k]) if acc[k] else np.zeros((0,), np.float32)).astype(
-            np.float32 if k in ("x", "phi", "res") else np.int32) for k in keys}
-        if done is None:
+            np.float32 if k in ("x", "phi", "res", "vx", "vy") else np.int32) for k in keys}
+        if not partial:
             np.savez_compressed(path, **arrs)
-        else:
-            np.savez(path, done=done, **arrs)
+            return
+        tmp = path + ".tmp.npz"            # a restart during the write must not destroy the last checkpoint
+        np.savez(tmp, done=len(done_idx), done_idx=np.array(sorted(done_idx), np.int32), **arrs)
+        os.replace(tmp, path)
     t = time.time()
     ex = ProcessPoolExecutor(max_workers=a.workers)
+    # games finish in any order; each one is checkpointed as it finishes, so a container restart loses only the
+    # games still running (in order, one long game held back every later result and a restart lost them all)
+    futs = {ex.submit(_timed, jobs[k]): k for k in range(len(jobs)) if k not in done_idx}
     try:
-        for k, r in enumerate(ex.map(_timed, jobs[start:]), start):
-            if a.max_minutes and time.time() - t > a.max_minutes * 60:
-                print(f"time budget reached after {k} games", file=sys.stderr)
-                break
+        for f in as_completed(futs):
+            k, r = futs[f], f.result()
             if not r.get("timeout") and r["n"]:
                 for key in ("x", "phi"):
                     acc[key].append(np.array(r[key], dtype=np.float32))
                 for key in ("n", "pick", "seat", "kind"):
                     acc[key].append(np.array(r[key], dtype=np.int32))
                 acc["game"].append(np.full(len(r["n"]), k, dtype=np.int32))
+                if a.values and r["vy"]:
+                    acc["vx"].append(np.array(r["vx"], dtype=np.float32))
+                    acc["vy"].append(np.array(r["vy"], dtype=np.float32))
+                    acc["vgame"].append(np.full(len(r["vy"]), k, dtype=np.int32))
+                    for key in ("vdec", "vopt", "vpo"):
+                        acc[key].append(np.array(r[key], dtype=np.int32))
                 w = r["winner"]
                 acc["res"].append(np.array([0.5 if w is None else (1.0 if s == w else 0.0) for s in r["seat"]],
                                            dtype=np.float32))
-            if (k + 1) % 20 == 0:
-                print(f"policy data {k + 1}/{len(jobs)} games, {sum(len(v) for v in acc['n'])} decisions ({time.time() - t:.0f}s)",
+            done_idx.add(k)
+            if len(done_idx) % 20 == 0:
+                print(f"policy data {len(done_idx)}/{len(jobs)} games, {sum(len(v) for v in acc['n'])} decisions ({time.time() - t:.0f}s)",
                       file=sys.stderr)
-            if (k + 1) % 10 == 0:
-                save(part, done=k + 1)
+            save(part, partial=True)
+            if a.max_minutes and time.time() - t > a.max_minutes * 60:
+                print(f"time budget reached after {len(done_idx)} games", file=sys.stderr)
+                break
     finally:
         ex.shutdown(wait=False, cancel_futures=True)
     save(a.out)
@@ -126,6 +157,9 @@ def main():
         os.remove(part)
     print(json.dumps({"decisions": sum(len(v) for v in acc["n"]), "options": sum(len(v) for v in acc["phi"]),
                       "secs": round(time.time() - t)}))
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(0)     # don't wait for games still running in the workers when the time budget ended the run
 
 
 if __name__ == "__main__":

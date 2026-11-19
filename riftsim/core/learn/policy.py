@@ -22,6 +22,7 @@ import random
 
 from ..policies import GreedyPolicy, MCTSPolicy, ai_options, determinize, mulligan_choice
 from . import model as M
+from .features import encode
 
 
 def _resolve(ref):
@@ -185,6 +186,9 @@ class LearnedGreedy(GreedyPolicy):
         self.deep, self.margin, self.deep_samples = deep, margin, deep_samples
         self.opp = LearnedGreedy(net, seed=seed + 577, samples=1) if deep else None
         self.deep_calls = 0
+        # recorder (tools/policy_data.py --values): a list that gets (features of each one-turn sample, two-turn win
+        # probability) per searched candidate, to train a one-turn judge on the two-turn search's values
+        self.recorder = None
 
     def evaluate(self, game, d, opts):
         vals = []
@@ -192,8 +196,11 @@ class LearnedGreedy(GreedyPolicy):
                   and any(isinstance(x, tuple) and x[0] not in ("pass", "end_turn") for x in opts))
         if window:
             self.window_calls += 1
+        rec = [] if self.recorder is not None else None
         for o in opts:
             v = 0.0
+            if rec is not None:
+                rec.append([])
             for _ in range(self.samples):
                 g = determinize(game, d.player, self.rng)
                 if g.pending is not None and o in g.pending.options:
@@ -203,6 +210,8 @@ class LearnedGreedy(GreedyPolicy):
                 else:
                     to_turn_end(g, d.player, self.helper, opp=self.opp_react)
                 v += self.net.predict(g, d.player)
+                if rec is not None and not g.over:
+                    rec[-1].append(encode(g, d.player))
             v = 1000.0 * (v / self.samples - 0.5) + self.rng.random() * self.noise
             vals.append(v)
         if self.pnet is not None and d.kind == "action" and len(opts) >= 2:
@@ -235,6 +244,8 @@ class LearnedGreedy(GreedyPolicy):
                             opponent_turn(g, d.player, them, respond=me)
                         v += self.net.predict(g, d.player)
                     dv = 1000.0 * (v / self.deep_samples - 0.5)
+                    if rec is not None and rec[i]:
+                        self.recorder.append((rec[i], v / self.deep_samples, self.p_calls, i))
                     vals[i] = 1e6 + dv if self.blend is None else vals[i] + self.blend * (dv - vals[i])
                 return vals
         if (self.hold and d.kind == "action" and len(opts) >= 2 and game.turn_player == d.player

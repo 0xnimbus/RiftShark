@@ -1,0 +1,80 @@
+name: Search self-play data (sharded)
+# Started by hand from the Actions tab (or the API). Each runner plays games with a searching AI
+# (tools/policy_data.py) and records its choices and, with values, the two-turn search's value of every candidate it
+# searched. Each shard's file is pushed to the branch search-data-<run id> (and kept as an artifact), so the training
+# machine can fetch them with git.
+on:
+  workflow_dispatch:
+    inputs:
+      policy:
+        description: "AI that plays the games"
+        default: "search-v2"
+      shards:
+        description: "Number of parallel runners"
+        default: "20"
+      games_per_shard:
+        description: "Games per runner (the time budget usually ends it first)"
+        default: "200"
+      minutes:
+        description: "Stop starting new work after this many minutes"
+        default: "320"
+      seed:
+        description: "Base seed (each shard adds shard * 100000)"
+        default: "20000000"
+      values:
+        description: "Record the search's values (--values)"
+        default: "true"
+permissions:
+  contents: write
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      shards: ${{ steps.s.outputs.list }}
+    steps:
+      - id: s
+        run: echo "list=$(python3 -c "import json; print(json.dumps(list(range(int('${{ inputs.shards }}')))))")" >> "$GITHUB_OUTPUT"
+  play:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJson(needs.plan.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install numpy
+      - name: Play
+        env:
+          RIFTSHARK_GAME_LIMIT: "6000"
+        run: >
+          python tools/policy_data.py --policy ${{ inputs.policy }} --games ${{ inputs.games_per_shard }}
+          --workers $(nproc) --max-minutes ${{ inputs.minutes }}
+          --seed $(( ${{ inputs.seed }} + ${{ matrix.shard }} * 100000 ))
+          ${{ inputs.values == 'true' && '--values' || '' }}
+          --out out/search_${{ matrix.shard }}.npz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: search-${{ matrix.shard }}
+          path: out/search_${{ matrix.shard }}.npz
+          retention-days: 14
+      - name: Push to the data branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          B=search-data-${{ github.run_id }}
+          mkdir -p data_out && cp out/search_${{ matrix.shard }}.npz data_out/
+          for i in 1 2 3 4 5 6; do
+            if git fetch -q origin "$B" 2>/dev/null; then
+              git checkout -qf -B "$B" FETCH_HEAD
+            else
+              git checkout -q --orphan "$B" && git rm -rq --cached .
+            fi
+            git add -f data_out/search_${{ matrix.shard }}.npz
+            git commit -qm "search data shard ${{ matrix.shard }}" && git push origin "$B" && break
+            sleep $((RANDOM % 20 + 5))
+          done
