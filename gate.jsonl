@@ -1,0 +1,2 @@
+{"specs": ["learned:judge_s1:p=policy_g14:ps3:crn:b=0.3:d10", "search-v2"], "winner": 0, "decks": ["riven_exile.json", "riven_exile.json"]}
+{"specs": ["search-v2", "learned:judge_s1:p=policy_g14:ps3:crn:b=0.3:d10"], "winner": 0, "decks": ["riven_exile.json", "riven_exile.json"]}
