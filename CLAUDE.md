@@ -253,6 +253,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   (Kennen, Keeper of Balance killed in response still stunned); CR 811.1.d.3.a says it mistargets, since it reads
   where it was played from its source. `Game.hidden_source_gone` empties those choices at finalize and `_Recheck`
   drops them at resolution. Checked OK: Blood Rush follows its errata ("this turn"), Lingering Animus counts gear.
+  15:20: attached gear kept its old location when its unit moved or was recalled (CR 719.3.a: attached cards move
+  with the top-most card), so Orianna, Exquisite (Irelia deck) dealt no combat damage beside an equipped unit that had
+  moved in, and a dead unit's Equipment detached in base instead of where the unit died (436.4.b, then recalled).
+  `Game._sync_attachments` runs on every location change (move, recall, control change in base).
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
