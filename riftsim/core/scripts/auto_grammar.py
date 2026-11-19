@@ -562,7 +562,7 @@ def parse_sentence(s, state):
         return _each_player_kills("gear")
     m = re.match(r"prevent all spell and ability damage this turn$", sl)
     if m:
-        return [O.DelayedPassive("replace:damage", {"applies": lambda g, c, ev: not ev.get("combat"), "replace": lambda g, c, ev: None})]
+        return [O.DelayedPassive("replace:damage", {"applies": lambda g, c, ev: not ev.get("combat") and not ev.get("unit_source"), "replace": lambda g, c, ev: None})]
     m = re.match(r"put (\w+) into your hand and recycle the rest$", sl)
     if m:
         return [O.ChooseFromList(lambda g, c: list(c.vars.get("looked", [])), out="__pick", n=_num(m.group(1)) or 1), O.ToHand(Ref("__pick")),
@@ -604,14 +604,16 @@ def parse_sentence(s, state):
             return a + b
         except ParseError:
             pass
+    # "Deal damage equal to my/its Might": the spell or ability deals it (only "I/it/they deal ..." names a unit as
+    # the source, CR 418.6.b.3)
     m = re.match(r"deal damage equal to my might to (.+)$", sl)
     if m:
         ins, ref, _ = choose(m.group(1), _next_out(state))
-        return ins + [O.Deal(O.might_of(Ref("self")), ref, source=Ref("self"))]
+        return ins + [O.Deal(O.might_of(Ref("self")), ref)]
     m = re.match(r"deal damage equal to (?:its|their) might to (.+)$", sl)
     if m:
         ins, ref, _ = choose(m.group(1), _next_out(state))
-        return ins + [O.Deal(O.might_of(Ref("t")), ref, source=Ref("t"))]
+        return ins + [O.Deal(O.might_of(Ref("t")), ref)]
     m = re.match(r"the next time (it|they) (?:dies|die) this turn, recall (?:it|them) exhausted instead$", sl)
     if m:
         return [O.DelayedPassive("replace:die", {"applies": lambda g, c, ev: ev.get("uid") == c.vars.get("t"),
