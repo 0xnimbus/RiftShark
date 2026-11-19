@@ -1,0 +1,93 @@
+name: Gate (sharded)
+# Started by hand from the Actions tab (or the API). Plays CAND against BEST (tools/train_loop.py gate) split over
+# parallel runners; shard i uses seed + i * 1000. The merge job prints the score and pushes every game to the branch
+# gate-<run id> as one jsonl file.
+on:
+  workflow_dispatch:
+    inputs:
+      cand:
+        description: "Candidate AI spec"
+        required: true
+      best:
+        description: "AI to beat"
+        default: "search-v2"
+      shards:
+        description: "Number of parallel runners"
+        default: "20"
+      games_per_shard:
+        description: "Games per runner (even, so each shuffle is played from both seats)"
+        default: "10"
+      seed:
+        description: "Base seed"
+        default: "500000"
+      mirror:
+        description: "Both AIs play the same deck (--mirror)"
+        default: "true"
+permissions:
+  contents: write
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      shards: ${{ steps.s.outputs.list }}
+    steps:
+      - id: s
+        run: echo "list=$(python3 -c "import json; print(json.dumps(list(range(int('${{ inputs.shards }}')))))")" >> "$GITHUB_OUTPUT"
+  play:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJson(needs.plan.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install numpy
+      - name: Gate
+        env:
+          RIFTSHARK_GAME_LIMIT: "6000"
+        run: |
+          mkdir -p out
+          python tools/train_loop.py gate "${{ inputs.cand }}" "${{ inputs.best }}" --games ${{ inputs.games_per_shard }} \
+            --workers $(nproc) --seed $(( ${{ inputs.seed }} + ${{ matrix.shard }} * 1000 )) \
+            ${{ inputs.mirror == 'true' && '--mirror' || '' }} --log out/gate_${{ matrix.shard }}.jsonl
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gate-${{ matrix.shard }}
+          path: out/gate_${{ matrix.shard }}.jsonl
+  merge:
+    needs: play
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: shards
+      - name: Score
+        run: |
+          cat shards/*/gate_*.jsonl > gate.jsonl
+          python3 - "${{ inputs.cand }}" <<'EOF' | tee -a "$GITHUB_STEP_SUMMARY"
+          import json, math, sys
+          cand = sys.argv[1]
+          games = [json.loads(l) for l in open("gate.jsonl") if l.strip()]
+          won = sum(1 for g in games if g.get("winner") is not None and g["specs"][g["winner"]] == cand)
+          n = len(games)
+          p = won / n if n else 0.0
+          z = 1.96
+          lo = (p + z*z/(2*n) - z*math.sqrt(p*(1-p)/n + z*z/(4*n*n))) / (1 + z*z/n) if n else 0.0
+          hi = (p + z*z/(2*n) + z*math.sqrt(p*(1-p)/n + z*z/(4*n*n))) / (1 + z*z/n) if n else 0.0
+          print(f"GATE {cand} vs ${{ inputs.best }}: {won}/{n} = {p:.1%} (95% interval {lo:.1%}-{hi:.1%})")
+          EOF
+      - name: Push to the gate branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -q --orphan "gate-${{ github.run_id }}" && git rm -rq --cached .
+          printf '%s\n' "${{ inputs.cand }} vs ${{ inputs.best }}" > gate_specs.txt
+          git add -f gate.jsonl gate_specs.txt && git commit -qm "gate games" && git push origin "gate-${{ github.run_id }}"

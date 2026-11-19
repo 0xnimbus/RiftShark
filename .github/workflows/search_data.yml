@@ -68,7 +68,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           B=search-data-${{ github.run_id }}
           mkdir -p data_out && cp out/search_${{ matrix.shard }}.npz data_out/
-          for i in 1 2 3 4 5 6; do
+          for i in $(seq 1 20); do
             if git fetch -q origin "$B" 2>/dev/null; then
               git checkout -qf -B "$B" FETCH_HEAD
             else
@@ -76,5 +76,5 @@ jobs:
             fi
             git add -f data_out/search_${{ matrix.shard }}.npz
             git commit -qm "search data shard ${{ matrix.shard }}" && git push origin "$B" && break
-            sleep $((RANDOM % 20 + 5))
+            sleep $((RANDOM % 30 + 5))
           done
