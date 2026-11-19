@@ -3,6 +3,9 @@
 Per decision with two or more options (payments and mulligans excluded): the decider's position features
 (features.encode, own seat only), the option features of every option (policy_net.encode_option), the index the AI
 picked, the seat and the decision kind; per game the winner. tools/train_policy.py trains the policy net on it.
+Also both seats' features at every turn boundary and at what-if boundaries (bkind 1: the decider ends the turn
+here, one action decision in three) (bx, bseat, bkind, bgame, bres): the judge's training positions, unlike
+the mid-turn decision positions in x (a judge trained on those plays far worse: 11% vs gen 14, 2026-11-19).
 
 usage:
   python tools/policy_data.py --policy learned:gen_014 --games 1500 --out out/pol_g14.npz
@@ -40,11 +43,32 @@ def _game(args):
     g = Game(db, decks, seed=seed, log=False)
     g.max_turns = 60
     xs, phis, nopt, pick, seat, kind = [], [], [], [], [], []
+    bx, bseat, bkind, last_turn = [], [], [], None
+    from riftsim.core.learn.policy import to_turn_end
+    from riftsim.core.policies import GreedyPolicy, determinize
+    helper = GreedyPolicy(seed + 991, samples=1)
+    wrng = random.Random(seed * 13 + 5)          # own generator: the what-ifs never change the game itself
     t = time.time()
     while True:
         d = g.run()
         if d is None:
             break
+        if g.turn != last_turn:             # a turn boundary, both seats: the positions the judge is trained on
+            last_turn = g.turn
+            for s in (0, 1):
+                bx.append(encode(g, s))
+                bseat.append(s)
+                bkind.append(0)
+        elif d.kind == "action" and wrng.random() < 1.0 / 3:
+            # what-if boundary (as in train_loop self-play): the decider ends the turn here, on a copy where the
+            # opponent's hidden cards are a sample from the decider's view; labelled with the game's result
+            h = determinize(g, d.player, wrng)
+            to_turn_end(h, d.player, helper)
+            if not h.over:
+                for s in (0, 1):
+                    bx.append(encode(h, s))
+                    bseat.append(s)
+                    bkind.append(1)
         opts = ai_options(d, g)
         if d.kind == "pay":
             g.choose(opts[0]); continue
@@ -70,7 +94,8 @@ def _game(args):
             vopt += [opt] * len(rows)                     # its candidate
             vpo += list(range(len(rows)))                 # which one-turn sample
     return {"x": xs, "phi": phis, "n": nopt, "pick": pick, "seat": seat, "kind": kind, "winner": g.winner,
-            "vx": vx, "vy": vy, "vdec": vdec, "vopt": vopt, "vpo": vpo, "secs": time.time() - t}
+            "vx": vx, "vy": vy, "vdec": vdec, "vopt": vopt, "vpo": vpo, "bx": bx, "bseat": bseat, "bkind": bkind,
+            "secs": time.time() - t}
 
 
 def _timed(args):
@@ -97,7 +122,7 @@ def main():
         pair = rng.sample(T.DECKS, 2)
         jobs.append((pair, a.seed + 2 * i, a.policy, a.values))
         jobs.append((pair[::-1], a.seed + 2 * i + 1, a.policy, a.values))
-    keys = ("x", "phi", "n", "pick", "seat", "kind", "game", "res") + (("vx", "vy", "vgame", "vdec", "vopt", "vpo") if a.values else ())
+    keys = ("x", "phi", "n", "pick", "seat", "kind", "game", "res", "bx", "bseat", "bkind", "bgame", "bres") + (("vx", "vy", "vgame", "vdec", "vopt", "vpo") if a.values else ())
     acc = {k: [] for k in keys}
     part = a.out + ".partial.npz"
     done_idx = set()
@@ -113,7 +138,7 @@ def main():
     def save(path, partial=False):
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
         arrs = {k: (np.concatenate(acc[k]) if acc[k] else np.zeros((0,), np.float32)).astype(
-            np.float32 if k in ("x", "phi", "res", "vx", "vy") else np.int32) for k in keys}
+            np.float32 if k in ("x", "phi", "res", "vx", "vy", "bx", "bres") else np.int32) for k in keys}
         if not partial:
             np.savez_compressed(path, **arrs)
             return
@@ -143,6 +168,13 @@ def main():
                 w = r["winner"]
                 acc["res"].append(np.array([0.5 if w is None else (1.0 if s == w else 0.0) for s in r["seat"]],
                                            dtype=np.float32))
+                if r.get("bx"):
+                    acc["bx"].append(np.array(r["bx"], dtype=np.float32))
+                    acc["bseat"].append(np.array(r["bseat"], dtype=np.int32))
+                    acc["bkind"].append(np.array(r["bkind"], dtype=np.int32))
+                    acc["bgame"].append(np.full(len(r["bseat"]), k, dtype=np.int32))
+                    acc["bres"].append(np.array([0.5 if w is None else (1.0 if s == w else 0.0) for s in r["bseat"]],
+                                                dtype=np.float32))
             done_idx.add(k)
             if len(done_idx) % 20 == 0:
                 print(f"policy data {len(done_idx)}/{len(jobs)} games, {sum(len(v) for v in acc['n'])} decisions ({time.time() - t:.0f}s)",
