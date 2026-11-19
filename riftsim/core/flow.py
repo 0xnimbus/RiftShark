@@ -679,6 +679,7 @@ class FlowMixin:
                     o.controller = m.value
                     if o.zone == "board" and o.location is not None and o.location[0] == "base":
                         o.location = ("base", o.controller)
+                        self._sync_attachments(o)
                 else:
                     keep.append(m)
             if len(keep) != len(o.mods):

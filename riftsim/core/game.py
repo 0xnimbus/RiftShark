@@ -701,7 +701,15 @@ class Game(flow.FlowMixin):
             self._detach_raw(o.uid)
         self.restruct()
 
+    def _sync_attachments(self, o):
+        """CR 719.3.a: when the top-most card changes locations, all attached cards change locations with it."""
+        for a in o.attachments:
+            ao = self.objects.get(a)
+            if ao is not None and ao.zone == "board":
+                ao.location = o.location
+
     def _on_change_location(self, o):
+        self._sync_attachments(o)
         if any(m.duration == "while_here" for m in o.mods):
             o.mods = [m for m in o.mods if m.duration != "while_here"]
             self.restruct()
@@ -2042,6 +2050,7 @@ class Game(flow.FlowMixin):
         o.controller = p
         if o.location is not None and o.location[0] == "base":
             o.location = ("base", p)
+            self._sync_attachments(o)
         if duration != "permanent":
             o.mods.append(Mod("control", o.owner, duration, ctx.source if ctx else None, self.tick()))
         self.restruct()
@@ -2076,6 +2085,7 @@ class Game(flow.FlowMixin):
                     o.controller = m.value
                     if o.location is not None and o.location[0] == "base":
                         o.location = ("base", o.controller)
+                        self._sync_attachments(o)
                     self.log("control_ends", uid=o.uid, player=o.controller)
                     self.bump()
                     self.dirty = True

@@ -2276,3 +2276,25 @@ def test_hidden_play_effect_mistargets_when_its_unit_left_the_board(db):
         _drive(g, pick=pick)
         assert done or not kill
         assert g.objects[foe].stunned is (not kill)
+
+
+# ----------------------------------------------------------------------------- 2026-11-19 15:20 run
+def test_attached_gear_moves_with_its_unit(db):
+    # CR 719.3.a: when the top-most card changes locations, its attached cards go with it. An equipped unit moved to a
+    # battlefield left its Equipment in base, so Orianna, Exquisite ("I don't deal combat damage unless there's a
+    # friendly gear here", Irelia deck) dealt none beside an equipped unit. Recalls and deaths follow the unit too.
+    g = _fresh(db)
+    ori = put(g, db, 0, "Orianna, Exquisite", ("bf", 0))
+    u = put(g, db, 0, "Mountain Drake", ("base", 0), exclude=[ori])
+    sword = put(g, db, 0, "Long Sword", ("base", 0), exclude=[ori, u])
+    g.do_attach(sword, u, Context(0, None))
+    assert g.no_combat_damage(ori)
+    g.do_move([u], ("bf", 0), Context(0, None))
+    assert g.objects[sword].location == ("bf", 0)
+    assert not g.no_combat_damage(ori)
+    g.do_recall(u, Context(0, None))
+    assert g.objects[sword].location == ("base", 0) and g.no_combat_damage(ori)
+    g.do_move([u], ("bf", 0), Context(0, None))
+    g.do_kill([u], Context(1, None))
+    # CR 436.4.b: it detaches where the unit last was; the cleanup recalls gear at a battlefield (436.4.a)
+    assert g.objects[sword].attached_to is None and g.objects[sword].location == ("bf", 0)
