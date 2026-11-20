@@ -402,6 +402,31 @@ class DamageAssignments:
         return sorted(out, reverse=True)
 
 
+class DamageAssignmentsAny:
+    """CR 467.2.c.8-9: a unit with exclusionary requirements (Tank and Backline / "assigned last") follows the one
+    its assigner picks, each such unit on its own. `variants` are DamageAssignments, one per combination of picks;
+    an assignment is legal when it is legal under one of them. count() is an upper bound (a plan legal under two
+    combinations counts twice) used only to pick flat vs one-unit-at-a-time; plans() has each plan once."""
+
+    def __init__(self, variants):
+        self.variants = variants
+        self.info = variants[0].info
+        self.total = variants[0].total
+
+    def count(self, prefix=()):
+        return sum(v.count(prefix) for v in self.variants)
+
+    def amounts(self, prefix):
+        out = set()
+        for v in self.variants:
+            if v.count(prefix):
+                out.update(v.amounts(prefix))
+        return sorted(out)
+
+    def plans(self):
+        return sorted({pl for v in self.variants for pl in v.plans()}, reverse=True)
+
+
 class FlowMixin:
     # ------------------------------------------------------------------ driver
     def run(self):
@@ -1039,9 +1064,13 @@ class FlowMixin:
             tank = c.keywords.get("tank") and not any(
                 self.objects[src].controller == player and self.objects[src].location == self.objects[u].location
                 for src, _ in self.rules("ignore_tank_here"))          # Dune Surfer
-            prio = 0 if tank else (2 if (c.keywords.get("backline") or u in last) else 1)
-            info.append((need, prio))
-        return DamageAssignments(info, total)
+            back = bool(c.keywords.get("backline") or u in last)
+            # Tank and Backline both: the assigner fulfils one of them (CR 467.2.c.8), each unit separately (467.2.c.9)
+            info.append((need, (0, 2) if tank and back else (0 if tank else (2 if back else 1))))
+        if not any(isinstance(p, tuple) for _, p in info):
+            return DamageAssignments(info, total)
+        picks = itertools.product(*[p if isinstance(p, tuple) else (p,) for _, p in info])
+        return DamageAssignmentsAny([DamageAssignments([(n, p) for (n, _), p in zip(info, pk)], total) for pk in picks])
 
     def _damage_plans(self, targets, total, player=None):
         """Every legal combat damage assignment, as plan tuples in target order (see DamageAssignments)."""

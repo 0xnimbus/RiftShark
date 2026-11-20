@@ -275,6 +275,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   `Game.current_targets(ctx)` drops choices whose entry stamp changed. Checked OK: no "give ... [keyword]/[M]" without
   "this turn" lasts only the turn (scan of every card; Blood Rush is errata), Shadow's Call's [Temporary] is
   permanent, Time Warp banishes itself, expert-policy rules_audit (8 games) clean.
+  10:20: a unit with both Tank and Backline (or "assigned last") always took combat damage first; CR 467.2.c.8 lets
+  the assigner fulfil either one (first or last, never in between), each such unit separately (467.2.c.9):
+  `flow.DamageAssignmentsAny` unions the per-pick automata. Checked OK: hiding from the champion zone (Kennen,
+  Keeper of Balance), Back Off draws only from hand, Edge of Night attaches at its play location.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
