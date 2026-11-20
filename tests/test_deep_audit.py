@@ -2374,3 +2374,35 @@ def test_not_so_fast_ignores_a_target_that_left_the_board_and_came_back(db):
             g.restruct()
         offered = ray in choose.sel.candidates(g, Context(1, nsf))
         assert offered is (how != "replayed"), how
+
+
+def test_a_unit_with_tank_and_backline_is_assigned_first_or_last_at_the_assigners_pick(db):
+    """CR 467.2.c.8 example: Caitlyn, Patrolling (Backline) given Tank, with two units without abilities. The
+    assigner fulfils one of her requirements: damage to her first (Tank) or last (Backline), never in between.
+    Tank always won, so the Backline option was never offered. 467.2.c.9: two such units are picked separately."""
+    g = main_phase(db, [_deck(db, "vex_gloomist"), _deck(db, "riven_exile")])
+    bf = ("bf", 0)
+    cait = put(g, db, 1, "Caitlyn, Patrolling", bf)
+    a = put(g, db, 1, "Stellacorn Herder", bf, exclude=(cait,))
+    b = put(g, db, 1, "Stellacorn Herder", bf, exclude=(cait, a))
+    g.add_mod(cait, "keyword", ("tank", True), duration="turn")
+    g.restruct()
+    assert g.chars(cait).keywords.get("tank") and g.chars(cait).keywords.get("backline")
+    nc, na = g._lethal_need(cait, 20, 0), g._lethal_need(a, 20, 0)
+    plans = set(g._damage_plans([cait, a, b], 2, 0))
+    assert (2, 0, 0) in plans                       # Tank: Caitlyn first
+    assert (0, 2, 0) in plans and (0, 0, 2) in plans   # Backline: the others first
+    total = nc + na + 1                             # Caitlyn lethal, then one unit short: Tank order
+    plans = set(g._damage_plans([cait, a, b], total, 0))
+    assert (nc, na, 1) in plans
+    total = na + 1                                  # in between (one other unit lethal, then Caitlyn) is never legal
+    plans = set(g._damage_plans([cait, a, b], total, 0))
+    assert (1, na, 0) not in plans and (0, na, 1) in plans
+    # two Caitlyns with Tank and one plain unit: both may be dealt first (467.2.c.9 example)
+    c2 = put(g, db, 1, "Caitlyn, Patrolling", bf, exclude=(cait, a, b))
+    g.add_mod(c2, "keyword", ("tank", True), duration="turn")
+    g.restruct()
+    plans = set(g._damage_plans([cait, c2, a], nc + nc, 0))
+    assert {(nc, nc, 0), (nc, 0, na), (0, nc, na)} <= plans          # each Caitlyn picks Tank or Backline
+    plans = set(g._damage_plans([cait, c2, a], na, 0))
+    assert {(nc, 0, 0), (0, nc, 0), (0, 0, na)} <= plans
