@@ -1401,6 +1401,22 @@ class FlowMixin:
                 out.append(v)
         return out
 
+    def current_targets(self, ctx):
+        """The item's chosen targets that are still the same objects: a target that changed to or from a non-board
+        zone is no longer counted as chosen (CR 359.3.e.4, 359.3.e.9.a); a mistargeted one still on the board is."""
+        chosen = ctx.vars.get("__chosen") or {}
+        out = []
+        for name, sel in ctx.vars.get("__targets", []):
+            v = ctx.vars.get(name)
+            stamps = (chosen.get(name) or {}).get("stamps") or {}
+            for u in (v if isinstance(v, tuple) else (v,)):
+                if not isinstance(u, int) or u not in self.objects:
+                    continue
+                if u in stamps and self.objects[u].entered_stamp != stamps[u]:
+                    continue
+                out.append(u)
+        return out
+
     def _deflect_total(self, it, ctx):
         total = 0
         if it.uid is not None and it.uid in self.objects and any(
