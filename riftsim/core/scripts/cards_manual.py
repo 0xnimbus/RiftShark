@@ -188,7 +188,7 @@ def repulse(defn):
     def item_ok(g, c, it, u):
         if it.controller == c.controller or it.ctx is None or it.removed or not it.finalized:
             return False
-        chosen = [x for x in g._target_uids(it.ctx) if isinstance(x, int) and x in g.objects]
+        chosen = g.current_targets(it.ctx)         # CR 359.3.e.9.a: mistargeted ones still count, zone-changed ones don't
         if u not in chosen:
             return False
         return not any(x != u and g.objects[x].zone == "board" and g.objects[x].controller == c.controller

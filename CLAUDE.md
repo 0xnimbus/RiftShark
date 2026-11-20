@@ -269,6 +269,12 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   of the chosen board objects and the source (ctx `__dl_stamps`); events about a replaced object don't match and
   `ops._uids` drops it on resolution. Checked OK: Switcheroo follows CR 434 (increase/decrease, snapshotted),
   Akali, Silent's "unless I'm in combat" uses the combat battlefield (designations are set in each cleanup).
+  05:20: Not So Fast and Repulse read an item's choices by uid, so a target that was returned to hand and played again
+  still counted as chosen (Not So Fast could counter a Hextech Ray whose target had been replayed); CR 359.3.e.9.a
+  counts mistargeted choices still on the board but not ones that changed to or from a non-board zone.
+  `Game.current_targets(ctx)` drops choices whose entry stamp changed. Checked OK: no "give ... [keyword]/[M]" without
+  "this turn" lasts only the turn (scan of every card; Blood Rush is errata), Shadow's Call's [Temporary] is
+  permanent, Time Warp banishes itself, expert-policy rules_audit (8 games) clean.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

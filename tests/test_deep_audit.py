@@ -2343,3 +2343,34 @@ def test_delayed_it_does_not_follow_a_unit_that_left_and_came_back(db):
         g.dirty, g.pending = True, None
         _drive(g)
         assert g.objects[foe].zone == ("board" if replay else "trash"), replay
+
+
+# ----------------------------------------------------------------------------- 2026-11-20 05:20 run
+def test_not_so_fast_ignores_a_target_that_left_the_board_and_came_back(db):
+    # CR 359.3.e.9.a: a finalized item still "chooses" a mistargeted unit that is on the board, but not one that changed
+    # to or from a non-board zone. Not So Fast (Riven, Irelia, Akali, Master Yi decks: "Counter an enemy spell or ability
+    # that chooses a friendly unit or gear") could answer Hextech Ray after its target was returned and played again.
+    from riftsim.core.selectors import Sel
+    nsf_defn = _card(db, "Not So Fast")
+    choose = next(i for a in nsf_defn.abilities for i in (a.target_code or []) if isinstance(getattr(i, "sel", None), Sel))
+    for how in ("stay", "moved", "replayed"):
+        g = _fresh(db)
+        foe = put(g, db, 1, "Mountain Drake", ("bf", 0))
+        nsf = give(g, 1, "Not So Fast", db)
+        give(g, 0, "Hextech Ray", db)
+        _set_runes(g, db, 0, [("fury", False)] * 3)
+        g.pending = None
+        d = g.run()
+        ray = next(o for o in d.options if o[0] == "play" and g.objects[o[1]].defn.name == "Hextech Ray")[1]
+        g.choose(("play", ray))
+        _drive(g, pick=lambda d: foe if d.kind == "choose" and foe in d.options else None,
+               stop=lambda d: any(it.uid == ray and it.finalized for it in g.chain))
+        o = g.objects[foe]
+        if how == "moved":
+            g.do_move([foe], ("base", 1), Context(1, None))      # mistargeted, still on the board: still chosen
+        elif how == "replayed":
+            g._to_zone(o, "hand")
+            g._to_zone(o, "board", location=("bf", 0), controller=1)
+            g.restruct()
+        offered = ray in choose.sel.candidates(g, Context(1, nsf))
+        assert offered is (how != "replayed"), how

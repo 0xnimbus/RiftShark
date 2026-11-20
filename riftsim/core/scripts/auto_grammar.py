@@ -731,8 +731,8 @@ def parse_sentence(s, state):
             # Not So Fast: a finalized enemy chain item whose choices include a unit/gear I control (CR 355.9.a.2)
             if it.controller == c.controller or it.ctx is None or it.removed or not it.finalized:
                 return False
-            for x in g._target_uids(it.ctx):
-                o = g.objects.get(x) if isinstance(x, int) else None
+            for x in g.current_targets(it.ctx):         # not targets that left the board and came back (359.3.e.9.a)
+                o = g.objects.get(x)
                 if o is not None and o.zone == "board" and o.controller == c.controller \
                         and set(kinds) & set(g.chars(x).types):
                     return True
