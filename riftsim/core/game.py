@@ -3,6 +3,7 @@ replacement effects, costs and the rune pool. Turn structure, chain and combat a
 from __future__ import annotations
 
 import copy
+import itertools
 import os
 import sys
 import random
@@ -1398,9 +1399,44 @@ class Game(flow.FlowMixin):
         locs = {self.objects[u].location for u in uids if u in self.objects}
         return bonus + max((v for l, v in here.items() if l in locs), default=0)
 
-    def do_deal(self, uids, amount, ctx, source_uid=None, combat=False, bonus=True):
+    def _damage_mod_orders(self, o, amt):
+        """CR 372 / 433.1.b: the damage replacement effects on a unit (Lotus Trap's doubling, Counter Strike's
+        prevent-next, Ki Barrier-style shields) apply in the order its controller picks. -> list of (order, final
+        amount, label) with one entry per distinct outcome, in the default order first. An order is a tuple of
+        indexes into o.mods."""
+        effs = [i for i, m in enumerate(o.mods) if m.kind == "double_damage"]
+        pn = next((i for i, m in enumerate(o.mods) if m.kind == "prevent_next"), None)
+        effs += [pn] if pn is not None else []
+        effs += [i for i, m in enumerate(o.mods) if m.kind == "prevent" and m.value > 0]
+        out, seen = [], set()
+        perms = [tuple(effs)] + ([q for q in itertools.permutations(effs) if q != tuple(effs)] if len(effs) <= 5 else [])
+        for order in perms:
+            a, left = amt, {}
+            for i in order:
+                m = o.mods[i]
+                if a <= 0:
+                    break
+                if m.kind == "double_damage":
+                    a *= 2
+                elif m.kind == "prevent_next":
+                    left[i], a = 0, 0
+                else:
+                    used = min(m.value, a)
+                    left[i], a = m.value - used, a - used
+            key = (a, tuple(sorted(left.items())))
+            if key in seen:
+                continue
+            seen.add(key)
+            names = " then ".join(self.label(o.mods[i].source) if o.mods[i].source in self.objects else o.mods[i].kind
+                                  for i in order)
+            out.append((order, a, f"{names}: {a} damage"))
+        return out
+
+    def do_deal(self, uids, amount, ctx, source_uid=None, combat=False, bonus=True, _orders=None, _amts=None):
         """Deal `amount` damage to each target. A single Deal action (CR 418). bonus=False: the amount already
-        includes its Bonus Damage (a Split, CR 715.3)."""
+        includes its Bonus Damage (a Split, CR 715.3). `_orders` {uid: mod order} / `_amts` {uid: amount}: set when
+        a target's controller has picked the order of its damage replacements (_DamageOrderStep)."""
+        _orders, _amts = dict(_orders or {}), dict(_amts or {})
         src = source_uid if source_uid is not None else (ctx.source if ctx else None)
         by = ctx.controller if ctx else None
         # CR 418.6.b.3: when a spell or ability names a unit as the source ("They deal damage equal to their Mights to
@@ -1415,35 +1451,58 @@ class Game(flow.FlowMixin):
         if amount is None or amount <= 0:
             return                                       # no damage dealt: Bonus Damage doesn't apply (CR 715.4)
         bonus, here_bonus = self.deal_bonus(ctx, combat) if bonus else (0, {})
-        for u in list(uids):
+        uids = list(uids)
+        for k, u in enumerate(uids):
             o = self.objects.get(u)
             if o is None or o.zone != "board":
                 continue
-            bonus_u = bonus + here_bonus.get(o.location, 0)
-            amt = amount + bonus_u
-            ev = self.replace_event({"kind": "damage", "uid": u, "amount": amt, "source": src, "player": o.controller,
-                                     "loc": o.location, "by": by, "combat": combat, "unit_source": unit_source})
+            amt = _amts[u] if u in _amts else amount + bonus + here_bonus.get(o.location, 0)
+            base = {"kind": "damage", "uid": u, "amount": amt, "source": src, "player": o.controller,
+                    "loc": o.location, "by": by, "combat": combat, "unit_source": unit_source}
+            if u not in _orders:
+                # CR 372: several replacement effects on this damage apply in the order its controller picks
+                dry = self.replace_event(dict(base), dry=True)
+                if dry is not None and dry.get("amount", 0) > 0 and len(self._damage_mod_orders(o, dry["amount"])) > 1:
+                    rest = [x for x in uids[k:] if x in self.objects and self.objects[x].zone == "board"]
+                    amts = dict(_amts)
+                    for x in rest:
+                        amts.setdefault(x, amount + bonus + here_bonus.get(self.objects[x].location, 0))
+                    c = Context(o.controller, u, here=o.location)
+                    c.vars["__dord"] = {"uid": u, "uids": tuple(rest), "amts": amts, "orders": _orders,
+                                        "ctx_controller": ctx.controller if ctx is not None else None,
+                                        "ctx_source": ctx.source if ctx is not None else None,
+                                        "ctx_item": ctx.item if ctx is not None else None,
+                                        "source_uid": source_uid, "combat": combat}
+                    self.vm_frames.append(Frame([_DamageOrderStep()], c))
+                    return
+            ev = self.replace_event(base)
             if ev is None or ev.get("amount", 0) <= 0:
                 continue
             amt = ev["amount"]
-            # Lotus Trap: "Double all damage that would be dealt to it this turn." (one doubling per effect)
-            for m in o.mods:
+            # Lotus Trap: "Double all damage that would be dealt to it this turn." (one doubling per effect);
+            # Counter Strike: "The next time that unit would be dealt damage this turn, prevent it."; prevention
+            # shields (mods of kind 'prevent'), in the order picked (default: doublings, prevent-next, shields)
+            opts = self._damage_mod_orders(o, amt)
+            order = _orders.get(u)
+            order = next((q for q, _, _ in opts if q == order), opts[0][0] if opts else ())
+            drop = None
+            for i in order:
+                m = o.mods[i]
+                if amt <= 0:
+                    break
                 if m.kind == "double_damage":
                     amt *= 2
-            # Counter Strike: "The next time that unit would be dealt damage this turn, prevent it."
-            nxt = next((m for m in o.mods if m.kind == "prevent_next"), None)
-            if nxt is not None:
-                o.mods.remove(nxt)
-                self.restruct()
-                self.log("prevent", uid=u, amount=amt)
-                continue
-            # prevention shields (mods of kind 'prevent')
-            for i, m in enumerate(o.mods):
-                if m.kind == "prevent" and m.value > 0 and amt > 0:
+                elif m.kind == "prevent_next":
+                    drop, amt = i, 0
+                    self.log("prevent", uid=u, amount=amt)
+                else:
                     used = min(m.value, amt)
                     # Mods are never changed in place (clones share them): replace the shield with a smaller one
                     o.mods[i] = Mod(m.kind, m.value - used, m.duration, m.source, m.stamp, m.loc)
                     amt -= used
+            if drop is not None:
+                del o.mods[drop]
+                self.restruct()
             if amt <= 0:
                 continue
             if "unit" not in self.chars(u).types:
@@ -2524,6 +2583,41 @@ class _OptionalReplacementStep:
             game._ask_optional_replacement(u, ev, dctx)
             return None
         game._finish_death(u, ev, dctx)
+        return None
+
+
+class _DamageOrderStep:
+    """VM step: a unit about to be dealt damage has several damage replacement effects whose order changes the
+    outcome (Lotus Trap + Ki Barrier, Counter Strike + a shield): its controller picks the order (CR 372, 433.1.b
+    example at 467.2.c.5); then the Deal goes on for it and the targets after it."""
+
+    def _opts(self, game, ctx):
+        info = ctx.vars["__dord"]
+        u = info["uid"]
+        o = game.objects.get(u)
+        if o is None or o.zone != "board":
+            return []
+        return game._damage_mod_orders(o, info["amts"][u])
+
+    def run(self, game, ctx):
+        opts = self._opts(game, ctx)
+        if len(opts) < 2:
+            return self.resume(game, ctx, None)
+        u = ctx.vars["__dord"]["uid"]
+        return Decision(ctx.controller, "order_replacement", list(range(len(opts))), out="__dord_choice",
+                        labels=[l for _, _, l in opts], info={"uid": u, "label": game.label(u)})
+
+    def resume(self, game, ctx, choice):
+        info = ctx.vars["__dord"]
+        opts = self._opts(game, ctx)
+        orders = dict(info["orders"])
+        orders[info["uid"]] = opts[choice][0] if choice is not None and choice < len(opts) else (opts[0][0] if opts else ())
+        dctx = None
+        if info["ctx_controller"] is not None:
+            dctx = Context(info["ctx_controller"], info["ctx_source"])
+            dctx.item = info["ctx_item"]
+        game.do_deal(list(info["uids"]), 0 if not info["uids"] else 1, dctx, source_uid=info["source_uid"],
+                     combat=info["combat"], bonus=False, _orders=orders, _amts=info["amts"])
         return None
 
 

@@ -2406,3 +2406,42 @@ def test_a_unit_with_tank_and_backline_is_assigned_first_or_last_at_the_assigner
     assert {(nc, nc, 0), (nc, 0, na), (0, nc, na)} <= plans          # each Caitlyn picks Tank or Backline
     plans = set(g._damage_plans([cait, c2, a], na, 0))
     assert {(nc, 0, 0), (0, nc, 0), (0, 0, na)} <= plans
+
+
+def test_damage_replacement_effects_apply_in_the_order_the_units_controller_picks(db):
+    """CR 372 / the example at 467.2.c.5: a unit with a prevent-2 shield and Lotus Trap's doubling takes 3 damage.
+    Its controller orders the replacement effects: shield first (1 left, doubled: 2 damage) or doubling first (6, 2
+    prevented: 4). The engine always doubled first. Counter Strike's prevent-next with a Ki Barrier shield: the
+    shield can take a small hit and keep Counter Strike for later, or Counter Strike can be spent."""
+    g = main_phase(db, [_deck(db, "vex_gloomist"), _deck(db, "riven_exile")])
+    bf = ("bf", 0)
+    lotus = give(g, 0, "Lotus Trap", db)
+    ki = give(g, 0, "Ki Barrier", db)
+    u = put(g, db, 1, "Mountain Drake", bf)                         # 10 [M]
+    g.add_mod(u, "prevent", 2, duration="turn", source=ki)
+    g.add_mod(u, "double_damage", True, duration="turn", source=lotus)
+    g.restruct()
+    g.do_deal([u], 3, Context(0, lotus))
+    d = g.run()
+    assert d is not None and d.kind == "order_replacement" and d.player == 1, d
+    assert sorted(l.split(": ")[1] for l in d.labels) == ["2 damage", "4 damage"]
+    g.choose(next(o for o, l in zip(d.options, d.labels) if l.endswith(": 2 damage")))
+    g.run()
+    assert g.objects[u].damage == 2
+    # Counter Strike + a 7 shield, 3 damage: keep Counter Strike (shield absorbs 3) or spend it (shield stays 7)
+    v = put(g, db, 1, "Mountain Drake", bf, exclude=(u,))
+    cs = give(g, 0, "Counter Strike", db)
+    g.add_mod(v, "prevent_next", True, duration="turn", source=cs)
+    g.add_mod(v, "prevent", 7, duration="turn", source=ki)
+    g.restruct()
+    g.pending = None
+    g.do_deal([v], 3, Context(0, lotus))
+    d = g.run()
+    assert d is not None and d.kind == "order_replacement", d
+    shield_first = next(o for o, l in zip(d.options, d.labels) if l.startswith(g.label(ki)))
+    g.choose(shield_first)
+    g.run()
+    mods = g.objects[v].mods
+    assert g.objects[v].damage == 0
+    assert any(m.kind == "prevent_next" for m in mods), "Counter Strike was spent"
+    assert any(m.kind == "prevent" and m.value == 4 for m in mods)
