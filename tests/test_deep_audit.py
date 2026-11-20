@@ -2445,3 +2445,38 @@ def test_damage_replacement_effects_apply_in_the_order_the_units_controller_pick
     assert g.objects[v].damage == 0
     assert any(m.kind == "prevent_next" for m in mods), "Counter Strike was spent"
     assert any(m.kind == "prevent" and m.value == 4 for m in mods)
+
+
+def test_a_card_returned_to_hand_in_public_view_stays_known_to_the_opponent(db):
+    """A unit returned to its owner's hand (Gust, Rebuke, Star-Crossed, Retreat), a card taken back from the trash
+    and a card revealed from the top of the deck and then drawn all moved in public view: every player saw which
+    card went to that hand. `knows` forgot them (a new object in hand counted as hidden), so the AI's lookahead
+    (policies.determinize) reshuffled them into random cards. Drawn cards stay hidden."""
+    import random
+    from riftsim.core.policies import determinize
+    g = main_phase(db, [_deck(db, "kennen_tempest"), _deck(db, "riven_exile")])
+    u = put(g, db, 1, "Stellacorn Herder", ("bf", 0))
+    t = put(g, db, 1, "Mountain Drake", ("base", 1), exclude=(u,))
+    g._to_zone(g.objects[u], "hand")                    # bounced
+    g._to_zone(g.objects[t], "trash")
+    g._to_zone(g.objects[t], "hand")                    # returned from the trash
+    top = g.players[1].deck[0]
+    g.emit("reveal", player=1, cards=[top])
+    drawn_revealed = g._draw_raw(1)
+    drawn_hidden = g._draw_raw(1)
+    assert drawn_revealed == top
+    for x in (u, t, drawn_revealed):
+        assert g.knows(0, x), g.label(x)
+    assert not g.knows(0, drawn_hidden)
+    names = sorted(g.objects[x].defn.name for x in (u, t, drawn_revealed))
+    for seed in range(5):
+        d = determinize(g, 0, random.Random(seed))
+        hand = sorted(d.objects[x].defn.name for x in d.players[1].hand)
+        for n in names:
+            assert hand.count(n) >= names.count(n), (n, hand)
+    # facedown cards returned to hand were never seen
+    g2 = main_phase(db, [_deck(db, "kennen_tempest"), _deck(db, "riven_exile")])
+    h = g2.players[1].hand[0]
+    g2._to_zone(g2.objects[h], "facedown")
+    g2._to_zone(g2.objects[h], "hand")
+    assert not g2.knows(0, h)
