@@ -915,6 +915,10 @@ class Game(flow.FlowMixin):
         for d in list(self.delayed):
             if d.fired and d.once:
                 continue
+            dst = d.ctx.vars.get("__dl_stamps")
+            if dst and ev.get("uid") in dst and ev["uid"] in self.objects \
+                    and self.objects[ev["uid"]].entered_stamp != dst[ev["uid"]]:
+                continue           # the event is about a new object, not the one the delayed ability refers to
             if d.matches(self, ev):
                 pend.append((d.ctx.source, d, None))
                 d.fired = True
@@ -950,6 +954,8 @@ class Game(flow.FlowMixin):
             # creator's targets are not re-checked against this trigger's event (that dropped them, e.g. Tornado Warrior)
             ctx.vars.pop("__targets", None)
             self._stamp_trigger_objects(ctx, ev)
+            if ctx.vars.get("__dl_stamps"):
+                ctx.vars["__ev_stamps"] = {**ctx.vars.get("__ev_stamps", {}), **ctx.vars["__dl_stamps"]}
             item = ChainItem(self.next_item_id, "trigger", ctx.controller, uid, None, ctx, label=ab.label or "delayed", code=ab.code)
             self.next_item_id += 1
             self.chain.append(item)
@@ -1022,6 +1028,20 @@ class Game(flow.FlowMixin):
     def add_delayed(self, ctx, event, effect, filt, expires, once, label):
         d = DelayedAbility(self.next_item_id, event, compile_effect(effect), filt, expires, once, ctx.clone(), label, self.turn)
         self.next_item_id += 1
+        # CR 124: "it" in a delayed ability is the object chosen when it was created ("Kill it the next time it takes
+        # damage", "When it dies this turn", "Disempower it at end of turn"); once that object leaves the board and
+        # comes back it is a new object the delayed ability doesn't see. Remember the board objects' entry stamps.
+        st = {}
+        for name, rec in (ctx.vars.get("__chosen") or {}).items():
+            for u, stamp in (rec.get("stamps") or {}).items():
+                o = self.objects.get(u)
+                if o is not None and o.zone == "board" and o.entered_stamp == stamp:
+                    st[u] = stamp
+        so = self.objects.get(ctx.source) if ctx.source is not None else None
+        if so is not None and so.zone == "board":
+            st[ctx.source] = so.entered_stamp
+        if st:
+            d.ctx.vars["__dl_stamps"] = st
         self.delayed.append(d)
 
     def _buff_bonus(self, o):

@@ -2321,3 +2321,25 @@ def test_units_named_as_the_source_deal_unit_damage_not_spell_damage(db):
         if spirit:
             g.do_deal([mine], 2, Context(1, None))     # a spell or ability's own damage: prevented
             assert g.objects[mine].damage == small
+
+
+# ----------------------------------------------------------------------------- 2026-11-20 00:20 run
+def test_delayed_it_does_not_follow_a_unit_that_left_and_came_back(db):
+    # CR 124: Noxian Guillotine ("Choose a unit. Kill it the next time it takes damage this turn") refers to the chosen
+    # object. Returned to hand and played again, it is a new object: damage no longer kills it. The same unit, still on
+    # the board, is killed.
+    for replay in (False, True):
+        g = _fresh(db)
+        foe = put(g, db, 1, "Mountain Drake", ("bf", 0))
+        _cast_with(g, db, 0, "Noxian Guillotine, Darius", [("fury", False)] * 4,
+                   lambda d: foe if d.kind == "choose" and foe in d.options else None)
+        assert g.objects[foe].zone == "board" and g.delayed
+        if replay:
+            o = g.objects[foe]
+            g._to_zone(o, "hand")
+            g._to_zone(o, "board", location=("bf", 0), controller=1)
+            g.restruct()
+        g.do_deal([foe], 1, Context(0, None))
+        g.dirty, g.pending = True, None
+        _drive(g)
+        assert g.objects[foe].zone == ("board" if replay else "trash"), replay

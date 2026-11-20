@@ -263,6 +263,12 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   Damage was added. `do_deal(source_uid=<unit>)` now marks the event `unit_source` (no spell/ability prevention or
   bonus, the unit's controller is responsible, 418.6.b.4). "Deal damage equal to my Might" (Yasuo, Graves, Caitlyn,
   Ezreal, Dashing) is ability damage and no longer passes the unit as the source.
+  2026-11-20 00:20: delayed abilities matched "it" by uid, so a chosen unit returned to hand and played again was
+  still hit (Noxian Guillotine killed the replayed unit on its next damage; Siphoning Strike / Deadly Flourish paid
+  out when the new object died; Tornado Warrior disempowered it). CR 124: `Game.add_delayed` stores the entry stamps
+  of the chosen board objects and the source (ctx `__dl_stamps`); events about a replaced object don't match and
+  `ops._uids` drops it on resolution. Checked OK: Switcheroo follows CR 434 (increase/decrease, snapshotted),
+  Akali, Silent's "unless I'm in combat" uses the combat battlefield (designations are set in each cleanup).
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
