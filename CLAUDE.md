@@ -285,6 +285,12 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   decision `order_replacement`), then goes on with that target and the rest. Open: combat lethal need
   (`preview_damage`) still assumes the default order; replace_event replacements (Unyielding Spirit) always go first.
   No tournament list plays these cards.
+  20:20: a card that went to a hand in public view (a unit returned by Gust/Rebuke/Star-Crossed/Retreat, a card
+  taken from the trash, a card revealed from the deck and then drawn) became unknown to the opponent, so the AIs'
+  `determinize` reshuffled it into a random card (no cheating, but public information lost). `Game._to_zone` /
+  `_draw_raw` now record it in `Game.known` for the players who saw it (`Game._public_viewers`); drawn and facedown
+  cards stay hidden. The play page shows such cards face up in the opponent's hand. Checked OK: Concert Poster's
+  conquer trigger, The Empyrean's Predict amount, Bellows Breath's same-location choice.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

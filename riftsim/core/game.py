@@ -754,6 +754,10 @@ class Game(flow.FlowMixin):
         """Low level zone change. Tokens leaving the board cease to exist (CR 187)."""
         if o.zone == "board" and zone != "board":
             o.temp["__lk_controller"] = o.controller     # last known controller ("Its controller draws 2")
+        # who will know the card once it is in a hand: a face-up card moving there in public view (a unit returned
+        # to hand, a card taken from the trash) is known to every player; a revealed card stays known to those who
+        # saw it (CR 124 makes a new object, but the move itself was public information)
+        seen_by = self._public_viewers(o) if zone == "hand" else ()
         self._remove_from_zone(o)
         if o.defn.is_token and zone not in ("board", "chain"):
             o.zone = "gone"
@@ -767,6 +771,8 @@ class Game(flow.FlowMixin):
         o.controller = o.owner if controller is None else controller
         if zone == "hand":
             p.hand.append(o.uid)
+            for q in seen_by:
+                self.known.setdefault(q, {})[o.uid] = o.entered_stamp
         elif zone == "deck":
             (p.deck.insert(0, o.uid) if top else p.deck.append(o.uid))
         elif zone == "trash":
@@ -785,15 +791,27 @@ class Game(flow.FlowMixin):
             o.counters = {}
         self.restruct()
 
+    def _public_viewers(self, o):
+        """Players who see a card as it moves from its current zone to a hand: everyone for a face-up public zone
+        (board, trash, banishment, chain, champion zone), those it was revealed to for a card in a deck."""
+        if o.zone in ("board", "trash", "banish", "chain", "champion"):
+            return tuple(range(len(self.players)))
+        if o.zone == "deck":
+            return tuple(q for q, m in self.known.items() if m.get(o.uid) == o.entered_stamp)
+        return ()
+
     def _draw_raw(self, p):
         ps = self.players[p]
         if not ps.deck:
             return None
         u = ps.deck.pop(0)
         o = self.objects[u]
+        seen_by = self._public_viewers(o)          # a card revealed on top of the deck, then drawn
         o.zone = "hand"
         ps.hand.append(u)
         o.entered_stamp = self.tick()
+        for q in seen_by:
+            self.known.setdefault(q, {})[u] = o.entered_stamp
         self.restruct()                 # zone change: the trigger index lists abilities by zone
         return u
 
