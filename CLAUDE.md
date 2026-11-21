@@ -298,6 +298,11 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   among ... at a single battlefield") now keeps the hidden battlefield; destinations stay free. This answers the
   2026-11-09 open question. Checked OK: hidden Temporal Breach whose unit moved off its battlefield does nothing
   (CR 359.3.e.2.a example), Seal of Discord pays as an Add source, En Garde, Shuriken Flip, Sabotage reveals.
+  05:20: runes recycled together went to the bottom of the rune deck in a random order; CR 417.5.a gives their owner
+  the order (main deck cards stay random, 417.5). `ops.Recycle` asks `recycle_order` (one domain per place, runes of
+  a domain are interchangeable) and `do_recycle(rune_order=)` keeps it (Coalesced Energy). Checked OK: Pyke, Dockside
+  Butcher from facedown offers its [Fury] additional cost, Trifarian Captain's Power limit, Weaponmaster's "[A] less"
+  also reduces a domain Power cost (CR 356.4.f example; 821.1.c.3 reads as "no Power").
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
