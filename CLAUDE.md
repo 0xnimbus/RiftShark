@@ -291,6 +291,13 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   `_draw_raw` now record it in `Game.known` for the players who saw it (`Game._public_viewers`); drawn and facedown
   cards stay hidden. The play page shows such cards face up in the opponent's hand. Checked OK: Concert Poster's
   conquer trigger, The Empyrean's Predict amount, Bellows Breath's same-location choice.
+  2026-11-21 00:20: "choose a battlefield" targets the battlefield (CR 170.7) and "units at a battlefield" restricts
+  the units' targets, but `ChooseLocation` ignored the hidden restriction (811.1.d.2-3): Bedeviling Stranger (Riven,
+  Kennen) played from facedown could pick another crowded battlefield, Fox-Fire, Ahri could kill units anywhere,
+  Resonating Strike could pick any battlefield you control. `ChooseLocation(targeted=True)` (also the auto "split
+  among ... at a single battlefield") now keeps the hidden battlefield; destinations stay free. This answers the
+  2026-11-09 open question. Checked OK: hidden Temporal Breach whose unit moved off its battlefield does nothing
+  (CR 359.3.e.2.a example), Seal of Discord pays as an Add source, En Garde, Shuriken Flip, Sabotage reveals.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

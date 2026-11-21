@@ -2480,3 +2480,53 @@ def test_a_card_returned_to_hand_in_public_view_stays_known_to_the_opponent(db):
     g2._to_zone(g2.objects[h], "facedown")
     g2._to_zone(g2.objects[h], "hand")
     assert not g2.knows(0, h)
+
+
+def test_hidden_cards_that_choose_a_battlefield_choose_their_own(db):
+    """CR 170.7 / 355.10.b: "choose a battlefield" targets the battlefield (Bedeviling Stranger, Resonating Strike) and
+    "units at a battlefield" restricts the units' targets (Fox-Fire, Ahri). Played from facedown, those choices must
+    be at the battlefield it was hidden at (811.1.d.2-3). The battlefield was chosen freely, so a hidden Stranger
+    could return an enemy unit from another crowded battlefield and Fox-Fire could kill units anywhere."""
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "kaisa_void")])
+    _clear_bfs(g, db)
+    g.set_bf_controller(0, 0)
+    put(g, db, 0, "Stellacorn Herder", ("bf", 0))
+    crowd = [put(g, db, 1, "Stellacorn Herder", ("bf", 1)) for _ in range(2)]
+    crowd += [put(g, db, 0, "Stellacorn Herder", ("bf", 1)) for _ in range(2)]
+    st = give(g, 0, "Bedeviling Stranger", db)
+    ff = give(g, 0, "Fox-Fire, Ahri", db)
+    assert g.do_hide(0, st, ("bf", 0))
+    g.objects[st].facedown_turn = g.turn - 1
+    g.restruct()
+    _ready_runes(g, 0)
+    seen = []
+
+    def pick(d):
+        if d.kind == "choose_location":
+            seen.append(list(d.options))
+        return None
+    d = g.run()
+    play = next(o for o in d.options if o[0] == "play" and o[1] == st)
+    g.choose(play)
+    _drive(g, pick=pick)
+    assert all(opts == [("bf", 0)] for opts in seen), seen
+    assert all(g.objects[u].zone == "board" for u in crowd)
+    # Fox-Fire hidden at the same battlefield (Stranger is no longer facedown there): only units there
+    assert g.do_hide(0, ff, ("bf", 0))
+    g.objects[ff].facedown_turn = g.turn - 1
+    g.restruct()
+    _ready_runes(g, 0)
+    seen.clear()
+    killed = []
+
+    def pick2(d):
+        if d.kind == "choose_location":
+            seen.append(list(d.options))
+        if d.kind in ("choose", "choose_many", "choose_from_list"):
+            killed.extend(o for o in d.options if o in crowd)
+        return None
+    d = g.run()
+    g.choose(("play", ff))
+    _drive(g, pick=pick2)
+    assert all(opts == [("bf", 0)] for opts in seen), seen
+    assert not killed and all(g.objects[u].zone == "board" for u in crowd)
