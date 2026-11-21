@@ -315,6 +315,13 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   was shown off). Checked OK: Ember Monk triggers only on facedown plays, Gutter Guardian can't show off a
   facedown card (Radiance FAQ), Astral Heron's discount is "this turn" (errata) and used by effect plays (CR 420
   example), Evelynn, Entrancing needs your turn, Baron Nashor only enters the Pit when he adds it, Decree of Rage.
+  20:20: a scan of every card for targeted choices left in resolution code found three hand scripts: Kha'Zix,
+  Evolving Hunter ("you may spend 3 XP to deal ... to an enemy unit here") and Lady of Clockwork ("you may pay [1]
+  to choose a friendly gear") now pay and choose as the trigger is finalized (CR 383.3.b, 355.10.c.1;
+  `targeting._peel_costs` knows non-optional SpendXP). Teemo, Strategist follows his errata: defend trigger only,
+  enemy unit chosen on the chain, one Deal of N (418.8), none for 0. Not in any tournament list. Checked OK:
+  move destinations are chosen while playing (CR 355.4), Thrill of the Hunt's battlefield is picked by the play
+  itself, Undertitan adds [2] as Void Burrower reveals it, Noxian Emissary's Empowered Deathknell.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

@@ -394,10 +394,12 @@ def lady_of_clockwork(defn):
         g.add_mod(new, "base_might", g.objects[new].base_defn().energy or 0, duration="permanent", source=c.source)
         g.bump()
 
-    return {"abilities": [Triggered("start_main", [
-        O.If(lambda g, c: bool(g.choice_candidates(c, gear, targeted=True)), [
-            O.PayResources(1, out="__lady"),
-            O.If(Ref("__lady"), [O.Choose(gear, out="t", targeted=True), O.Do(animate)])])],
+    # "you may pay [1] to" is the base cost paid as the trigger is finalized (CR 383.3.b); the gear is a target chosen
+    # then (355.10.c.1).
+    return {"abilities": [Triggered("start_main", [O.May([
+        O.Choose(gear, out="t", targeted=True),
+        O.PayResources(1, out="__lady", optional=False),
+        O.Do(animate)], label="pay [1] to choose a friendly gear")],
         label=defn.name, source_text=defn.text)], "replace": True}
 
 
@@ -597,11 +599,13 @@ def jayce_hammer(defn):
 def khazix_evolving(defn):
     # [Hunt]   (keyword)
     # When I attack, you may spend 3 XP to deal damage equal to my Might to an enemy unit here.
-    return {"abilities": [Triggered("attack_self", [
+    # "spend 3 XP to" is the trigger's base cost, paid as it is finalized (CR 383.3.b), and the enemy unit is chosen
+    # then too (355.10.c.1: the unit is a target, the XP is not).
+    return {"abilities": [Triggered("attack_self", [O.May([
+        O.Choose(Sel("unit", side="enemy", where="here"), out="t"),
         O.If(lambda g, c: g.players[c.controller].xp >= 3, [
-            O.SpendXP(3, out="__xp"),
-            O.If(Ref("__xp"), [O.Choose(Sel("unit", side="enemy", where="here"), out="t"),
-                               O.Deal(lambda g, c: g.chars(c.source).might or 0, Ref("t"))])])],
+            O.SpendXP(3, out="__xp", optional=False),
+            O.Deal(lambda g, c: g.chars(c.source).might or 0, Ref("t"))])], label="spend 3 XP to deal damage")],
         label=defn.name, source_text=defn.text)], "replace": True}
 
 
@@ -1296,16 +1300,15 @@ def ivern_friend(defn):
 
 @script("Teemo, Strategist")
 def teemo_strategist(defn):
-    # [Hidden]   (keyword)
-    # When I defend or I'm played from [Hidden], reveal the top 5 cards of your Main Deck. Deal 1 to an enemy unit here
-    # for each card with [Hidden], then recycle them.
-    eff = [O.Look(5, out="looked", reveal=True),
-           O.Times(lambda g, c: sum(1 for u in c.vars.get("looked", []) if g.objects[u].base_defn().keywords.get("hidden")),
-                   [O.Choose(Sel("unit", side="enemy", where="here"), out="t"), O.Deal(1, Ref("t"))]),
+    # Errata (Origins): "[Hidden] When I defend, choose an enemy unit here and reveal the top 5 cards of your Main Deck.
+    # Deal 1 to that unit for each card with [Hidden] revealed this way, then recycle the revealed cards."
+    # The unit is chosen as the trigger goes on the chain (CR 355.5); one Deal of N (418.8), none for 0 (715.4).
+    hidden_n = lambda g, c: sum(1 for u in c.vars.get("looked", []) if g.objects[u].base_defn().keywords.get("hidden"))
+    eff = [O.Choose(Sel("unit", side="enemy", where="here"), out="t"),
+           O.Look(5, out="looked", reveal=True),
+           O.If(lambda g, c: hidden_n(g, c) > 0, [O.Deal(hidden_n, Ref("t"))]),
            O.Recycle(lambda g, c: [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck"])]
-    return {"abilities": [Triggered("defend_self", list(eff), label=defn.name, source_text=defn.text),
-                          Triggered("play_self", list(eff), filt=lambda g, s, ev: ev.get("from_zone") == "facedown",
-                                    label=defn.name, source_text=defn.text)], "replace": True}
+    return {"abilities": [Triggered("defend_self", eff, label=defn.name, source_text=defn.text)], "replace": True}
 
 
 @script("Rek'Sai, Swarm Queen")
