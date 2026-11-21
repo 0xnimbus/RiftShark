@@ -1751,12 +1751,14 @@ class Game(flow.FlowMixin):
             self.turn_memo[("discarded", o.owner)] = self.turn_memo.get(("discarded", o.owner), 0) + 1
             self.emit("discard", uid=u, player=o.owner, ctx=ctx, batch=batch)
 
-    def do_recycle(self, uids, ctx=None):
+    def do_recycle(self, uids, ctx=None, rune_order=None):
         """Recycle (CR 417): cards go to the bottom of their owner's deck; runes to the bottom of the rune deck.
-        Several cards recycled at once go to the bottom in a random order (CR 417.5)."""
+        Several cards recycled at once go to the bottom in a random order (CR 417.5); `rune_order`: runes recycled
+        with them, in the order their owner chose (417.5.a), top-most first."""
         uids = list(uids)
         if len(uids) > 1:
             self.rng.shuffle(uids)
+        uids += list(rune_order or ())
         batch = self.tick()
         for u in uids:
             o = self.objects.get(u)

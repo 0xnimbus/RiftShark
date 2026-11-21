@@ -2530,3 +2530,35 @@ def test_hidden_cards_that_choose_a_battlefield_choose_their_own(db):
     _drive(g, pick=pick2)
     assert all(opts == [("bf", 0)] for opts in seen), seen
     assert not killed and all(g.objects[u].zone == "board" for u in crowd)
+
+
+def test_runes_recycled_together_go_to_the_bottom_in_their_owners_order(db):
+    """CR 417.5.a: runes recycled at the same time go to the bottom of the rune deck in the order their owner chooses
+    (main deck cards go in a random order, 417.5). Coalesced Energy ("At the end of your turn, recycle all your runes,
+    then channel 4 runes exhausted") shuffled them."""
+    from riftsim.core.vm import Frame
+    from riftsim.core import ops as O
+    from riftsim.core.selectors import Sel
+    g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "riven_exile")])
+    runes = list(g.players[0].runes)
+    doms = {g.objects[u].defn.domains[0] for u in runes}
+    assert len(doms) == 2, doms
+    last = sorted(doms)[-1]
+    before = len(g.players[0].rune_deck)
+    g.pending = None
+    g.vm_frames.append(Frame([O.Recycle(Sel("rune", side="friendly"))], Context(0, None)))
+    asked = 0
+    while True:
+        d = g.run()
+        if d is None or d.kind != "recycle_order":
+            break
+        asked += 1
+        assert d.player == 0
+        # put every rune of the other domain first, so the last domain ends at the very bottom
+        g.choose(next(o for o in d.options if g.objects[o].defn.domains[0] != last))
+    assert asked >= 1
+    bottom = g.players[0].rune_deck[before:]
+    assert sorted(bottom) == sorted(runes)
+    k = sum(1 for u in runes if g.objects[u].defn.domains[0] != last)
+    assert all(g.objects[u].defn.domains[0] != last for u in bottom[:k])
+    assert all(g.objects[u].defn.domains[0] == last for u in bottom[k:])

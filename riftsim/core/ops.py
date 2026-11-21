@@ -652,7 +652,8 @@ class Recycle(Instr):
         if self.targets is not None:
             us = _uids(game, ctx, self.targets)
             if us:
-                game.do_recycle(us, ctx)
+                ctx.vars["__rcy"] = {"all": list(us), "order": [], "left": [u for u in us if _is_rune(game, u)]}
+                return self._next_rune(game, ctx)
             return None
         p = _player(game, ctx, self.player)
         n = val(game, ctx, self.n)
@@ -665,9 +666,48 @@ class Recycle(Instr):
             return self.resume(game, ctx, opts[0])
         return Decision(p, "recycle", opts, out=self.out, labels=[", ".join(game.label(u) for u in o) for o in opts])
 
+    def _next_rune(self, game, ctx):
+        """CR 417.5.a: runes recycled together go to the bottom of the rune deck in the order their owner chooses
+        (other cards go in a random order, 417.5). Runes of one domain are interchangeable, so the owner picks a
+        domain for the next place until one domain is left."""
+        st = ctx.vars["__rcy"]
+        while st["left"]:
+            doms = {}
+            for u in st["left"]:
+                doms.setdefault(_rune_domain(game, u), u)
+            if len(doms) == 1:
+                st["order"] += st["left"]
+                st["left"] = []
+                break
+            owner = game.objects[st["left"][0]].owner
+            opts = list(doms.values())
+            n = len(st["order"])
+            return Decision(owner, "recycle_order", opts, out="__rcy_pick",
+                            labels=[f"{game.label(u)} next ({n + 1} of {n + len(st['left'])} runes going to the bottom)"
+                                    for u in opts], info={"label": "Order the recycled runes (top to bottom)"})
+        runes = set(st["order"])
+        game.do_recycle([u for u in st["all"] if u not in runes], ctx, rune_order=st["order"])
+        return None
+
     def resume(self, game, ctx, choice):
+        st = ctx.vars.get("__rcy")
+        if self.targets is not None and st is not None and st["left"]:
+            dom = _rune_domain(game, choice)
+            u = choice if choice in st["left"] else next(x for x in st["left"] if _rune_domain(game, x) == dom)
+            st["left"].remove(u)
+            st["order"].append(u)
+            return self._next_rune(game, ctx)
         game.do_recycle(list(choice), ctx)
         return None
+
+
+def _is_rune(game, u):
+    o = game.objects.get(u)
+    return o is not None and o.defn.type == "rune"
+
+
+def _rune_domain(game, u):
+    return tuple(game.objects[u].defn.domains or ())
 
 
 class Burn(Instr):
