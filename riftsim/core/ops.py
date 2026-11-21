@@ -275,8 +275,12 @@ def _record_pick(ctx, v):
 class ChooseLocation(Instr):
     """Choose a battlefield (or base). Stores location tuple in ctx.vars[out]."""
 
-    def __init__(self, out="loc", kinds=("bf",), pred=None, player=None, label="Choose a battlefield", include_bases=False):
+    def __init__(self, out="loc", kinds=("bf",), pred=None, player=None, label="Choose a battlefield", include_bases=False,
+                 targeted=False):
         self.out, self.kinds, self.pred, self.player, self.label, self.include_bases = out, kinds, pred, player, label, include_bases
+        # targeted: the battlefield is a target ("choose a battlefield", "units at a battlefield"; CR 170.7, 355.10.b),
+        # not a destination ("move it to a battlefield", "play it to a battlefield" don't target)
+        self.targeted = targeted
 
     def run(self, game, ctx):
         p = _player(game, ctx, self.player)
@@ -285,6 +289,10 @@ class ChooseLocation(Instr):
             locs += [("base", q) for q in range(len(game.players))]
         if self.pred:
             locs = [l for l in locs if self.pred(game, ctx, l)]
+        if self.targeted and ctx.target_bf is not None:
+            # CR 811.1.d.2-3: a card played from facedown chooses at the battlefield it was hidden at (a play effect:
+            # only while its source is still on the board to tell where that was, 811.1.d.3.a)
+            locs = [] if game.hidden_source_gone(ctx) else [l for l in locs if l == ctx.target_bf]
         if not locs:
             ctx.vars[self.out] = None
             return None

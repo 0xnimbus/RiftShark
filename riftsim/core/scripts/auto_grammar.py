@@ -830,7 +830,7 @@ def parse_sentence(s, state):
     if m:
         tgt = m.group(1)
         if "at a single battlefield" in m.group(2) or "at one battlefield" in m.group(2):
-            return [O.ChooseLocation(out="__bf"),
+            return [O.ChooseLocation(out="__bf", targeted=True),
                     O.Choose(Sel("unit", where="loc:__bf"), out="__split", n=O.split_cap(parse_amount(tgt)), up_to=True),
                     O.Split(parse_amount(tgt), Ref("__split"))]
         if m.group(2).startswith("enemy units here") or m.group(2) == "units here":

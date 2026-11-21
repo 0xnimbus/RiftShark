@@ -36,7 +36,7 @@ def bedeviling_stranger(defn):
     # battlefield as the trigger goes on the chain (up to one: there may be none there); the count is checked and
     # the "may" decided on resolution (383.3.a.3).
     return [Triggered("play_self", [
-        O.ChooseLocation(out="__bl"),
+        O.ChooseLocation(out="__bl", targeted=True),
         O.Choose(Sel("unit", side="enemy", where="loc:__bl"), out="t", up_to=True),
         O.If(lambda g, c: c.vars.get("t") is not None and c.vars.get("__bl") is not None and len(g.units_at(c.vars["__bl"])) >= 4,
              [O.May([O.ToHand(Ref("t"))], label="return an enemy unit there")]),

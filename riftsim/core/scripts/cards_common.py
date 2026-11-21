@@ -1041,7 +1041,7 @@ def resonating_strike(defn):
     # unit to that battlefield and give it +2 [M] this turn.
     mine = lambda g, c, l: g.battlefields[l[1]].controller == c.controller
     elsewhere = Sel("unit", side="friendly", pred=lambda g, c, u: g.objects[u].location != c.vars.get("loc"), elsewhere=True)
-    return [SpellEffect([O.ChooseLocation(out="loc", pred=mine), O.Choose(elsewhere, out="t"),
+    return [SpellEffect([O.ChooseLocation(out="loc", pred=mine, targeted=True), O.Choose(elsewhere, out="t"),
                          O.Move(Ref("t"), Ref("loc")), O.GiveMight(Ref("t"), 2)], label=defn.name, source_text=defn.text)]
 
 
@@ -2454,7 +2454,7 @@ def fox_fire(defn):
         loc = c.vars.get("loc")
         used = sum(g.chars(u).might or 0 for u in c.vars.get("__ff", []))
         return [u for u in g.units_at(loc) if (g.chars(u).might or 0) + used <= 4] if loc else []
-    return [SpellEffect([O.ChooseLocation(out="loc")] + _pick_up_to(opts, 8, "__ff", "kill a unit there (total Might 4 or less)") +
+    return [SpellEffect([O.ChooseLocation(out="loc", targeted=True)] + _pick_up_to(opts, 8, "__ff", "kill a unit there (total Might 4 or less)") +
                         [O.Kill(lambda g, c: list(c.vars.get("__ff") or ()))], label=defn.name, source_text=defn.text)]
 
 
