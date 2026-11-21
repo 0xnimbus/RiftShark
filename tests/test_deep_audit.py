@@ -2592,3 +2592,40 @@ def test_a_spell_an_effect_plays_from_the_trash_is_not_banished_like_flow(db):
     _drive(g, pick=pick)
     assert all(g.objects[u].zone == "trash" for u in foes)       # played twice: both units killed
     assert g.objects[dfb].zone == "trash", (g.objects[dfb].zone, seen)
+
+
+def test_battle_preparations_chooses_its_runes_as_it_is_played(db):
+    """Battle Preparations ("[Show Off] a gear. Give a unit +2 [M] this turn. If you showed off, ready up to 2 runes"):
+    runes are public, so they are targets chosen as the spell is played (CR 355.5, 355.10), after the Show Off choice,
+    not at resolution. Without a gear shown off nothing is chosen."""
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "kaisa_void")])
+    _clear_bfs(g, db)
+    unit = put(g, db, 0, "Legion Rearguard", ("base", 0))
+    gear = put(g, db, 0, "Blade of the Exile", ("base", 0))
+    bp = give(g, 0, "Battle Preparations", db)
+    for r in list(g.players[0].rune_deck)[:6]:
+        g.players[0].rune_deck.remove(r)
+        g.players[0].runes.append(r)
+        g.objects[r].zone = "board"
+    _ready_runes(g, 0)
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == bp))
+    kinds = []
+
+    def pick(d):
+        kinds.append(d.kind)
+        if d.kind == "show_off":
+            return gear
+        if d.kind == "choose_many":
+            return max(d.options, key=lambda o: len(o) if isinstance(o, tuple) else 0)
+        return None
+    _drive(g, pick=pick, stop=lambda d: any(it.uid == bp and it.finalized for it in g.chain))
+    item = next(it for it in g.chain if it.uid == bp)
+    picked = item.ctx.vars.get("t2")
+    picked = picked if isinstance(picked, tuple) else (picked,)
+    assert item.ctx.shown_off and len([u for u in picked if u is not None]) == 2, kinds
+    assert all(g.objects[u].exhausted for u in picked)        # the runes paid for it: readied on resolution
+    _drive(g)
+    assert g.objects[bp].zone == "trash"
+    assert not any(g.objects[u].exhausted for u in picked)
+    assert g.chars(unit).might == (g.objects[unit].defn.might or 0) + 2

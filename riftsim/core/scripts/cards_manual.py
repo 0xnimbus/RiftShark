@@ -320,3 +320,15 @@ def veiled_temple(defn):
                        O.If(Ref("__vt"), [O.Ready(Ref("__vt")),
                                           O.If(is_equipment, [O.May([O.Detach(Ref("__vt"))], label="detach it")])])],
                       label="Veiled Temple", source_text=defn.text)]
+
+
+@script("Battle Preparations")
+def battle_preparations(defn):
+    # [Reaction] [Show Off] a gear. Give a unit +2 [M] this turn. If you showed off, ready up to 2 runes.
+    # The runes are targets (public, CR 355.10), so they are chosen as the spell is played (355.5), right after the
+    # Show Off decision (832.1.c.2); with nothing shown off there is nothing to choose.
+    shown = lambda g, c: bool(getattr(c, "shown_off", None))
+    return [SpellEffect([O.Choose(Sel("unit"), out="t"),
+                         O.Choose(Sel("rune", pred=lambda g, c, u: shown(g, c)), out="t2", n=2, up_to=True),
+                         O.GiveMight(Ref("t"), 2, duration="turn"),
+                         O.If(shown, [O.Ready(Ref("t2"))])], label=defn.name, source_text=defn.text)]

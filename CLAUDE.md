@@ -309,6 +309,12 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   `_play` now marks Flow plays (ctx `__flow`, never effect plays); resolve, counter and fizzle read that flag.
   Checked OK: Lonely Poro's "alone" (CR 740.2.a, friendly units at its location), An Offer You Can't Refuse
   gives the Gold to the gear's controller, Kinkou Initiate counts only your other units.
+  15:20: Battle Preparations' "If you showed off, ready up to 2 runes" chose the runes at resolution (the last
+  targeted choice left there, see 2026-11-17 05:20); runes are public, so they are targets chosen as it is played
+  (CR 355.5, 355.10), right after the Show Off pick. Hand-scripted in cards_manual.py (nothing to choose if nothing
+  was shown off). Checked OK: Ember Monk triggers only on facedown plays, Gutter Guardian can't show off a
+  facedown card (Radiance FAQ), Astral Heron's discount is "this turn" (errata) and used by effect plays (CR 420
+  example), Evelynn, Entrancing needs your turn, Baron Nashor only enters the Pit when he adds it, Decree of Rage.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
