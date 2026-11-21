@@ -303,6 +303,12 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   a domain are interchangeable) and `do_recycle(rune_order=)` keeps it (Coalesced Energy). Checked OK: Pyke, Dockside
   Butcher from facedown offers its [Fury] additional cost, Trifarian Captain's Power limit, Weaponmaster's "[A] less"
   also reduces a domain Power cost (CR 356.4.f example; 821.1.c.3 reads as "no Power").
+  10:20: every spell played from the trash was banished as it left the chain, but CR 829.1.b banishes only Flow
+  plays (printed Flow or Kennen's granted Flow): Death from Below's "you may play this from your trash for [A]"
+  copy was banished instead of going back to the trash, and a countered Forbidden Technique replay was banished.
+  `_play` now marks Flow plays (ctx `__flow`, never effect plays); resolve, counter and fizzle read that flag.
+  Checked OK: Lonely Poro's "alone" (CR 740.2.a, friendly units at its location), An Offer You Can't Refuse
+  gives the Gold to the gear's controller, Kinkou Initiate counts only your other units.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

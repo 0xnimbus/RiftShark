@@ -1552,8 +1552,7 @@ class FlowMixin:
         if it.uid is not None and it.kind in ("spell", "unit", "gear"):
             o = self.objects[it.uid]
             if o.zone == "chain":
-                flow = it.kind == "spell" and it.ctx is not None and it.ctx.played_from == "trash" \
-                    and not it.ctx.vars.get("__recycle_after")
+                flow = it.kind == "spell" and it.ctx is not None and it.ctx.vars.get("__flow")
                 self._to_zone(o, "banish" if flow else "trash")      # Flow: banished on leaving the chain (CR 829.1.b.1)
         self.log("fizzle", item=it.id, label=it.label, why=why)
         self.dirty = True
@@ -1619,7 +1618,7 @@ class FlowMixin:
             if o.zone == "chain":
                 if it.ctx.vars.get("__recycle_after"):         # Fizz, Trickster
                     self.do_recycle([it.uid], it.ctx)
-                elif it.ctx.played_from == "trash" or it.ctx.vars.get("__banish_after"):
+                elif it.ctx.vars.get("__flow") or it.ctx.vars.get("__banish_after"):     # Flow (CR 829.1.b)
                     self._to_zone(o, "banish")
                 else:
                     self._to_zone(o, "trash")
@@ -2276,6 +2275,11 @@ class FlowMixin:
             self.turn_memo[("gear_played", p)] = self.turn_memo.get(("gear_played", p), 0) + 1     # Ornn's Forge
         ctx = Context(p, uid, here=loc)
         ctx.played_from = z
+        # Played from the trash for its Flow cost (or Kennen's granted Flow): banished as it leaves the chain
+        # (CR 829.1.b). A spell an effect plays from the trash (Death from Below's replay, Fizz) is not.
+        if z == "trash" and kind == "spell" and not getattr(self, "_limited_play", False) \
+                and (d.keywords.get("flow_cost") or self._trash_play_perm(uid) is None):
+            ctx.vars["__flow"] = True
         if z == "facedown":
             ctx.target_bf = o.hidden_at
         if loc is not None:

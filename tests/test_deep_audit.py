@@ -2562,3 +2562,33 @@ def test_runes_recycled_together_go_to_the_bottom_in_their_owners_order(db):
     k = sum(1 for u in runes if g.objects[u].defn.domains[0] != last)
     assert all(g.objects[u].defn.domains[0] != last for u in bottom[:k])
     assert all(g.objects[u].defn.domains[0] == last for u in bottom[k:])
+
+
+def test_a_spell_an_effect_plays_from_the_trash_is_not_banished_like_flow(db):
+    """CR 829.1.b: only a spell played for its Flow cost is banished as it leaves the chain. Death from Below's
+    "you may play this from your trash for [A]" has no "banish this", so the replayed copy goes back to the trash
+    (and can be replayed again); a Flow play (Lightning Rush) is still banished."""
+    g = main_phase(db, [_deck(db, "kennen_tempest"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    dfb = give(g, 0, "Death from Below", db)
+    foes = []
+    for _ in range(2):
+        foes.append(put(g, db, 1, "Legion Rearguard", ("bf", 0), exclude=foes))
+    assert all((g.chars(u).might or 0) <= 3 for u in foes)
+    for r in list(g.players[0].rune_deck)[:6]:
+        g.players[0].rune_deck.remove(r)
+        g.players[0].runes.append(r)
+        g.objects[r].zone = "board"
+    _ready_runes(g, 0)
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == dfb))
+    seen = []
+
+    def pick(d):
+        seen.append(d.kind)
+        if d.kind in ("may", "optional") or (d.kind == "choose" and True in d.options):
+            return True if True in d.options else d.options[0]
+        return None
+    _drive(g, pick=pick)
+    assert all(g.objects[u].zone == "trash" for u in foes)       # played twice: both units killed
+    assert g.objects[dfb].zone == "trash", (g.objects[dfb].zone, seen)
