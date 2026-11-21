@@ -2629,3 +2629,27 @@ def test_battle_preparations_chooses_its_runes_as_it_is_played(db):
     assert g.objects[bp].zone == "trash"
     assert not any(g.objects[u].exhausted for u in picked)
     assert g.chars(unit).might == (g.objects[unit].defn.might or 0) + 2
+
+
+def test_trigger_targets_and_xp_costs_are_chosen_as_the_trigger_is_finalized(db):
+    """Kha'Zix, Evolving Hunter ("you may spend 3 XP to deal damage equal to my Might to an enemy unit here") and Lady
+    of Clockwork ("you may pay [1] to choose a friendly gear") chose their unit/gear on resolution, after paying; the
+    cost is the trigger's base cost (CR 383.3.b) and the object a target (355.10.c.1), both settled as it is finalized.
+    Teemo, Strategist follows his errata: only "When I defend", the enemy unit is chosen as the trigger goes on the
+    chain, and it takes one Deal of N (CR 418.8), none when nothing with [Hidden] is revealed (715.4)."""
+    from riftsim.core import ops as O
+
+    def kinds(code):
+        return [type(x).__name__ for x in code or []]
+    kz = next(ab for ab in next(c for c in db if c.name == "Kha'Zix, Evolving Hunter").abilities
+              if "SpendXP" in kinds(ab.target_code) + kinds(ab.code))
+    assert "Choose" in kinds(kz.target_code) and "SpendXP" in kinds(kz.target_code)
+    assert "Choose" not in kinds(kz.code) and "SpendXP" not in kinds(kz.code)
+    lady = next(c for c in db if c.name == "Lady of Clockwork").abilities[0]
+    assert "Choose" in kinds(lady.target_code) and "PayResources" in kinds(lady.target_code)
+    assert "Choose" not in kinds(lady.code)
+    teemo = [ab for ab in next(c for c in db if c.name == "Teemo, Strategist").abilities if hasattr(ab, "event")]
+    assert len(teemo) == 1 and teemo[0].event == "defend_self"
+    assert "Choose" in kinds(teemo[0].target_code) and "Choose" not in kinds(teemo[0].code)
+    assert kinds(teemo[0].code).count("Deal") == 1 and not any(isinstance(x, O._LoopInit) for x in teemo[0].code
+                                                               if hasattr(O, "_LoopInit"))

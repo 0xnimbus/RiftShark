@@ -277,7 +277,8 @@ def _peel_costs(body):
         b = body[0]
         tail_ok = all(isinstance(x, O.SetVar) for x in body[1:])      # "... SetVar(__did)" after the If
         if isinstance(b, O.If) and not b.els and tail_ok and b.then and (
-                (isinstance(b.then[0], O.Exhaust) and _is_self(b.then[0].targets)) or isinstance(b.then[0], O.PayResources)):
+                (isinstance(b.then[0], O.Exhaust) and _is_self(b.then[0].targets)) or isinstance(b.then[0], O.PayResources)
+                or (isinstance(b.then[0], O.SpendXP) and not b.then[0].optional)):
             if not ("has_var" in getattr(b.cond, "__qualname__", "") and costs):
                 pre.append(b.cond)        # (an "if you paid, ..." around the rest needs nothing: payment is checked)
             body = list(b.then) + body[1:]
@@ -286,6 +287,9 @@ def _peel_costs(body):
             costs.append(body.pop(0))
             continue
         if isinstance(b, O.PayResources) and not b.optional and b.out:
+            costs.append(body.pop(0))
+            continue
+        if isinstance(b, O.SpendXP) and not b.optional:      # "spend N XP to ..." (checked by the If before it)
             costs.append(body.pop(0))
             continue
         if isinstance(b, O.If) and not b.els and costs and "has_var" in getattr(b.cond, "__qualname__", "") and tail_ok:
