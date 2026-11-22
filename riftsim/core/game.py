@@ -1037,8 +1037,13 @@ class Game(flow.FlowMixin):
             ctx.vars["__ev_stamps"] = st
 
     def add_reflexive(self, ctx, effect, label="do this"):
+        """'Do this:' (CR 388-389): a new pending chain item. Like a triggered ability, its choices and a leading "you
+        may" (with a cost right after it) are settled as it is finalized (CR 355, 388.4), not when it resolves."""
+        from .targeting import split_trigger
         c = ctx.clone()
-        item = ChainItem(self.next_item_id, "reflexive", ctx.controller, ctx.source, None, c, label=label, code=compile_effect(effect))
+        targets, eff = split_trigger(effect)
+        item = ChainItem(self.next_item_id, "reflexive", ctx.controller, ctx.source, None, c, label=label,
+                         code=compile_effect(eff), target_code=compile_effect(targets) if targets else None)
         self.next_item_id += 1
         item.stamp = self.tick()
         self.chain.append(item)

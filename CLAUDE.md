@@ -322,6 +322,13 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   enemy unit chosen on the chain, one Deal of N (418.8), none for 0. Not in any tournament list. Checked OK:
   move destinations are chosen while playing (CR 355.4), Thrill of the Hunt's battlefield is picked by the play
   itself, Undertitan adds [2] as Void Burrower reveals it, Noxian Emissary's Empowered Deathknell.
+  2026-11-22 00:20: reflexive triggers ("Then do this:", CR 388-389) made their choices and "you may" on resolution;
+  `Game.add_reflexive` now splits them like a trigger (`split_trigger`: choices, a leading may and its cost are
+  settled as the item is finalized, 388.4). Arise! and Guards! (Azir deck) did their errata's "Then do this:"
+  inline; both now put a reflexive item on the chain (players can respond before the Soldiers are readied).
+  Open: other errata "do this" cards ("If this kills it, do this: draw 1", Reflection copies, "Do this
+  twice") are still inline. Checked OK: Hunker Down's move lock covers every mover, Abandon keeps a Flow spell
+  banished, Alpha Strike gains XP per unit its damage kills.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
