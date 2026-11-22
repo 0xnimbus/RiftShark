@@ -342,6 +342,11 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   unchanged. "First/second card" triggers read the event's `nth` (finalize order), not the count at resolution.
   Open: Fizz, Trickster's errata "Then recycle it" and Rell, Magnetic's "If you do, then do this: Attach it to me"
   read literally act while the played card is still on the chain; kept as "after it resolves" until a ruling.
+  15:20: three scripts still followed pre-errata text (Spiritforged). Rek'Sai, Swarm Queen and Void Rush: "You may
+  banish one, then play it": the card is banished first and played from there (paying, or [2] less), so one that
+  can't be played stays banished instead of being recycled/drawn (CR 420.3.c). Jax, Unmatched: "Your Equipment
+  everywhere have [Quick-Draw]" (was hand only): Reaction timing and the attach trigger for Equipment played from
+  the trash, face down or by effects. None is in a tournament list.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
