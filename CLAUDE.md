@@ -329,6 +329,12 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   Open: other errata "do this" cards ("If this kills it, do this: draw 1", Reflection copies, "Do this
   twice") are still inline. Checked OK: Hunker Down's move lock covers every mover, Abandon keeps a Flow spell
   banished, Alpha Strike gains XP per unit its damage kills.
+  05:20: Disintegrate ("Deal 3 to a unit at a battlefield. If this kills it, do this: draw 1") never drew: the
+  unit dies of lethal damage in the cleanup after the spell (CR 323), but the auto-script checked the trash while
+  resolving. Hand-scripted as a delayed die trigger credited by `dmg_item` (like Alpha Strike; the only other
+  "this kills" card). Dragon's Rage, Lee Sin's errata "Then do this: Choose another enemy unit at its
+  destination" is now a reflexive item (target chosen at its finalize). Still inline: Rell, Magnetic's "then do
+  this: Attach it to me"; Bone Skewer, Mirror Image, Keeper of Masks and LeBlanc, Deceiver are unscripted.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

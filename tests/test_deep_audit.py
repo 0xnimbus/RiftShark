@@ -2708,3 +2708,58 @@ def test_guards_pays_to_ready_its_soldier_as_a_reflexive_trigger(db):
     _drive(g, pick=pick)
     assert seen.get("asked") and seen.get("tok") is not None
     assert not g.objects[seen["tok"]].exhausted
+
+
+def _spell_setup(db, deck, name):
+    g = main_phase(db, [_deck(db, deck), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    for r in list(g.players[0].rune_deck)[:8]:
+        g.players[0].rune_deck.remove(r)
+        g.players[0].runes.append(r)
+        g.objects[r].zone = "board"
+    _ready_runes(g, 0)
+    return g, give(g, 0, name, db)
+
+
+def test_disintegrate_draws_when_its_damage_kills_the_unit(db):
+    """Disintegrate (errata: "Deal 3 to a unit at a battlefield. If this kills it, do this: draw 1."): the unit dies of
+    lethal damage in the cleanup after the spell resolves (CR 323), so checking "is it in the trash" while resolving
+    never drew. It is a reflexive trigger on that death (CR 388)."""
+    for name, draws in (("Legion Rearguard", 1), ("Undertitan", 0)):
+        g, ds = _spell_setup(db, "kaisa_void", "Disintegrate")
+        foe = put(g, db, 1, name, ("bf", 0))
+        g.objects[foe].defn = next(c for c in db if c.name == name)
+        g.restruct()
+        h = len(g.players[0].hand)
+        d = g.run()
+        g.choose(next(o for o in d.options if o[0] == "play" and o[1] == ds))
+        _drive(g, pick=lambda d: foe if d.kind == "choose" and foe in d.options else None)
+        assert len(g.players[0].hand) - (h - 1) == draws, name
+        assert (g.objects[foe].zone != "board") == bool(draws)
+
+
+def test_dragons_rage_chooses_the_second_unit_in_a_reflexive_trigger(db):
+    """Dragon's Rage, Lee Sin (errata: "Move an enemy unit. Then do this: Choose another enemy unit at its
+    destination. They deal damage equal to their Mights to each other."): the second unit is chosen as a separate
+    reflexive chain item is finalized, after the move (CR 388)."""
+    g, dr = _spell_setup(db, "kaisa_void", "Dragon's Rage, Lee Sin")
+    a = put(g, db, 1, "Legion Rearguard", ("base", 1))
+    b = put(g, db, 1, "Legion Rearguard", ("bf", 0), exclude=(a,))
+    put(g, db, 1, "Legion Rearguard", ("bf", 0), exclude=(a, b))         # two units there: a real choice
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == dr))
+    seen = {}
+
+    def pick(d):
+        if d.kind == "choose" and a in d.options:
+            return a
+        if d.kind == "choose_location" and ("bf", 0) in d.options:
+            return ("bf", 0)
+        refl = next((it for it in g.chain if it.kind == "reflexive"), None)
+        if refl is not None and d.kind == "choose" and b in d.options:
+            seen["refl"] = (refl.finalized, g.objects[a].location)
+            return b
+        return None
+    _drive(g, pick=pick)
+    assert seen.get("refl") == (False, ("bf", 0))
+    assert g.objects[a].zone != "board" and g.objects[b].zone != "board"     # 2 and 2: both die
