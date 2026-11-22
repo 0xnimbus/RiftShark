@@ -109,6 +109,16 @@ def _fast_in_hand(g, p):
     return False
 
 
+def _reaction_ready(g, p):
+    """p holds a [Reaction] card in hand whose Energy cost its ready runes (and pool) cover."""
+    r = g.available_energy(p)
+    for u in g.players[p].hand:
+        c = g.objects[u].base_defn()
+        if c.keywords.get("reaction") and (c.energy or 0) <= r:
+            return True
+    return False
+
+
 def _reseed(pols, x):
     """Re-seed the random generators of these policies and the helper policies they hold."""
     seen, stack, k = set(), list(pols), 0
@@ -135,7 +145,7 @@ class LearnedGreedy(GreedyPolicy):
     look, so a game costs a few times a plain one instead of a hundred times."""
 
     def __init__(self, net, seed=0, samples=3, deep=False, margin=0.04, deep_samples=2, react=False, window=None,
-                 hold=False, hold_k=3, pnet=None, pk=3, blend=None, pstrong=0, crn=False, adapt=0, adapt_gap=15.0, **kw):
+                 hold=False, hold_k=3, pnet=None, pk=3, blend=None, pstrong=0, crn=False, adapt=0, adapt_gap=15.0, holdup=0.0, **kw):
         super().__init__(seed, samples=samples, **kw)
         self.net = net
         # window ('learned:REF:rw', 'rwl' with the learned AI as the opponent): an action decision in the opponent's
@@ -186,6 +196,9 @@ class LearnedGreedy(GreedyPolicy):
         self.deep, self.margin, self.deep_samples = deep, margin, deep_samples
         self.opp = LearnedGreedy(net, seed=seed + 577, samples=1) if deep else None
         self.deep_calls = 0
+        # holdup ('hu=X'): a one-turn judgement that ends our turn with a [Reaction] card we can pay for gets +X win
+        # probability (the judge only sees the board at our turn's end, so runes held up for interaction look wasted)
+        self.holdup = holdup
         # recorder (tools/policy_data.py --values): a list that gets (features of each one-turn sample, two-turn win
         # probability) per searched candidate, to train a one-turn judge on the two-turn search's values
         self.recorder = None
@@ -210,6 +223,9 @@ class LearnedGreedy(GreedyPolicy):
                 else:
                     to_turn_end(g, d.player, self.helper, opp=self.opp_react)
                 v += self.net.predict(g, d.player)
+                if self.holdup and not window and not g.over and g.turn_player != d.player \
+                        and _reaction_ready(g, d.player):
+                    v += self.holdup
                 if rec is not None and not g.over:
                     rec[-1].append(encode(g, d.player))
             v = 1000.0 * (v / self.samples - 0.5) + self.rng.random() * self.noise
@@ -394,6 +410,8 @@ def make_learned(kind, arg, seed=0):
                 kw["adapt_gap"] = float(f[1:])
             elif f == "crn":
                 kw["crn"] = True
+            elif f.startswith("hu="):
+                kw["holdup"] = float(f[3:])
             elif f.startswith("b=") :
                 kw["blend"] = float(f[2:])
             elif f.startswith("d") and f[1:].isdigit():
