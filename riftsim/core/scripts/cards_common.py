@@ -1645,6 +1645,15 @@ def reinforce(defn):
                         label=defn.name, source_text=defn.text)]
 
 
+@script("Salvage")
+def salvage(defn):
+    # Errata (Origins): [Action] You may kill up to one gear. Draw 1.
+    # "Up to one": the gear is a target chosen as it is played (CR 355.10), and zero is allowed, so Salvage can be
+    # played with no gear on the board just to draw (the auto-script needed a gear to choose).
+    return [SpellEffect([O.Choose(Sel("gear"), out="t", n=1, up_to=True), O.Kill(Ref("t")), O.Draw(1)],
+                        label=defn.name, source_text=defn.text)]
+
+
 @script("Pack of Wonders")
 def pack_of_wonders(defn):
     # [T]: Return another friendly gear, unit, or [Hidden] card to its owner's hand.
@@ -1782,10 +1791,11 @@ class _RevealUntilUnit(O.Instr):
 
 @script("Dazzling Aurora")
 def dazzling_aurora(defn):
-    # At the end of your turn, reveal cards from the top of your Main Deck until you reveal a unit. Play it, ignoring its
-    # cost, and recycle the rest.
+    # Errata (Origins): At the end of your turn, reveal cards from the top of your Main Deck until you reveal a unit and
+    # banish it. Play it, ignoring its cost, and recycle the rest. (Played from the banish zone: a unit that can't be
+    # played stays banished, CR 420.3.c.)
     return [Triggered("end_turn", [_RevealUntilUnit(),
-                                   O.If(Ref("__du"), [O.PlayCard(Ref("__du"), ignore="all")]),
+                                   O.If(Ref("__du"), [O.Banish(Ref("__du")), O.PlayCard(Ref("__du"), ignore="all")]),
                                    O.Recycle(lambda g, c: [u for u in c.vars.get("__dr", []) if g.objects[u].zone == "deck"])],
                       label=defn.name, source_text=defn.text)]
 
