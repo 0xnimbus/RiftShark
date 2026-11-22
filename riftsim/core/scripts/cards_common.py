@@ -1909,11 +1909,11 @@ def riposte(defn):
 
 @script("Void Rush")
 def void_rush(defn):
-    # Reveal the top 2 cards of your Main Deck. You may play one of them, reducing its cost by [2]. Draw any you did not
-    # play this way.
+    # Errata (Spiritforged): Reveal the top 2 cards of your Main Deck. You may banish one, then play it, reducing its
+    # cost by [2]. Draw any you didn't banish. A banished card that can't be played stays banished (CR 420.3.c).
     cards = lambda g, c: [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck"]
     def cheaper(g, c):
-        e, pw = g.card_cost(c.controller, c.vars["__vr"], "deck", None)
+        e, pw = g.card_cost(c.controller, c.vars["__vr"], "banish", None)
         return (max(0, e - 2), pw)
     def draw_rest(g, c):
         ps = g.players[c.controller]
@@ -1921,8 +1921,9 @@ def void_rush(defn):
             ps.deck.remove(u); ps.deck.insert(0, u)
             g.do_draw(c.controller, 1, c)
     return [SpellEffect([O.Look(2, out="looked", reveal=True),
-                         O.ChooseFromList(cards, out="__vr", up_to=True, label="play one, [2] less"), O.Do(_unwrap("__vr")),
-                         O.If(Ref("__vr"), [O.PlayCard(Ref("__vr"), alt_cost=cheaper)]),
+                         O.ChooseFromList(cards, out="__vr", up_to=True, label="banish one, then play it [2] less"),
+                         O.Do(_unwrap("__vr")),
+                         O.If(Ref("__vr"), [O.Banish(Ref("__vr")), O.PlayCard(Ref("__vr"), alt_cost=cheaper)]),
                          O.Do(draw_rest, label="draw the rest")], label=defn.name, source_text=defn.text)]
 
 

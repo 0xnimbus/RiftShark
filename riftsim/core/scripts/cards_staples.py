@@ -1193,10 +1193,11 @@ def kayle_justified(defn):
 @script("Jax, Unmatched")
 def jax_unmatched(defn):
     # [Deflect]   (keyword)
-    # Each Equipment in your hand has [Quick-Draw]. (CR 819.1.d: [Reaction] and "When you play this, attach it to a
-    # unit you control.")
+    # Errata (Spiritforged): Your Equipment everywhere have [Quick-Draw]. (CR 819.1.d: [Reaction] and "When you play
+    # this, attach it to a unit you control.") Not only from hand: an Equipment played from the trash, from face down
+    # or by an effect has it too.
     def granted_quick_draw_play(g, s, ev):
-        if ev.get("kind") != "play" or ev.get("player") != g.objects[s].controller or ev.get("from_zone") != "hand":
+        if ev.get("kind") != "play" or ev.get("player") != g.objects[s].controller or ev.get("token"):
             return False
         d = g.objects[ev["uid"]].base_defn()
         return d.is_equipment and not d.keywords.get("quick_draw")
@@ -1313,8 +1314,10 @@ def teemo_strategist(defn):
 
 @script("Rek'Sai, Swarm Queen")
 def reksai_swarm_queen(defn):
-    # When I attack, you may reveal the top 2 cards of your Main Deck. You may play one. Then recycle the rest.
-    # If the played card is a unit, you may play it here.
+    # Errata (Spiritforged): When I attack, you may reveal the top 2 cards of your Main Deck. You may banish one, then
+    # play it. If it is a unit, you may play it here. Recycle the rest.
+    # The card is banished first and played from there (paying its cost, CR 420.3.b); one that can't be played stays
+    # banished (CR 420.3.c).
     def pick(g, c):
         return list(c.vars.get("looked", []))
 
@@ -1323,9 +1326,10 @@ def reksai_swarm_queen(defn):
         return u in g.objects and g.objects[u].base_defn().is_unit
     here_or_usual = lambda g, c, l: l == c.here or l in O._unit_play_locations(g, c.controller)
     body = [O.Look(2, out="looked", reveal=True),
-            O.ChooseFromList(pick, out="__rq", up_to=True, label="play one of the revealed cards"),
+            O.ChooseFromList(pick, out="__rq", up_to=True, label="banish one of the revealed cards, then play it"),
             O.Do(_unwrap("__rq")),
             O.If(Ref("__rq"), [
+                O.Banish(Ref("__rq")),
                 O.If(is_unit, [O.ChooseLocation(out="__rql", include_bases=True, pred=here_or_usual, label="Play it where?"),
                                O.PlayCard(Ref("__rq"), loc=Ref("__rql"))],
                      [O.PlayCard(Ref("__rq"))])]),

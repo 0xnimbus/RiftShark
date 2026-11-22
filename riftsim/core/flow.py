@@ -1842,8 +1842,8 @@ class FlowMixin:
         kws = c.keywords
         reaction = bool(kws.get("reaction")) or (from_zone == "facedown" and o.facedown_turn is not None and self.turn > o.facedown_turn) \
             or bool(kws.get("quick_draw"))
-        if from_zone == "hand" and c.is_equipment and self.rules("hand_equipment_quick_draw", player=p):
-            reaction = True                       # Jax, Unmatched: "Each Equipment in your hand has [Quick-Draw]."
+        if c.is_equipment and self.rules("hand_equipment_quick_draw", player=p):
+            reaction = True                       # Jax, Unmatched (errata): "Your Equipment everywhere have [Quick-Draw]."
         action = bool(kws.get("action"))
         if c.type == "gear" and kws.get("deploy") and self.rules("deploy_gear_action", player=p):
             action = True                         # Jarvan IV, Martial Paragon: "Your gear with [Deploy] have [Action]."
