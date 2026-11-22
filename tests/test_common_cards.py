@@ -1347,3 +1347,16 @@ def test_jax_unmatched_gives_quick_draw_to_equipment_everywhere(db, decks):
     assert g.limited_play(0, eq, __import__("riftsim.core.vm", fromlist=["Context"]).Context(0, None), ignore="all")
     settle(g, yes=True, picks=[unit])
     assert g.objects[eq].attached_to == unit
+
+
+def test_dazzling_aurora_banishes_the_unit_and_keeps_it_banished_if_it_cant_be_played(db, decks):
+    """Errata (Origins): "... until you reveal a unit and banish it. Play it, ignoring its cost". Under a "can't play
+    cards" lock (Brynhir Thundersong) the play fails (CR 420.3.b) and the unit stays banished (420.3.c)."""
+    from riftsim.core.vm import Context
+    g = main_phase(db, decks)
+    a = put(g, db, 0, "Dazzling Aurora", ("base", 0))
+    first_unit = next(u for u in g.players[0].deck if g.objects[u].base_defn().is_unit)
+    g.add_turn_effect(Context(1, None), "cant_play", {"players": [0]})
+    _fire(g, a, "Dazzling Aurora")
+    settle(g)
+    assert g.objects[first_unit].zone == "banish"

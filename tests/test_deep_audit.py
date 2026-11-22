@@ -2791,3 +2791,30 @@ def test_when_you_play_a_spell_triggers_on_its_resolution_not_when_countered(db)
         _drive(g, pick=pick)
         assert seen[0] == [sp]                 # nothing triggered while the spell waits on the chain
         assert g.chars(st).might == (2 if counter else 3)
+
+
+def test_salvage_kills_up_to_one_gear_so_it_can_be_played_with_none(db):
+    """Salvage errata (Origins): "You may kill up to one gear. Draw 1." (Viktor, Rek'Sai and Sett lists.) The
+    auto-script chose exactly one gear as it was played, so Salvage could not be played (to draw) with no gear on the
+    board, and a gear had to be chosen whenever one existed."""
+    g, sp = _spell_setup(db, "viktor_herald", "Salvage")
+    h = len(g.players[0].hand)
+    d = g.run()
+    assert ("play", sp) in d.options
+    g.choose(("play", sp))
+    _drive(g)
+    assert len(g.players[0].hand) == h        # Salvage left the hand, one card drawn
+    g, sp = _spell_setup(db, "viktor_herald", "Salvage")
+    gear = put(g, db, 1, "Doran's Shield", ("base", 1))
+    g.restruct()
+    d = g.run()
+    g.choose(("play", sp))
+    offered = []
+
+    def pick(d):
+        if d.kind in ("choose", "choose_many") and any(o in ((), None) or o == (gear,) or o == gear for o in d.options):
+            offered.append(list(d.options))
+            return next(o for o in d.options if o in ((), None))
+        return None
+    _drive(g, pick=pick)
+    assert offered and g.objects[gear].zone == "board"

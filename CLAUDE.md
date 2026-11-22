@@ -347,6 +347,11 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   can't be played stays banished instead of being recycled/drawn (CR 420.3.c). Jax, Unmatched: "Your Equipment
   everywhere have [Quick-Draw]" (was hand only): Reaction timing and the attach trigger for Equipment played from
   the trash, face down or by effects. None is in a tournament list.
+  20:20: Salvage (errata: "You may kill up to one gear. Draw 1."; Viktor, Rek'Sai and Sett lists) was auto-scripted as
+  "choose exactly one gear", so it could not be played with no gear on the board and a gear had to be chosen;
+  hand-scripted in cards_common.py (up to one target, CR 355.10). Dazzling Aurora follows its errata ("reveal ...
+  until you reveal a unit and banish it. Play it"): a unit that can't be played stays banished. Checked OK: Clockwork
+  Keeper's draw is a play trigger, Targon's Peak readies up to 2, Highlander heals/exhausts/recalls.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
