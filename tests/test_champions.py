@@ -947,3 +947,21 @@ def test_neeko_adds_a_chosen_legend_while_on_board(db, decks):
     g.do_kill([nk])
     settle(g)
     assert g.objects[added[0]].zone == "gone"
+
+
+def test_reksai_swarm_queen_banishes_the_card_before_playing_it(db, decks):
+    """Errata (Spiritforged): "You may banish one, then play it ... Recycle the rest." The card is played from the
+    banish zone and paid for; one that can't be played stays banished (CR 420.3.c) instead of being recycled."""
+    g = main_phase(db, decks)
+    for r in g.players[0].runes:
+        g.objects[r].exhausted = True
+    g.restruct()
+    rq = put(g, db, 0, "Rek'Sai, Swarm Queen", ("bf", 0))
+    big = next(c for c in db if c.is_unit and not c.is_champion and (c.energy or 0) >= 7)
+    top, second = g.players[0].deck[0], g.players[0].deck[1]
+    g.objects[top].defn = big
+    g.restruct()
+    _fire(g, rq, "Rek'Sai, Swarm Queen", here=("bf", 0))
+    settle(g, yes=True, picks=[(top,), ("bf", 0)])
+    assert g.objects[top].zone == "banish"
+    assert g.objects[second].zone == "deck" and g.players[0].deck[-1] == second

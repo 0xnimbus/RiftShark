@@ -1314,3 +1314,36 @@ def test_noxian_emissary_empowered_deathknell_plays_two_recruits(db, decks):
         g.do_kill([u], Context(1, None)); settle(g)
         m = sum(o.defn.name == "Recruit" and o.zone == "board" for o in g.objects.values())
         assert m - n == (2 if emp else 0)
+
+
+def test_void_rush_banishes_the_card_before_playing_it(db, decks):
+    """Errata (Spiritforged): "You may banish one, then play it, reducing its cost by [2]. Draw any you didn't
+    banish." A banished card that can't be paid for stays banished (CR 420.3.c); the other is drawn."""
+    g = main_phase(db, decks)
+    for r in g.players[0].runes:
+        g.objects[r].exhausted = True
+    big = next(c for c in db if c.is_unit and not c.is_champion and (c.energy or 0) >= 7)
+    top, second = g.players[0].deck[:2]
+    g.objects[top].defn = big
+    g.restruct()
+    _run_spell(g, db, "Void Rush", picks=[(top,)])
+    assert g.objects[top].zone == "banish"
+    assert g.objects[second].zone == "hand"
+
+
+def test_jax_unmatched_gives_quick_draw_to_equipment_everywhere(db, decks):
+    """Errata (Spiritforged): "Your Equipment everywhere have [Quick-Draw]", not only those in hand: an Equipment
+    played from the trash has [Reaction] and attaches as it is played (CR 819.1.d)."""
+    g = main_phase(db, decks)
+    put(g, db, 0, "Jax, Unmatched", ("base", 0))
+    eq = _card_in(g, db, 0, "Doran's Shield", "trash")
+    from riftsim.core.objects import ChainItem
+    g.chain, g.priority = [ChainItem(900, "ability", 1, label="x")], 0    # a closed chain: only [Reaction] cards
+    assert g._play_timing_ok(0, eq, "trash")
+    assert not g._play_timing_ok(0, _card_in(g, db, 0, "Elnuk Herd", "trash"), "trash")
+    g.chain = []
+    unit = put(g, db, 0, "Elnuk Herd", ("base", 0), exclude=(eq,))
+    g.restruct()
+    assert g.limited_play(0, eq, __import__("riftsim.core.vm", fromlist=["Context"]).Context(0, None), ignore="all")
+    settle(g, yes=True, picks=[unit])
+    assert g.objects[eq].attached_to == unit

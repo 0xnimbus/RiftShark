@@ -1041,7 +1041,7 @@ def resonating_strike(defn):
     # unit to that battlefield and give it +2 [M] this turn.
     mine = lambda g, c, l: g.battlefields[l[1]].controller == c.controller
     elsewhere = Sel("unit", side="friendly", pred=lambda g, c, u: g.objects[u].location != c.vars.get("loc"), elsewhere=True)
-    return [SpellEffect([O.ChooseLocation(out="loc", pred=mine), O.Choose(elsewhere, out="t"),
+    return [SpellEffect([O.ChooseLocation(out="loc", pred=mine, targeted=True), O.Choose(elsewhere, out="t"),
                          O.Move(Ref("t"), Ref("loc")), O.GiveMight(Ref("t"), 2)], label=defn.name, source_text=defn.text)]
 
 
@@ -1807,12 +1807,29 @@ def dragons_rage(defn):
     dests = lambda g, c, l: c.vars.get("t") is not None and l != g.objects[c.vars["t"]].location and g.valid_destination(c.vars["t"], l, mover=c.controller)
     there = lambda g, c: [u for u in g.units_at(g.objects[c.vars["t"]].location) if u != c.vars["t"] and _enemy(g, c, u)] \
         if c.vars.get("t") in g.objects and g.objects[c.vars["t"]].zone == "board" else []
+    # Errata (Origins): "Move an enemy unit. Then do this: Choose another enemy unit at its destination. They deal
+    # damage equal to their Mights to each other." The second part is a reflexive trigger (CR 388): it goes on the
+    # chain after the move and the other unit is a target chosen as it is finalized.
+    other = Sel("unit", side="enemy", pred=lambda g, c, u: u in there(g, c))
     return [SpellEffect([O.Choose(Sel("unit", side="enemy"), out="t"),
                          O.ChooseLocation(out="loc", pred=dests, include_bases=True, label="move it where?"),
                          O.Move(Ref("t"), Ref("loc")),
-                         O.ChooseFromList(there, out="t2", label="choose another enemy unit there"),
-                         O.Do(lambda g, c: _fight(g, c, c.vars.get("t"), c.vars.get("t2")) if c.vars.get("t2") else None,
-                              label="they deal damage to each other")], label=defn.name, source_text=defn.text)]
+                         O.Reflexive([O.Choose(other, out="t2"),
+                                      O.Do(lambda g, c: _fight(g, c, c.vars.get("t"), c.vars.get("t2")) if c.vars.get("t2") else None,
+                                           label="they deal damage to each other")], label="choose another enemy unit there")],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Disintegrate")
+def disintegrate(defn):
+    # Errata (Origins): "[Action] Deal 3 to a unit at a battlefield. If this kills it, do this: draw 1." The unit dies
+    # in the cleanup after the spell resolves (lethal damage, CR 323), so the draw is a reflexive trigger on that death
+    # (CR 388), credited through the damage's chain item like Alpha Strike.
+    return [SpellEffect([O.Choose(Sel("unit", where="battlefield"), out="t"), O.Deal(3, Ref("t")),
+                         O.Delayed(lambda g, s, ev: ev.get("kind") == "die" and ev.get("dmg_item") is not None, [O.Draw(1)],
+                                   filt=lambda g, c, ev: ev.get("dmg_item") == c.item and ev.get("uid") == c.vars.get("t"),
+                                   once=True, label="Disintegrate: draw 1")],
+                        label=defn.name, source_text=defn.text)]
 
 
 @script("Zenith Blade, Leona")
@@ -1892,11 +1909,11 @@ def riposte(defn):
 
 @script("Void Rush")
 def void_rush(defn):
-    # Reveal the top 2 cards of your Main Deck. You may play one of them, reducing its cost by [2]. Draw any you did not
-    # play this way.
+    # Errata (Spiritforged): Reveal the top 2 cards of your Main Deck. You may banish one, then play it, reducing its
+    # cost by [2]. Draw any you didn't banish. A banished card that can't be played stays banished (CR 420.3.c).
     cards = lambda g, c: [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck"]
     def cheaper(g, c):
-        e, pw = g.card_cost(c.controller, c.vars["__vr"], "deck", None)
+        e, pw = g.card_cost(c.controller, c.vars["__vr"], "banish", None)
         return (max(0, e - 2), pw)
     def draw_rest(g, c):
         ps = g.players[c.controller]
@@ -1904,8 +1921,9 @@ def void_rush(defn):
             ps.deck.remove(u); ps.deck.insert(0, u)
             g.do_draw(c.controller, 1, c)
     return [SpellEffect([O.Look(2, out="looked", reveal=True),
-                         O.ChooseFromList(cards, out="__vr", up_to=True, label="play one, [2] less"), O.Do(_unwrap("__vr")),
-                         O.If(Ref("__vr"), [O.PlayCard(Ref("__vr"), alt_cost=cheaper)]),
+                         O.ChooseFromList(cards, out="__vr", up_to=True, label="banish one, then play it [2] less"),
+                         O.Do(_unwrap("__vr")),
+                         O.If(Ref("__vr"), [O.Banish(Ref("__vr")), O.PlayCard(Ref("__vr"), alt_cost=cheaper)]),
                          O.Do(draw_rest, label="draw the rest")], label=defn.name, source_text=defn.text)]
 
 
@@ -2454,7 +2472,7 @@ def fox_fire(defn):
         loc = c.vars.get("loc")
         used = sum(g.chars(u).might or 0 for u in c.vars.get("__ff", []))
         return [u for u in g.units_at(loc) if (g.chars(u).might or 0) + used <= 4] if loc else []
-    return [SpellEffect([O.ChooseLocation(out="loc")] + _pick_up_to(opts, 8, "__ff", "kill a unit there (total Might 4 or less)") +
+    return [SpellEffect([O.ChooseLocation(out="loc", targeted=True)] + _pick_up_to(opts, 8, "__ff", "kill a unit there (total Might 4 or less)") +
                         [O.Kill(lambda g, c: list(c.vars.get("__ff") or ()))], label=defn.name, source_text=defn.text)]
 
 

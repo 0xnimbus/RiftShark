@@ -731,8 +731,8 @@ def parse_sentence(s, state):
             # Not So Fast: a finalized enemy chain item whose choices include a unit/gear I control (CR 355.9.a.2)
             if it.controller == c.controller or it.ctx is None or it.removed or not it.finalized:
                 return False
-            for x in g._target_uids(it.ctx):
-                o = g.objects.get(x) if isinstance(x, int) else None
+            for x in g.current_targets(it.ctx):         # not targets that left the board and came back (359.3.e.9.a)
+                o = g.objects.get(x)
                 if o is not None and o.zone == "board" and o.controller == c.controller \
                         and set(kinds) & set(g.chars(x).types):
                     return True
@@ -830,7 +830,7 @@ def parse_sentence(s, state):
     if m:
         tgt = m.group(1)
         if "at a single battlefield" in m.group(2) or "at one battlefield" in m.group(2):
-            return [O.ChooseLocation(out="__bf"),
+            return [O.ChooseLocation(out="__bf", targeted=True),
                     O.Choose(Sel("unit", where="loc:__bf"), out="__split", n=O.split_cap(parse_amount(tgt)), up_to=True),
                     O.Split(parse_amount(tgt), Ref("__split"))]
         if m.group(2).startswith("enemy units here") or m.group(2) == "units here":
@@ -1248,7 +1248,7 @@ TRIGGER_PATTERNS = [
     (r"when you play a card on an opponent's turn", lambda g, s, ev: ev.get("kind") == "play" and ev.get("player") == g.objects[s].controller and g.turn_player != ev["player"]),
     (r"when you play a spell on an opponent's turn", lambda g, s, ev: ev.get("kind") == "play" and ev.get("player") == g.objects[s].controller and ev.get("card_type") == "spell" and g.turn_player != ev["player"]),
     (r"when you play a unit during a showdown", lambda g, s, ev: ev.get("kind") == "play" and ev.get("player") == g.objects[s].controller and ev.get("card_type") == "unit" and g.showdown is not None),
-    (r"when you play your first card each turn", lambda g, s, ev: ev.get("kind") == "play" and not ev.get("token") and ev.get("player") == g.objects[s].controller and len(g.players[ev["player"]].played_this_turn) == 1),
+    (r"when you play your first card each turn", lambda g, s, ev: ev.get("kind") == "play" and not ev.get("token") and ev.get("player") == g.objects[s].controller and ev.get("nth", len(g.players[ev["player"]].played_this_turn)) == 1),
     (r"when you play a card with energy cost \[(\d+)\] or more", "you_play_card"),
     (r"when you play me from face ?down on your turn", lambda g, s, ev: ev.get("kind") == "play" and ev.get("uid") == s and ev.get("from_zone") == "facedown" and g.turn_player == ev.get("player")),
     (r"when a unit you control becomes mighty", "unit_becomes_mighty"),
@@ -1324,7 +1324,7 @@ TRIGGER_PATTERNS = [
     (r"the first time a friendly unit dies each turn", "friendly_unit_dies"),
     (r"the first time i conquer each turn", "conquer_self"),
     (r"the first time i attack each turn", "attack_self"),
-    (r"when you play your second card in a turn", lambda g, s, ev: ev.get("kind") == "play" and ev.get("player") == g.objects[s].controller and len(g.players[ev["player"]].played_this_turn) == 2),
+    (r"when you play your second card in a turn", lambda g, s, ev: ev.get("kind") == "play" and ev.get("player") == g.objects[s].controller and ev.get("nth", len(g.players[ev["player"]].played_this_turn)) == 2),
     (r"when you play this", "play_self"),
     (r"when i attack or defend", lambda g, s, ev: ev.get("kind") in ("attack", "defend") and ev.get("uid") == s),
     (r"when i attack", "attack_self"),

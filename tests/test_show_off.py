@@ -59,13 +59,18 @@ def test_battle_preparations_show_off_gear_readies_runes(db, decks):
             return gear
         if d.kind == "pay":
             return d.options[0]
+        if d.kind == "choose_many":                         # the runes are targets, chosen as it is played
+            picked.extend(max(d.options, key=lambda o: len(o) if isinstance(o, tuple) else 0))
+            return tuple(picked)
         return mine if mine in d.options else d.options[0]
+    picked = []
     seen, _ = _play_until(g, s, answer)
     assert seen[0] == "show_off" and shown                  # decided first, while finalizing
-    exhausted_before = sum(g.objects[u].exhausted for u in g.players[0].runes)
-    assert exhausted_before >= 2
+    assert len(picked) == 2
+    for u in picked:                                        # exhaust them so the ready is visible
+        g.objects[u].exhausted = True
     _resolve(g)
-    assert sum(g.objects[u].exhausted for u in g.players[0].runes) == exhausted_before - 2
+    assert not any(g.objects[u].exhausted for u in picked)
     assert g.objects[gear].zone == "hand"                   # revealed, not spent
 
 

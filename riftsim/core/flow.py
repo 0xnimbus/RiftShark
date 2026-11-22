@@ -402,6 +402,31 @@ class DamageAssignments:
         return sorted(out, reverse=True)
 
 
+class DamageAssignmentsAny:
+    """CR 467.2.c.8-9: a unit with exclusionary requirements (Tank and Backline / "assigned last") follows the one
+    its assigner picks, each such unit on its own. `variants` are DamageAssignments, one per combination of picks;
+    an assignment is legal when it is legal under one of them. count() is an upper bound (a plan legal under two
+    combinations counts twice) used only to pick flat vs one-unit-at-a-time; plans() has each plan once."""
+
+    def __init__(self, variants):
+        self.variants = variants
+        self.info = variants[0].info
+        self.total = variants[0].total
+
+    def count(self, prefix=()):
+        return sum(v.count(prefix) for v in self.variants)
+
+    def amounts(self, prefix):
+        out = set()
+        for v in self.variants:
+            if v.count(prefix):
+                out.update(v.amounts(prefix))
+        return sorted(out)
+
+    def plans(self):
+        return sorted({pl for v in self.variants for pl in v.plans()}, reverse=True)
+
+
 class FlowMixin:
     # ------------------------------------------------------------------ driver
     def run(self):
@@ -1039,9 +1064,13 @@ class FlowMixin:
             tank = c.keywords.get("tank") and not any(
                 self.objects[src].controller == player and self.objects[src].location == self.objects[u].location
                 for src, _ in self.rules("ignore_tank_here"))          # Dune Surfer
-            prio = 0 if tank else (2 if (c.keywords.get("backline") or u in last) else 1)
-            info.append((need, prio))
-        return DamageAssignments(info, total)
+            back = bool(c.keywords.get("backline") or u in last)
+            # Tank and Backline both: the assigner fulfils one of them (CR 467.2.c.8), each unit separately (467.2.c.9)
+            info.append((need, (0, 2) if tank and back else (0 if tank else (2 if back else 1))))
+        if not any(isinstance(p, tuple) for _, p in info):
+            return DamageAssignments(info, total)
+        picks = itertools.product(*[p if isinstance(p, tuple) else (p,) for _, p in info])
+        return DamageAssignmentsAny([DamageAssignments([(n, p) for (n, _), p in zip(info, pk)], total) for pk in picks])
 
     def _damage_plans(self, targets, total, player=None):
         """Every legal combat damage assignment, as plan tuples in target order (see DamageAssignments)."""
@@ -1378,8 +1407,15 @@ class FlowMixin:
                 extra = sum(t.get("amount", 0) for t in self.consume_turn_effects("bonus_damage", player=it.controller))
                 if extra:
                     ctx.vars["__spell_bonus"] = ctx.vars.get("__spell_bonus", 0) + extra
-            self.emit("play", uid=it.uid, player=it.controller, card_type=it.kind, loc=ctx.vars.get("__loc") or ctx.target_bf,
-                      from_zone=ctx.played_from, item=it.id, energy=self._energy_spent(it), paid=dict(ctx.paid), ctx=ctx)
+            ev = dict(uid=it.uid, player=it.controller, card_type=it.kind, loc=ctx.vars.get("__loc") or ctx.target_bf,
+                      from_zone=ctx.played_from, item=it.id, energy=self._energy_spent(it), paid=dict(ctx.paid),
+                      nth=len(self.players[it.controller].played_this_turn))
+            if it.kind == "spell":
+                # CR 420.4.a: "when you play" triggers trigger when the act of playing is completed by the card's
+                # resolution; a countered spell never triggers them (420.4.a.1). Units and gear resolve on finalizing.
+                ctx.vars["__play_ev"] = ev
+            else:
+                self.emit("play", ctx=ctx, **ev)
         elif it.kind == "ability":
             self.emit("activate", uid=it.uid, player=it.controller, energy=(it.cost or {}).get("energy", 0), item=it.id, ctx=ctx)
         self.priority = it.controller
@@ -1399,6 +1435,22 @@ class FlowMixin:
                 out.extend(v)
             else:
                 out.append(v)
+        return out
+
+    def current_targets(self, ctx):
+        """The item's chosen targets that are still the same objects: a target that changed to or from a non-board
+        zone is no longer counted as chosen (CR 359.3.e.4, 359.3.e.9.a); a mistargeted one still on the board is."""
+        chosen = ctx.vars.get("__chosen") or {}
+        out = []
+        for name, sel in ctx.vars.get("__targets", []):
+            v = ctx.vars.get(name)
+            stamps = (chosen.get(name) or {}).get("stamps") or {}
+            for u in (v if isinstance(v, tuple) else (v,)):
+                if not isinstance(u, int) or u not in self.objects:
+                    continue
+                if u in stamps and self.objects[u].entered_stamp != stamps[u]:
+                    continue
+                out.append(u)
         return out
 
     def _deflect_total(self, it, ctx):
@@ -1507,8 +1559,7 @@ class FlowMixin:
         if it.uid is not None and it.kind in ("spell", "unit", "gear"):
             o = self.objects[it.uid]
             if o.zone == "chain":
-                flow = it.kind == "spell" and it.ctx is not None and it.ctx.played_from == "trash" \
-                    and not it.ctx.vars.get("__recycle_after")
+                flow = it.kind == "spell" and it.ctx is not None and it.ctx.vars.get("__flow")
                 self._to_zone(o, "banish" if flow else "trash")      # Flow: banished on leaving the chain (CR 829.1.b.1)
         self.log("fizzle", item=it.id, label=it.label, why=why)
         self.dirty = True
@@ -1574,10 +1625,12 @@ class FlowMixin:
             if o.zone == "chain":
                 if it.ctx.vars.get("__recycle_after"):         # Fizz, Trickster
                     self.do_recycle([it.uid], it.ctx)
-                elif it.ctx.played_from == "trash" or it.ctx.vars.get("__banish_after"):
+                elif it.ctx.vars.get("__flow") or it.ctx.vars.get("__banish_after"):     # Flow (CR 829.1.b)
                     self._to_zone(o, "banish")
                 else:
                     self._to_zone(o, "trash")
+            if it.ctx.vars.get("__play_ev"):
+                self.emit("play", ctx=it.ctx, **it.ctx.vars.pop("__play_ev"))
             self.emit("resolve", uid=it.uid, player=it.controller, card_type="spell", item=it.id, energy=self._energy_spent(it),
                       may_replay=bool(it.ctx.vars.get("__may_replay")))     # "you may play this from your trash"
         if it.kind == "trigger" and it.ability is not None and getattr(it.ability, "keyword", None) == "deathknell":
@@ -1789,8 +1842,8 @@ class FlowMixin:
         kws = c.keywords
         reaction = bool(kws.get("reaction")) or (from_zone == "facedown" and o.facedown_turn is not None and self.turn > o.facedown_turn) \
             or bool(kws.get("quick_draw"))
-        if from_zone == "hand" and c.is_equipment and self.rules("hand_equipment_quick_draw", player=p):
-            reaction = True                       # Jax, Unmatched: "Each Equipment in your hand has [Quick-Draw]."
+        if c.is_equipment and self.rules("hand_equipment_quick_draw", player=p):
+            reaction = True                       # Jax, Unmatched (errata): "Your Equipment everywhere have [Quick-Draw]."
         action = bool(kws.get("action"))
         if c.type == "gear" and kws.get("deploy") and self.rules("deploy_gear_action", player=p):
             action = True                         # Jarvan IV, Martial Paragon: "Your gear with [Deploy] have [Action]."
@@ -2231,6 +2284,11 @@ class FlowMixin:
             self.turn_memo[("gear_played", p)] = self.turn_memo.get(("gear_played", p), 0) + 1     # Ornn's Forge
         ctx = Context(p, uid, here=loc)
         ctx.played_from = z
+        # Played from the trash for its Flow cost (or Kennen's granted Flow): banished as it leaves the chain
+        # (CR 829.1.b). A spell an effect plays from the trash (Death from Below's replay, Fizz) is not.
+        if z == "trash" and kind == "spell" and not getattr(self, "_limited_play", False) \
+                and (d.keywords.get("flow_cost") or self._trash_play_perm(uid) is None):
+            ctx.vars["__flow"] = True
         if z == "facedown":
             ctx.target_bf = o.hidden_at
         if loc is not None:

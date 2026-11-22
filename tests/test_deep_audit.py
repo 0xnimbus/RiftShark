@@ -263,10 +263,37 @@ def test_tideturner_only_swaps_with_a_unit_at_another_location(db):
 
 
 def test_arise_readies_up_to_two_soldiers(db):
-    # Arise! (errata): "Then do this: Ready up to two of them." -> readying fewer is a legal choice
-    ar = next(c for c in db if c.name == "Arise!")
-    ch = next(i for i in ar.abilities[0].code if type(i).__name__ == "Choose")
-    assert ch.n == 2 and ch.up_to
+    """Arise! (errata): "... Then do this: Ready up to two of them." is a reflexive trigger (CR 388): it goes on the
+    chain after the tokens are played, the tokens (public, so targets) are chosen as it is finalized, up to two of
+    them, and players get priority before it resolves."""
+    g = main_phase(db, [_deck(db, "azir_emperor"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    for name in ("B.F. Sword", "Doran's Shield", "Soul Sword"):
+        put(g, db, 0, name, ("base", 0))
+    ar = give(g, 0, "Arise!", db)
+    for r in list(g.players[0].rune_deck)[:8]:
+        g.players[0].rune_deck.remove(r)
+        g.players[0].runes.append(r)
+        g.objects[r].zone = "board"
+    _ready_runes(g, 0)
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == ar))
+    seen = {}
+
+    def pick(d):
+        if d.kind == "choose_many" and any(it.kind == "reflexive" for it in g.chain):
+            refl = next(it for it in g.chain if it.kind == "reflexive")
+            seen["finalized"] = refl.finalized
+            seen["opts"] = d.options
+            seen["tokens"] = tuple(refl.ctx.vars.get("__sss") or ())
+            seen["spell_zone"] = g.objects[ar].zone
+            return max(d.options, key=lambda o: len(o) if isinstance(o, tuple) else 0)
+        return None
+    _drive(g, pick=pick)
+    toks = seen["tokens"]
+    assert len(toks) == 3 and seen["finalized"] is False          # chosen while the reflexive item is finalized
+    assert max(len(o) for o in seen["opts"] if isinstance(o, tuple)) == 2
+    assert sum(1 for u in toks if not g.objects[u].exhausted) == 2
 
 
 # ----------------------------------------------------------------------------- 2026-11-07 05:20 run: errata, other cards
@@ -2343,3 +2370,424 @@ def test_delayed_it_does_not_follow_a_unit_that_left_and_came_back(db):
         g.dirty, g.pending = True, None
         _drive(g)
         assert g.objects[foe].zone == ("board" if replay else "trash"), replay
+
+
+# ----------------------------------------------------------------------------- 2026-11-20 05:20 run
+def test_not_so_fast_ignores_a_target_that_left_the_board_and_came_back(db):
+    # CR 359.3.e.9.a: a finalized item still "chooses" a mistargeted unit that is on the board, but not one that changed
+    # to or from a non-board zone. Not So Fast (Riven, Irelia, Akali, Master Yi decks: "Counter an enemy spell or ability
+    # that chooses a friendly unit or gear") could answer Hextech Ray after its target was returned and played again.
+    from riftsim.core.selectors import Sel
+    nsf_defn = _card(db, "Not So Fast")
+    choose = next(i for a in nsf_defn.abilities for i in (a.target_code or []) if isinstance(getattr(i, "sel", None), Sel))
+    for how in ("stay", "moved", "replayed"):
+        g = _fresh(db)
+        foe = put(g, db, 1, "Mountain Drake", ("bf", 0))
+        nsf = give(g, 1, "Not So Fast", db)
+        give(g, 0, "Hextech Ray", db)
+        _set_runes(g, db, 0, [("fury", False)] * 3)
+        g.pending = None
+        d = g.run()
+        ray = next(o for o in d.options if o[0] == "play" and g.objects[o[1]].defn.name == "Hextech Ray")[1]
+        g.choose(("play", ray))
+        _drive(g, pick=lambda d: foe if d.kind == "choose" and foe in d.options else None,
+               stop=lambda d: any(it.uid == ray and it.finalized for it in g.chain))
+        o = g.objects[foe]
+        if how == "moved":
+            g.do_move([foe], ("base", 1), Context(1, None))      # mistargeted, still on the board: still chosen
+        elif how == "replayed":
+            g._to_zone(o, "hand")
+            g._to_zone(o, "board", location=("bf", 0), controller=1)
+            g.restruct()
+        offered = ray in choose.sel.candidates(g, Context(1, nsf))
+        assert offered is (how != "replayed"), how
+
+
+def test_a_unit_with_tank_and_backline_is_assigned_first_or_last_at_the_assigners_pick(db):
+    """CR 467.2.c.8 example: Caitlyn, Patrolling (Backline) given Tank, with two units without abilities. The
+    assigner fulfils one of her requirements: damage to her first (Tank) or last (Backline), never in between.
+    Tank always won, so the Backline option was never offered. 467.2.c.9: two such units are picked separately."""
+    g = main_phase(db, [_deck(db, "vex_gloomist"), _deck(db, "riven_exile")])
+    bf = ("bf", 0)
+    cait = put(g, db, 1, "Caitlyn, Patrolling", bf)
+    a = put(g, db, 1, "Stellacorn Herder", bf, exclude=(cait,))
+    b = put(g, db, 1, "Stellacorn Herder", bf, exclude=(cait, a))
+    g.add_mod(cait, "keyword", ("tank", True), duration="turn")
+    g.restruct()
+    assert g.chars(cait).keywords.get("tank") and g.chars(cait).keywords.get("backline")
+    nc, na = g._lethal_need(cait, 20, 0), g._lethal_need(a, 20, 0)
+    plans = set(g._damage_plans([cait, a, b], 2, 0))
+    assert (2, 0, 0) in plans                       # Tank: Caitlyn first
+    assert (0, 2, 0) in plans and (0, 0, 2) in plans   # Backline: the others first
+    total = nc + na + 1                             # Caitlyn lethal, then one unit short: Tank order
+    plans = set(g._damage_plans([cait, a, b], total, 0))
+    assert (nc, na, 1) in plans
+    total = na + 1                                  # in between (one other unit lethal, then Caitlyn) is never legal
+    plans = set(g._damage_plans([cait, a, b], total, 0))
+    assert (1, na, 0) not in plans and (0, na, 1) in plans
+    # two Caitlyns with Tank and one plain unit: both may be dealt first (467.2.c.9 example)
+    c2 = put(g, db, 1, "Caitlyn, Patrolling", bf, exclude=(cait, a, b))
+    g.add_mod(c2, "keyword", ("tank", True), duration="turn")
+    g.restruct()
+    plans = set(g._damage_plans([cait, c2, a], nc + nc, 0))
+    assert {(nc, nc, 0), (nc, 0, na), (0, nc, na)} <= plans          # each Caitlyn picks Tank or Backline
+    plans = set(g._damage_plans([cait, c2, a], na, 0))
+    assert {(nc, 0, 0), (0, nc, 0), (0, 0, na)} <= plans
+
+
+def test_damage_replacement_effects_apply_in_the_order_the_units_controller_picks(db):
+    """CR 372 / the example at 467.2.c.5: a unit with a prevent-2 shield and Lotus Trap's doubling takes 3 damage.
+    Its controller orders the replacement effects: shield first (1 left, doubled: 2 damage) or doubling first (6, 2
+    prevented: 4). The engine always doubled first. Counter Strike's prevent-next with a Ki Barrier shield: the
+    shield can take a small hit and keep Counter Strike for later, or Counter Strike can be spent."""
+    g = main_phase(db, [_deck(db, "vex_gloomist"), _deck(db, "riven_exile")])
+    bf = ("bf", 0)
+    lotus = give(g, 0, "Lotus Trap", db)
+    ki = give(g, 0, "Ki Barrier", db)
+    u = put(g, db, 1, "Mountain Drake", bf)                         # 10 [M]
+    g.add_mod(u, "prevent", 2, duration="turn", source=ki)
+    g.add_mod(u, "double_damage", True, duration="turn", source=lotus)
+    g.restruct()
+    g.do_deal([u], 3, Context(0, lotus))
+    d = g.run()
+    assert d is not None and d.kind == "order_replacement" and d.player == 1, d
+    assert sorted(l.split(": ")[1] for l in d.labels) == ["2 damage", "4 damage"]
+    g.choose(next(o for o, l in zip(d.options, d.labels) if l.endswith(": 2 damage")))
+    g.run()
+    assert g.objects[u].damage == 2
+    # Counter Strike + a 7 shield, 3 damage: keep Counter Strike (shield absorbs 3) or spend it (shield stays 7)
+    v = put(g, db, 1, "Mountain Drake", bf, exclude=(u,))
+    cs = give(g, 0, "Counter Strike", db)
+    g.add_mod(v, "prevent_next", True, duration="turn", source=cs)
+    g.add_mod(v, "prevent", 7, duration="turn", source=ki)
+    g.restruct()
+    g.pending = None
+    g.do_deal([v], 3, Context(0, lotus))
+    d = g.run()
+    assert d is not None and d.kind == "order_replacement", d
+    shield_first = next(o for o, l in zip(d.options, d.labels) if l.startswith(g.label(ki)))
+    g.choose(shield_first)
+    g.run()
+    mods = g.objects[v].mods
+    assert g.objects[v].damage == 0
+    assert any(m.kind == "prevent_next" for m in mods), "Counter Strike was spent"
+    assert any(m.kind == "prevent" and m.value == 4 for m in mods)
+
+
+def test_a_card_returned_to_hand_in_public_view_stays_known_to_the_opponent(db):
+    """A unit returned to its owner's hand (Gust, Rebuke, Star-Crossed, Retreat), a card taken back from the trash
+    and a card revealed from the top of the deck and then drawn all moved in public view: every player saw which
+    card went to that hand. `knows` forgot them (a new object in hand counted as hidden), so the AI's lookahead
+    (policies.determinize) reshuffled them into random cards. Drawn cards stay hidden."""
+    import random
+    from riftsim.core.policies import determinize
+    g = main_phase(db, [_deck(db, "kennen_tempest"), _deck(db, "riven_exile")])
+    u = put(g, db, 1, "Stellacorn Herder", ("bf", 0))
+    t = put(g, db, 1, "Mountain Drake", ("base", 1), exclude=(u,))
+    g._to_zone(g.objects[u], "hand")                    # bounced
+    g._to_zone(g.objects[t], "trash")
+    g._to_zone(g.objects[t], "hand")                    # returned from the trash
+    top = g.players[1].deck[0]
+    g.emit("reveal", player=1, cards=[top])
+    drawn_revealed = g._draw_raw(1)
+    drawn_hidden = g._draw_raw(1)
+    assert drawn_revealed == top
+    for x in (u, t, drawn_revealed):
+        assert g.knows(0, x), g.label(x)
+    assert not g.knows(0, drawn_hidden)
+    names = sorted(g.objects[x].defn.name for x in (u, t, drawn_revealed))
+    for seed in range(5):
+        d = determinize(g, 0, random.Random(seed))
+        hand = sorted(d.objects[x].defn.name for x in d.players[1].hand)
+        for n in names:
+            assert hand.count(n) >= names.count(n), (n, hand)
+    # facedown cards returned to hand were never seen
+    g2 = main_phase(db, [_deck(db, "kennen_tempest"), _deck(db, "riven_exile")])
+    h = g2.players[1].hand[0]
+    g2._to_zone(g2.objects[h], "facedown")
+    g2._to_zone(g2.objects[h], "hand")
+    assert not g2.knows(0, h)
+
+
+def test_hidden_cards_that_choose_a_battlefield_choose_their_own(db):
+    """CR 170.7 / 355.10.b: "choose a battlefield" targets the battlefield (Bedeviling Stranger, Resonating Strike) and
+    "units at a battlefield" restricts the units' targets (Fox-Fire, Ahri). Played from facedown, those choices must
+    be at the battlefield it was hidden at (811.1.d.2-3). The battlefield was chosen freely, so a hidden Stranger
+    could return an enemy unit from another crowded battlefield and Fox-Fire could kill units anywhere."""
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "kaisa_void")])
+    _clear_bfs(g, db)
+    g.set_bf_controller(0, 0)
+    put(g, db, 0, "Stellacorn Herder", ("bf", 0))
+    crowd = [put(g, db, 1, "Stellacorn Herder", ("bf", 1)) for _ in range(2)]
+    crowd += [put(g, db, 0, "Stellacorn Herder", ("bf", 1)) for _ in range(2)]
+    st = give(g, 0, "Bedeviling Stranger", db)
+    ff = give(g, 0, "Fox-Fire, Ahri", db)
+    assert g.do_hide(0, st, ("bf", 0))
+    g.objects[st].facedown_turn = g.turn - 1
+    g.restruct()
+    _ready_runes(g, 0)
+    seen = []
+
+    def pick(d):
+        if d.kind == "choose_location":
+            seen.append(list(d.options))
+        return None
+    d = g.run()
+    play = next(o for o in d.options if o[0] == "play" and o[1] == st)
+    g.choose(play)
+    _drive(g, pick=pick)
+    assert all(opts == [("bf", 0)] for opts in seen), seen
+    assert all(g.objects[u].zone == "board" for u in crowd)
+    # Fox-Fire hidden at the same battlefield (Stranger is no longer facedown there): only units there
+    assert g.do_hide(0, ff, ("bf", 0))
+    g.objects[ff].facedown_turn = g.turn - 1
+    g.restruct()
+    _ready_runes(g, 0)
+    seen.clear()
+    killed = []
+
+    def pick2(d):
+        if d.kind == "choose_location":
+            seen.append(list(d.options))
+        if d.kind in ("choose", "choose_many", "choose_from_list"):
+            killed.extend(o for o in d.options if o in crowd)
+        return None
+    d = g.run()
+    g.choose(("play", ff))
+    _drive(g, pick=pick2)
+    assert all(opts == [("bf", 0)] for opts in seen), seen
+    assert not killed and all(g.objects[u].zone == "board" for u in crowd)
+
+
+def test_runes_recycled_together_go_to_the_bottom_in_their_owners_order(db):
+    """CR 417.5.a: runes recycled at the same time go to the bottom of the rune deck in the order their owner chooses
+    (main deck cards go in a random order, 417.5). Coalesced Energy ("At the end of your turn, recycle all your runes,
+    then channel 4 runes exhausted") shuffled them."""
+    from riftsim.core.vm import Frame
+    from riftsim.core import ops as O
+    from riftsim.core.selectors import Sel
+    g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "riven_exile")])
+    runes = list(g.players[0].runes)
+    doms = {g.objects[u].defn.domains[0] for u in runes}
+    assert len(doms) == 2, doms
+    last = sorted(doms)[-1]
+    before = len(g.players[0].rune_deck)
+    g.pending = None
+    g.vm_frames.append(Frame([O.Recycle(Sel("rune", side="friendly"))], Context(0, None)))
+    asked = 0
+    while True:
+        d = g.run()
+        if d is None or d.kind != "recycle_order":
+            break
+        asked += 1
+        assert d.player == 0
+        # put every rune of the other domain first, so the last domain ends at the very bottom
+        g.choose(next(o for o in d.options if g.objects[o].defn.domains[0] != last))
+    assert asked >= 1
+    bottom = g.players[0].rune_deck[before:]
+    assert sorted(bottom) == sorted(runes)
+    k = sum(1 for u in runes if g.objects[u].defn.domains[0] != last)
+    assert all(g.objects[u].defn.domains[0] != last for u in bottom[:k])
+    assert all(g.objects[u].defn.domains[0] == last for u in bottom[k:])
+
+
+def test_a_spell_an_effect_plays_from_the_trash_is_not_banished_like_flow(db):
+    """CR 829.1.b: only a spell played for its Flow cost is banished as it leaves the chain. Death from Below's
+    "you may play this from your trash for [A]" has no "banish this", so the replayed copy goes back to the trash
+    (and can be replayed again); a Flow play (Lightning Rush) is still banished."""
+    g = main_phase(db, [_deck(db, "kennen_tempest"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    dfb = give(g, 0, "Death from Below", db)
+    foes = []
+    for _ in range(2):
+        foes.append(put(g, db, 1, "Legion Rearguard", ("bf", 0), exclude=foes))
+    assert all((g.chars(u).might or 0) <= 3 for u in foes)
+    for r in list(g.players[0].rune_deck)[:6]:
+        g.players[0].rune_deck.remove(r)
+        g.players[0].runes.append(r)
+        g.objects[r].zone = "board"
+    _ready_runes(g, 0)
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == dfb))
+    seen = []
+
+    def pick(d):
+        seen.append(d.kind)
+        if d.kind in ("may", "optional") or (d.kind == "choose" and True in d.options):
+            return True if True in d.options else d.options[0]
+        return None
+    _drive(g, pick=pick)
+    assert all(g.objects[u].zone == "trash" for u in foes)       # played twice: both units killed
+    assert g.objects[dfb].zone == "trash", (g.objects[dfb].zone, seen)
+
+
+def test_battle_preparations_chooses_its_runes_as_it_is_played(db):
+    """Battle Preparations ("[Show Off] a gear. Give a unit +2 [M] this turn. If you showed off, ready up to 2 runes"):
+    runes are public, so they are targets chosen as the spell is played (CR 355.5, 355.10), after the Show Off choice,
+    not at resolution. Without a gear shown off nothing is chosen."""
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "kaisa_void")])
+    _clear_bfs(g, db)
+    unit = put(g, db, 0, "Legion Rearguard", ("base", 0))
+    gear = put(g, db, 0, "Blade of the Exile", ("base", 0))
+    bp = give(g, 0, "Battle Preparations", db)
+    for r in list(g.players[0].rune_deck)[:6]:
+        g.players[0].rune_deck.remove(r)
+        g.players[0].runes.append(r)
+        g.objects[r].zone = "board"
+    _ready_runes(g, 0)
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == bp))
+    kinds = []
+
+    def pick(d):
+        kinds.append(d.kind)
+        if d.kind == "show_off":
+            return gear
+        if d.kind == "choose_many":
+            return max(d.options, key=lambda o: len(o) if isinstance(o, tuple) else 0)
+        return None
+    _drive(g, pick=pick, stop=lambda d: any(it.uid == bp and it.finalized for it in g.chain))
+    item = next(it for it in g.chain if it.uid == bp)
+    picked = item.ctx.vars.get("t2")
+    picked = picked if isinstance(picked, tuple) else (picked,)
+    assert item.ctx.shown_off and len([u for u in picked if u is not None]) == 2, kinds
+    assert all(g.objects[u].exhausted for u in picked)        # the runes paid for it: readied on resolution
+    _drive(g)
+    assert g.objects[bp].zone == "trash"
+    assert not any(g.objects[u].exhausted for u in picked)
+    assert g.chars(unit).might == (g.objects[unit].defn.might or 0) + 2
+
+
+def test_trigger_targets_and_xp_costs_are_chosen_as_the_trigger_is_finalized(db):
+    """Kha'Zix, Evolving Hunter ("you may spend 3 XP to deal damage equal to my Might to an enemy unit here") and Lady
+    of Clockwork ("you may pay [1] to choose a friendly gear") chose their unit/gear on resolution, after paying; the
+    cost is the trigger's base cost (CR 383.3.b) and the object a target (355.10.c.1), both settled as it is finalized.
+    Teemo, Strategist follows his errata: only "When I defend", the enemy unit is chosen as the trigger goes on the
+    chain, and it takes one Deal of N (CR 418.8), none when nothing with [Hidden] is revealed (715.4)."""
+    from riftsim.core import ops as O
+
+    def kinds(code):
+        return [type(x).__name__ for x in code or []]
+    kz = next(ab for ab in next(c for c in db if c.name == "Kha'Zix, Evolving Hunter").abilities
+              if "SpendXP" in kinds(ab.target_code) + kinds(ab.code))
+    assert "Choose" in kinds(kz.target_code) and "SpendXP" in kinds(kz.target_code)
+    assert "Choose" not in kinds(kz.code) and "SpendXP" not in kinds(kz.code)
+    lady = next(c for c in db if c.name == "Lady of Clockwork").abilities[0]
+    assert "Choose" in kinds(lady.target_code) and "PayResources" in kinds(lady.target_code)
+    assert "Choose" not in kinds(lady.code)
+    teemo = [ab for ab in next(c for c in db if c.name == "Teemo, Strategist").abilities if hasattr(ab, "event")]
+    assert len(teemo) == 1 and teemo[0].event == "defend_self"
+    assert "Choose" in kinds(teemo[0].target_code) and "Choose" not in kinds(teemo[0].code)
+    assert kinds(teemo[0].code).count("Deal") == 1 and not any(isinstance(x, O._LoopInit) for x in teemo[0].code
+                                                               if hasattr(O, "_LoopInit"))
+
+
+def test_guards_pays_to_ready_its_soldier_as_a_reflexive_trigger(db):
+    """Guards! (errata): "Play a 2 [M] Sand Soldier unit token. Then do this: You may pay [C] to ready it." The
+    reflexive item's "you may" and its payment are settled as it is finalized (CR 388.4, 383.3.b), on the chain."""
+    g = main_phase(db, [_deck(db, "azir_emperor"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    gd = give(g, 0, "Guards!", db)
+    for r in list(g.players[0].rune_deck)[:8]:
+        g.players[0].rune_deck.remove(r)
+        g.players[0].runes.append(r)
+        g.objects[r].zone = "board"
+    _ready_runes(g, 0)
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == gd))
+    seen = {}
+
+    def pick(d):
+        refl = next((it for it in g.chain if it.kind == "reflexive"), None)
+        if refl is not None and d.kind == "yesno" and not refl.finalized:
+            seen["asked"] = True
+            return True
+        if refl is not None and refl.finalized and "tok" not in seen:
+            seen["tok"] = refl.ctx.vars.get("__tok")
+        return None
+    _drive(g, pick=pick)
+    assert seen.get("asked") and seen.get("tok") is not None
+    assert not g.objects[seen["tok"]].exhausted
+
+
+def _spell_setup(db, deck, name):
+    g = main_phase(db, [_deck(db, deck), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    for r in list(g.players[0].rune_deck)[:8]:
+        g.players[0].rune_deck.remove(r)
+        g.players[0].runes.append(r)
+        g.objects[r].zone = "board"
+    _ready_runes(g, 0)
+    return g, give(g, 0, name, db)
+
+
+def test_disintegrate_draws_when_its_damage_kills_the_unit(db):
+    """Disintegrate (errata: "Deal 3 to a unit at a battlefield. If this kills it, do this: draw 1."): the unit dies of
+    lethal damage in the cleanup after the spell resolves (CR 323), so checking "is it in the trash" while resolving
+    never drew. It is a reflexive trigger on that death (CR 388)."""
+    for name, draws in (("Legion Rearguard", 1), ("Undertitan", 0)):
+        g, ds = _spell_setup(db, "kaisa_void", "Disintegrate")
+        foe = put(g, db, 1, name, ("bf", 0))
+        g.objects[foe].defn = next(c for c in db if c.name == name)
+        g.restruct()
+        h = len(g.players[0].hand)
+        d = g.run()
+        g.choose(next(o for o in d.options if o[0] == "play" and o[1] == ds))
+        _drive(g, pick=lambda d: foe if d.kind == "choose" and foe in d.options else None)
+        assert len(g.players[0].hand) - (h - 1) == draws, name
+        assert (g.objects[foe].zone != "board") == bool(draws)
+
+
+def test_dragons_rage_chooses_the_second_unit_in_a_reflexive_trigger(db):
+    """Dragon's Rage, Lee Sin (errata: "Move an enemy unit. Then do this: Choose another enemy unit at its
+    destination. They deal damage equal to their Mights to each other."): the second unit is chosen as a separate
+    reflexive chain item is finalized, after the move (CR 388)."""
+    g, dr = _spell_setup(db, "kaisa_void", "Dragon's Rage, Lee Sin")
+    a = put(g, db, 1, "Legion Rearguard", ("base", 1))
+    b = put(g, db, 1, "Legion Rearguard", ("bf", 0), exclude=(a,))
+    put(g, db, 1, "Legion Rearguard", ("bf", 0), exclude=(a, b))         # two units there: a real choice
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == dr))
+    seen = {}
+
+    def pick(d):
+        if d.kind == "choose" and a in d.options:
+            return a
+        if d.kind == "choose_location" and ("bf", 0) in d.options:
+            return ("bf", 0)
+        refl = next((it for it in g.chain if it.kind == "reflexive"), None)
+        if refl is not None and d.kind == "choose" and b in d.options:
+            seen["refl"] = (refl.finalized, g.objects[a].location)
+            return b
+        return None
+    _drive(g, pick=pick)
+    assert seen.get("refl") == (False, ("bf", 0))
+    assert g.objects[a].zone != "board" and g.objects[b].zone != "board"     # 2 and 2: both die
+
+
+def test_when_you_play_a_spell_triggers_on_its_resolution_not_when_countered(db):
+    """CR 420.4.a: a trigger on playing a card triggers when the act of playing is completed by the card's resolution
+    (Vendetta patch notes: in a trigger condition "play" means "resolve"), and a countered spell never triggers it
+    (420.4.a.1). Ravenbloom Student got +1 [M] as the spell was finalized, above the spell, even if it was countered."""
+    for counter in (False, True):
+        g, sp = _spell_setup(db, "kaisa_void", "Stupefy")
+        st = put(g, db, 0, "Ravenbloom Student", ("base", 0))
+        foe = put(g, db, 1, "Undertitan", ("bf", 0))
+        g.objects[foe].defn = next(c for c in db if c.name == "Undertitan")
+        g.restruct()
+        d = g.run()
+        g.choose(next(o for o in d.options if o[0] == "play" and o[1] == sp))
+        seen = []
+
+        def pick(d):
+            if d.kind == "choose" and foe in d.options:
+                return foe
+            if d.kind == "action" and g.chain and not seen:
+                seen.append([it.uid for it in g.chain])
+                if counter:
+                    assert g.do_counter(g.chain[-1].id)
+                    return "rerun"
+            return None
+        _drive(g, pick=pick)
+        assert seen[0] == [sp]                 # nothing triggered while the spell waits on the chain
+        assert g.chars(st).might == (2 if counter else 3)

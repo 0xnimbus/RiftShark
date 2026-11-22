@@ -36,7 +36,7 @@ def bedeviling_stranger(defn):
     # battlefield as the trigger goes on the chain (up to one: there may be none there); the count is checked and
     # the "may" decided on resolution (383.3.a.3).
     return [Triggered("play_self", [
-        O.ChooseLocation(out="__bl"),
+        O.ChooseLocation(out="__bl", targeted=True),
         O.Choose(Sel("unit", side="enemy", where="loc:__bl"), out="t", up_to=True),
         O.If(lambda g, c: c.vars.get("t") is not None and c.vars.get("__bl") is not None and len(g.units_at(c.vars["__bl"])) >= 4,
              [O.May([O.ToHand(Ref("t"))], label="return an enemy unit there")]),
@@ -188,7 +188,7 @@ def repulse(defn):
     def item_ok(g, c, it, u):
         if it.controller == c.controller or it.ctx is None or it.removed or not it.finalized:
             return False
-        chosen = [x for x in g._target_uids(it.ctx) if isinstance(x, int) and x in g.objects]
+        chosen = g.current_targets(it.ctx)         # CR 359.3.e.9.a: mistargeted ones still count, zone-changed ones don't
         if u not in chosen:
             return False
         return not any(x != u and g.objects[x].zone == "board" and g.objects[x].controller == c.controller
@@ -320,3 +320,15 @@ def veiled_temple(defn):
                        O.If(Ref("__vt"), [O.Ready(Ref("__vt")),
                                           O.If(is_equipment, [O.May([O.Detach(Ref("__vt"))], label="detach it")])])],
                       label="Veiled Temple", source_text=defn.text)]
+
+
+@script("Battle Preparations")
+def battle_preparations(defn):
+    # [Reaction] [Show Off] a gear. Give a unit +2 [M] this turn. If you showed off, ready up to 2 runes.
+    # The runes are targets (public, CR 355.10), so they are chosen as the spell is played (355.5), right after the
+    # Show Off decision (832.1.c.2); with nothing shown off there is nothing to choose.
+    shown = lambda g, c: bool(getattr(c, "shown_off", None))
+    return [SpellEffect([O.Choose(Sel("unit"), out="t"),
+                         O.Choose(Sel("rune", pred=lambda g, c, u: shown(g, c)), out="t2", n=2, up_to=True),
+                         O.GiveMight(Ref("t"), 2, duration="turn"),
+                         O.If(shown, [O.Ready(Ref("t2"))])], label=defn.name, source_text=defn.text)]

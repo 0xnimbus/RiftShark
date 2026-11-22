@@ -269,6 +269,84 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   of the chosen board objects and the source (ctx `__dl_stamps`); events about a replaced object don't match and
   `ops._uids` drops it on resolution. Checked OK: Switcheroo follows CR 434 (increase/decrease, snapshotted),
   Akali, Silent's "unless I'm in combat" uses the combat battlefield (designations are set in each cleanup).
+  05:20: Not So Fast and Repulse read an item's choices by uid, so a target that was returned to hand and played again
+  still counted as chosen (Not So Fast could counter a Hextech Ray whose target had been replayed); CR 359.3.e.9.a
+  counts mistargeted choices still on the board but not ones that changed to or from a non-board zone.
+  `Game.current_targets(ctx)` drops choices whose entry stamp changed. Checked OK: no "give ... [keyword]/[M]" without
+  "this turn" lasts only the turn (scan of every card; Blood Rush is errata), Shadow's Call's [Temporary] is
+  permanent, Time Warp banishes itself, expert-policy rules_audit (8 games) clean.
+  10:20: a unit with both Tank and Backline (or "assigned last") always took combat damage first; CR 467.2.c.8 lets
+  the assigner fulfil either one (first or last, never in between), each such unit separately (467.2.c.9):
+  `flow.DamageAssignmentsAny` unions the per-pick automata. Checked OK: hiding from the champion zone (Kennen,
+  Keeper of Balance), Back Off draws only from hand, Edge of Night attaches at its play location.
+  15:20: damage replacement effects on one unit (Lotus Trap's doubling, Counter Strike's prevent-next, Ki Barrier-style
+  shields) always applied doubling, prevent-next, shields; CR 372 (example at 467.2.c.5) lets the unit's controller
+  order them: `Game._damage_mod_orders` lists the distinct outcomes and `do_deal` asks (`game._DamageOrderStep`,
+  decision `order_replacement`), then goes on with that target and the rest. Open: combat lethal need
+  (`preview_damage`) still assumes the default order; replace_event replacements (Unyielding Spirit) always go first.
+  No tournament list plays these cards.
+  20:20: a card that went to a hand in public view (a unit returned by Gust/Rebuke/Star-Crossed/Retreat, a card
+  taken from the trash, a card revealed from the deck and then drawn) became unknown to the opponent, so the AIs'
+  `determinize` reshuffled it into a random card (no cheating, but public information lost). `Game._to_zone` /
+  `_draw_raw` now record it in `Game.known` for the players who saw it (`Game._public_viewers`); drawn and facedown
+  cards stay hidden. The play page shows such cards face up in the opponent's hand. Checked OK: Concert Poster's
+  conquer trigger, The Empyrean's Predict amount, Bellows Breath's same-location choice.
+  2026-11-21 00:20: "choose a battlefield" targets the battlefield (CR 170.7) and "units at a battlefield" restricts
+  the units' targets, but `ChooseLocation` ignored the hidden restriction (811.1.d.2-3): Bedeviling Stranger (Riven,
+  Kennen) played from facedown could pick another crowded battlefield, Fox-Fire, Ahri could kill units anywhere,
+  Resonating Strike could pick any battlefield you control. `ChooseLocation(targeted=True)` (also the auto "split
+  among ... at a single battlefield") now keeps the hidden battlefield; destinations stay free. This answers the
+  2026-11-09 open question. Checked OK: hidden Temporal Breach whose unit moved off its battlefield does nothing
+  (CR 359.3.e.2.a example), Seal of Discord pays as an Add source, En Garde, Shuriken Flip, Sabotage reveals.
+  05:20: runes recycled together went to the bottom of the rune deck in a random order; CR 417.5.a gives their owner
+  the order (main deck cards stay random, 417.5). `ops.Recycle` asks `recycle_order` (one domain per place, runes of
+  a domain are interchangeable) and `do_recycle(rune_order=)` keeps it (Coalesced Energy). Checked OK: Pyke, Dockside
+  Butcher from facedown offers its [Fury] additional cost, Trifarian Captain's Power limit, Weaponmaster's "[A] less"
+  also reduces a domain Power cost (CR 356.4.f example; 821.1.c.3 reads as "no Power").
+  10:20: every spell played from the trash was banished as it left the chain, but CR 829.1.b banishes only Flow
+  plays (printed Flow or Kennen's granted Flow): Death from Below's "you may play this from your trash for [A]"
+  copy was banished instead of going back to the trash, and a countered Forbidden Technique replay was banished.
+  `_play` now marks Flow plays (ctx `__flow`, never effect plays); resolve, counter and fizzle read that flag.
+  Checked OK: Lonely Poro's "alone" (CR 740.2.a, friendly units at its location), An Offer You Can't Refuse
+  gives the Gold to the gear's controller, Kinkou Initiate counts only your other units.
+  15:20: Battle Preparations' "If you showed off, ready up to 2 runes" chose the runes at resolution (the last
+  targeted choice left there, see 2026-11-17 05:20); runes are public, so they are targets chosen as it is played
+  (CR 355.5, 355.10), right after the Show Off pick. Hand-scripted in cards_manual.py (nothing to choose if nothing
+  was shown off). Checked OK: Ember Monk triggers only on facedown plays, Gutter Guardian can't show off a
+  facedown card (Radiance FAQ), Astral Heron's discount is "this turn" (errata) and used by effect plays (CR 420
+  example), Evelynn, Entrancing needs your turn, Baron Nashor only enters the Pit when he adds it, Decree of Rage.
+  20:20: a scan of every card for targeted choices left in resolution code found three hand scripts: Kha'Zix,
+  Evolving Hunter ("you may spend 3 XP to deal ... to an enemy unit here") and Lady of Clockwork ("you may pay [1]
+  to choose a friendly gear") now pay and choose as the trigger is finalized (CR 383.3.b, 355.10.c.1;
+  `targeting._peel_costs` knows non-optional SpendXP). Teemo, Strategist follows his errata: defend trigger only,
+  enemy unit chosen on the chain, one Deal of N (418.8), none for 0. Not in any tournament list. Checked OK:
+  move destinations are chosen while playing (CR 355.4), Thrill of the Hunt's battlefield is picked by the play
+  itself, Undertitan adds [2] as Void Burrower reveals it, Noxian Emissary's Empowered Deathknell.
+  2026-11-22 00:20: reflexive triggers ("Then do this:", CR 388-389) made their choices and "you may" on resolution;
+  `Game.add_reflexive` now splits them like a trigger (`split_trigger`: choices, a leading may and its cost are
+  settled as the item is finalized, 388.4). Arise! and Guards! (Azir deck) did their errata's "Then do this:"
+  inline; both now put a reflexive item on the chain (players can respond before the Soldiers are readied).
+  Open: other errata "do this" cards ("If this kills it, do this: draw 1", Reflection copies, "Do this
+  twice") are still inline. Checked OK: Hunker Down's move lock covers every mover, Abandon keeps a Flow spell
+  banished, Alpha Strike gains XP per unit its damage kills.
+  05:20: Disintegrate ("Deal 3 to a unit at a battlefield. If this kills it, do this: draw 1") never drew: the
+  unit dies of lethal damage in the cleanup after the spell (CR 323), but the auto-script checked the trash while
+  resolving. Hand-scripted as a delayed die trigger credited by `dmg_item` (like Alpha Strike; the only other
+  "this kills" card). Dragon's Rage, Lee Sin's errata "Then do this: Choose another enemy unit at its
+  destination" is now a reflexive item (target chosen at its finalize). Still inline: Rell, Magnetic's "then do
+  this: Attach it to me"; Bone Skewer, Mirror Image, Keeper of Masks and LeBlanc, Deceiver are unscripted.
+  10:20: "When you play a spell/card" triggers fired as the spell was finalized, above it on the chain, and even when
+  it was countered; CR 420.4.a (Vendetta notes: in a trigger condition "play" means "resolve") makes them trigger on
+  the spell's resolution, never if countered (Ravenbloom Student, Ember Monk with hidden spells, Astral Heron). The
+  spell's "play" event is held in ctx `__play_ev` and emitted in `_resolved`; units/gear resolve on finalizing, so
+  unchanged. "First/second card" triggers read the event's `nth` (finalize order), not the count at resolution.
+  Open: Fizz, Trickster's errata "Then recycle it" and Rell, Magnetic's "If you do, then do this: Attach it to me"
+  read literally act while the played card is still on the chain; kept as "after it resolves" until a ruling.
+  15:20: three scripts still followed pre-errata text (Spiritforged). Rek'Sai, Swarm Queen and Void Rush: "You may
+  banish one, then play it": the card is banished first and played from there (paying, or [2] less), so one that
+  can't be played stays banished instead of being recycled/drawn (CR 420.3.c). Jax, Unmatched: "Your Equipment
+  everywhere have [Quick-Draw]" (was hand only): Reaction timing and the attach trigger for Equipment played from
+  the trash, face down or by effects. None is in a tournament list.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
