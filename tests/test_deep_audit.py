@@ -2763,3 +2763,31 @@ def test_dragons_rage_chooses_the_second_unit_in_a_reflexive_trigger(db):
     _drive(g, pick=pick)
     assert seen.get("refl") == (False, ("bf", 0))
     assert g.objects[a].zone != "board" and g.objects[b].zone != "board"     # 2 and 2: both die
+
+
+def test_when_you_play_a_spell_triggers_on_its_resolution_not_when_countered(db):
+    """CR 420.4.a: a trigger on playing a card triggers when the act of playing is completed by the card's resolution
+    (Vendetta patch notes: in a trigger condition "play" means "resolve"), and a countered spell never triggers it
+    (420.4.a.1). Ravenbloom Student got +1 [M] as the spell was finalized, above the spell, even if it was countered."""
+    for counter in (False, True):
+        g, sp = _spell_setup(db, "kaisa_void", "Stupefy")
+        st = put(g, db, 0, "Ravenbloom Student", ("base", 0))
+        foe = put(g, db, 1, "Undertitan", ("bf", 0))
+        g.objects[foe].defn = next(c for c in db if c.name == "Undertitan")
+        g.restruct()
+        d = g.run()
+        g.choose(next(o for o in d.options if o[0] == "play" and o[1] == sp))
+        seen = []
+
+        def pick(d):
+            if d.kind == "choose" and foe in d.options:
+                return foe
+            if d.kind == "action" and g.chain and not seen:
+                seen.append([it.uid for it in g.chain])
+                if counter:
+                    assert g.do_counter(g.chain[-1].id)
+                    return "rerun"
+            return None
+        _drive(g, pick=pick)
+        assert seen[0] == [sp]                 # nothing triggered while the spell waits on the chain
+        assert g.chars(st).might == (2 if counter else 3)

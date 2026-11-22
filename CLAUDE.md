@@ -335,6 +335,13 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   "this kills" card). Dragon's Rage, Lee Sin's errata "Then do this: Choose another enemy unit at its
   destination" is now a reflexive item (target chosen at its finalize). Still inline: Rell, Magnetic's "then do
   this: Attach it to me"; Bone Skewer, Mirror Image, Keeper of Masks and LeBlanc, Deceiver are unscripted.
+  10:20: "When you play a spell/card" triggers fired as the spell was finalized, above it on the chain, and even when
+  it was countered; CR 420.4.a (Vendetta notes: in a trigger condition "play" means "resolve") makes them trigger on
+  the spell's resolution, never if countered (Ravenbloom Student, Ember Monk with hidden spells, Astral Heron). The
+  spell's "play" event is held in ctx `__play_ev` and emitted in `_resolved`; units/gear resolve on finalizing, so
+  unchanged. "First/second card" triggers read the event's `nth` (finalize order), not the count at resolution.
+  Open: Fizz, Trickster's errata "Then recycle it" and Rell, Magnetic's "If you do, then do this: Attach it to me"
+  read literally act while the played card is still on the chain; kept as "after it resolves" until a ruling.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
