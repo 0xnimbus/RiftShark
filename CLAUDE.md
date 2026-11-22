@@ -326,7 +326,7 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   `Game.add_reflexive` now splits them like a trigger (`split_trigger`: choices, a leading may and its cost are
   settled as the item is finalized, 388.4). Arise! and Guards! (Azir deck) did their errata's "Then do this:"
   inline; both now put a reflexive item on the chain (players can respond before the Soldiers are readied).
-  Open: other errata "do this" cards (Hextech Ray-style "If this kills it, do this", Reflection copies, "Do this
+  Open: other errata "do this" cards ("If this kills it, do this: draw 1", Reflection copies, "Do this
   twice") are still inline. Checked OK: Hunker Down's move lock covers every mover, Abandon keeps a Flow spell
   banished, Alpha Strike gains XP per unit its damage kills.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
