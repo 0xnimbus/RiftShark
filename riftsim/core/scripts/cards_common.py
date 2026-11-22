@@ -1807,12 +1807,29 @@ def dragons_rage(defn):
     dests = lambda g, c, l: c.vars.get("t") is not None and l != g.objects[c.vars["t"]].location and g.valid_destination(c.vars["t"], l, mover=c.controller)
     there = lambda g, c: [u for u in g.units_at(g.objects[c.vars["t"]].location) if u != c.vars["t"] and _enemy(g, c, u)] \
         if c.vars.get("t") in g.objects and g.objects[c.vars["t"]].zone == "board" else []
+    # Errata (Origins): "Move an enemy unit. Then do this: Choose another enemy unit at its destination. They deal
+    # damage equal to their Mights to each other." The second part is a reflexive trigger (CR 388): it goes on the
+    # chain after the move and the other unit is a target chosen as it is finalized.
+    other = Sel("unit", side="enemy", pred=lambda g, c, u: u in there(g, c))
     return [SpellEffect([O.Choose(Sel("unit", side="enemy"), out="t"),
                          O.ChooseLocation(out="loc", pred=dests, include_bases=True, label="move it where?"),
                          O.Move(Ref("t"), Ref("loc")),
-                         O.ChooseFromList(there, out="t2", label="choose another enemy unit there"),
-                         O.Do(lambda g, c: _fight(g, c, c.vars.get("t"), c.vars.get("t2")) if c.vars.get("t2") else None,
-                              label="they deal damage to each other")], label=defn.name, source_text=defn.text)]
+                         O.Reflexive([O.Choose(other, out="t2"),
+                                      O.Do(lambda g, c: _fight(g, c, c.vars.get("t"), c.vars.get("t2")) if c.vars.get("t2") else None,
+                                           label="they deal damage to each other")], label="choose another enemy unit there")],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Disintegrate")
+def disintegrate(defn):
+    # Errata (Origins): "[Action] Deal 3 to a unit at a battlefield. If this kills it, do this: draw 1." The unit dies
+    # in the cleanup after the spell resolves (lethal damage, CR 323), so the draw is a reflexive trigger on that death
+    # (CR 388), credited through the damage's chain item like Alpha Strike.
+    return [SpellEffect([O.Choose(Sel("unit", where="battlefield"), out="t"), O.Deal(3, Ref("t")),
+                         O.Delayed(lambda g, s, ev: ev.get("kind") == "die" and ev.get("dmg_item") is not None, [O.Draw(1)],
+                                   filt=lambda g, c, ev: ev.get("dmg_item") == c.item and ev.get("uid") == c.vars.get("t"),
+                                   once=True, label="Disintegrate: draw 1")],
+                        label=defn.name, source_text=defn.text)]
 
 
 @script("Zenith Blade, Leona")
