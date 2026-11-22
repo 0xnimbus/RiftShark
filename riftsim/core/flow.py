@@ -1407,8 +1407,15 @@ class FlowMixin:
                 extra = sum(t.get("amount", 0) for t in self.consume_turn_effects("bonus_damage", player=it.controller))
                 if extra:
                     ctx.vars["__spell_bonus"] = ctx.vars.get("__spell_bonus", 0) + extra
-            self.emit("play", uid=it.uid, player=it.controller, card_type=it.kind, loc=ctx.vars.get("__loc") or ctx.target_bf,
-                      from_zone=ctx.played_from, item=it.id, energy=self._energy_spent(it), paid=dict(ctx.paid), ctx=ctx)
+            ev = dict(uid=it.uid, player=it.controller, card_type=it.kind, loc=ctx.vars.get("__loc") or ctx.target_bf,
+                      from_zone=ctx.played_from, item=it.id, energy=self._energy_spent(it), paid=dict(ctx.paid),
+                      nth=len(self.players[it.controller].played_this_turn))
+            if it.kind == "spell":
+                # CR 420.4.a: "when you play" triggers trigger when the act of playing is completed by the card's
+                # resolution; a countered spell never triggers them (420.4.a.1). Units and gear resolve on finalizing.
+                ctx.vars["__play_ev"] = ev
+            else:
+                self.emit("play", ctx=ctx, **ev)
         elif it.kind == "ability":
             self.emit("activate", uid=it.uid, player=it.controller, energy=(it.cost or {}).get("energy", 0), item=it.id, ctx=ctx)
         self.priority = it.controller
@@ -1622,6 +1629,8 @@ class FlowMixin:
                     self._to_zone(o, "banish")
                 else:
                     self._to_zone(o, "trash")
+            if it.ctx.vars.get("__play_ev"):
+                self.emit("play", ctx=it.ctx, **it.ctx.vars.pop("__play_ev"))
             self.emit("resolve", uid=it.uid, player=it.controller, card_type="spell", item=it.id, energy=self._energy_spent(it),
                       may_replay=bool(it.ctx.vars.get("__may_replay")))     # "you may play this from your trash"
         if it.kind == "trigger" and it.ability is not None and getattr(it.ability, "keyword", None) == "deathknell":
