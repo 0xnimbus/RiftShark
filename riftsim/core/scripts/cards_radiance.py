@@ -423,10 +423,10 @@ def arise(defn):
     return [SpellEffect([
         O.PlayToken("Sand Soldier", loc="base", count=lambda g, c: len([u for u in Sel("gear", side="friendly", tags=["Equipment"]).candidates(g, c)]),
                     out="__ss"),
-        # errata (Spiritforged): "Then do this: Ready up to two of them."
-        O.Choose(lambda g, c: [u for u in c.vars.get("__sss", ()) if g.objects[u].zone == "board"], out="__rd", n=2, up_to=True,
-                 targeted=False),
-        O.Ready(Ref("__rd")),
+        # errata (Spiritforged): "Then do this: Ready up to two of them." A reflexive trigger (CR 388): it goes on the
+        # chain, the tokens (public, so targets) are chosen as it is finalized, and players may respond before it resolves.
+        O.Reflexive([O.Choose(Sel("unit", pred=lambda g, c, u: u in (c.vars.get("__sss") or ())), out="__rd", n=2, up_to=True),
+                     O.Ready(Ref("__rd"))], label="ready up to two of them"),
     ], label=defn.name, source_text=defn.text)]
 
 
@@ -436,8 +436,11 @@ def guards(defn):
     # "it" is the token (the auto-scripter read it as a chosen unit, so paying readied nothing).
     return [SpellEffect([
         O.PlayToken("Sand Soldier", loc="choose", out="__tok"),
-        O.If(O.has_var("__tok"), [O.May([O.PayResources(0, ["order"], out="__paid", optional=False),
-                                         O.If(O.has_var("__paid"), [O.Ready(Ref("__tok"))])], label="pay [Order] to ready it")]),
+        # "Then do this:" is a reflexive trigger (CR 388): the "you may" and the payment are settled as it is finalized
+        # (388.4, 383.3.b), and opponents can respond before the token is readied.
+        O.If(O.has_var("__tok"), [O.Reflexive([O.May([O.PayResources(0, ["order"], out="__paid", optional=False),
+                                                      O.If(O.has_var("__paid"), [O.Ready(Ref("__tok"))])],
+                                                     label="pay [Order] to ready it")], label="you may pay to ready it")]),
     ], label=defn.name, source_text=defn.text)]
 
 

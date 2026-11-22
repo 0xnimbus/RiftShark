@@ -263,10 +263,37 @@ def test_tideturner_only_swaps_with_a_unit_at_another_location(db):
 
 
 def test_arise_readies_up_to_two_soldiers(db):
-    # Arise! (errata): "Then do this: Ready up to two of them." -> readying fewer is a legal choice
-    ar = next(c for c in db if c.name == "Arise!")
-    ch = next(i for i in ar.abilities[0].code if type(i).__name__ == "Choose")
-    assert ch.n == 2 and ch.up_to
+    """Arise! (errata): "... Then do this: Ready up to two of them." is a reflexive trigger (CR 388): it goes on the
+    chain after the tokens are played, the tokens (public, so targets) are chosen as it is finalized, up to two of
+    them, and players get priority before it resolves."""
+    g = main_phase(db, [_deck(db, "azir_emperor"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    for name in ("B.F. Sword", "Doran's Shield", "Soul Sword"):
+        put(g, db, 0, name, ("base", 0))
+    ar = give(g, 0, "Arise!", db)
+    for r in list(g.players[0].rune_deck)[:8]:
+        g.players[0].rune_deck.remove(r)
+        g.players[0].runes.append(r)
+        g.objects[r].zone = "board"
+    _ready_runes(g, 0)
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == ar))
+    seen = {}
+
+    def pick(d):
+        if d.kind == "choose_many" and any(it.kind == "reflexive" for it in g.chain):
+            refl = next(it for it in g.chain if it.kind == "reflexive")
+            seen["finalized"] = refl.finalized
+            seen["opts"] = d.options
+            seen["tokens"] = tuple(refl.ctx.vars.get("__sss") or ())
+            seen["spell_zone"] = g.objects[ar].zone
+            return max(d.options, key=lambda o: len(o) if isinstance(o, tuple) else 0)
+        return None
+    _drive(g, pick=pick)
+    toks = seen["tokens"]
+    assert len(toks) == 3 and seen["finalized"] is False          # chosen while the reflexive item is finalized
+    assert max(len(o) for o in seen["opts"] if isinstance(o, tuple)) == 2
+    assert sum(1 for u in toks if not g.objects[u].exhausted) == 2
 
 
 # ----------------------------------------------------------------------------- 2026-11-07 05:20 run: errata, other cards
@@ -2653,3 +2680,31 @@ def test_trigger_targets_and_xp_costs_are_chosen_as_the_trigger_is_finalized(db)
     assert "Choose" in kinds(teemo[0].target_code) and "Choose" not in kinds(teemo[0].code)
     assert kinds(teemo[0].code).count("Deal") == 1 and not any(isinstance(x, O._LoopInit) for x in teemo[0].code
                                                                if hasattr(O, "_LoopInit"))
+
+
+def test_guards_pays_to_ready_its_soldier_as_a_reflexive_trigger(db):
+    """Guards! (errata): "Play a 2 [M] Sand Soldier unit token. Then do this: You may pay [C] to ready it." The
+    reflexive item's "you may" and its payment are settled as it is finalized (CR 388.4, 383.3.b), on the chain."""
+    g = main_phase(db, [_deck(db, "azir_emperor"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    gd = give(g, 0, "Guards!", db)
+    for r in list(g.players[0].rune_deck)[:8]:
+        g.players[0].rune_deck.remove(r)
+        g.players[0].runes.append(r)
+        g.objects[r].zone = "board"
+    _ready_runes(g, 0)
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == gd))
+    seen = {}
+
+    def pick(d):
+        refl = next((it for it in g.chain if it.kind == "reflexive"), None)
+        if refl is not None and d.kind == "yesno" and not refl.finalized:
+            seen["asked"] = True
+            return True
+        if refl is not None and refl.finalized and "tok" not in seen:
+            seen["tok"] = refl.ctx.vars.get("__tok")
+        return None
+    _drive(g, pick=pick)
+    assert seen.get("asked") and seen.get("tok") is not None
+    assert not g.objects[seen["tok"]].exhausted
