@@ -1376,3 +1376,22 @@ def test_sigil_of_the_storm_picks_the_rune_as_it_resolves(db, decks):
     g.vm_frames.append(Frame(list(ab.code), ctx))
     settle(g, picks=[runes[0]])
     assert runes[0] not in g.players[0].runes and len(g.players[0].runes) == len(runes) - 1
+
+
+def test_hall_of_legends_readies_your_legend_without_targeting_it(db, decks):
+    """Hall of Legends: "you may pay [1] to ready your legend." CR 355.10.g: "your legend" is not a target, so it is
+    picked as the ability resolves (several legends with Neeko, Blending In); the auto-script chose it as a target as
+    the trigger went on the chain. The [1] is still paid as the trigger is finalized."""
+    from riftsim.core import ops as O
+    from riftsim.core.vm import Context, Frame, relocate
+    hall = next(c for c in db if c.name == "Hall of Legends")
+    ab = next(a for a in hall.abilities if type(a).__name__ == "Triggered")
+    assert not any(isinstance(i, O.Choose) for i in ab.target_code or [])
+    g = main_phase(db, decks)
+    leg = next(u for u, o in g.objects.items() if o.zone == "board" and o.controller == 0 and "legend" in o.defn.types)
+    g.objects[leg].exhausted = True
+    g.restruct()
+    tc = list(ab.target_code)
+    g.vm_frames.append(Frame(tc + relocate(ab.code, len(tc)), Context(0, None)))
+    settle(g, yes=True)
+    assert not g.objects[leg].exhausted

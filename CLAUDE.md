@@ -357,6 +357,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   `at_resolution`). Scans: every "up to N" / "any number of" choice in every script allows fewer (CR 355.13), and
   "must" instructions (Safety Inspector, Shard of Undoing, Angler Wyrm) choose nothing early. Open: "ready your
   legend" (Hall of Legends, 355.10.g) is still a target chosen at finalize; not in any tournament list.
+  05:20: Hall of Legends hand-scripted: "ready your legend" is no longer a target (CR 355.10.g); with several legends
+  it is picked as the ability resolves, the [1] is still decided and paid as the trigger is finalized (383.3.b).
+  Checked OK: Azir equipment (Eye of the Herald, Hand Hammer, Brutalizer), Deathgrip errata targets, Thrill of the
+  Hunt, Ambush locations/timing, Ganking, attachment control (CR 718.5.f).
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

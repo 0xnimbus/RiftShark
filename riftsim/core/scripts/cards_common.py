@@ -1663,6 +1663,19 @@ def sigil_of_the_storm(defn):
     return [Triggered("you_conquer_here", [pick, O.Recycle(Ref("__rn"))], label=defn.name, source_text=defn.text)]
 
 
+@script("Hall of Legends")
+def hall_of_legends(defn):
+    # When you conquer here, you may pay [1] to ready your legend.
+    # CR 355.10.g: "your legend" is not a target; with several legends (Neeko, Blending In) the legend is picked as the
+    # ability resolves. The "you may pay [1]" is decided and paid as the trigger is finalized (CR 383.3.b).
+    pick = O.Choose(Sel("legend", side="friendly"), out="__hl_l", targeted=False, label="ready your legend")
+    pick.at_resolution = True
+    return [Triggered("you_conquer_here", [O.May([
+        O.PayResources(1, [], out="__hl", optional=False),
+        O.If(O.has_var("__hl"), [pick, O.Ready(Ref("__hl_l"))])], label="pay [1] to ready your legend")],
+        label=defn.name, source_text=defn.text)]
+
+
 @script("Pack of Wonders")
 def pack_of_wonders(defn):
     # [T]: Return another friendly gear, unit, or [Hidden] card to its owner's hand.
