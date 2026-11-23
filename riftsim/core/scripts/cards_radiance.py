@@ -303,8 +303,7 @@ def trifarian_captain(defn):
         u = c.vars.get("__pick")
         if u is not None:
             g.emit("reveal", player=c.controller, cards=[u], ctx=c)
-            g.put_in_hand(u, c)
-            g.emit("draw", player=c.controller, uid=u, ctx=c)
+            g.draw_card(u, c)
     return [Triggered("play_self", [
         O.Look(4, out="__look"),
         O.ChooseFromList(eligible, out="__picks", n=1, up_to=True, label="reveal a unit or gear and draw it"),

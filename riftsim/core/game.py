@@ -1252,6 +1252,21 @@ class Game(flow.FlowMixin):
             self.log("draw", player=p, uid=u)
             self.emit("draw", player=p, uid=u, ctx=ctx, batch=batch)
 
+    def draw_card(self, uid, ctx=None, batch=None):
+        """"Draw it" (Apprentice Smith, Trifarian Captain, Lightning Rush ...): drawing a specific card is still the
+        Draw action (CR 414.1: "takes a single card from a zone and adds it to the player's Hand"; 414.1.a: the top of
+        the Main Deck only unless specified), so it counts for "your second card each turn" and "when you draw"."""
+        o = self.objects.get(uid)
+        if o is None or o.zone in (None, "gone", "hand"):
+            return
+        p = o.owner
+        self.put_in_hand(uid, ctx)
+        if o.zone != "hand":
+            return
+        self.turn_memo[("draws", p)] = self.turn_memo.get(("draws", p), 0) + 1
+        self.log("draw", player=p, uid=uid)
+        self.emit("draw", player=p, uid=uid, ctx=ctx, batch=self.tick() if batch is None else batch)
+
     def _burn_out_until_cards(self, p):
         """CR 432.1-432.3: moving a card out of an empty Main Deck burns out first; if the deck is still empty
         the attempt burns out again, until an opponent has won. True when there is a card to move."""

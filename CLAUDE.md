@@ -361,6 +361,11 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   it is picked as the ability resolves, the [1] is still decided and paid as the trigger is finalized (383.3.b).
   Checked OK: Azir equipment (Eye of the Herald, Hand Hammer, Brutalizer), Deathgrip errata targets, Thrill of the
   Hunt, Ambush locations/timing, Ganking, attachment control (CR 718.5.f).
+  10:20: "... and draw it" (Lightning Rush, Trifarian Captain in Kennen; Apprentice Smith, Pakaa Protector, Raving
+  Witness, Fate Weaver, Double Trouble, Ornn, Ivern, Diana, Lunari) put the card in hand without the Draw action, so it
+  never counted for Frigid Jewel ("your second card each turn") or "when you draw" triggers; CR 414.1 makes it a draw:
+  `Game.draw_card` / `ops.DrawCard`. Checked OK: Falling Star / Icathian Rain errata (separate Deals, the same unit can
+  be chosen each time), Death from Below's replay, Thousand-Tailed Watcher only hits units there as it resolves.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
