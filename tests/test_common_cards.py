@@ -1411,3 +1411,19 @@ def test_draw_it_is_a_draw_for_second_card_triggers(db, decks):
     assert g.objects[top].zone == "hand"
     assert g.turn_memo[("draws", 0)] == 2
     assert g.chars(u).might == base + 2
+
+
+def test_auto_grammar_draw_it_uses_the_draw_action():
+    """The auto-scripter's "reveal a <kind> from among them and draw it" is the Draw action too (CR 414.1)."""
+    from riftsim.core.scripts.auto_grammar import parse_effect
+    eff = parse_effect("Look at the top 5 cards of your Main Deck. You may reveal a gear from among them and draw it.")
+
+    def names(code):
+        for x in code or []:
+            yield type(x).__name__
+            for k in ("then", "else_", "body", "effect", "code"):
+                v = getattr(x, k, None)
+                if isinstance(v, list):
+                    yield from names(v)
+    found = list(names(eff))
+    assert "DrawCard" in found and "ToHand" not in found

@@ -1066,7 +1066,7 @@ def parse_sentence(s, state):
     if m:
         kind = m.group(1)
         return [O.ChooseFromList(lambda g, c, k=kind: [u for u in c.vars.get("looked", []) if k in g.objects[u].defn.types], out="__pick", up_to=True),
-                O.ToHand(Ref("__pick"))]
+                O.DrawCard(Ref("__pick"))]
     m = re.match(r"recycle the rest$", sl)
     if m:
         return [O.Recycle(lambda g, c: [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck"])]
@@ -1075,7 +1075,7 @@ def parse_sentence(s, state):
         return [O.Recycle(lambda g, c: [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck"])]
     m = re.match(r"draw (?:it|them)$", sl)
     if m:
-        return [O.ToHand(Ref("looked"))]
+        return [O.DrawCard(Ref("looked"))]
     m = re.match(r"take control of (.+?)(?: this turn)?$", sl)
     if m:
         ins, ref, _ = choose(m.group(1), _next_out(state))
