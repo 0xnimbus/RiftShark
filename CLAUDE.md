@@ -352,6 +352,11 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   hand-scripted in cards_common.py (up to one target, CR 355.10). Dazzling Aurora follows its errata ("reveal ...
   until you reveal a unit and banish it. Play it"): a unit that can't be played stays banished. Checked OK: Clockwork
   Keeper's draw is a play trigger, Targon's Peak readies up to 2, Highlander heals/exhausts/recalls.
+  2026-11-23 00:20: Sigil of the Storm (errata: "you must recycle one of your runes. (This doesn't choose anything.)")
+  picked the rune as the trigger went on the chain; CR 355.10.f picks it as it resolves (hand-scripted, Choose
+  `at_resolution`). Scans: every "up to N" / "any number of" choice in every script allows fewer (CR 355.13), and
+  "must" instructions (Safety Inspector, Shard of Undoing, Angler Wyrm) choose nothing early. Open: "ready your
+  legend" (Hall of Legends, 355.10.g) is still a target chosen at finalize; not in any tournament list.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
