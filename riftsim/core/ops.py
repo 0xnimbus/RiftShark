@@ -1349,6 +1349,19 @@ class ToHand(Instr):
         return None
 
 
+class DrawCard(Instr):
+    """Draw specific cards ("... and draw it"): the Draw action on a chosen card (CR 414.1), unlike ToHand."""
+
+    def __init__(self, targets):
+        self.targets = targets
+
+    def run(self, game, ctx):
+        batch = game.tick()
+        for u in _uids(game, ctx, self.targets):
+            game.draw_card(u, ctx, batch=batch)
+        return None
+
+
 class ToTrash(Instr):
     def __init__(self, targets):
         self.targets = targets

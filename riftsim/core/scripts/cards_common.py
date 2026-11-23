@@ -420,7 +420,7 @@ def apprentice_smith(defn):
     is_gear = lambda g, c: top(g, c) is not None and g.objects[top(g, c)].base_defn().is_gear
     return [Triggered("move_self", [O.Look(1, out="looked", reveal=True),
                                     O.If(lambda g, c: top(g, c) is not None and g.objects[top(g, c)].zone == "deck",
-                                         [O.If(is_gear, [O.ToHand(top)], [O.Recycle(top)])])],
+                                         [O.If(is_gear, [O.DrawCard(top)], [O.Recycle(top)])])],
                       label=defn.name, source_text=defn.text)]
 
 
@@ -560,7 +560,7 @@ def _look_reveal_draw_recycle(n, pred, label):
     return [O.Look(n, out="looked"),
             O.ChooseFromList(cands, out="__lr", up_to=True, label=label), O.Do(_unwrap("__lr")),
             O.If(Ref("__lr"), [O.Do(lambda g, c: g.emit("reveal", player=c.controller, cards=[c.vars["__lr"]], ctx=c)),
-                               O.ToHand(Ref("__lr"))]),
+                               O.DrawCard(Ref("__lr"))]),
             O.Recycle(lambda g, c: [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck"])]
 
 
@@ -1020,7 +1020,7 @@ def pakaa_protector(defn):
     is_unit = lambda g, c: g.objects[top(g, c)].base_defn().is_unit
     return [Triggered("move_self", [O.Look(1, out="looked", reveal=True),
                                     O.If(lambda g, c: top(g, c) is not None and g.objects[top(g, c)].zone == "deck",
-                                         [O.If(is_unit, [O.ToHand(top)], [O.ToTrash(top), O.GiveMight(Ref("self"), 2)])])],
+                                         [O.If(is_unit, [O.DrawCard(top)], [O.ToTrash(top), O.GiveMight(Ref("self"), 2)])])],
                       label=defn.name, source_text=defn.text)]
 
 
@@ -1031,7 +1031,7 @@ def raving_witness(defn):
     mighty = lambda g, c: (g.objects[top(g, c)].base_defn().might or 0) >= 5
     return [Triggered("move_self", [O.Look(1, out="looked", reveal=True),
                                     O.If(lambda g, c: top(g, c) is not None and g.objects[top(g, c)].zone == "deck",
-                                         [O.If(mighty, [O.ToHand(top)], [O.Recycle(top)])])],
+                                         [O.If(mighty, [O.DrawCard(top)], [O.Recycle(top)])])],
                       label=defn.name, source_text=defn.text)]
 
 
@@ -1236,7 +1236,7 @@ def lightning_rush(defn):
     # your trash.  [Flow] [2][A]
     return [SpellEffect([O.Look(3, out="looked"),
                          O.ChooseFromList(lambda g, c: list(c.vars.get("looked", [])), out="__lr", up_to=True, label="draw one"),
-                         O.Do(_unwrap("__lr")), O.If(Ref("__lr"), [O.ToHand(Ref("__lr"))]),
+                         O.Do(_unwrap("__lr")), O.If(Ref("__lr"), [O.DrawCard(Ref("__lr"))]),
                          O.ToTrash(lambda g, c: [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck"])],
                         label=defn.name, source_text=defn.text)]
 

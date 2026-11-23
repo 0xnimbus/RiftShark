@@ -659,7 +659,7 @@ def _look_reveal_draw(n, kind):
                              label=f"reveal a {kind} and draw it"),
             O.Do(_unwrap("__pick")),
             O.Do(lambda g, c: g.emit("reveal", player=c.controller, cards=[c.vars["__pick"]], ctx=c) if c.vars.get("__pick") else None),
-            O.ToHand(Ref("__pick")),
+            O.DrawCard(Ref("__pick")),
             O.Recycle(lambda g, c: [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck"])]
 
 
@@ -753,7 +753,7 @@ def diana_lunari(defn):
         O.PayResources(1, out="__dp"),
         O.If(Ref("__dp"), [O.Predict(1), O.Do(top), O.SeeFromDeck(lambda g, c: [c.vars.get("__top")]), O.Do(reveal_top),
                            O.If(lambda g, c: c.vars.get("__top") in g.objects and g.objects[c.vars["__top"]].base_defn().type == "spell",
-                                [O.ToHand(Ref("__top"))])])], label=defn.name, source_text=defn.text)], "replace": True}
+                                [O.DrawCard(Ref("__top"))])])], label=defn.name, source_text=defn.text)], "replace": True}
 
 
 @script("Lulu, Whimsical")

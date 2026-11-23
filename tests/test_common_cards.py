@@ -1395,3 +1395,19 @@ def test_hall_of_legends_readies_your_legend_without_targeting_it(db, decks):
     g.vm_frames.append(Frame(tc + relocate(ab.code, len(tc)), Context(0, None)))
     settle(g, yes=True)
     assert not g.objects[leg].exhausted
+
+
+def test_draw_it_is_a_draw_for_second_card_triggers(db, decks):
+    """"Look at the top 3 ... choose a card from among them and draw it" (Lightning Rush; also Trifarian Captain,
+    Apprentice Smith, Ornn, Diana ...): drawing a specific card is the Draw action (CR 414.1), so it is the second card
+    drawn this turn for Frigid Jewel ("When you draw your second card each turn, give a friendly unit +2 [M]")."""
+    g = main_phase(db, decks)
+    fj = put(g, db, 0, "Frigid Jewel", ("base", 0))
+    u = put(g, db, 0, "Wily Newtfish", ("base", 0), exclude=(fj,))
+    g.turn_memo[("draws", 0)] = 1                   # drew one card already this turn
+    base = g.chars(u).might
+    top = g.players[0].deck[0]
+    _run_spell(g, db, "Lightning Rush", picks=[(top,), top, u])
+    assert g.objects[top].zone == "hand"
+    assert g.turn_memo[("draws", 0)] == 2
+    assert g.chars(u).might == base + 2
