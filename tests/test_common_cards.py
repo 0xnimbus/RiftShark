@@ -1427,3 +1427,31 @@ def test_auto_grammar_draw_it_uses_the_draw_action():
                     yield from names(v)
     found = list(names(eff))
     assert "DrawCard" in found and "ToHand" not in found
+
+
+def test_you_may_kill_a_gear_if_you_do_needs_the_gear_to_still_be_there(db, decks):
+    """Adaptatron (Irelia deck): "When I conquer, you may kill a gear. If you do, buff me." The gear is a target chosen
+    as the trigger goes on the chain; if it is gone when the trigger resolves, nothing was killed, so no buff (CR 359.3)."""
+    for gone in (False, True):
+        g = main_phase(db, decks)
+        a = put(g, db, 0, "Adaptatron", ("bf", 0))
+        gear = put(g, db, 1, "Doran's Shield", ("base", 1), exclude=(a,))
+        g.emit("conquer", player=0, loc=("bf", 0), bf=0, units=(a,), uid=a)
+        g.dirty = True
+        g.pending = None
+        for _ in range(40):
+            d = g.run()
+            item = next((it for it in g.chain if it.kind == "trigger" and it.uid == a), None)
+            if item is not None and item.finalized:
+                break
+            if d.kind == "yesno":
+                g.choose(True)
+            elif gear in d.options:
+                g.choose(gear)
+            else:
+                g.choose(("pass",) if ("pass",) in d.options else d.options[0])
+        assert item is not None and item.finalized
+        if gone:
+            g.do_banish([gear], None)
+        settle(g)
+        assert (g.objects[a].buffs >= 1) == (not gone), gone

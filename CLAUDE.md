@@ -370,6 +370,11 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   (no current auto card hit them; Rift Herald and Command: Attack are unscripted). Checked OK: Decree of Focus (combat
   with a Fury unit or chosen by an enemy Fury spell), Life from Stone exhausts only a ready unit, Pit Rookie / First
   Mate choose another unit, Ruin Runner / Baron untargetable only for enemies, Challenge-style fights, Temporal Breach.
+  20:20: auto "you may <targeted X>. If you do, Y" set "did" whether or not X happened: Adaptatron (Irelia deck: "you
+  may kill a gear. If you do, buff me") and Pickpocket still got Y when the gear left before the trigger resolved
+  (CR 359.3: an illegal target is not affected). `auto_grammar` now sets `__did` only while every targeted choice of
+  X is still legal. Checked OK: scoring once per battlefield per turn and the final point (CR 471-473), Forgotten
+  Monument, Accelerate on effect plays (CR 356.1.b.3), Blood Money, Imperial Decree, Shadow's Call, stun re-choice.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
