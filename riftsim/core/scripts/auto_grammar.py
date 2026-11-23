@@ -685,7 +685,11 @@ def parse_sentence(s, state):
     m = re.match(r"you may (.*)", s, re.I)
     if m:
         body = parse_sentence(m.group(1), state)
-        return [O.May(body + [O.SetVar("__did", True)], label=m.group(1)[:40], out="__may")]
+        # "you may kill a gear. If you do, ...": you only "did" it if its target is still legal as it resolves
+        # (CR 359.3: an illegal target is not affected, so nothing was killed; Adaptatron, Pickpocket)
+        outs = [x.out for x in body if isinstance(x, O.Choose) and x.targeted]
+        did = (lambda g, c, outs=tuple(outs): all(c.vars.get(o) not in (None, ()) for o in outs)) if outs else True
+        return [O.May(body + [O.SetVar("__did", did)], label=m.group(1)[:40], out="__may")]
     m = re.match(r"(?:then|and then) (.*)", s, re.I)
     if m:
         return parse_sentence(m.group(1), state)
