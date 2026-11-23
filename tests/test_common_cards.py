@@ -1360,3 +1360,19 @@ def test_dazzling_aurora_banishes_the_unit_and_keeps_it_banished_if_it_cant_be_p
     _fire(g, a, "Dazzling Aurora")
     settle(g)
     assert g.objects[first_unit].zone == "banish"
+
+
+def test_sigil_of_the_storm_picks_the_rune_as_it_resolves(db, decks):
+    """Errata (Origins): "you must recycle one of your runes. (This doesn't choose anything.)" CR 355.10.f: not a
+    target, so the rune is picked as the ability resolves; the auto-script picked it as the trigger went on the chain."""
+    from riftsim.core import ops as O
+    from riftsim.core.vm import Context, Frame
+    sig = next(c for c in db if c.name == "Sigil of the Storm")
+    ab = next(a for a in sig.abilities if type(a).__name__ == "Triggered")
+    assert not any(isinstance(i, O.Choose) for i in ab.target_code or [])
+    g = main_phase(db, decks)
+    runes = list(g.players[0].runes)
+    ctx = Context(0, None)
+    g.vm_frames.append(Frame(list(ab.code), ctx))
+    settle(g, picks=[runes[0]])
+    assert runes[0] not in g.players[0].runes and len(g.players[0].runes) == len(runes) - 1

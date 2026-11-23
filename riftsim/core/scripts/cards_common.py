@@ -1654,6 +1654,15 @@ def salvage(defn):
                         label=defn.name, source_text=defn.text)]
 
 
+@script("Sigil of the Storm")
+def sigil_of_the_storm(defn):
+    # Errata (Origins): When you conquer here, you must recycle one of your runes. (This doesn't choose anything.)
+    # CR 355.10.f: not a target; the rune is picked as the ability resolves, not as it goes on the chain.
+    pick = O.Choose(Sel("rune", side="friendly"), out="__rn", targeted=False, label="recycle one of your runes")
+    pick.at_resolution = True
+    return [Triggered("you_conquer_here", [pick, O.Recycle(Ref("__rn"))], label=defn.name, source_text=defn.text)]
+
+
 @script("Pack of Wonders")
 def pack_of_wonders(defn):
     # [T]: Return another friendly gear, unit, or [Hidden] card to its owner's hand.
