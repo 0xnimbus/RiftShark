@@ -168,10 +168,10 @@ def test_emperors_dais_conquer_bounces_a_unit_for_a_sand_soldier(db, decks):
         if u in d.options:
             return u
         return None
-    drive(g, lambda g: g.objects[u].zone == "hand" or g.turn > 1, pick)
+    soldiers = lambda g: [x for x in g.units_at(dest, 0) if g.objects[x].defn.name == "Sand Soldier"]
+    drive(g, lambda g: soldiers(g) or g.turn > 1, pick)
     assert g.objects[u].zone == "hand"
-    tokens = [x for x in g.units_at(dest, 0) if g.objects[x].defn.name == "Sand Soldier"]
-    assert tokens
+    assert soldiers(g)
 
 
 def test_emperors_dais_does_not_offer_the_payment_without_energy(db, decks):
@@ -199,3 +199,31 @@ def test_emperors_dais_does_not_offer_the_payment_without_energy(db, decks):
     assert any(e["kind"] == "event:conquer" for e in g.events)
     assert not any("Sand Soldier" in " ".join(map(str, l)) for l in asked)
     assert g.objects[u].zone == "board"
+
+
+def test_emperors_dais_returns_the_unit_as_a_cost_when_the_trigger_is_finalized(db, decks):
+    """Emperor's Dais (errata, Vendetta): "you may pay [1] and return a unit you control here to its owner's hand to
+    play a 2 [M] Sand Soldier unit token here." Paying [1] and returning the unit are the base cost (CR 383.3.b): the
+    unit is already in hand while the trigger waits on the chain, and the Sand Soldier still comes afterwards."""
+    g, bf = setup(db, decks, "Emperor's Dais")
+    u = put_unit(g, 0, ("base", 0))
+    dest = ("bf", bf.idx)
+    seen = {}
+
+    def pick(d):
+        it = next((x for x in g.chain if x.kind == "trigger" and "Dais" in (x.label or "")), None)
+        if it is not None and it.finalized and "zone" not in seen:
+            seen["zone"] = g.objects[u].zone
+        if d.kind == "action":
+            for o in d.options:
+                if o[0] == "move" and o[2] == dest and u in o[1]:
+                    return o
+        if d.kind == "yesno" and True in d.options:
+            return True
+        if u in d.options:
+            return u
+        return None
+    soldiers = lambda g: [x for x in g.units_at(dest, 0) if g.objects[x].defn.name == "Sand Soldier"]
+    drive(g, lambda g: soldiers(g) or g.turn > 1, pick)
+    assert seen.get("zone") == "hand"
+    assert soldiers(g)

@@ -375,6 +375,12 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   (CR 359.3: an illegal target is not affected). `auto_grammar` now sets `__did` only while every targeted choice of
   X is still legal. Checked OK: scoring once per battlefield per turn and the final point (CR 471-473), Forgotten
   Monument, Accelerate on effect plays (CR 356.1.b.3), Blood Money, Imperial Decree, Shadow's Call, stun re-choice.
+  2026-11-24 00:20: Emperor's Dais (Azir deck) followed its pre-errata text ("... hand. If you do, play ..."); the
+  Vendetta errata reads "pay [1] and return a unit you control here to its owner's hand to play a ... Sand Soldier",
+  so both are the base cost (CR 383.3.b): the unit is returned as the trigger is finalized (not a target; yes only
+  while a friendly unit is there and [1] is payable) and the Soldier comes even if nothing is left there. The Diana,
+  Lunari open question is answered by the same errata ("you may pay [1] to [Predict], then reveal ..."): no pay, no
+  reveal, as scripted. Checked OK: hand scripts' "If you do" (Meditation, Call to Glory, Jayce, Crescent Guardian).
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

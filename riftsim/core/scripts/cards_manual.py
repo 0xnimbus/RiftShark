@@ -68,12 +68,20 @@ def zhonyas(defn):
 
 @script("Emperor's Dais")
 def emperors_dais(defn):
-    # When you conquer here, you may pay [1] and return a unit you control here to its owner's hand. If you do, play a 2 [M] Sand Soldier unit token here.
-    return [Triggered("you_conquer_here", [
-        O.May([O.PayResources(1, [], out="__paid", optional=False),
-               O.If(O.has_var("__paid"), [O.Choose(Sel("unit", side="friendly", where="here"), out="t", targeted=False),
-                                           O.If(O.has_var("t"), [O.ToHand(Ref("t")), O.PlayToken("Sand Soldier", loc="here")])])],
-              label="pay [1] and bounce a unit for a Sand Soldier")], label=defn.name, source_text=defn.text)]
+    # When you conquer here, you may pay [1] and return a unit you control here to its owner's hand to play a 2 [M] Sand
+    # Soldier unit token here. (errata, Vendetta: was "... hand. If you do, play ...")
+    # "[do X] to [do Y]": paying [1] and returning the unit are the trigger's base cost, paid as it is finalized
+    # (CR 383.3.b); yes is only offered while both can be paid, and the unit is not a target (it's a cost).
+    from ..targeting import _TriggerMay, _TriggerCostsOk
+    pay = O.PayResources(1, [], out="__paid", optional=False)
+    mine_here = Sel("unit", side="friendly", where="here")
+    has_unit = lambda g, c: bool(mine_here.candidates(g, c))
+    may = O.May([], label="pay [1] and return a unit here for a Sand Soldier", out="__may")
+    return [Triggered("you_conquer_here", [O.PlayToken("Sand Soldier", loc="here")],
+                      targets=[_TriggerMay(may, pre=[has_unit], costs=[pay]), pay, _TriggerCostsOk(["__paid"]),
+                               O.Choose(mine_here, out="__ret", targeted=False, label="return a unit you control here"),
+                               O.ToHand(Ref("__ret"))],
+                      label=defn.name, source_text=defn.text)]
 
 
 @script("Rakelstake")
