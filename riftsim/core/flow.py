@@ -1135,7 +1135,9 @@ class FlowMixin:
         att = self.units_at(loc, c["attacker"])
         dfn = self.units_at(loc, c["defender"])
         winner = loser = None
-        if att and not dfn:
+        if c.get("recalled"):
+            pass                                  # CR 468.3.d: units recalled in step 3d of the cleanup: No Result
+        elif att and not dfn:
             winner, loser = c["attacker"], c["defender"]
         elif dfn and not att:
             winner, loser = c["defender"], c["attacker"]

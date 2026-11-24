@@ -2853,3 +2853,31 @@ def test_mageseeker_warden_stops_enemy_hidden_units_but_not_spells(db):
     g.objects[w].controller = 0
     g.restruct()
     assert g._play_locations(0, fae, "facedown") == [("bf", 0)]
+
+
+def test_attackers_recalled_after_combat_damage_is_no_result_not_a_defender_win(db):
+    """CR 468.3.d: there is "No Result" if units were recalled in step 3d of the combat cleanup (attackers recalled
+    because defenders are still there). The engine named the defender the winner, so "When I win a combat" (Nidalee,
+    Cat Form defending, Sett deck), "When you win a combat" and Grim Resolve paid out for merely surviving."""
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "sett_the_boss")])
+    _clear_bfs(g, db)
+    w = put(g, db, 0, "Mournful Witness", ("base", 0))
+    nid = put(g, db, 1, "Nidalee, Cat Form", ("bf", 0))
+    g.objects[nid].defn = next(c for c in db if c.name == "Nidalee, Cat Form")
+    g.set_bf_controller(0, 1)
+    g.objects[nid].stunned = True               # deals no damage
+    g.restruct()
+    results = []
+    emit = g.emit
+
+    def spy(kind, **kw):
+        if kind == "combat_result":
+            results.append(kw.get("winner"))
+        return emit(kind, **kw)
+    g.emit = spy
+    h = len(g.players[1].hand)
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "move" and o[1] == (w,) and o[2] == ("bf", 0)))
+    _drive(g)
+    assert g.objects[nid].zone == "board" and g.objects[w].location == ("base", 0)
+    assert results == [None] and len(g.players[1].hand) == h
