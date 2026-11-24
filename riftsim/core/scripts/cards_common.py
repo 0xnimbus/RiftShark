@@ -1326,8 +1326,13 @@ def threshold_of_the_gray(defn):
 @script("Valley of Idols")
 def valley_of_idols(defn):
     # When a player plays a unit here, they may pay [1] to [Buff] it.
+    # "you may pay [1] to ..." is the trigger's base cost: decided and paid as it is finalized (CR 383.3.b)
+    from ..targeting import _TriggerMay, _TriggerCostsOk
     here = lambda g, s, ev: ev.get("kind") == "play" and ev.get("card_type") == "unit" and ev.get("loc") == g.objects[s].place
-    return [Triggered(here, [O.PayResources(1, out="__vi"), O.If(Ref("__vi"), [O.Buff(lambda g, c: c.event.get("uid"))])],
+    pay = O.PayResources(1, [], out="__paid", optional=False)
+    may = O.May([], label="pay [1] to buff it", out="__may")
+    return [Triggered(here, [O.Buff(lambda g, c: c.event.get("uid"))],
+                      targets=[_TriggerMay(may, costs=[pay]), pay, _TriggerCostsOk(["__paid"])],
                       controller="event", label=defn.name, source_text=defn.text)]
 
 

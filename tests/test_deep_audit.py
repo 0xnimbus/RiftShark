@@ -2881,3 +2881,52 @@ def test_attackers_recalled_after_combat_damage_is_no_result_not_a_defender_win(
     _drive(g)
     assert g.objects[nid].zone == "board" and g.objects[w].location == ("base", 0)
     assert results == [None] and len(g.players[1].hand) == h
+
+
+def _finalize_yesno(g, label, item):
+    """pick for _drive: answers yes to the yes/no whose label has `label`, recording whether its trigger was
+    already finalized at that moment."""
+    seen = []
+
+    def pick(d):
+        if d.kind == "yesno" and any(label in str(x) for x in (d.labels or ())):
+            seen.append([it.finalized for it in g.chain if it.kind == "trigger" and it.label == item])
+            return True
+        return None
+    return seen, pick
+
+
+def test_valley_of_idols_pay_1_is_decided_and_paid_as_the_trigger_is_finalized(db):
+    """Valley of Idols (Sett deck): "When a player plays a unit here, they may pay [1] to [Buff] it." A cost right
+    after "you may" is the trigger's base cost (CR 383.3.b): yes/no and the [1] come as the trigger is finalized, not
+    when it resolves (the hand script asked on resolution). The unit is buffed."""
+    g, u = _spell_setup(db, "kaisa_void", "Stellacorn Herder")
+    g.objects[g.battlefields[0].uid].defn = _card(db, "Valley of Idols")
+    put(g, db, 0, "Forecaster", ("bf", 0))
+    g.set_bf_controller(0, 0)
+    g.restruct()
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == u and ("bf", 0) in o))
+    seen, pick = _finalize_yesno(g, "buff it", "Valley of Idols")
+    _drive(g, pick=pick)
+    assert seen and seen[0] == [False]
+    assert g.objects[u].zone == "board" and g.objects[u].buffs == 1
+
+
+def test_monastery_of_hirana_spends_the_buff_as_the_trigger_is_finalized(db):
+    """Monastery of Hirana (Sett deck): "When you conquer here, you may spend a buff to draw 1." Spending the buff is
+    the trigger's base cost (CR 383.3.b), paid as it is finalized."""
+    g = main_phase(db, [_deck(db, "sett_the_boss"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    g.objects[g.battlefields[0].uid].defn = _card(db, "Monastery of Hirana")
+    a = put(g, db, 0, "Forecaster", ("base", 0))
+    g.objects[a].buffs = 1
+    g.restruct()
+    h = len(g.players[0].hand)
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "move" and len(o) > 2 and o[1] == (a,) and o[2] == ("bf", 0)))
+    seen, pick = _finalize_yesno(g, "spend a buff", "Monastery of Hirana")
+    _drive(g, pick=pick)
+    assert g.battlefields[0].controller == 0
+    assert seen and seen[0] == [False]
+    assert g.objects[a].buffs == 0 and len(g.players[0].hand) == h + 1

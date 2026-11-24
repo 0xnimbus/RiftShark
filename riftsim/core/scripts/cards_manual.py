@@ -66,6 +66,22 @@ def zhonyas(defn):
     return [Replacement("die", applies, replace, label=defn.name, single_use=True)]
 
 
+@script("Monastery of Hirana")
+def monastery_of_hirana(defn):
+    # When you conquer here, you may spend a buff to draw 1.
+    # "spend a buff to ..." is the trigger's base cost (CR 383.3.b): decided and paid as it is finalized. Which unit's
+    # buff is spent is part of paying the cost, not a target.
+    from ..targeting import _TriggerMay
+    conquer_here = lambda g, s, ev: ev.get("kind") == "conquer" and ev.get("loc") == g.objects[s].place
+    buffed = Sel("unit", side="friendly", buffed=True)
+    may = O.May([], label="spend a buff to draw 1", out="__may")
+    return [Triggered(conquer_here, [O.Draw(1)],
+                      targets=[_TriggerMay(may, pre=[lambda g, c: bool(buffed.candidates(g, c))]),
+                               O.Choose(buffed, out="__bu", targeted=False, label="spend a buff from"),
+                               O.SpendBuff(Ref("__bu"), out="__spent")],
+                      controller="event", label=defn.name, source_text=defn.text)]
+
+
 @script("Emperor's Dais")
 def emperors_dais(defn):
     # When you conquer here, you may pay [1] and return a unit you control here to its owner's hand to play a 2 [M] Sand

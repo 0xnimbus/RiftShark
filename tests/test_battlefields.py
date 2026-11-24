@@ -227,3 +227,4 @@ def test_emperors_dais_returns_the_unit_as_a_cost_when_the_trigger_is_finalized(
     drive(g, lambda g: soldiers(g) or g.turn > 1, pick)
     assert seen.get("zone") == "hand"
     assert soldiers(g)
+

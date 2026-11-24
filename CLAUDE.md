@@ -393,6 +393,11 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   combat" (Nidalee, Cat Form, Sett deck), "When you win a combat" and Grim Resolve paid out for surviving
   (`flow._task_combat_result`). Checked OK: Weaponmaster's choice is made as the trigger is finalized (CR 821.1.c),
   Equip's choice is a target (818.1.b.1: Irelia, Fervent triggers), Mageseeker's ready lock, Charm/Ride the Wind moves.
+  20:20: two Sett-deck battlefields still decided their cost on resolution: Valley of Idols ("they may pay [1] to [Buff]
+  it", hand script in cards_common.py) and Monastery of Hirana ("you may spend a buff to draw 1", auto). Both costs are
+  the trigger's base cost (CR 383.3.b): yes/no and payment as it is finalized (Monastery now in cards_manual.py; the
+  buff's unit is picked as part of the cost, not a target). Checked OK: every battlefield in the 12 tournament decks
+  (Star Spring, Rakelstake, Abandoned Hall, Sunken Temple, Forbidding Waste, Candlelit Sanctum), combat control task.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
