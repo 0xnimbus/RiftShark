@@ -1853,8 +1853,8 @@ class FlowMixin:
                     reaction = True
                 elif ab.perm == "action":
                     action = True
-        if from_zone == "facedown" and not reaction:
-            return False
+        if from_zone == "facedown" and not (reaction and o.facedown_turn is not None and self.turn > o.facedown_turn):
+            return False                          # CR 811.1.b: "Beginning on the next turn ... you may play this"
         if self.closed:
             return reaction and p == self.priority
         if self.showdown is not None or self.combat is not None:
