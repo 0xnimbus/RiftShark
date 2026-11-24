@@ -2818,3 +2818,17 @@ def test_salvage_kills_up_to_one_gear_so_it_can_be_played_with_none(db):
         return None
     _drive(g, pick=pick)
     assert offered and g.objects[gear].zone == "board"
+
+
+def test_a_reaction_card_hidden_this_turn_cant_be_played_from_facedown_until_the_next_turn(db):
+    """CR 811.1.b: "Beginning on the next turn, this gains [Reaction] and you may play this, ignoring its base cost."
+    The permission to play it from facedown starts next turn, so a printed [Reaction] (Consult the Past, Lotus Trap,
+    Resonating Strike) doesn't let it be flipped the turn it was hidden."""
+    g, cp = _spell_setup(db, "kaisa_void", "Consult the Past")
+    g.set_bf_controller(0, 0)
+    assert g.do_hide(0, cp, ("bf", 0))
+    g.restruct()
+    assert not any(o[0] == "play" and o[1] == cp for o in g.legal_actions(0))
+    g.objects[cp].facedown_turn = g.turn - 1
+    g.restruct()
+    assert any(o[0] == "play" and o[1] == cp for o in g.legal_actions(0))

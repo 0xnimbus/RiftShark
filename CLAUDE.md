@@ -381,6 +381,9 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   while a friendly unit is there and [1] is payable) and the Soldier comes even if nothing is left there. The Diana,
   Lunari open question is answered by the same errata ("you may pay [1] to [Predict], then reveal ..."): no pay, no
   reveal, as scripted. Checked OK: hand scripts' "If you do" (Meditation, Call to Glory, Jayce, Crescent Guardian).
+  05:20: a hidden card with printed [Reaction] (Consult the Past, Lotus Trap, Resonating Strike) could be played from
+  facedown the turn it was hidden; CR 811.1.b gives the "you may play this" permission only "beginning on the next
+  turn" (`flow` timing check needs `turn > facedown_turn` for every facedown play). Smoke games with these cards change.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
