@@ -384,6 +384,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   05:20: a hidden card with printed [Reaction] (Consult the Past, Lotus Trap, Resonating Strike) could be played from
   facedown the turn it was hidden; CR 811.1.b gives the "you may play this" permission only "beginning on the next
   turn" (`flow` timing check needs `turn > facedown_turn` for every facedown play). Smoke games with these cards change.
+  10:20: Mageseeker Warden ("opponents can only play units to their base") didn't stop enemy hidden units, which must be
+  played to the battlefield they were hidden at (CR 811.1.d.1): with both, the unit has no legal location and can't be
+  played from facedown (`flow._opp_warden`, rules_audit too). Last Caress ("even from face down ... any battlefield")
+  and Arachnoid Horror's static are still unscripted. Smoke games unchanged.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

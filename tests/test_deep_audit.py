@@ -2832,3 +2832,24 @@ def test_a_reaction_card_hidden_this_turn_cant_be_played_from_facedown_until_the
     g.objects[cp].facedown_turn = g.turn - 1
     g.restruct()
     assert any(o[0] == "play" and o[1] == cp for o in g.legal_actions(0))
+
+
+def test_mageseeker_warden_stops_enemy_hidden_units_but_not_spells(db):
+    """Mageseeker Warden: "While I'm at a battlefield, opponents can only play units to their base." A hidden unit must
+    be played to the battlefield it was hidden at (CR 811.1.d.1), so with an enemy Warden at a battlefield it has no
+    legal location and can't be played from facedown; hidden spells and the Warden's own side are unaffected."""
+    g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "riven_exile")])
+    fae = give(g, 0, "Mischievous Marai", db)
+    g.set_bf_controller(0, 0)
+    assert g.do_hide(0, fae, ("bf", 0))
+    g.objects[fae].facedown_turn = g.turn - 1
+    g.restruct()
+    assert g._play_locations(0, fae, "facedown") == [("bf", 0)]
+    w = put(g, db, 1, "Mageseeker Warden", ("bf", 1))
+    g.objects[w].defn = next(c for c in db if c.name == "Mageseeker Warden")
+    g.restruct()
+    assert g._play_locations(0, fae, "facedown") == []
+    assert not any(o[0] == "play" and o[1] == fae for o in g.legal_actions(0))
+    g.objects[w].controller = 0
+    g.restruct()
+    assert g._play_locations(0, fae, "facedown") == [("bf", 0)]
