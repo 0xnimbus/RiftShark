@@ -245,7 +245,9 @@ def expected_locations(g, p, u, z):
         return [None]
     if z == "facedown":
         blocked = {g.objects[s].place for s, _ in g.rules("cant_play_here")}
-        return [] if ("unit" in dd.types and o.hidden_at in blocked) else [o.hidden_at]     # Rockfall Path
+        warden = any(g.objects[s].controller != p and (g.objects[s].location or ("",))[0] == "bf"
+                     for s, _ in g.rules("opp_units_base_only"))
+        return [] if ("unit" in dd.types and (o.hidden_at in blocked or warden)) else [o.hidden_at]   # Rockfall, Warden
     if "unit" in dd.types:
         locs = [("base", p)] + [("bf", b.idx) for b in g.battlefields if b.controller == p]
         blocked = {g.objects[s].place for s, _ in g.rules("cant_play_here")}
