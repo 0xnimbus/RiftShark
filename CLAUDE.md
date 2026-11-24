@@ -388,6 +388,11 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   played to the battlefield they were hidden at (CR 811.1.d.1): with both, the unit has no legal location and can't be
   played from facedown (`flow._opp_warden`, rules_audit too). Last Caress ("even from face down ... any battlefield")
   and Arachnoid Horror's static are still unscripted. Smoke games unchanged.
+  15:20: attackers recalled in step 3d of the combat cleanup (defenders still there) made the defender the combat's
+  winner; CR 468.3.d calls that "No Result", so only a side whose opponent has no units left wins. "When I win a
+  combat" (Nidalee, Cat Form, Sett deck), "When you win a combat" and Grim Resolve paid out for surviving
+  (`flow._task_combat_result`). Checked OK: Weaponmaster's choice is made as the trigger is finalized (CR 821.1.c),
+  Equip's choice is a target (818.1.b.1: Irelia, Fervent triggers), Mageseeker's ready lock, Charm/Ride the Wind moves.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
