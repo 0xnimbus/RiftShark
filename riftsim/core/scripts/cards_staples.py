@@ -1454,9 +1454,9 @@ def sivir_ambitious(defn):
                 and g.combat["attacker"] == me.controller and g.turn_memo.get(("combat_excess", me.controller), 0) >= 5)
     amount = lambda g, c: c.vars.get("__sx", 0)
     store = O.Do(lambda g, c: c.vars.__setitem__("__sx", g.turn_memo.get(("combat_excess", c.controller), 0)))
+    # the "you may" and the enemy unit are settled as the trigger is finalized (CR 383.3.a, 355)
     return {"abilities": [Triggered(conquer_after_attack, [
-        store,
-        O.May([O.Choose(Sel("unit", side="enemy"), out="t"), O.Deal(amount, Ref("t"))], label="deal the excess to an enemy unit")],
+        O.May([O.Choose(Sel("unit", side="enemy"), out="t"), store, O.Deal(amount, Ref("t"))], label="deal the excess to an enemy unit")],
         label=defn.name, source_text=defn.text)], "replace": True}
 
 

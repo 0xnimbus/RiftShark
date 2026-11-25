@@ -3086,3 +3086,38 @@ def test_miss_fortune_captain_first_move_each_turn_is_not_once_each_turn(db):
     g.do_move([mf], ("bf", 1), Context(0, None))
     _drive(g, pick=pick)
     assert asked == [[False]] and g.objects[other].exhausted       # second move: no trigger
+
+
+def test_weaponmaster_may_is_decided_as_the_trigger_is_finalized(db):
+    """[Weaponmaster] (CR 821.1.c: "When you play me, you may choose a Card you control with the Equipment tag ...")
+    picked the Equipment or "none" at finalize, so a "no" still left the trigger on the chain to resolve. The leading
+    "you may" is now a yes/no at finalize, and no removes the trigger (CR 383.3.a.2); with no Equipment there is no
+    yes to give. Same for Veiled Temple ("you may ready a friendly gear") and Sivir, Ambitious, which decided late."""
+    from riftsim.core.abilities import Triggered
+    for name in ("Veiled Temple", "Sivir, Ambitious", "Lucian, Merciless"):
+        tr = next(a for a in _card(db, name).abilities if isinstance(a, Triggered))
+        assert [type(x).__name__ for x in tr.target_code][:2] == ["_TriggerMay", "Choose"], name
+    for with_gear in (True, False):
+        g, u = _spell_setup(db, "sett_the_boss", "Lucian, Merciless")
+        sw = put(g, db, 0, "Long Sword", ("base", 0)) if with_gear else None
+        d = g.run()
+        g.choose(next(o for o in d.options if o[0] == "play" and o[1] == u and ("base", 0) in o))
+        asked, resolved = [], []
+        real = g.log
+
+        def spy(kind, **kw):
+            if kind == "trigger_declined" and kw.get("label") == "Weaponmaster":
+                resolved.append("declined")
+            return real(kind, **kw)
+        g.log = spy
+
+        def pick(d):
+            if d.kind == "yesno" and any("Equipment" in str(x) for x in (d.labels or ())):
+                asked.append([it.finalized for it in g.chain if it.label == "Weaponmaster"])
+                return False
+            return None
+        _drive(g, pick=pick)
+        if with_gear:
+            assert asked == [[False]] and resolved == ["declined"] and g.objects[sw].attached_to is None
+        else:
+            assert asked == [] and not any(it.label == "Weaponmaster" for it in g.chain)
