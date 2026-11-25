@@ -417,16 +417,21 @@ def deceiver(defn):
     def there(g, c):
         return c.event.get("loc")
 
+    # "you may discard 1 and exhaust me to ..." is the trigger's base cost (CR 383.3.b): decided and paid as it is
+    # finalized; the unit to copy is picked once the Reflection exists
+    from ..targeting import _TriggerMay
     other_here = Sel("unit", pred=lambda g, c, u: u != c.vars.get("token") and g.objects[u].location == c.event.get("loc"))
-    body = [O.Choose(Sel("card", zone="hand", pred=lambda g, c, u: g.objects[u].owner == c.controller), out="__dd", targeted=False),
-            O.Do(lambda g, c: g.do_discard(c.controller, [c.vars["__dd"]], c)),
-            O.Do(lambda g, c: g.do_exhaust(c.source, c)),
-            O.PlayToken("Reflection", loc=there, ready=True),
+    may = O.May([], label="discard 1 and exhaust Deceiver to play a Reflection copy there", out="__may")
+    costs = [_TriggerMay(may, pre=[can]),
+             O.Choose(Sel("card", zone="hand", pred=lambda g, c, u: g.objects[u].owner == c.controller), out="__dd", targeted=False),
+             O.Do(lambda g, c: g.do_discard(c.controller, [c.vars["__dd"]], c)),
+             O.Do(lambda g, c: g.do_exhaust(c.source, c))]
+    body = [O.PlayToken("Reflection", loc=there, ready=True),
             O.Choose(other_here, out="__model", targeted=False),
             O.CopyAs(Ref("token"), Ref("__model")),
             O.GiveKeyword(Ref("token"), "temporary", True, duration="permanent")]
-    return {"abilities": [Triggered(conquer_or_hold, [O.If(can, [O.May(body, label="discard 1 and exhaust Deceiver to play a Reflection copy there")])],
-                                    label=defn.name, source_text=defn.text)], "replace": True}
+    return {"abilities": [Triggered(conquer_or_hold, body, targets=costs, label=defn.name, source_text=defn.text)],
+            "replace": True}
 
 
 # ----------------------------------------------------------------------------------------- champion units

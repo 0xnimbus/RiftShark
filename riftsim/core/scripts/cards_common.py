@@ -2603,6 +2603,11 @@ def rippers_bay(defn):
                       controller="event", label=defn.name, source_text=defn.text)]
 
 
+def _at_resolution(ins):
+    ins.at_resolution = True
+    return ins
+
+
 @script("Altar of Memories")
 def altar_of_memories(defn):
     # When a friendly unit dies, you may exhaust me to draw 1, then put a card from your hand on the top or bottom of
@@ -2617,7 +2622,7 @@ def altar_of_memories(defn):
     return [Triggered("friendly_unit_dies", [O.If(lambda g, c: not g.objects[c.source].exhausted, [
         O.May([O.Exhaust(Ref("self")), O.Draw(1),
                O.ChooseFromList(hand, out="__am", label="put a card from your hand on top or bottom of your deck"),
-               O.ChooseMode([("top", []), ("bottom", [])], out="__amw"),
+               _at_resolution(O.ChooseMode([("top", []), ("bottom", [])], out="__amw")),     # not a mode (CR 355.3)
                O.Do(put_back, label="put it back")], label="exhaust me to draw 1")])], label=defn.name, source_text=defn.text)]
 
 
