@@ -3121,3 +3121,37 @@ def test_weaponmaster_may_is_decided_as_the_trigger_is_finalized(db):
             assert asked == [[False]] and resolved == ["declined"] and g.objects[sw].attached_to is None
         else:
             assert asked == [] and not any(it.label == "Weaponmaster" for it in g.chain)
+
+
+def test_crumbling_sands_needs_an_opponent_to_have_played_another_spell(db):
+    """Crumbling Sands: "Counter a spell if an opponent has played another spell this turn." The auto-script read the
+    condition as the caster's [Legion] (another card played by *you*) and chose the spell on resolution. The spell is
+    a target chosen as it is played (CR 355.5); the condition counts opponents' spells other than the chosen one."""
+    tr = _card(db, "Crumbling Sands").abilities[0]
+    assert [type(x).__name__ for x in tr.target_code][:1] == ["Choose"]
+    for opp_spell in (False, True):
+        g, ds = _spell_setup(db, "kaisa_void", "Discipline")
+        cs = give(g, 0, "Crumbling Sands", db)
+        unit = put(g, db, 0, "Forecaster", ("base", 0))
+        if opp_spell:
+            other = next(u for u in g.players[1].deck if g.objects[u].base_defn().type == "spell")
+            g.players[1].played_this_turn.append(other)
+        d = g.run()
+        g.choose(next(o for o in d.options if o[0] == "play" and o[1] == ds))
+        state = {"cast": False}
+
+        def pick(d):
+            if d.kind == "action" and d.player == 0 and not state["cast"]:
+                o = next((o for o in d.options if o[0] == "play" and o[1] == cs), None)
+                if o is not None:
+                    state["cast"] = True
+                    return o
+            if d.kind == "choose":
+                want = ds if state["cast"] else unit
+                return next((o for o in d.options if o == want or o == (want,)), None)
+            return None
+        _drive(g, pick=pick)
+        assert state["cast"]
+        # Discipline gives the unit +2 [M] when it resolves; countered, it doesn't
+        countered = g.chars(unit).might == g.objects[unit].defn.might
+        assert countered == opp_spell, opp_spell

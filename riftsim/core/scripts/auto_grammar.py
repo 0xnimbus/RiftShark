@@ -1233,9 +1233,24 @@ def parse_condition(c):
                 return False
             return {"buffed": o.buffs > 0, "exhausted": o.exhausted, "empowered": bool(o.empowered), "mighty": g.chars(cx.source).mighty}[w]
         return f2
-    m = re.match(r"(?:you|an opponent) ha(?:s|ve) played another (spell|card|unit) this turn$", c)
+    m = re.match(r"(you|an opponent) ha(?:s|ve) played another (spell|card|unit) this turn$", c)
     if m:
-        return O.legion
+        if m.group(1) == "you" and m.group(2) == "card":
+            return O.legion
+        kind, opp = m.group(2), m.group(1) != "you"
+        def played_other(g, cx, kind=kind, opp=opp):
+            mine = set(g.current_targets(cx)) | {cx.source}
+            for q, ps in enumerate(g.players):
+                if (q != cx.controller) != opp:
+                    continue
+                for u in ps.played_this_turn:
+                    if u in mine or u not in g.objects:
+                        continue
+                    d = g.objects[u].base_defn()
+                    if kind == "card" or (kind == "spell" and d.type == "spell") or (kind == "unit" and d.is_unit):
+                        return True
+            return False
+        return played_other
     m = re.match(r"you control this battlefield$", c)
     if m:
         return lambda g, cx: cx.here is not None and cx.here[0] == "bf" and g.battlefields[cx.here[1]].controller == cx.controller

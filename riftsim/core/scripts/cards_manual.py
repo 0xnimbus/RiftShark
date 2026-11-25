@@ -363,3 +363,19 @@ def battle_preparations(defn):
                          O.Choose(Sel("rune", pred=lambda g, c, u: shown(g, c)), out="t2", n=2, up_to=True),
                          O.GiveMight(Ref("t"), 2, duration="turn"),
                          O.If(shown, [O.Ready(Ref("t2"))])], label=defn.name, source_text=defn.text)]
+
+
+@script("Crumbling Sands")
+def crumbling_sands(defn):
+    # [Reaction] Counter a spell if an opponent has played another spell this turn.
+    # The spell is a target, chosen as this is played (CR 355.5); "if an opponent has played another spell this turn"
+    # (a spell other than the one chosen) is checked as it resolves. The auto-script read the condition as this
+    # card's [Legion] (cards *you* played) and chose the spell on resolution.
+    def opp_played_other(g, c):
+        t = c.vars.get("__sp")
+        return any(u != t and u in g.objects and g.objects[u].base_defn().type == "spell"
+                   for q, ps in enumerate(g.players) if q != c.controller for u in ps.played_this_turn)
+    sel = Sel("spell", zone="chain", pred=lambda g, c, u: any(it.uid == u and it.kind == "spell" for it in g.chain))
+    return [SpellEffect([O.Choose(sel, out="__sp"),
+                         O.If(opp_played_other, [O.CounterItem(lambda g, c: next((it.id for it in g.chain if it.uid == c.vars.get("__sp")), None))])],
+                        label=defn.name, source_text=defn.text)]
