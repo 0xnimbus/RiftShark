@@ -406,6 +406,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   A ChooseMode with `at_resolution` (Altar's top/bottom) is not hoisted; Deceiver pays discard + exhaust at finalize and
   picks the copied unit after the Reflection exists. Open: Rumble (recycle another unit), Jinx/Mordekaiser (discard 1),
   Bottled Constellation (kill 3) decide at finalize but still pay on resolution; none is in a tournament list.
+  05:20: those four are now hand-scripted with the cost in the finalize code (CR 383.3.b): Super Mega Death Rocket!
+  and Mordekaiser, Dominating discard as the trigger is finalized (Mordekaiser's target is picked then too), Rumble,
+  Hotheaded recycles the other unit then (the Mech is picked on resolution), Bottled Constellation needs exactly 3
+  picks (the old script let you pick fewer and then did nothing) and kills them together before the point is scored.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

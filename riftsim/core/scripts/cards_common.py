@@ -284,10 +284,13 @@ def invert_timelines(defn):
 @script("Super Mega Death Rocket!, Jinx")
 def super_mega_death_rocket(defn):
     # Deal 5 to a unit.  When you conquer, you may discard 1 to return this from your trash to your hand.
+    # "discard 1 to ..." is the trigger's base cost (CR 383.3.b): decided and paid as the trigger is finalized.
+    from ..targeting import _TriggerMay
     has_hand = lambda g, c: bool(g.players[c.controller].hand)
+    may = O.May([], label="discard 1 to return this to your hand", out="__may")
     return [SpellEffect([O.Choose(Sel("unit"), out="t"), O.Deal(5, Ref("t"))], label=defn.name, source_text=defn.text),
-            Triggered(lambda g, s, ev: ev.get("kind") == "conquer" and ev.get("player") == g.objects[s].owner, [O.If(has_hand, [O.May([O.Discard(1), O.ToHand(Ref("self"))],
-                                                            label="discard 1 to return this to your hand")])],
+            Triggered(lambda g, s, ev: ev.get("kind") == "conquer" and ev.get("player") == g.objects[s].owner,
+                      [O.ToHand(Ref("self"))], targets=[_TriggerMay(may, pre=[has_hand]), O.Discard(1)],
                       zone="trash", label="return from trash", source_text=defn.text)]
 
 
@@ -2406,16 +2409,27 @@ def transpositionist(defn):
 @script("Bottled Constellation")
 def bottled_constellation(defn):
     # At the start of your Main Phase, you may kill 3 other friendly units and/or gear to score 1 point.
+    # "kill 3 ... to ..." is the trigger's base cost (CR 383.3.b): decided and paid (exactly 3, killed together) as the
+    # trigger is finalized; the point is scored on resolution.
+    from ..targeting import _TriggerMay
     others = lambda g, c: [u for u, o in g.objects.items() if u != c.source and o.zone == "board" and o.controller == c.controller
                            and o.defn.type != "rune" and ("unit" in g.chars(u).types or "gear" in g.chars(u).types)]
-    def pay(g, c):
-        us = list(c.vars.get("__bc") or ())
-        if len(us) == 3:
-            g.do_kill(us, c)
-            g.gain_points(c.controller, 1, "effect", c)
-    return [Triggered("start_main", [O.If(lambda g, c: len(others(g, c)) >= 3, [
-        O.May(_pick_up_to(others, 3, "__bc", "kill 3 other friendly units and/or gear") + [O.Do(pay, label="kill 3, score 1")],
-              label="kill 3 other friendly units and/or gear to score 1 point")])], label=defn.name, source_text=defn.text)]
+    def init(g, c):
+        c.vars["__bc"] = []
+    def add(i):
+        def f(g, c):
+            v = c.vars.get(f"__bc_{i}")
+            c.vars["__bc"].extend(v if isinstance(v, (tuple, list)) else [v])
+        return f
+    rest = lambda g, c: [u for u in others(g, c) if u not in c.vars.get("__bc", [])]
+    picks = []
+    for i in range(3):
+        picks += [O.ChooseFromList(rest, out=f"__bc_{i}", n=1, label="kill 3 other friendly units and/or gear"), O.Do(add(i))]
+    may = O.May([], label="kill 3 other friendly units and/or gear to score 1 point", out="__may")
+    return [Triggered("start_main", [O.Do(lambda g, c: g.gain_points(c.controller, 1, "effect", c), label="score 1")],
+                      targets=[_TriggerMay(may, pre=[lambda g, c: len(others(g, c)) >= 3]), O.Do(init)] + picks
+                      + [O.Do(lambda g, c: g.do_kill(list(c.vars["__bc"]), c), label="kill 3")],
+                      label=defn.name, source_text=defn.text)]
 
 
 @script("Forgotten Relic")

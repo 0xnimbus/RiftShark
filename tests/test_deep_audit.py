@@ -2966,3 +2966,74 @@ def test_hand_scripted_may_costs_are_paid_as_the_trigger_is_finalized(db):
         assert "_ModeAsk" not in fin, name
     dec = next(a for a in _card(db, "Deceiver").abilities if isinstance(a, Triggered))
     assert not any(type(x).__name__ == "Choose" and x.out == "__model" for x in dec.target_code)
+
+
+def test_discard_kill_and_recycle_costs_after_you_may_are_paid_as_the_trigger_is_finalized(db):
+    """CR 383.3.b: "you may discard 1 to ..." (Super Mega Death Rocket!, Mordekaiser, Dominating), "you may recycle
+    another friendly unit to ..." (Rumble, Hotheaded) and "you may kill 3 other friendly units and/or gear to ..."
+    (Bottled Constellation) are the trigger's base cost, decided and paid as it is finalized. The hand scripts paid
+    them on resolution. Rocket: the discard happens before the trigger resolves, and it comes back to hand."""
+    from riftsim.core.abilities import Triggered
+    want = {"Super Mega Death Rocket!, Jinx": "Discard", "Mordekaiser, Dominating": "Discard",
+            "Rumble, Hotheaded": "Recycle", "Bottled Constellation": "Do"}
+    for name, cost in want.items():
+        tr = [a for a in _card(db, name).abilities if isinstance(a, Triggered)][0]
+        fin = [type(x).__name__ for x in tr.target_code]
+        assert fin[0] == "_TriggerMay" and cost in fin, (name, fin)
+        assert not any(type(x).__name__ in ("Discard", "Recycle") for x in tr.code), name
+    g = main_phase(db, [_deck(db, "sett_the_boss"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    a = put(g, db, 0, "Forecaster", ("base", 0))
+    r = next(u for u in g.players[0].deck if u != a)
+    g.objects[r].defn = _card(db, "Super Mega Death Rocket!, Jinx")
+    g._to_zone(g.objects[r], "trash")
+    g.restruct()
+    hand = list(g.players[0].hand)
+    assert hand
+    discards = []
+    real = g.do_discard
+
+    def spy(p, us, ctx=None, *args, **kw):
+        discards.append([it.finalized for it in g.chain if it.kind == "trigger" and it.label == "return from trash"])
+        return real(p, us, ctx, *args, **kw)
+    g.do_discard = spy
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "move" and len(o) > 2 and o[1] == (a,) and o[2] == ("bf", 0)))
+    seen, pick = _finalize_yesno(g, "discard 1", "return from trash")
+    _drive(g, pick=pick)
+    assert g.battlefields[0].controller == 0
+    assert seen and discards and discards[0] == [False]
+    assert sum(g.objects[u].zone == "trash" for u in hand) == 1 and g.objects[r].zone == "hand"
+
+
+def test_bottled_constellation_kills_exactly_3_as_the_trigger_is_finalized(db):
+    """Bottled Constellation: "At the start of your Main Phase, you may kill 3 other friendly units and/or gear to score
+    1 point." The kill is the base cost (CR 383.3.b): three picks (no fewer) and the kill as the trigger is finalized,
+    then 1 point on resolution."""
+    g = main_phase(db, [_deck(db, "sett_the_boss"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    b = put(g, db, 0, "Bottled Constellation", ("base", 0))
+    us = [put(g, db, 0, "Forecaster", ("base", 0), exclude=[b]) for _ in range(4)]
+    pts = g.players[0].points
+    seen, pick0 = _finalize_yesno(g, "kill 3", "Bottled Constellation")
+    log = []
+    def pick(d):
+        if d.kind == "pick":
+            log.append(len(d.options))
+        r = pick0(d)
+        if r is not None: return r
+        if d.kind == "action" and d.player == 0 and g.turn_player == 1 and ("pass",) not in d.options:
+            return None
+        if d.kind == "action" and ("end_turn",) in d.options and g.turn_player == 1:
+            return ("end_turn",)
+        return None
+    d = g.run(); g.choose(("end_turn",))
+    for _ in range(200):
+        d = g.run()
+        if seen and d.kind == "action" and g.turn_player == 0 and not g.chain: break
+        c = pick(d)
+        if c is None:
+            c = ("end_turn",) if ("end_turn",) in d.options else (("pass",) if ("pass",) in d.options else d.options[0])
+        g.choose(c)
+    assert seen == [[False]] and log == [4, 3, 2]       # unfinalized at yes; exactly three picks, no "none"
+    assert sum(g.objects[u].zone == "trash" for u in us) == 3 and g.players[0].points == pts + 1
