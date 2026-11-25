@@ -129,11 +129,18 @@ def keyword_abilities(defn):
 
 
 def weaponmaster_ability():
-    """[Weaponmaster]: when you play me, you may attach an Equipment you control to me, paying its Equip cost."""
+    """[Weaponmaster]: when you play me, you may attach an Equipment you control to me, paying its Equip cost.
+    CR 821.1.c: "When you play me, you may choose a Card you control with the Equipment tag. ... Pay the cost of its
+    Equip ability, reduced by [A], to attach it": the leading "you may" is decided as the trigger is finalized and
+    "no" removes it from the chain (CR 383.3.a); the Equipment is chosen then, the Equip cost paid on resolution
+    (821.1.c.5)."""
+    from ..targeting import _TriggerMay
+    sel = Sel("gear", side="friendly", tags=["Equipment"])
+    may = O.May([], label="attach an Equipment you control to me", out="__may")
     return Triggered("play_self", [O.If(lambda g, c: c.vars.get("t") is not None,
                                         [O.PayEquip(Ref("t"), out="__eq"), O.If(Ref("__eq"), [O.Attach(Ref("t"), Ref("self"))])])],
-                     targets=[O.Choose(Sel("gear", side="friendly", tags=["Equipment"]), allow_none=True, targeted=False)],
-                     label="Weaponmaster", optional=True, keyword="weaponmaster")
+                     targets=[_TriggerMay(may, pre=[lambda g, c: bool(sel.candidates(g, c))]), O.Choose(sel, targeted=False)],
+                     label="Weaponmaster", keyword="weaponmaster")
 
 
 def _equip_cost(defn):

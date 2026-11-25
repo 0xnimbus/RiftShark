@@ -417,6 +417,13 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   (CR 383.3.e.2.b is only for "once each turn"); now may + choice at finalize, filter = her first move this turn.
   Checked OK: Lucian/Draven "first time" (no may), Twilight Shroud, Hush/Defy costs, Time Warp's turn queue, Stupefy's
   minimum on a 0-Might unit, Lightning Rush + Nocturne.
+  15:20: [Weaponmaster] (CR 821.1.c "When you play me, you may choose a Card ... with the Equipment tag") chose the
+  Equipment or "none" at finalize, so "no" still put the trigger on the chain; now a `_TriggerMay` (pre: you control an
+  Equipment) then the choice, and no removes it (383.3.a.2); the Equip cost is still paid on resolution (821.1.c.5).
+  Lucian and Akshan (Sett deck) are affected. Veiled Temple ("you may ready a friendly gear", same allow_none trick)
+  and Sivir, Ambitious (a Do before the May) decided late too. Checked OK: Death from Below's replay (a trigger on
+  its resolution with a leading may), Black Rose Sanctum / Star Spring / Rakelstake "first time" memos, rune pool
+  emptying (CR 167), cleanup steps 4-8 (CR 323.5-323.10), effect plays to a given location, "once each turn" texts.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

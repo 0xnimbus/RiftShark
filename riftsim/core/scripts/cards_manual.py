@@ -341,11 +341,15 @@ def veiled_temple(defn):
     def is_equipment(g, c):
         u = c.vars.get("__vt")
         return u is not None and u in g.objects and g.objects[u].attached_to is not None
+    # "you may ready a friendly gear" leads the effect: decided (and the gear chosen) as the trigger is finalized, "no"
+    # removes it from the chain (CR 383.3.a); "you may detach it" is decided on resolution (383.3.a.3).
+    gear = Sel("gear", side="friendly")
     return [Triggered("you_conquer_here",
-                      [O.Choose(Sel("gear", side="friendly"), out="__vt", targeted=False, allow_none=True,
-                                label="ready a friendly gear"),
-                       O.If(Ref("__vt"), [O.Ready(Ref("__vt")),
-                                          O.If(is_equipment, [O.May([O.Detach(Ref("__vt"))], label="detach it")])])],
+                      [O.If(lambda g, c: bool(gear.candidates(g, c)), [O.May([
+                          O.Choose(gear, out="__vt", targeted=False, label="ready a friendly gear"),
+                          O.Ready(Ref("__vt")),
+                          O.If(is_equipment, [O.May([O.Detach(Ref("__vt"))], label="detach it")])],
+                          label="ready a friendly gear")])],
                       label="Veiled Temple", source_text=defn.text)]
 
 
