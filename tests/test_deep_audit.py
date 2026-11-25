@@ -2930,3 +2930,39 @@ def test_monastery_of_hirana_spends_the_buff_as_the_trigger_is_finalized(db):
     assert g.battlefields[0].controller == 0
     assert seen and seen[0] == [False]
     assert g.objects[a].buffs == 0 and len(g.players[0].hand) == h + 1
+
+
+def test_ravenbloom_prefect_banishes_itself_as_the_trigger_is_finalized(db):
+    """Ravenbloom Prefect (Irelia list): "When an opponent plays a gear, you may banish me to banish it." "Banish me"
+    is the trigger's base cost (CR 383.3.b): decided and paid as the trigger is finalized, so the Prefect is gone
+    before anyone can respond. The hand script asked and banished on resolution. Same change for hand scripts written
+    as "if ready: you may exhaust this ..." (Fresh Beans, Solari Shrine, Altar of Memories) and "pay, then if paid"
+    (Battlefield Armorer, Fae Porter, Mistfall, Ripper's Bay)."""
+    g, ls = _spell_setup(db, "akali_rogue", "Long Sword")
+    put(g, db, 0, "Forecaster", ("base", 0))
+    pf = put(g, db, 1, "Ravenbloom Prefect", ("base", 1))
+    g.objects[pf].defn = _card(db, "Ravenbloom Prefect")
+    g.restruct()
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == ls))
+    seen, pick = _finalize_yesno(g, "banish me", "Ravenbloom Prefect")
+    _drive(g, pick=pick)
+    assert seen and seen[0] == [False]
+    assert g.objects[pf].zone == "banish" and g.objects[ls].zone == "banish"
+
+
+def test_hand_scripted_may_costs_are_paid_as_the_trigger_is_finalized(db):
+    """CR 383.3.b for hand scripts shaped "if I'm ready: you may exhaust me ..." and "pay [N]; if paid: ...": the
+    yes/no and the cost move to the finalize code. Altar of Memories' top-or-bottom pick stays at resolution (it is
+    not a mode, CR 355.3), and Deceiver's copied unit is picked after its Reflection exists."""
+    from riftsim.core.abilities import Triggered
+    want = {"Fresh Beans": "Exhaust", "Solari Shrine": "Exhaust", "Altar of Memories": "Exhaust",
+            "Battlefield Armorer": "PayResources", "Fae Porter": "PayResources", "Mistfall": "PayResources",
+            "Ripper's Bay": "PayResources", "Ravenbloom Prefect": "Banish"}
+    for name, cost in want.items():
+        tr = next(a for a in _card(db, name).abilities if isinstance(a, Triggered))
+        fin = [type(x).__name__ for x in tr.target_code]
+        assert fin[0] == "_TriggerMay" and cost in fin, (name, fin)
+        assert "_ModeAsk" not in fin, name
+    dec = next(a for a in _card(db, "Deceiver").abilities if isinstance(a, Triggered))
+    assert not any(type(x).__name__ == "Choose" and x.out == "__model" for x in dec.target_code)

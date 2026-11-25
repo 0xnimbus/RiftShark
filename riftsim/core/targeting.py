@@ -69,7 +69,7 @@ def split_choices(tree):
             outs.add(ins.name)
             rest.append(ins)
             continue
-        if isinstance(ins, O.ChooseMode):
+        if isinstance(ins, O.ChooseMode) and not getattr(ins, "at_resolution", False):
             # CR 355.3: the mode is chosen as the item is finalized, then that mode's choices (355.5)
             var = ins.out or f"__mode{len(hoisted)}_{id(ins)}"
             parts = [split_choices(list(body) if isinstance(body, list) else [body]) for _, body in ins.modes]
@@ -231,6 +231,10 @@ class _TriggerMay(Instr):
             o = game.objects.get(ctx.source)
             if o is None or o.zone != "board" or o.exhausted:
                 return False          # "exhaust me" can't be paid
+        if any(isinstance(c, O.Banish) for c in self.costs):
+            o = game.objects.get(ctx.source)
+            if o is None or o.zone != "board":
+                return False          # "banish me" can't be paid
         pays = [c for c in self.costs if isinstance(c, O.PayResources)]
         first = pays[0] if pays else next((b for b in self.may.body if not isinstance(b, O.Choose)), None)
         if isinstance(first, O.PayResources):
@@ -283,8 +287,8 @@ def _peel_costs(body):
                 pre.append(b.cond)        # (an "if you paid, ..." around the rest needs nothing: payment is checked)
             body = list(b.then) + body[1:]
             continue
-        if isinstance(b, O.Exhaust) and _is_self(b.targets):
-            costs.append(body.pop(0))
+        if isinstance(b, (O.Exhaust, O.Banish)) and _is_self(b.targets):
+            costs.append(body.pop(0))         # "exhaust me / banish me to ..."
             continue
         if isinstance(b, O.PayResources) and not b.optional and b.out:
             costs.append(body.pop(0))
@@ -312,15 +316,40 @@ class _TriggerCostsOk(Instr):
         return None
 
 
+def _pay_then_if(items):
+    """[PayResources(optional, out=X), If(Ref(X), [...])]: an optional payment and what it pays for."""
+    return (len(items) >= 2 and isinstance(items[0], O.PayResources) and items[0].optional and items[0].out
+            and items[0].player is None and isinstance(items[1], O.If) and not items[1].els
+            and isinstance(items[1].cond, Ref) and items[1].cond.name == items[0].out)
+
+
+def _rewrap(outer, items):
+    for cond in reversed(outer):
+        items = [O.If(cond, items)]
+    return items
+
+
 def split_trigger(tree):
     """split_choices for triggered abilities: a leading "you may" is decided as the trigger is finalized (CR 383.3.a),
     and a cost right after it ("you may pay [1] / exhaust me to ...") is paid then (383.3.b). Other effects:
     split_choices."""
     items = _items(tree)
+    outer = []
+    # "if I'm ready / still on the board, you may ..." (hand scripts): the check is a precondition for saying yes
+    while items and isinstance(items[0], O.If) and not items[0].els and len(items[0].then) >= 1 and (
+            isinstance(items[0].then[0], O.May) or _pay_then_if(items[0].then)):
+        outer.append(items[0].cond)
+        items = list(items[0].then) + items[1:]
+    if _pay_then_if(items):
+        # "you may pay [N] to X" written as an optional payment and "if paid, X" (CR 383.3.b: the trigger's base cost)
+        pay, then = items[0], items[1].then
+        items = [O.May([O.PayResources(pay.energy, pay.power, out=pay.out, optional=False, player=pay.player)] + list(then),
+                       label="pay to " + (getattr(then[0], "label", None) or type(then[0]).__name__.lower()), out="__may")] + items[2:]
     if not items or not isinstance(items[0], O.May) or items[0].player is not None:
-        return split_choices(items)
+        return split_choices(_rewrap(outer, items))
     may = items[0]
     lead, pre, costs, eff = _peel_costs(may.body)
+    pre = outer + pre
     hoisted, rest = split_choices(lead + eff + items[1:])
     fin_costs = []
     if costs:

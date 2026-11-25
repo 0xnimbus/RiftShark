@@ -398,6 +398,14 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   the trigger's base cost (CR 383.3.b): yes/no and payment as it is finalized (Monastery now in cards_manual.py; the
   buff's unit is picked as part of the cost, not a target). Checked OK: every battlefield in the 12 tournament decks
   (Star Spring, Rakelstake, Abandoned Hall, Sunken Temple, Forbidding Waste, Candlelit Sanctum), combat control task.
+  2026-11-25 00:20: a scan of every "When ..., you may <cost> to ..." card found hand scripts that still asked and paid
+  on resolution because the may sat under an "if I'm ready" If or was written as "pay; if paid": Ravenbloom Prefect
+  (Irelia list: "banish me to banish it"), Fresh Beans, Solari Shrine, Altar of Memories, Battlefield Armorer, Fae
+  Porter, Mistfall, Ripper's Bay, Diana's [1], Jayce's ready target. `targeting.split_trigger` now treats a leading
+  If as a precondition for yes and "pay; if paid" as "you may pay", and "banish me" is a base cost (CR 383.3.b).
+  A ChooseMode with `at_resolution` (Altar's top/bottom) is not hoisted; Deceiver pays discard + exhaust at finalize and
+  picks the copied unit after the Reflection exists. Open: Rumble (recycle another unit), Jinx/Mordekaiser (discard 1),
+  Bottled Constellation (kill 3) decide at finalize but still pay on resolution; none is in a tournament list.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
