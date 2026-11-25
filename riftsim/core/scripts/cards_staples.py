@@ -638,10 +638,15 @@ def ksante(defn):
 @script("Mordekaiser, Dominating")
 def mordekaiser_dominating(defn):
     # When you play me or when I attack, you may discard 1 to kill a unit or gear.
+    # "discard 1 to ..." is the trigger's base cost (CR 383.3.b): yes/no, the target and the discard are all settled
+    # as the trigger is finalized; the kill happens on resolution.
+    from ..targeting import _TriggerMay
     sel = Sel("permanent", pred=lambda g, c, u: bool({"unit", "gear"} & set(g.chars(u).types)))
-    eff = [O.If(lambda g, c: bool(g.players[c.controller].hand) and c.vars.get("t") is not None, [
-        O.May([O.Discard(1), O.Kill(Ref("t"))], label="discard 1 to kill it")])]
-    return {"abilities": [Triggered(ev, list(eff), targets=[O.Choose(sel, out="t")], label=defn.name, source_text=defn.text)
+    may = O.May([], label="discard 1 to kill a unit or gear", out="__may")
+    pre = [lambda g, c: bool(g.players[c.controller].hand), lambda g, c: bool(sel.candidates(g, c))]
+    return {"abilities": [Triggered(ev, [O.Kill(Ref("t"))],
+                                    targets=[_TriggerMay(may, pre=list(pre)), O.Choose(sel, out="t"), O.Discard(1)],
+                                    label=defn.name, source_text=defn.text)
                           for ev in ("play_self", "attack_self")], "replace": True}
 
 
@@ -1515,12 +1520,16 @@ def rumble_hotheaded(defn):
         u = c.vars.get("__mech")
         e, pw = g.card_cost(c.controller, u, "trash", None)
         return (max(0, e - c.vars.get("__rm", 0)), pw)
-    body = [O.Choose(others, out="__rr", targeted=False), O.Do(remember), O.Recycle(Ref("__rr")),
-            O.ChooseFromList(mechs, out="__mech", label="play a Mech from your trash"),
+    # "recycle another friendly unit to ..." is the trigger's base cost (CR 383.3.b): decided and paid as the trigger
+    # is finalized (the unit is not a target); the Mech is picked and played on resolution.
+    from ..targeting import _TriggerMay
+    may = O.May([], label="recycle another friendly unit", out="__may")
+    body = [O.ChooseFromList(mechs, out="__mech", label="play a Mech from your trash"),
             O.Do(_unwrap("__mech")),
             O.If(Ref("__mech"), [O.PlayCard(Ref("__mech"), alt_cost=cost)])]
-    return {"abilities": [Triggered("conquer_self", [
-        O.If(lambda g, c: bool(mechs(g, c)) and bool(others(g, c)), [O.May(body, label="recycle another friendly unit")])],
+    return {"abilities": [Triggered("conquer_self", body,
+        targets=[_TriggerMay(may, pre=[lambda g, c: bool(mechs(g, c)) and bool(others(g, c))]),
+                 O.Choose(others, out="__rr", targeted=False, label="recycle"), O.Do(remember), O.Recycle(Ref("__rr"))],
         label=defn.name, source_text=defn.text)], "replace": False}
 
 
