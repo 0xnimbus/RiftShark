@@ -64,6 +64,13 @@ def split_choices(tree):
             outs.add(ins.out)
             prev_hoisted = True
             continue
+        if isinstance(ins, O.ChoosePlayer):
+            # CR 355.7 / 355.9.a: a chosen player is a target, chosen as the item is finalized ("choose a player.
+            # They discard 1", Bewitching Spirit, Blade Twirler)
+            hoisted.append(ins)
+            outs.add(ins.out)
+            prev_hoisted = True
+            continue
         if isinstance(ins, O.SetVar) and ins.name == "__tloc" and prev_hoisted:
             hoisted.append(ins)
             outs.add(ins.name)

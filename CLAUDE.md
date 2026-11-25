@@ -410,6 +410,13 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   and Mordekaiser, Dominating discard as the trigger is finalized (Mordekaiser's target is picked then too), Rumble,
   Hotheaded recycles the other unit then (the Mech is picked on resolution), Bottled Constellation needs exactly 3
   picks (the old script let you pick fewer and then did nothing) and kills them together before the point is scored.
+  10:20: a chosen player is a target (CR 355.7, 355.9.a) but `ops.ChoosePlayer` ran on resolution: Bewitching Spirit
+  ("choose a player. They discard 1") and Blade Twirler picked late; `targeting.split_choices` now hoists it (every
+  "choose an opponent" too, one option in 2 players). Miss Fortune, Captain ("The first time I move each turn, you may
+  ready something else") asked on resolution and was a once-each-turn trigger, so a "no" let her second move trigger it
+  (CR 383.3.e.2.b is only for "once each turn"); now may + choice at finalize, filter = her first move this turn.
+  Checked OK: Lucian/Draven "first time" (no may), Twilight Shroud, Hush/Defy costs, Time Warp's turn queue, Stupefy's
+  minimum on a 0-Might unit, Lightning Rush + Nocturne.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

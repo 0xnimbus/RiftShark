@@ -3037,3 +3037,52 @@ def test_bottled_constellation_kills_exactly_3_as_the_trigger_is_finalized(db):
         g.choose(c)
     assert seen == [[False]] and log == [4, 3, 2]       # unfinalized at yes; exactly three picks, no "none"
     assert sum(g.objects[u].zone == "trash" for u in us) == 3 and g.players[0].points == pts + 1
+
+
+def test_a_chosen_player_is_a_target_chosen_as_the_item_is_finalized(db):
+    """CR 355.7 / 355.9.a: a player a spell or ability chooses is a target, chosen as the item goes on the chain.
+    Bewitching Spirit ("When you play me, choose a player. They discard 1.") and Blade Twirler asked on resolution."""
+    for name in ("Bewitching Spirit", "Blade Twirler", "Sabotage"):
+        ab = next(a for a in _card(db, name).abilities if hasattr(a, "target_code"))
+        assert [type(x).__name__ for x in ab.target_code][:1] == ["ChoosePlayer"], name
+        assert not any(type(x).__name__ == "ChoosePlayer" for x in ab.code), name
+    g, u = _spell_setup(db, "kaisa_void", "Bewitching Spirit")
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == u))
+    seen = []
+
+    def pick(d):
+        if d.kind == "choose_player":
+            seen.append([it.finalized for it in g.chain if it.kind == "trigger" and it.uid == u])
+            return 1
+        return None
+    hands = [len(p.hand) for p in g.players]
+    _drive(g, pick=pick)
+    assert seen == [[False]]
+    assert len(g.players[1].hand) == hands[1] - 1
+
+
+def test_miss_fortune_captain_first_move_each_turn_is_not_once_each_turn(db):
+    """Miss Fortune, Captain: "The first time I move each turn, you may ready something else that's exhausted." The
+    "you may" and the thing to ready are settled as the trigger is finalized (CR 383.3.a; the script asked on
+    resolution), and declining doesn't make a later move "the first time" (it was a once-each-turn trigger, which
+    CR 383.3.e.2.b lets trigger again after a no)."""
+    g = main_phase(db, [_deck(db, "sett_the_boss"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    mf = put(g, db, 0, "Miss Fortune, Captain", ("base", 0))
+    other = put(g, db, 0, "Forecaster", ("base", 0), exclude=[mf])
+    g.objects[other].exhausted = True
+    g.restruct()
+    asked = []
+
+    def pick(d):
+        if d.kind == "yesno" and any("ready something" in str(x) for x in (d.labels or ())):
+            asked.append([it.finalized for it in g.chain if it.kind == "trigger" and it.uid == mf])
+            return False
+        return None
+    g.do_move([mf], ("bf", 0), Context(0, None))
+    _drive(g, pick=pick)
+    assert asked == [[False]] and g.objects[other].exhausted
+    g.do_move([mf], ("bf", 1), Context(0, None))
+    _drive(g, pick=pick)
+    assert asked == [[False]] and g.objects[other].exhausted       # second move: no trigger

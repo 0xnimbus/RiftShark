@@ -355,7 +355,7 @@ def test_draven_scores_first_combat_win_and_gives_a_point_when_he_dies_in_combat
     settle(g)
     from riftsim.core.vm import Context, Frame
     ctx = Context(0, dr); ctx.vars["self"] = dr
-    g.vm_frames.append(Frame(list(ab[1].code), ctx))
+    g.vm_frames.append(Frame(list(ab[1].target_code or []) + list(ab[1].code), ctx))     # a chosen player is a target (finalize)
     settle(g)
     assert g.players[1].points == p1 + 1
 
