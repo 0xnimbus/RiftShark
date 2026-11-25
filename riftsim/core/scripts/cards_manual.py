@@ -186,13 +186,16 @@ def ekko_recurrent(defn):
 @script("Miss Fortune, Captain")
 def miss_fortune_captain(defn):
     # [Accelerate] [Ganking]  The first time I move each turn, you may ready something else that's exhausted.
-    def exhausted_others(g, c):
-        return [u for u, o in g.objects.items() if o.zone == "board" and u != c.source and o.exhausted
-                and {"unit", "gear", "rune", "legend"} & set(g.chars(u).types)]
+    # The leading "you may" and the thing to ready are settled as the trigger is finalized (CR 383.3.a, 355). "The
+    # first time I move each turn" is not "once each turn" (383.3.e): declining doesn't let a later move trigger it.
+    from .cards_staples import _moves_this_turn
+    others = Sel("card", pred=lambda g, c, u: g.objects[u].zone == "board" and u != c.source and g.objects[u].exhausted
+                 and bool({"unit", "gear", "rune", "legend"} & set(g.chars(u).types)))
     return [Triggered("move_self", [
-        O.ChooseFromList(exhausted_others, out="__r", n=1, up_to=True, label="ready something else that's exhausted"),
-        O.Ready(Ref("__r")),
-    ], once_per_turn=True, label=defn.name, source_text=defn.text)]
+        O.If(lambda g, c: bool(others.candidates(g, c)), [
+            O.May([O.Choose(others, out="__r", targeted=False), O.Ready(Ref("__r"))],
+                  label="ready something else that's exhausted")])],
+        filt=lambda g, s, ev: _moves_this_turn(g, s) == 1, label=defn.name, source_text=defn.text)]
 
 
 @script("Royal Entourage")
