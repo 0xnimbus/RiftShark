@@ -1205,9 +1205,17 @@ def parse_condition(c):
     if m:
         sel, _, _, _ = parse_sel(m.group(1) + " here")
         return lambda g, cx, s=sel: bool(s.candidates(g, cx))
-    m = re.match(r"you have (\d+)\+ units (?:here|at that battlefield)$", c)
+    m = re.match(r"you have (\d+)\+ units (here|at that battlefield)$", c)
     if m:
-        return lambda g, cx, n=int(m.group(1)): len(g.units_at(cx.here, cx.controller)) >= n if cx.here else False
+        if m.group(2) == "here":
+            return lambda g, cx, n=int(m.group(1)): len(g.units_at(cx.here, cx.controller)) >= n if cx.here else False
+
+        def at_that_bf(g, cx, n=int(m.group(1))):
+            # "that battlefield" is the event's (the conquered one for "When you conquer"), not the source's place:
+            # a legend has no place (Garen, Might of Demacia never drew)
+            loc = (cx.event or {}).get("loc") or cx.vars.get("__bl")
+            return loc is not None and len(g.units_at(loc, cx.controller)) >= n
+        return at_that_bf
     m = re.match(r"an opponent controls a battlefield$", c)
     if m:
         return lambda g, cx: any(b.controller is not None and b.controller != cx.controller for b in g.battlefields)

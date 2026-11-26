@@ -3155,3 +3155,24 @@ def test_crumbling_sands_needs_an_opponent_to_have_played_another_spell(db):
         # Discipline gives the unit +2 [M] when it resolves; countered, it doesn't
         countered = g.chars(unit).might == g.objects[unit].defn.might
         assert countered == opp_spell, opp_spell
+
+
+def test_garen_legend_draws_when_you_conquer_with_4_units_at_that_battlefield(db):
+    """Garen, Might of Demacia (legend): "When you conquer, if you have 4+ units at that battlefield, draw 2." The
+    auto condition counted units at the source's place, and a legend has none, so it never drew. "That battlefield"
+    is the conquered one (the event's location)."""
+    for n, drawn in ((4, 2), (3, 0)):
+        g = main_phase(db, [_deck(db, "sett_the_boss"), _deck(db, "riven_exile")])
+        _clear_bfs(g, db)
+        lg = g.players[0].legend
+        g.objects[lg].defn = _card(db, "Garen, Might of Demacia")
+        g.restruct()
+        us = []
+        for _ in range(n):
+            us.append(put(g, db, 0, "Forecaster", ("base", 0), exclude=us))
+        h = len(g.players[0].hand)
+        d = g.run()
+        g.choose(next(o for o in d.options if o[0] == "move" and len(o) > 2 and set(o[1]) == set(us) and o[2] == ("bf", 0)))
+        _drive(g)
+        assert g.battlefields[0].controller == 0
+        assert len(g.players[0].hand) - h == drawn, n
