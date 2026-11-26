@@ -1347,3 +1347,111 @@ def test_jax_unmatched_gives_quick_draw_to_equipment_everywhere(db, decks):
     assert g.limited_play(0, eq, __import__("riftsim.core.vm", fromlist=["Context"]).Context(0, None), ignore="all")
     settle(g, yes=True, picks=[unit])
     assert g.objects[eq].attached_to == unit
+
+
+def test_dazzling_aurora_banishes_the_unit_and_keeps_it_banished_if_it_cant_be_played(db, decks):
+    """Errata (Origins): "... until you reveal a unit and banish it. Play it, ignoring its cost". Under a "can't play
+    cards" lock (Brynhir Thundersong) the play fails (CR 420.3.b) and the unit stays banished (420.3.c)."""
+    from riftsim.core.vm import Context
+    g = main_phase(db, decks)
+    a = put(g, db, 0, "Dazzling Aurora", ("base", 0))
+    first_unit = next(u for u in g.players[0].deck if g.objects[u].base_defn().is_unit)
+    g.add_turn_effect(Context(1, None), "cant_play", {"players": [0]})
+    _fire(g, a, "Dazzling Aurora")
+    settle(g)
+    assert g.objects[first_unit].zone == "banish"
+
+
+def test_sigil_of_the_storm_picks_the_rune_as_it_resolves(db, decks):
+    """Errata (Origins): "you must recycle one of your runes. (This doesn't choose anything.)" CR 355.10.f: not a
+    target, so the rune is picked as the ability resolves; the auto-script picked it as the trigger went on the chain."""
+    from riftsim.core import ops as O
+    from riftsim.core.vm import Context, Frame
+    sig = next(c for c in db if c.name == "Sigil of the Storm")
+    ab = next(a for a in sig.abilities if type(a).__name__ == "Triggered")
+    assert not any(isinstance(i, O.Choose) for i in ab.target_code or [])
+    g = main_phase(db, decks)
+    runes = list(g.players[0].runes)
+    ctx = Context(0, None)
+    g.vm_frames.append(Frame(list(ab.code), ctx))
+    settle(g, picks=[runes[0]])
+    assert runes[0] not in g.players[0].runes and len(g.players[0].runes) == len(runes) - 1
+
+
+def test_hall_of_legends_readies_your_legend_without_targeting_it(db, decks):
+    """Hall of Legends: "you may pay [1] to ready your legend." CR 355.10.g: "your legend" is not a target, so it is
+    picked as the ability resolves (several legends with Neeko, Blending In); the auto-script chose it as a target as
+    the trigger went on the chain. The [1] is still paid as the trigger is finalized."""
+    from riftsim.core import ops as O
+    from riftsim.core.vm import Context, Frame, relocate
+    hall = next(c for c in db if c.name == "Hall of Legends")
+    ab = next(a for a in hall.abilities if type(a).__name__ == "Triggered")
+    assert not any(isinstance(i, O.Choose) for i in ab.target_code or [])
+    g = main_phase(db, decks)
+    leg = next(u for u, o in g.objects.items() if o.zone == "board" and o.controller == 0 and "legend" in o.defn.types)
+    g.objects[leg].exhausted = True
+    g.restruct()
+    tc = list(ab.target_code)
+    g.vm_frames.append(Frame(tc + relocate(ab.code, len(tc)), Context(0, None)))
+    settle(g, yes=True)
+    assert not g.objects[leg].exhausted
+
+
+def test_draw_it_is_a_draw_for_second_card_triggers(db, decks):
+    """"Look at the top 3 ... choose a card from among them and draw it" (Lightning Rush; also Trifarian Captain,
+    Apprentice Smith, Ornn, Diana ...): drawing a specific card is the Draw action (CR 414.1), so it is the second card
+    drawn this turn for Frigid Jewel ("When you draw your second card each turn, give a friendly unit +2 [M]")."""
+    g = main_phase(db, decks)
+    fj = put(g, db, 0, "Frigid Jewel", ("base", 0))
+    u = put(g, db, 0, "Wily Newtfish", ("base", 0), exclude=(fj,))
+    g.turn_memo[("draws", 0)] = 1                   # drew one card already this turn
+    base = g.chars(u).might
+    top = g.players[0].deck[0]
+    _run_spell(g, db, "Lightning Rush", picks=[(top,), top, u])
+    assert g.objects[top].zone == "hand"
+    assert g.turn_memo[("draws", 0)] == 2
+    assert g.chars(u).might == base + 2
+
+
+def test_auto_grammar_draw_it_uses_the_draw_action():
+    """The auto-scripter's "reveal a <kind> from among them and draw it" is the Draw action too (CR 414.1)."""
+    from riftsim.core.scripts.auto_grammar import parse_effect
+    eff = parse_effect("Look at the top 5 cards of your Main Deck. You may reveal a gear from among them and draw it.")
+
+    def names(code):
+        for x in code or []:
+            yield type(x).__name__
+            for k in ("then", "else_", "body", "effect", "code"):
+                v = getattr(x, k, None)
+                if isinstance(v, list):
+                    yield from names(v)
+    found = list(names(eff))
+    assert "DrawCard" in found and "ToHand" not in found
+
+
+def test_you_may_kill_a_gear_if_you_do_needs_the_gear_to_still_be_there(db, decks):
+    """Adaptatron (Irelia deck): "When I conquer, you may kill a gear. If you do, buff me." The gear is a target chosen
+    as the trigger goes on the chain; if it is gone when the trigger resolves, nothing was killed, so no buff (CR 359.3)."""
+    for gone in (False, True):
+        g = main_phase(db, decks)
+        a = put(g, db, 0, "Adaptatron", ("bf", 0))
+        gear = put(g, db, 1, "Doran's Shield", ("base", 1), exclude=(a,))
+        g.emit("conquer", player=0, loc=("bf", 0), bf=0, units=(a,), uid=a)
+        g.dirty = True
+        g.pending = None
+        for _ in range(40):
+            d = g.run()
+            item = next((it for it in g.chain if it.kind == "trigger" and it.uid == a), None)
+            if item is not None and item.finalized:
+                break
+            if d.kind == "yesno":
+                g.choose(True)
+            elif gear in d.options:
+                g.choose(gear)
+            else:
+                g.choose(("pass",) if ("pass",) in d.options else d.options[0])
+        assert item is not None and item.finalized
+        if gone:
+            g.do_banish([gear], None)
+        settle(g)
+        assert (g.objects[a].buffs >= 1) == (not gone), gone

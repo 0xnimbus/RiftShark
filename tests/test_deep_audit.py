@@ -2791,3 +2791,388 @@ def test_when_you_play_a_spell_triggers_on_its_resolution_not_when_countered(db)
         _drive(g, pick=pick)
         assert seen[0] == [sp]                 # nothing triggered while the spell waits on the chain
         assert g.chars(st).might == (2 if counter else 3)
+
+
+def test_salvage_kills_up_to_one_gear_so_it_can_be_played_with_none(db):
+    """Salvage errata (Origins): "You may kill up to one gear. Draw 1." (Viktor, Rek'Sai and Sett lists.) The
+    auto-script chose exactly one gear as it was played, so Salvage could not be played (to draw) with no gear on the
+    board, and a gear had to be chosen whenever one existed."""
+    g, sp = _spell_setup(db, "viktor_herald", "Salvage")
+    h = len(g.players[0].hand)
+    d = g.run()
+    assert ("play", sp) in d.options
+    g.choose(("play", sp))
+    _drive(g)
+    assert len(g.players[0].hand) == h        # Salvage left the hand, one card drawn
+    g, sp = _spell_setup(db, "viktor_herald", "Salvage")
+    gear = put(g, db, 1, "Doran's Shield", ("base", 1))
+    g.restruct()
+    d = g.run()
+    g.choose(("play", sp))
+    offered = []
+
+    def pick(d):
+        if d.kind in ("choose", "choose_many") and any(o in ((), None) or o == (gear,) or o == gear for o in d.options):
+            offered.append(list(d.options))
+            return next(o for o in d.options if o in ((), None))
+        return None
+    _drive(g, pick=pick)
+    assert offered and g.objects[gear].zone == "board"
+
+
+def test_a_reaction_card_hidden_this_turn_cant_be_played_from_facedown_until_the_next_turn(db):
+    """CR 811.1.b: "Beginning on the next turn, this gains [Reaction] and you may play this, ignoring its base cost."
+    The permission to play it from facedown starts next turn, so a printed [Reaction] (Consult the Past, Lotus Trap,
+    Resonating Strike) doesn't let it be flipped the turn it was hidden."""
+    g, cp = _spell_setup(db, "kaisa_void", "Consult the Past")
+    g.set_bf_controller(0, 0)
+    assert g.do_hide(0, cp, ("bf", 0))
+    g.restruct()
+    assert not any(o[0] == "play" and o[1] == cp for o in g.legal_actions(0))
+    g.objects[cp].facedown_turn = g.turn - 1
+    g.restruct()
+    assert any(o[0] == "play" and o[1] == cp for o in g.legal_actions(0))
+
+
+def test_mageseeker_warden_stops_enemy_hidden_units_but_not_spells(db):
+    """Mageseeker Warden: "While I'm at a battlefield, opponents can only play units to their base." A hidden unit must
+    be played to the battlefield it was hidden at (CR 811.1.d.1), so with an enemy Warden at a battlefield it has no
+    legal location and can't be played from facedown; hidden spells and the Warden's own side are unaffected."""
+    g = main_phase(db, [_deck(db, "kaisa_void"), _deck(db, "riven_exile")])
+    fae = give(g, 0, "Mischievous Marai", db)
+    g.set_bf_controller(0, 0)
+    assert g.do_hide(0, fae, ("bf", 0))
+    g.objects[fae].facedown_turn = g.turn - 1
+    g.restruct()
+    assert g._play_locations(0, fae, "facedown") == [("bf", 0)]
+    w = put(g, db, 1, "Mageseeker Warden", ("bf", 1))
+    g.objects[w].defn = next(c for c in db if c.name == "Mageseeker Warden")
+    g.restruct()
+    assert g._play_locations(0, fae, "facedown") == []
+    assert not any(o[0] == "play" and o[1] == fae for o in g.legal_actions(0))
+    g.objects[w].controller = 0
+    g.restruct()
+    assert g._play_locations(0, fae, "facedown") == [("bf", 0)]
+
+
+def test_attackers_recalled_after_combat_damage_is_no_result_not_a_defender_win(db):
+    """CR 468.3.d: there is "No Result" if units were recalled in step 3d of the combat cleanup (attackers recalled
+    because defenders are still there). The engine named the defender the winner, so "When I win a combat" (Nidalee,
+    Cat Form defending, Sett deck), "When you win a combat" and Grim Resolve paid out for merely surviving."""
+    g = main_phase(db, [_deck(db, "riven_exile"), _deck(db, "sett_the_boss")])
+    _clear_bfs(g, db)
+    w = put(g, db, 0, "Mournful Witness", ("base", 0))
+    nid = put(g, db, 1, "Nidalee, Cat Form", ("bf", 0))
+    g.objects[nid].defn = next(c for c in db if c.name == "Nidalee, Cat Form")
+    g.set_bf_controller(0, 1)
+    g.objects[nid].stunned = True               # deals no damage
+    g.restruct()
+    results = []
+    emit = g.emit
+
+    def spy(kind, **kw):
+        if kind == "combat_result":
+            results.append(kw.get("winner"))
+        return emit(kind, **kw)
+    g.emit = spy
+    h = len(g.players[1].hand)
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "move" and o[1] == (w,) and o[2] == ("bf", 0)))
+    _drive(g)
+    assert g.objects[nid].zone == "board" and g.objects[w].location == ("base", 0)
+    assert results == [None] and len(g.players[1].hand) == h
+
+
+def _finalize_yesno(g, label, item):
+    """pick for _drive: answers yes to the yes/no whose label has `label`, recording whether its trigger was
+    already finalized at that moment."""
+    seen = []
+
+    def pick(d):
+        if d.kind == "yesno" and any(label in str(x) for x in (d.labels or ())):
+            seen.append([it.finalized for it in g.chain if it.kind == "trigger" and it.label == item])
+            return True
+        return None
+    return seen, pick
+
+
+def test_valley_of_idols_pay_1_is_decided_and_paid_as_the_trigger_is_finalized(db):
+    """Valley of Idols (Sett deck): "When a player plays a unit here, they may pay [1] to [Buff] it." A cost right
+    after "you may" is the trigger's base cost (CR 383.3.b): yes/no and the [1] come as the trigger is finalized, not
+    when it resolves (the hand script asked on resolution). The unit is buffed."""
+    g, u = _spell_setup(db, "kaisa_void", "Stellacorn Herder")
+    g.objects[g.battlefields[0].uid].defn = _card(db, "Valley of Idols")
+    put(g, db, 0, "Forecaster", ("bf", 0))
+    g.set_bf_controller(0, 0)
+    g.restruct()
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == u and ("bf", 0) in o))
+    seen, pick = _finalize_yesno(g, "buff it", "Valley of Idols")
+    _drive(g, pick=pick)
+    assert seen and seen[0] == [False]
+    assert g.objects[u].zone == "board" and g.objects[u].buffs == 1
+
+
+def test_monastery_of_hirana_spends_the_buff_as_the_trigger_is_finalized(db):
+    """Monastery of Hirana (Sett deck): "When you conquer here, you may spend a buff to draw 1." Spending the buff is
+    the trigger's base cost (CR 383.3.b), paid as it is finalized."""
+    g = main_phase(db, [_deck(db, "sett_the_boss"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    g.objects[g.battlefields[0].uid].defn = _card(db, "Monastery of Hirana")
+    a = put(g, db, 0, "Forecaster", ("base", 0))
+    g.objects[a].buffs = 1
+    g.restruct()
+    h = len(g.players[0].hand)
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "move" and len(o) > 2 and o[1] == (a,) and o[2] == ("bf", 0)))
+    seen, pick = _finalize_yesno(g, "spend a buff", "Monastery of Hirana")
+    _drive(g, pick=pick)
+    assert g.battlefields[0].controller == 0
+    assert seen and seen[0] == [False]
+    assert g.objects[a].buffs == 0 and len(g.players[0].hand) == h + 1
+
+
+def test_ravenbloom_prefect_banishes_itself_as_the_trigger_is_finalized(db):
+    """Ravenbloom Prefect (Irelia list): "When an opponent plays a gear, you may banish me to banish it." "Banish me"
+    is the trigger's base cost (CR 383.3.b): decided and paid as the trigger is finalized, so the Prefect is gone
+    before anyone can respond. The hand script asked and banished on resolution. Same change for hand scripts written
+    as "if ready: you may exhaust this ..." (Fresh Beans, Solari Shrine, Altar of Memories) and "pay, then if paid"
+    (Battlefield Armorer, Fae Porter, Mistfall, Ripper's Bay)."""
+    g, ls = _spell_setup(db, "akali_rogue", "Long Sword")
+    put(g, db, 0, "Forecaster", ("base", 0))
+    pf = put(g, db, 1, "Ravenbloom Prefect", ("base", 1))
+    g.objects[pf].defn = _card(db, "Ravenbloom Prefect")
+    g.restruct()
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == ls))
+    seen, pick = _finalize_yesno(g, "banish me", "Ravenbloom Prefect")
+    _drive(g, pick=pick)
+    assert seen and seen[0] == [False]
+    assert g.objects[pf].zone == "banish" and g.objects[ls].zone == "banish"
+
+
+def test_hand_scripted_may_costs_are_paid_as_the_trigger_is_finalized(db):
+    """CR 383.3.b for hand scripts shaped "if I'm ready: you may exhaust me ..." and "pay [N]; if paid: ...": the
+    yes/no and the cost move to the finalize code. Altar of Memories' top-or-bottom pick stays at resolution (it is
+    not a mode, CR 355.3), and Deceiver's copied unit is picked after its Reflection exists."""
+    from riftsim.core.abilities import Triggered
+    want = {"Fresh Beans": "Exhaust", "Solari Shrine": "Exhaust", "Altar of Memories": "Exhaust",
+            "Battlefield Armorer": "PayResources", "Fae Porter": "PayResources", "Mistfall": "PayResources",
+            "Ripper's Bay": "PayResources", "Ravenbloom Prefect": "Banish"}
+    for name, cost in want.items():
+        tr = next(a for a in _card(db, name).abilities if isinstance(a, Triggered))
+        fin = [type(x).__name__ for x in tr.target_code]
+        assert fin[0] == "_TriggerMay" and cost in fin, (name, fin)
+        assert "_ModeAsk" not in fin, name
+    dec = next(a for a in _card(db, "Deceiver").abilities if isinstance(a, Triggered))
+    assert not any(type(x).__name__ == "Choose" and x.out == "__model" for x in dec.target_code)
+
+
+def test_discard_kill_and_recycle_costs_after_you_may_are_paid_as_the_trigger_is_finalized(db):
+    """CR 383.3.b: "you may discard 1 to ..." (Super Mega Death Rocket!, Mordekaiser, Dominating), "you may recycle
+    another friendly unit to ..." (Rumble, Hotheaded) and "you may kill 3 other friendly units and/or gear to ..."
+    (Bottled Constellation) are the trigger's base cost, decided and paid as it is finalized. The hand scripts paid
+    them on resolution. Rocket: the discard happens before the trigger resolves, and it comes back to hand."""
+    from riftsim.core.abilities import Triggered
+    want = {"Super Mega Death Rocket!, Jinx": "Discard", "Mordekaiser, Dominating": "Discard",
+            "Rumble, Hotheaded": "Recycle", "Bottled Constellation": "Do"}
+    for name, cost in want.items():
+        tr = [a for a in _card(db, name).abilities if isinstance(a, Triggered)][0]
+        fin = [type(x).__name__ for x in tr.target_code]
+        assert fin[0] == "_TriggerMay" and cost in fin, (name, fin)
+        assert not any(type(x).__name__ in ("Discard", "Recycle") for x in tr.code), name
+    g = main_phase(db, [_deck(db, "sett_the_boss"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    a = put(g, db, 0, "Forecaster", ("base", 0))
+    r = next(u for u in g.players[0].deck if u != a)
+    g.objects[r].defn = _card(db, "Super Mega Death Rocket!, Jinx")
+    g._to_zone(g.objects[r], "trash")
+    g.restruct()
+    hand = list(g.players[0].hand)
+    assert hand
+    discards = []
+    real = g.do_discard
+
+    def spy(p, us, ctx=None, *args, **kw):
+        discards.append([it.finalized for it in g.chain if it.kind == "trigger" and it.label == "return from trash"])
+        return real(p, us, ctx, *args, **kw)
+    g.do_discard = spy
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "move" and len(o) > 2 and o[1] == (a,) and o[2] == ("bf", 0)))
+    seen, pick = _finalize_yesno(g, "discard 1", "return from trash")
+    _drive(g, pick=pick)
+    assert g.battlefields[0].controller == 0
+    assert seen and discards and discards[0] == [False]
+    assert sum(g.objects[u].zone == "trash" for u in hand) == 1 and g.objects[r].zone == "hand"
+
+
+def test_bottled_constellation_kills_exactly_3_as_the_trigger_is_finalized(db):
+    """Bottled Constellation: "At the start of your Main Phase, you may kill 3 other friendly units and/or gear to score
+    1 point." The kill is the base cost (CR 383.3.b): three picks (no fewer) and the kill as the trigger is finalized,
+    then 1 point on resolution."""
+    g = main_phase(db, [_deck(db, "sett_the_boss"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    b = put(g, db, 0, "Bottled Constellation", ("base", 0))
+    us = [put(g, db, 0, "Forecaster", ("base", 0), exclude=[b]) for _ in range(4)]
+    pts = g.players[0].points
+    seen, pick0 = _finalize_yesno(g, "kill 3", "Bottled Constellation")
+    log = []
+    def pick(d):
+        if d.kind == "pick":
+            log.append(len(d.options))
+        r = pick0(d)
+        if r is not None: return r
+        if d.kind == "action" and d.player == 0 and g.turn_player == 1 and ("pass",) not in d.options:
+            return None
+        if d.kind == "action" and ("end_turn",) in d.options and g.turn_player == 1:
+            return ("end_turn",)
+        return None
+    d = g.run(); g.choose(("end_turn",))
+    for _ in range(200):
+        d = g.run()
+        if seen and d.kind == "action" and g.turn_player == 0 and not g.chain: break
+        c = pick(d)
+        if c is None:
+            c = ("end_turn",) if ("end_turn",) in d.options else (("pass",) if ("pass",) in d.options else d.options[0])
+        g.choose(c)
+    assert seen == [[False]] and log == [4, 3, 2]       # unfinalized at yes; exactly three picks, no "none"
+    assert sum(g.objects[u].zone == "trash" for u in us) == 3 and g.players[0].points == pts + 1
+
+
+def test_a_chosen_player_is_a_target_chosen_as_the_item_is_finalized(db):
+    """CR 355.7 / 355.9.a: a player a spell or ability chooses is a target, chosen as the item goes on the chain.
+    Bewitching Spirit ("When you play me, choose a player. They discard 1.") and Blade Twirler asked on resolution."""
+    for name in ("Bewitching Spirit", "Blade Twirler", "Sabotage"):
+        ab = next(a for a in _card(db, name).abilities if hasattr(a, "target_code"))
+        assert [type(x).__name__ for x in ab.target_code][:1] == ["ChoosePlayer"], name
+        assert not any(type(x).__name__ == "ChoosePlayer" for x in ab.code), name
+    g, u = _spell_setup(db, "kaisa_void", "Bewitching Spirit")
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == u))
+    seen = []
+
+    def pick(d):
+        if d.kind == "choose_player":
+            seen.append([it.finalized for it in g.chain if it.kind == "trigger" and it.uid == u])
+            return 1
+        return None
+    hands = [len(p.hand) for p in g.players]
+    _drive(g, pick=pick)
+    assert seen == [[False]]
+    assert len(g.players[1].hand) == hands[1] - 1
+
+
+def test_miss_fortune_captain_first_move_each_turn_is_not_once_each_turn(db):
+    """Miss Fortune, Captain: "The first time I move each turn, you may ready something else that's exhausted." The
+    "you may" and the thing to ready are settled as the trigger is finalized (CR 383.3.a; the script asked on
+    resolution), and declining doesn't make a later move "the first time" (it was a once-each-turn trigger, which
+    CR 383.3.e.2.b lets trigger again after a no)."""
+    g = main_phase(db, [_deck(db, "sett_the_boss"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    mf = put(g, db, 0, "Miss Fortune, Captain", ("base", 0))
+    other = put(g, db, 0, "Forecaster", ("base", 0), exclude=[mf])
+    g.objects[other].exhausted = True
+    g.restruct()
+    asked = []
+
+    def pick(d):
+        if d.kind == "yesno" and any("ready something" in str(x) for x in (d.labels or ())):
+            asked.append([it.finalized for it in g.chain if it.kind == "trigger" and it.uid == mf])
+            return False
+        return None
+    g.do_move([mf], ("bf", 0), Context(0, None))
+    _drive(g, pick=pick)
+    assert asked == [[False]] and g.objects[other].exhausted
+    g.do_move([mf], ("bf", 1), Context(0, None))
+    _drive(g, pick=pick)
+    assert asked == [[False]] and g.objects[other].exhausted       # second move: no trigger
+
+
+def test_weaponmaster_may_is_decided_as_the_trigger_is_finalized(db):
+    """[Weaponmaster] (CR 821.1.c: "When you play me, you may choose a Card you control with the Equipment tag ...")
+    picked the Equipment or "none" at finalize, so a "no" still left the trigger on the chain to resolve. The leading
+    "you may" is now a yes/no at finalize, and no removes the trigger (CR 383.3.a.2); with no Equipment there is no
+    yes to give. Same for Veiled Temple ("you may ready a friendly gear") and Sivir, Ambitious, which decided late."""
+    from riftsim.core.abilities import Triggered
+    for name in ("Veiled Temple", "Sivir, Ambitious", "Lucian, Merciless"):
+        tr = next(a for a in _card(db, name).abilities if isinstance(a, Triggered))
+        assert [type(x).__name__ for x in tr.target_code][:2] == ["_TriggerMay", "Choose"], name
+    for with_gear in (True, False):
+        g, u = _spell_setup(db, "sett_the_boss", "Lucian, Merciless")
+        sw = put(g, db, 0, "Long Sword", ("base", 0)) if with_gear else None
+        d = g.run()
+        g.choose(next(o for o in d.options if o[0] == "play" and o[1] == u and ("base", 0) in o))
+        asked, resolved = [], []
+        real = g.log
+
+        def spy(kind, **kw):
+            if kind == "trigger_declined" and kw.get("label") == "Weaponmaster":
+                resolved.append("declined")
+            return real(kind, **kw)
+        g.log = spy
+
+        def pick(d):
+            if d.kind == "yesno" and any("Equipment" in str(x) for x in (d.labels or ())):
+                asked.append([it.finalized for it in g.chain if it.label == "Weaponmaster"])
+                return False
+            return None
+        _drive(g, pick=pick)
+        if with_gear:
+            assert asked == [[False]] and resolved == ["declined"] and g.objects[sw].attached_to is None
+        else:
+            assert asked == [] and not any(it.label == "Weaponmaster" for it in g.chain)
+
+
+def test_crumbling_sands_needs_an_opponent_to_have_played_another_spell(db):
+    """Crumbling Sands: "Counter a spell if an opponent has played another spell this turn." The auto-script read the
+    condition as the caster's [Legion] (another card played by *you*) and chose the spell on resolution. The spell is
+    a target chosen as it is played (CR 355.5); the condition counts opponents' spells other than the chosen one."""
+    tr = _card(db, "Crumbling Sands").abilities[0]
+    assert [type(x).__name__ for x in tr.target_code][:1] == ["Choose"]
+    for opp_spell in (False, True):
+        g, ds = _spell_setup(db, "kaisa_void", "Discipline")
+        cs = give(g, 0, "Crumbling Sands", db)
+        unit = put(g, db, 0, "Forecaster", ("base", 0))
+        if opp_spell:
+            other = next(u for u in g.players[1].deck if g.objects[u].base_defn().type == "spell")
+            g.players[1].played_this_turn.append(other)
+        d = g.run()
+        g.choose(next(o for o in d.options if o[0] == "play" and o[1] == ds))
+        state = {"cast": False}
+
+        def pick(d):
+            if d.kind == "action" and d.player == 0 and not state["cast"]:
+                o = next((o for o in d.options if o[0] == "play" and o[1] == cs), None)
+                if o is not None:
+                    state["cast"] = True
+                    return o
+            if d.kind == "choose":
+                want = ds if state["cast"] else unit
+                return next((o for o in d.options if o == want or o == (want,)), None)
+            return None
+        _drive(g, pick=pick)
+        assert state["cast"]
+        # Discipline gives the unit +2 [M] when it resolves; countered, it doesn't
+        countered = g.chars(unit).might == g.objects[unit].defn.might
+        assert countered == opp_spell, opp_spell
+
+
+def test_garen_legend_draws_when_you_conquer_with_4_units_at_that_battlefield(db):
+    """Garen, Might of Demacia (legend): "When you conquer, if you have 4+ units at that battlefield, draw 2." The
+    auto condition counted units at the source's place, and a legend has none, so it never drew. "That battlefield"
+    is the conquered one (the event's location)."""
+    for n, drawn in ((4, 2), (3, 0)):
+        g = main_phase(db, [_deck(db, "sett_the_boss"), _deck(db, "riven_exile")])
+        _clear_bfs(g, db)
+        lg = g.players[0].legend
+        g.objects[lg].defn = _card(db, "Garen, Might of Demacia")
+        g.restruct()
+        us = []
+        for _ in range(n):
+            us.append(put(g, db, 0, "Forecaster", ("base", 0), exclude=us))
+        h = len(g.players[0].hand)
+        d = g.run()
+        g.choose(next(o for o in d.options if o[0] == "move" and len(o) > 2 and set(o[1]) == set(us) and o[2] == ("bf", 0)))
+        _drive(g)
+        assert g.battlefields[0].controller == 0
+        assert len(g.players[0].hand) - h == drawn, n

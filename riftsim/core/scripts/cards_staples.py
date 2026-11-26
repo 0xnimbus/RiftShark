@@ -417,16 +417,21 @@ def deceiver(defn):
     def there(g, c):
         return c.event.get("loc")
 
+    # "you may discard 1 and exhaust me to ..." is the trigger's base cost (CR 383.3.b): decided and paid as it is
+    # finalized; the unit to copy is picked once the Reflection exists
+    from ..targeting import _TriggerMay
     other_here = Sel("unit", pred=lambda g, c, u: u != c.vars.get("token") and g.objects[u].location == c.event.get("loc"))
-    body = [O.Choose(Sel("card", zone="hand", pred=lambda g, c, u: g.objects[u].owner == c.controller), out="__dd", targeted=False),
-            O.Do(lambda g, c: g.do_discard(c.controller, [c.vars["__dd"]], c)),
-            O.Do(lambda g, c: g.do_exhaust(c.source, c)),
-            O.PlayToken("Reflection", loc=there, ready=True),
+    may = O.May([], label="discard 1 and exhaust Deceiver to play a Reflection copy there", out="__may")
+    costs = [_TriggerMay(may, pre=[can]),
+             O.Choose(Sel("card", zone="hand", pred=lambda g, c, u: g.objects[u].owner == c.controller), out="__dd", targeted=False),
+             O.Do(lambda g, c: g.do_discard(c.controller, [c.vars["__dd"]], c)),
+             O.Do(lambda g, c: g.do_exhaust(c.source, c))]
+    body = [O.PlayToken("Reflection", loc=there, ready=True),
             O.Choose(other_here, out="__model", targeted=False),
             O.CopyAs(Ref("token"), Ref("__model")),
             O.GiveKeyword(Ref("token"), "temporary", True, duration="permanent")]
-    return {"abilities": [Triggered(conquer_or_hold, [O.If(can, [O.May(body, label="discard 1 and exhaust Deceiver to play a Reflection copy there")])],
-                                    label=defn.name, source_text=defn.text)], "replace": True}
+    return {"abilities": [Triggered(conquer_or_hold, body, targets=costs, label=defn.name, source_text=defn.text)],
+            "replace": True}
 
 
 # ----------------------------------------------------------------------------------------- champion units
@@ -633,10 +638,15 @@ def ksante(defn):
 @script("Mordekaiser, Dominating")
 def mordekaiser_dominating(defn):
     # When you play me or when I attack, you may discard 1 to kill a unit or gear.
+    # "discard 1 to ..." is the trigger's base cost (CR 383.3.b): yes/no, the target and the discard are all settled
+    # as the trigger is finalized; the kill happens on resolution.
+    from ..targeting import _TriggerMay
     sel = Sel("permanent", pred=lambda g, c, u: bool({"unit", "gear"} & set(g.chars(u).types)))
-    eff = [O.If(lambda g, c: bool(g.players[c.controller].hand) and c.vars.get("t") is not None, [
-        O.May([O.Discard(1), O.Kill(Ref("t"))], label="discard 1 to kill it")])]
-    return {"abilities": [Triggered(ev, list(eff), targets=[O.Choose(sel, out="t")], label=defn.name, source_text=defn.text)
+    may = O.May([], label="discard 1 to kill a unit or gear", out="__may")
+    pre = [lambda g, c: bool(g.players[c.controller].hand), lambda g, c: bool(sel.candidates(g, c))]
+    return {"abilities": [Triggered(ev, [O.Kill(Ref("t"))],
+                                    targets=[_TriggerMay(may, pre=list(pre)), O.Choose(sel, out="t"), O.Discard(1)],
+                                    label=defn.name, source_text=defn.text)
                           for ev in ("play_self", "attack_self")], "replace": True}
 
 
@@ -659,7 +669,7 @@ def _look_reveal_draw(n, kind):
                              label=f"reveal a {kind} and draw it"),
             O.Do(_unwrap("__pick")),
             O.Do(lambda g, c: g.emit("reveal", player=c.controller, cards=[c.vars["__pick"]], ctx=c) if c.vars.get("__pick") else None),
-            O.ToHand(Ref("__pick")),
+            O.DrawCard(Ref("__pick")),
             O.Recycle(lambda g, c: [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck"])]
 
 
@@ -753,7 +763,7 @@ def diana_lunari(defn):
         O.PayResources(1, out="__dp"),
         O.If(Ref("__dp"), [O.Predict(1), O.Do(top), O.SeeFromDeck(lambda g, c: [c.vars.get("__top")]), O.Do(reveal_top),
                            O.If(lambda g, c: c.vars.get("__top") in g.objects and g.objects[c.vars["__top"]].base_defn().type == "spell",
-                                [O.ToHand(Ref("__top"))])])], label=defn.name, source_text=defn.text)], "replace": True}
+                                [O.DrawCard(Ref("__top"))])])], label=defn.name, source_text=defn.text)], "replace": True}
 
 
 @script("Lulu, Whimsical")
@@ -1444,9 +1454,9 @@ def sivir_ambitious(defn):
                 and g.combat["attacker"] == me.controller and g.turn_memo.get(("combat_excess", me.controller), 0) >= 5)
     amount = lambda g, c: c.vars.get("__sx", 0)
     store = O.Do(lambda g, c: c.vars.__setitem__("__sx", g.turn_memo.get(("combat_excess", c.controller), 0)))
+    # the "you may" and the enemy unit are settled as the trigger is finalized (CR 383.3.a, 355)
     return {"abilities": [Triggered(conquer_after_attack, [
-        store,
-        O.May([O.Choose(Sel("unit", side="enemy"), out="t"), O.Deal(amount, Ref("t"))], label="deal the excess to an enemy unit")],
+        O.May([O.Choose(Sel("unit", side="enemy"), out="t"), store, O.Deal(amount, Ref("t"))], label="deal the excess to an enemy unit")],
         label=defn.name, source_text=defn.text)], "replace": True}
 
 
@@ -1510,12 +1520,16 @@ def rumble_hotheaded(defn):
         u = c.vars.get("__mech")
         e, pw = g.card_cost(c.controller, u, "trash", None)
         return (max(0, e - c.vars.get("__rm", 0)), pw)
-    body = [O.Choose(others, out="__rr", targeted=False), O.Do(remember), O.Recycle(Ref("__rr")),
-            O.ChooseFromList(mechs, out="__mech", label="play a Mech from your trash"),
+    # "recycle another friendly unit to ..." is the trigger's base cost (CR 383.3.b): decided and paid as the trigger
+    # is finalized (the unit is not a target); the Mech is picked and played on resolution.
+    from ..targeting import _TriggerMay
+    may = O.May([], label="recycle another friendly unit", out="__may")
+    body = [O.ChooseFromList(mechs, out="__mech", label="play a Mech from your trash"),
             O.Do(_unwrap("__mech")),
             O.If(Ref("__mech"), [O.PlayCard(Ref("__mech"), alt_cost=cost)])]
-    return {"abilities": [Triggered("conquer_self", [
-        O.If(lambda g, c: bool(mechs(g, c)) and bool(others(g, c)), [O.May(body, label="recycle another friendly unit")])],
+    return {"abilities": [Triggered("conquer_self", body,
+        targets=[_TriggerMay(may, pre=[lambda g, c: bool(mechs(g, c)) and bool(others(g, c))]),
+                 O.Choose(others, out="__rr", targeted=False, label="recycle"), O.Do(remember), O.Recycle(Ref("__rr"))],
         label=defn.name, source_text=defn.text)], "replace": False}
 
 

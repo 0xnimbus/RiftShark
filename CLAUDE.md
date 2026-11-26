@@ -347,6 +347,95 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   can't be played stays banished instead of being recycled/drawn (CR 420.3.c). Jax, Unmatched: "Your Equipment
   everywhere have [Quick-Draw]" (was hand only): Reaction timing and the attach trigger for Equipment played from
   the trash, face down or by effects. None is in a tournament list.
+  20:20: Salvage (errata: "You may kill up to one gear. Draw 1."; Viktor, Rek'Sai and Sett lists) was auto-scripted as
+  "choose exactly one gear", so it could not be played with no gear on the board and a gear had to be chosen;
+  hand-scripted in cards_common.py (up to one target, CR 355.10). Dazzling Aurora follows its errata ("reveal ...
+  until you reveal a unit and banish it. Play it"): a unit that can't be played stays banished. Checked OK: Clockwork
+  Keeper's draw is a play trigger, Targon's Peak readies up to 2, Highlander heals/exhausts/recalls.
+  2026-11-23 00:20: Sigil of the Storm (errata: "you must recycle one of your runes. (This doesn't choose anything.)")
+  picked the rune as the trigger went on the chain; CR 355.10.f picks it as it resolves (hand-scripted, Choose
+  `at_resolution`). Scans: every "up to N" / "any number of" choice in every script allows fewer (CR 355.13), and
+  "must" instructions (Safety Inspector, Shard of Undoing, Angler Wyrm) choose nothing early. Open: "ready your
+  legend" (Hall of Legends, 355.10.g) is still a target chosen at finalize; not in any tournament list.
+  05:20: Hall of Legends hand-scripted: "ready your legend" is no longer a target (CR 355.10.g); with several legends
+  it is picked as the ability resolves, the [1] is still decided and paid as the trigger is finalized (383.3.b).
+  Checked OK: Azir equipment (Eye of the Herald, Hand Hammer, Brutalizer), Deathgrip errata targets, Thrill of the
+  Hunt, Ambush locations/timing, Ganking, attachment control (CR 718.5.f).
+  10:20: "... and draw it" (Lightning Rush, Trifarian Captain in Kennen; Apprentice Smith, Pakaa Protector, Raving
+  Witness, Fate Weaver, Double Trouble, Ornn, Ivern, Diana, Lunari) put the card in hand without the Draw action, so it
+  never counted for Frigid Jewel ("your second card each turn") or "when you draw" triggers; CR 414.1 makes it a draw:
+  `Game.draw_card` / `ops.DrawCard`. Checked OK: Falling Star / Icathian Rain errata (separate Deals, the same unit can
+  be chosen each time), Death from Below's replay, Thousand-Tailed Watcher only hits units there as it resolves.
+  15:20: the auto-scripter's "reveal a <kind> from among them and draw it" / "draw it" lines also use `ops.DrawCard`
+  (no current auto card hit them; Rift Herald and Command: Attack are unscripted). Checked OK: Decree of Focus (combat
+  with a Fury unit or chosen by an enemy Fury spell), Life from Stone exhausts only a ready unit, Pit Rookie / First
+  Mate choose another unit, Ruin Runner / Baron untargetable only for enemies, Challenge-style fights, Temporal Breach.
+  20:20: auto "you may <targeted X>. If you do, Y" set "did" whether or not X happened: Adaptatron (Irelia deck: "you
+  may kill a gear. If you do, buff me") and Pickpocket still got Y when the gear left before the trigger resolved
+  (CR 359.3: an illegal target is not affected). `auto_grammar` now sets `__did` only while every targeted choice of
+  X is still legal. Checked OK: scoring once per battlefield per turn and the final point (CR 471-473), Forgotten
+  Monument, Accelerate on effect plays (CR 356.1.b.3), Blood Money, Imperial Decree, Shadow's Call, stun re-choice.
+  2026-11-24 00:20: Emperor's Dais (Azir deck) followed its pre-errata text ("... hand. If you do, play ..."); the
+  Vendetta errata reads "pay [1] and return a unit you control here to its owner's hand to play a ... Sand Soldier",
+  so both are the base cost (CR 383.3.b): the unit is returned as the trigger is finalized (not a target; yes only
+  while a friendly unit is there and [1] is payable) and the Soldier comes even if nothing is left there. The Diana,
+  Lunari open question is answered by the same errata ("you may pay [1] to [Predict], then reveal ..."): no pay, no
+  reveal, as scripted. Checked OK: hand scripts' "If you do" (Meditation, Call to Glory, Jayce, Crescent Guardian).
+  05:20: a hidden card with printed [Reaction] (Consult the Past, Lotus Trap, Resonating Strike) could be played from
+  facedown the turn it was hidden; CR 811.1.b gives the "you may play this" permission only "beginning on the next
+  turn" (`flow` timing check needs `turn > facedown_turn` for every facedown play). Smoke games with these cards change.
+  10:20: Mageseeker Warden ("opponents can only play units to their base") didn't stop enemy hidden units, which must be
+  played to the battlefield they were hidden at (CR 811.1.d.1): with both, the unit has no legal location and can't be
+  played from facedown (`flow._opp_warden`, rules_audit too). Last Caress ("even from face down ... any battlefield")
+  and Arachnoid Horror's static are still unscripted. Smoke games unchanged.
+  15:20: attackers recalled in step 3d of the combat cleanup (defenders still there) made the defender the combat's
+  winner; CR 468.3.d calls that "No Result", so only a side whose opponent has no units left wins. "When I win a
+  combat" (Nidalee, Cat Form, Sett deck), "When you win a combat" and Grim Resolve paid out for surviving
+  (`flow._task_combat_result`). Checked OK: Weaponmaster's choice is made as the trigger is finalized (CR 821.1.c),
+  Equip's choice is a target (818.1.b.1: Irelia, Fervent triggers), Mageseeker's ready lock, Charm/Ride the Wind moves.
+  20:20: two Sett-deck battlefields still decided their cost on resolution: Valley of Idols ("they may pay [1] to [Buff]
+  it", hand script in cards_common.py) and Monastery of Hirana ("you may spend a buff to draw 1", auto). Both costs are
+  the trigger's base cost (CR 383.3.b): yes/no and payment as it is finalized (Monastery now in cards_manual.py; the
+  buff's unit is picked as part of the cost, not a target). Checked OK: every battlefield in the 12 tournament decks
+  (Star Spring, Rakelstake, Abandoned Hall, Sunken Temple, Forbidding Waste, Candlelit Sanctum), combat control task.
+  2026-11-25 00:20: a scan of every "When ..., you may <cost> to ..." card found hand scripts that still asked and paid
+  on resolution because the may sat under an "if I'm ready" If or was written as "pay; if paid": Ravenbloom Prefect
+  (Irelia list: "banish me to banish it"), Fresh Beans, Solari Shrine, Altar of Memories, Battlefield Armorer, Fae
+  Porter, Mistfall, Ripper's Bay, Diana's [1], Jayce's ready target. `targeting.split_trigger` now treats a leading
+  If as a precondition for yes and "pay; if paid" as "you may pay", and "banish me" is a base cost (CR 383.3.b).
+  A ChooseMode with `at_resolution` (Altar's top/bottom) is not hoisted; Deceiver pays discard + exhaust at finalize and
+  picks the copied unit after the Reflection exists. Open: Rumble (recycle another unit), Jinx/Mordekaiser (discard 1),
+  Bottled Constellation (kill 3) decide at finalize but still pay on resolution; none is in a tournament list.
+  05:20: those four are now hand-scripted with the cost in the finalize code (CR 383.3.b): Super Mega Death Rocket!
+  and Mordekaiser, Dominating discard as the trigger is finalized (Mordekaiser's target is picked then too), Rumble,
+  Hotheaded recycles the other unit then (the Mech is picked on resolution), Bottled Constellation needs exactly 3
+  picks (the old script let you pick fewer and then did nothing) and kills them together before the point is scored.
+  10:20: a chosen player is a target (CR 355.7, 355.9.a) but `ops.ChoosePlayer` ran on resolution: Bewitching Spirit
+  ("choose a player. They discard 1") and Blade Twirler picked late; `targeting.split_choices` now hoists it (every
+  "choose an opponent" too, one option in 2 players). Miss Fortune, Captain ("The first time I move each turn, you may
+  ready something else") asked on resolution and was a once-each-turn trigger, so a "no" let her second move trigger it
+  (CR 383.3.e.2.b is only for "once each turn"); now may + choice at finalize, filter = her first move this turn.
+  Checked OK: Lucian/Draven "first time" (no may), Twilight Shroud, Hush/Defy costs, Time Warp's turn queue, Stupefy's
+  minimum on a 0-Might unit, Lightning Rush + Nocturne.
+  15:20: [Weaponmaster] (CR 821.1.c "When you play me, you may choose a Card ... with the Equipment tag") chose the
+  Equipment or "none" at finalize, so "no" still put the trigger on the chain; now a `_TriggerMay` (pre: you control an
+  Equipment) then the choice, and no removes it (383.3.a.2); the Equip cost is still paid on resolution (821.1.c.5).
+  Lucian and Akshan (Sett deck) are affected. Veiled Temple ("you may ready a friendly gear", same allow_none trick)
+  and Sivir, Ambitious (a Do before the May) decided late too. Checked OK: Death from Below's replay (a trigger on
+  its resolution with a leading may), Black Rose Sanctum / Star Spring / Rakelstake "first time" memos, rune pool
+  emptying (CR 167), cleanup steps 4-8 (CR 323.5-323.10), effect plays to a given location, "once each turn" texts.
+  20:20: a scan of every ability for targeted choices left in resolution code found Crumbling Sands ("Counter a spell
+  if an opponent has played another spell this turn"): the auto-grammar read that condition as the caster's [Legion]
+  (cards *you* played) and the If around the Choose kept the spell from being chosen as it was played. Hand-scripted
+  (cards_manual.py: target at play, opponents' spells other than the chosen one checked on resolution); the grammar's
+  "an opponent has played another X" no longer maps to Legion. Smoke games with it in a random deck change. Twisted
+  Fate, Gambler's choices stay on resolution (they depend on the rune revealed then).
+  2026-11-26 00:20: a read through the auto-grammar's conditions found "you have N+ units at that battlefield" (Garen,
+  Might of Demacia legend and its Starter: "When you conquer, if you have 4+ units at that battlefield, draw 2") counting
+  units at the trigger source's place, which a legend doesn't have: it never drew. "That battlefield" now reads the
+  event's location ("here" still the source's). No other legend's auto text reads "here"/"that battlefield"; no auto
+  trigger condition reads "it" (the intervening check has no targets yet). Checked OK: Revna / Forgotten Library's
+  "if you spent [4] or more" (the spell's play event carries the energy), Akali, Silent's "unless I'm in combat".
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

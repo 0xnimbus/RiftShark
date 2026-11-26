@@ -1135,7 +1135,9 @@ class FlowMixin:
         att = self.units_at(loc, c["attacker"])
         dfn = self.units_at(loc, c["defender"])
         winner = loser = None
-        if att and not dfn:
+        if c.get("recalled"):
+            pass                                  # CR 468.3.d: units recalled in step 3d of the cleanup: No Result
+        elif att and not dfn:
             winner, loser = c["attacker"], c["defender"]
         elif dfn and not att:
             winner, loser = c["defender"], c["attacker"]
@@ -1853,13 +1855,18 @@ class FlowMixin:
                     reaction = True
                 elif ab.perm == "action":
                     action = True
-        if from_zone == "facedown" and not reaction:
-            return False
+        if from_zone == "facedown" and not (reaction and o.facedown_turn is not None and self.turn > o.facedown_turn):
+            return False                          # CR 811.1.b: "Beginning on the next turn ... you may play this"
         if self.closed:
             return reaction and p == self.priority
         if self.showdown is not None or self.combat is not None:
             return (reaction or action) and p == self.focus
         return p == self.turn_player and self.phase == "main"
+
+    def _opp_warden(self, p):
+        """Mageseeker Warden: "While I'm at a battlefield, opponents can only play units to their base." """
+        return any(self.objects[src].controller != p and (self.objects[src].location or ("",))[0] == "bf"
+                   for src, _ in self.rules("opp_units_base_only"))
 
     def _play_locations(self, p, uid, from_zone):
         o = self.objects[uid]
@@ -1869,6 +1876,8 @@ class FlowMixin:
         if from_zone == "facedown":
             if "unit" in d.types and o.hidden_at in {self.objects[src].place for src, v in self.rules("cant_play_here")}:
                 return []                    # a unit hidden at Rockfall Path can't be played there
+            if "unit" in d.types and self._opp_warden(p):
+                return []                    # CR 811.1.d.1 must go to that battlefield, Mageseeker Warden only to base
             return [o.hidden_at]
         locs = [("base", p)]
         if "unit" in d.types:
@@ -1921,8 +1930,7 @@ class FlowMixin:
                 loc = ("bf", bf.idx)
                 if bf.controller is None and not self.units_at(loc) and loc not in locs:
                     locs.append(loc)
-        if "unit" in d.types and any(self.objects[src].controller != p and (self.objects[src].location or ("",))[0] == "bf"
-                                     for src, _ in self.rules("opp_units_base_only")):
+        if "unit" in d.types and self._opp_warden(p):
             locs = [l for l in locs if l[0] == "base"]       # Mageseeker Warden
         for ab in self._abilities_of(uid, o):
             if isinstance(ab, PlayPermission) and ab.perm == "only_to" and ab.value is not None:

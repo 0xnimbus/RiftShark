@@ -284,10 +284,13 @@ def invert_timelines(defn):
 @script("Super Mega Death Rocket!, Jinx")
 def super_mega_death_rocket(defn):
     # Deal 5 to a unit.  When you conquer, you may discard 1 to return this from your trash to your hand.
+    # "discard 1 to ..." is the trigger's base cost (CR 383.3.b): decided and paid as the trigger is finalized.
+    from ..targeting import _TriggerMay
     has_hand = lambda g, c: bool(g.players[c.controller].hand)
+    may = O.May([], label="discard 1 to return this to your hand", out="__may")
     return [SpellEffect([O.Choose(Sel("unit"), out="t"), O.Deal(5, Ref("t"))], label=defn.name, source_text=defn.text),
-            Triggered(lambda g, s, ev: ev.get("kind") == "conquer" and ev.get("player") == g.objects[s].owner, [O.If(has_hand, [O.May([O.Discard(1), O.ToHand(Ref("self"))],
-                                                            label="discard 1 to return this to your hand")])],
+            Triggered(lambda g, s, ev: ev.get("kind") == "conquer" and ev.get("player") == g.objects[s].owner,
+                      [O.ToHand(Ref("self"))], targets=[_TriggerMay(may, pre=[has_hand]), O.Discard(1)],
                       zone="trash", label="return from trash", source_text=defn.text)]
 
 
@@ -420,7 +423,7 @@ def apprentice_smith(defn):
     is_gear = lambda g, c: top(g, c) is not None and g.objects[top(g, c)].base_defn().is_gear
     return [Triggered("move_self", [O.Look(1, out="looked", reveal=True),
                                     O.If(lambda g, c: top(g, c) is not None and g.objects[top(g, c)].zone == "deck",
-                                         [O.If(is_gear, [O.ToHand(top)], [O.Recycle(top)])])],
+                                         [O.If(is_gear, [O.DrawCard(top)], [O.Recycle(top)])])],
                       label=defn.name, source_text=defn.text)]
 
 
@@ -560,7 +563,7 @@ def _look_reveal_draw_recycle(n, pred, label):
     return [O.Look(n, out="looked"),
             O.ChooseFromList(cands, out="__lr", up_to=True, label=label), O.Do(_unwrap("__lr")),
             O.If(Ref("__lr"), [O.Do(lambda g, c: g.emit("reveal", player=c.controller, cards=[c.vars["__lr"]], ctx=c)),
-                               O.ToHand(Ref("__lr"))]),
+                               O.DrawCard(Ref("__lr"))]),
             O.Recycle(lambda g, c: [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck"])]
 
 
@@ -1020,7 +1023,7 @@ def pakaa_protector(defn):
     is_unit = lambda g, c: g.objects[top(g, c)].base_defn().is_unit
     return [Triggered("move_self", [O.Look(1, out="looked", reveal=True),
                                     O.If(lambda g, c: top(g, c) is not None and g.objects[top(g, c)].zone == "deck",
-                                         [O.If(is_unit, [O.ToHand(top)], [O.ToTrash(top), O.GiveMight(Ref("self"), 2)])])],
+                                         [O.If(is_unit, [O.DrawCard(top)], [O.ToTrash(top), O.GiveMight(Ref("self"), 2)])])],
                       label=defn.name, source_text=defn.text)]
 
 
@@ -1031,7 +1034,7 @@ def raving_witness(defn):
     mighty = lambda g, c: (g.objects[top(g, c)].base_defn().might or 0) >= 5
     return [Triggered("move_self", [O.Look(1, out="looked", reveal=True),
                                     O.If(lambda g, c: top(g, c) is not None and g.objects[top(g, c)].zone == "deck",
-                                         [O.If(mighty, [O.ToHand(top)], [O.Recycle(top)])])],
+                                         [O.If(mighty, [O.DrawCard(top)], [O.Recycle(top)])])],
                       label=defn.name, source_text=defn.text)]
 
 
@@ -1236,7 +1239,7 @@ def lightning_rush(defn):
     # your trash.  [Flow] [2][A]
     return [SpellEffect([O.Look(3, out="looked"),
                          O.ChooseFromList(lambda g, c: list(c.vars.get("looked", [])), out="__lr", up_to=True, label="draw one"),
-                         O.Do(_unwrap("__lr")), O.If(Ref("__lr"), [O.ToHand(Ref("__lr"))]),
+                         O.Do(_unwrap("__lr")), O.If(Ref("__lr"), [O.DrawCard(Ref("__lr"))]),
                          O.ToTrash(lambda g, c: [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck"])],
                         label=defn.name, source_text=defn.text)]
 
@@ -1326,8 +1329,13 @@ def threshold_of_the_gray(defn):
 @script("Valley of Idols")
 def valley_of_idols(defn):
     # When a player plays a unit here, they may pay [1] to [Buff] it.
+    # "you may pay [1] to ..." is the trigger's base cost: decided and paid as it is finalized (CR 383.3.b)
+    from ..targeting import _TriggerMay, _TriggerCostsOk
     here = lambda g, s, ev: ev.get("kind") == "play" and ev.get("card_type") == "unit" and ev.get("loc") == g.objects[s].place
-    return [Triggered(here, [O.PayResources(1, out="__vi"), O.If(Ref("__vi"), [O.Buff(lambda g, c: c.event.get("uid"))])],
+    pay = O.PayResources(1, [], out="__paid", optional=False)
+    may = O.May([], label="pay [1] to buff it", out="__may")
+    return [Triggered(here, [O.Buff(lambda g, c: c.event.get("uid"))],
+                      targets=[_TriggerMay(may, costs=[pay]), pay, _TriggerCostsOk(["__paid"])],
                       controller="event", label=defn.name, source_text=defn.text)]
 
 
@@ -1645,6 +1653,37 @@ def reinforce(defn):
                         label=defn.name, source_text=defn.text)]
 
 
+@script("Salvage")
+def salvage(defn):
+    # Errata (Origins): [Action] You may kill up to one gear. Draw 1.
+    # "Up to one": the gear is a target chosen as it is played (CR 355.10), and zero is allowed, so Salvage can be
+    # played with no gear on the board just to draw (the auto-script needed a gear to choose).
+    return [SpellEffect([O.Choose(Sel("gear"), out="t", n=1, up_to=True), O.Kill(Ref("t")), O.Draw(1)],
+                        label=defn.name, source_text=defn.text)]
+
+
+@script("Sigil of the Storm")
+def sigil_of_the_storm(defn):
+    # Errata (Origins): When you conquer here, you must recycle one of your runes. (This doesn't choose anything.)
+    # CR 355.10.f: not a target; the rune is picked as the ability resolves, not as it goes on the chain.
+    pick = O.Choose(Sel("rune", side="friendly"), out="__rn", targeted=False, label="recycle one of your runes")
+    pick.at_resolution = True
+    return [Triggered("you_conquer_here", [pick, O.Recycle(Ref("__rn"))], label=defn.name, source_text=defn.text)]
+
+
+@script("Hall of Legends")
+def hall_of_legends(defn):
+    # When you conquer here, you may pay [1] to ready your legend.
+    # CR 355.10.g: "your legend" is not a target; with several legends (Neeko, Blending In) the legend is picked as the
+    # ability resolves. The "you may pay [1]" is decided and paid as the trigger is finalized (CR 383.3.b).
+    pick = O.Choose(Sel("legend", side="friendly"), out="__hl_l", targeted=False, label="ready your legend")
+    pick.at_resolution = True
+    return [Triggered("you_conquer_here", [O.May([
+        O.PayResources(1, [], out="__hl", optional=False),
+        O.If(O.has_var("__hl"), [pick, O.Ready(Ref("__hl_l"))])], label="pay [1] to ready your legend")],
+        label=defn.name, source_text=defn.text)]
+
+
 @script("Pack of Wonders")
 def pack_of_wonders(defn):
     # [T]: Return another friendly gear, unit, or [Hidden] card to its owner's hand.
@@ -1782,10 +1821,11 @@ class _RevealUntilUnit(O.Instr):
 
 @script("Dazzling Aurora")
 def dazzling_aurora(defn):
-    # At the end of your turn, reveal cards from the top of your Main Deck until you reveal a unit. Play it, ignoring its
-    # cost, and recycle the rest.
+    # Errata (Origins): At the end of your turn, reveal cards from the top of your Main Deck until you reveal a unit and
+    # banish it. Play it, ignoring its cost, and recycle the rest. (Played from the banish zone: a unit that can't be
+    # played stays banished, CR 420.3.c.)
     return [Triggered("end_turn", [_RevealUntilUnit(),
-                                   O.If(Ref("__du"), [O.PlayCard(Ref("__du"), ignore="all")]),
+                                   O.If(Ref("__du"), [O.Banish(Ref("__du")), O.PlayCard(Ref("__du"), ignore="all")]),
                                    O.Recycle(lambda g, c: [u for u in c.vars.get("__dr", []) if g.objects[u].zone == "deck"])],
                       label=defn.name, source_text=defn.text)]
 
@@ -2369,16 +2409,27 @@ def transpositionist(defn):
 @script("Bottled Constellation")
 def bottled_constellation(defn):
     # At the start of your Main Phase, you may kill 3 other friendly units and/or gear to score 1 point.
+    # "kill 3 ... to ..." is the trigger's base cost (CR 383.3.b): decided and paid (exactly 3, killed together) as the
+    # trigger is finalized; the point is scored on resolution.
+    from ..targeting import _TriggerMay
     others = lambda g, c: [u for u, o in g.objects.items() if u != c.source and o.zone == "board" and o.controller == c.controller
                            and o.defn.type != "rune" and ("unit" in g.chars(u).types or "gear" in g.chars(u).types)]
-    def pay(g, c):
-        us = list(c.vars.get("__bc") or ())
-        if len(us) == 3:
-            g.do_kill(us, c)
-            g.gain_points(c.controller, 1, "effect", c)
-    return [Triggered("start_main", [O.If(lambda g, c: len(others(g, c)) >= 3, [
-        O.May(_pick_up_to(others, 3, "__bc", "kill 3 other friendly units and/or gear") + [O.Do(pay, label="kill 3, score 1")],
-              label="kill 3 other friendly units and/or gear to score 1 point")])], label=defn.name, source_text=defn.text)]
+    def init(g, c):
+        c.vars["__bc"] = []
+    def add(i):
+        def f(g, c):
+            v = c.vars.get(f"__bc_{i}")
+            c.vars["__bc"].extend(v if isinstance(v, (tuple, list)) else [v])
+        return f
+    rest = lambda g, c: [u for u in others(g, c) if u not in c.vars.get("__bc", [])]
+    picks = []
+    for i in range(3):
+        picks += [O.ChooseFromList(rest, out=f"__bc_{i}", n=1, label="kill 3 other friendly units and/or gear"), O.Do(add(i))]
+    may = O.May([], label="kill 3 other friendly units and/or gear to score 1 point", out="__may")
+    return [Triggered("start_main", [O.Do(lambda g, c: g.gain_points(c.controller, 1, "effect", c), label="score 1")],
+                      targets=[_TriggerMay(may, pre=[lambda g, c: len(others(g, c)) >= 3]), O.Do(init)] + picks
+                      + [O.Do(lambda g, c: g.do_kill(list(c.vars["__bc"]), c), label="kill 3")],
+                      label=defn.name, source_text=defn.text)]
 
 
 @script("Forgotten Relic")
@@ -2566,6 +2617,11 @@ def rippers_bay(defn):
                       controller="event", label=defn.name, source_text=defn.text)]
 
 
+def _at_resolution(ins):
+    ins.at_resolution = True
+    return ins
+
+
 @script("Altar of Memories")
 def altar_of_memories(defn):
     # When a friendly unit dies, you may exhaust me to draw 1, then put a card from your hand on the top or bottom of
@@ -2580,7 +2636,7 @@ def altar_of_memories(defn):
     return [Triggered("friendly_unit_dies", [O.If(lambda g, c: not g.objects[c.source].exhausted, [
         O.May([O.Exhaust(Ref("self")), O.Draw(1),
                O.ChooseFromList(hand, out="__am", label="put a card from your hand on top or bottom of your deck"),
-               O.ChooseMode([("top", []), ("bottom", [])], out="__amw"),
+               _at_resolution(O.ChooseMode([("top", []), ("bottom", [])], out="__amw")),     # not a mode (CR 355.3)
                O.Do(put_back, label="put it back")], label="exhaust me to draw 1")])], label=defn.name, source_text=defn.text)]
 
 

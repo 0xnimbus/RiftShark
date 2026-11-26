@@ -685,7 +685,11 @@ def parse_sentence(s, state):
     m = re.match(r"you may (.*)", s, re.I)
     if m:
         body = parse_sentence(m.group(1), state)
-        return [O.May(body + [O.SetVar("__did", True)], label=m.group(1)[:40], out="__may")]
+        # "you may kill a gear. If you do, ...": you only "did" it if its target is still legal as it resolves
+        # (CR 359.3: an illegal target is not affected, so nothing was killed; Adaptatron, Pickpocket)
+        outs = [x.out for x in body if isinstance(x, O.Choose) and x.targeted]
+        did = (lambda g, c, outs=tuple(outs): all(c.vars.get(o) not in (None, ()) for o in outs)) if outs else True
+        return [O.May(body + [O.SetVar("__did", did)], label=m.group(1)[:40], out="__may")]
     m = re.match(r"(?:then|and then) (.*)", s, re.I)
     if m:
         return parse_sentence(m.group(1), state)
@@ -1066,7 +1070,7 @@ def parse_sentence(s, state):
     if m:
         kind = m.group(1)
         return [O.ChooseFromList(lambda g, c, k=kind: [u for u in c.vars.get("looked", []) if k in g.objects[u].defn.types], out="__pick", up_to=True),
-                O.ToHand(Ref("__pick"))]
+                O.DrawCard(Ref("__pick"))]
     m = re.match(r"recycle the rest$", sl)
     if m:
         return [O.Recycle(lambda g, c: [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck"])]
@@ -1075,7 +1079,7 @@ def parse_sentence(s, state):
         return [O.Recycle(lambda g, c: [u for u in c.vars.get("looked", []) if g.objects[u].zone == "deck"])]
     m = re.match(r"draw (?:it|them)$", sl)
     if m:
-        return [O.ToHand(Ref("looked"))]
+        return [O.DrawCard(Ref("looked"))]
     m = re.match(r"take control of (.+?)(?: this turn)?$", sl)
     if m:
         ins, ref, _ = choose(m.group(1), _next_out(state))
@@ -1201,9 +1205,17 @@ def parse_condition(c):
     if m:
         sel, _, _, _ = parse_sel(m.group(1) + " here")
         return lambda g, cx, s=sel: bool(s.candidates(g, cx))
-    m = re.match(r"you have (\d+)\+ units (?:here|at that battlefield)$", c)
+    m = re.match(r"you have (\d+)\+ units (here|at that battlefield)$", c)
     if m:
-        return lambda g, cx, n=int(m.group(1)): len(g.units_at(cx.here, cx.controller)) >= n if cx.here else False
+        if m.group(2) == "here":
+            return lambda g, cx, n=int(m.group(1)): len(g.units_at(cx.here, cx.controller)) >= n if cx.here else False
+
+        def at_that_bf(g, cx, n=int(m.group(1))):
+            # "that battlefield" is the event's (the conquered one for "When you conquer"), not the source's place:
+            # a legend has no place (Garen, Might of Demacia never drew)
+            loc = (cx.event or {}).get("loc") or cx.vars.get("__bl")
+            return loc is not None and len(g.units_at(loc, cx.controller)) >= n
+        return at_that_bf
     m = re.match(r"an opponent controls a battlefield$", c)
     if m:
         return lambda g, cx: any(b.controller is not None and b.controller != cx.controller for b in g.battlefields)
@@ -1229,9 +1241,24 @@ def parse_condition(c):
                 return False
             return {"buffed": o.buffs > 0, "exhausted": o.exhausted, "empowered": bool(o.empowered), "mighty": g.chars(cx.source).mighty}[w]
         return f2
-    m = re.match(r"(?:you|an opponent) ha(?:s|ve) played another (spell|card|unit) this turn$", c)
+    m = re.match(r"(you|an opponent) ha(?:s|ve) played another (spell|card|unit) this turn$", c)
     if m:
-        return O.legion
+        if m.group(1) == "you" and m.group(2) == "card":
+            return O.legion
+        kind, opp = m.group(2), m.group(1) != "you"
+        def played_other(g, cx, kind=kind, opp=opp):
+            mine = set(g.current_targets(cx)) | {cx.source}
+            for q, ps in enumerate(g.players):
+                if (q != cx.controller) != opp:
+                    continue
+                for u in ps.played_this_turn:
+                    if u in mine or u not in g.objects:
+                        continue
+                    d = g.objects[u].base_defn()
+                    if kind == "card" or (kind == "spell" and d.type == "spell") or (kind == "unit" and d.is_unit):
+                        return True
+            return False
+        return played_other
     m = re.match(r"you control this battlefield$", c)
     if m:
         return lambda g, cx: cx.here is not None and cx.here[0] == "bf" and g.battlefields[cx.here[1]].controller == cx.controller

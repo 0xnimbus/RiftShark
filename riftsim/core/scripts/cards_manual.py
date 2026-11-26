@@ -66,14 +66,38 @@ def zhonyas(defn):
     return [Replacement("die", applies, replace, label=defn.name, single_use=True)]
 
 
+@script("Monastery of Hirana")
+def monastery_of_hirana(defn):
+    # When you conquer here, you may spend a buff to draw 1.
+    # "spend a buff to ..." is the trigger's base cost (CR 383.3.b): decided and paid as it is finalized. Which unit's
+    # buff is spent is part of paying the cost, not a target.
+    from ..targeting import _TriggerMay
+    conquer_here = lambda g, s, ev: ev.get("kind") == "conquer" and ev.get("loc") == g.objects[s].place
+    buffed = Sel("unit", side="friendly", buffed=True)
+    may = O.May([], label="spend a buff to draw 1", out="__may")
+    return [Triggered(conquer_here, [O.Draw(1)],
+                      targets=[_TriggerMay(may, pre=[lambda g, c: bool(buffed.candidates(g, c))]),
+                               O.Choose(buffed, out="__bu", targeted=False, label="spend a buff from"),
+                               O.SpendBuff(Ref("__bu"), out="__spent")],
+                      controller="event", label=defn.name, source_text=defn.text)]
+
+
 @script("Emperor's Dais")
 def emperors_dais(defn):
-    # When you conquer here, you may pay [1] and return a unit you control here to its owner's hand. If you do, play a 2 [M] Sand Soldier unit token here.
-    return [Triggered("you_conquer_here", [
-        O.May([O.PayResources(1, [], out="__paid", optional=False),
-               O.If(O.has_var("__paid"), [O.Choose(Sel("unit", side="friendly", where="here"), out="t", targeted=False),
-                                           O.If(O.has_var("t"), [O.ToHand(Ref("t")), O.PlayToken("Sand Soldier", loc="here")])])],
-              label="pay [1] and bounce a unit for a Sand Soldier")], label=defn.name, source_text=defn.text)]
+    # When you conquer here, you may pay [1] and return a unit you control here to its owner's hand to play a 2 [M] Sand
+    # Soldier unit token here. (errata, Vendetta: was "... hand. If you do, play ...")
+    # "[do X] to [do Y]": paying [1] and returning the unit are the trigger's base cost, paid as it is finalized
+    # (CR 383.3.b); yes is only offered while both can be paid, and the unit is not a target (it's a cost).
+    from ..targeting import _TriggerMay, _TriggerCostsOk
+    pay = O.PayResources(1, [], out="__paid", optional=False)
+    mine_here = Sel("unit", side="friendly", where="here")
+    has_unit = lambda g, c: bool(mine_here.candidates(g, c))
+    may = O.May([], label="pay [1] and return a unit here for a Sand Soldier", out="__may")
+    return [Triggered("you_conquer_here", [O.PlayToken("Sand Soldier", loc="here")],
+                      targets=[_TriggerMay(may, pre=[has_unit], costs=[pay]), pay, _TriggerCostsOk(["__paid"]),
+                               O.Choose(mine_here, out="__ret", targeted=False, label="return a unit you control here"),
+                               O.ToHand(Ref("__ret"))],
+                      label=defn.name, source_text=defn.text)]
 
 
 @script("Rakelstake")
@@ -162,13 +186,16 @@ def ekko_recurrent(defn):
 @script("Miss Fortune, Captain")
 def miss_fortune_captain(defn):
     # [Accelerate] [Ganking]  The first time I move each turn, you may ready something else that's exhausted.
-    def exhausted_others(g, c):
-        return [u for u, o in g.objects.items() if o.zone == "board" and u != c.source and o.exhausted
-                and {"unit", "gear", "rune", "legend"} & set(g.chars(u).types)]
+    # The leading "you may" and the thing to ready are settled as the trigger is finalized (CR 383.3.a, 355). "The
+    # first time I move each turn" is not "once each turn" (383.3.e): declining doesn't let a later move trigger it.
+    from .cards_staples import _moves_this_turn
+    others = Sel("card", pred=lambda g, c, u: g.objects[u].zone == "board" and u != c.source and g.objects[u].exhausted
+                 and bool({"unit", "gear", "rune", "legend"} & set(g.chars(u).types)))
     return [Triggered("move_self", [
-        O.ChooseFromList(exhausted_others, out="__r", n=1, up_to=True, label="ready something else that's exhausted"),
-        O.Ready(Ref("__r")),
-    ], once_per_turn=True, label=defn.name, source_text=defn.text)]
+        O.If(lambda g, c: bool(others.candidates(g, c)), [
+            O.May([O.Choose(others, out="__r", targeted=False), O.Ready(Ref("__r"))],
+                  label="ready something else that's exhausted")])],
+        filt=lambda g, s, ev: _moves_this_turn(g, s) == 1, label=defn.name, source_text=defn.text)]
 
 
 @script("Royal Entourage")
@@ -314,11 +341,15 @@ def veiled_temple(defn):
     def is_equipment(g, c):
         u = c.vars.get("__vt")
         return u is not None and u in g.objects and g.objects[u].attached_to is not None
+    # "you may ready a friendly gear" leads the effect: decided (and the gear chosen) as the trigger is finalized, "no"
+    # removes it from the chain (CR 383.3.a); "you may detach it" is decided on resolution (383.3.a.3).
+    gear = Sel("gear", side="friendly")
     return [Triggered("you_conquer_here",
-                      [O.Choose(Sel("gear", side="friendly"), out="__vt", targeted=False, allow_none=True,
-                                label="ready a friendly gear"),
-                       O.If(Ref("__vt"), [O.Ready(Ref("__vt")),
-                                          O.If(is_equipment, [O.May([O.Detach(Ref("__vt"))], label="detach it")])])],
+                      [O.If(lambda g, c: bool(gear.candidates(g, c)), [O.May([
+                          O.Choose(gear, out="__vt", targeted=False, label="ready a friendly gear"),
+                          O.Ready(Ref("__vt")),
+                          O.If(is_equipment, [O.May([O.Detach(Ref("__vt"))], label="detach it")])],
+                          label="ready a friendly gear")])],
                       label="Veiled Temple", source_text=defn.text)]
 
 
@@ -332,3 +363,19 @@ def battle_preparations(defn):
                          O.Choose(Sel("rune", pred=lambda g, c, u: shown(g, c)), out="t2", n=2, up_to=True),
                          O.GiveMight(Ref("t"), 2, duration="turn"),
                          O.If(shown, [O.Ready(Ref("t2"))])], label=defn.name, source_text=defn.text)]
+
+
+@script("Crumbling Sands")
+def crumbling_sands(defn):
+    # [Reaction] Counter a spell if an opponent has played another spell this turn.
+    # The spell is a target, chosen as this is played (CR 355.5); "if an opponent has played another spell this turn"
+    # (a spell other than the one chosen) is checked as it resolves. The auto-script read the condition as this
+    # card's [Legion] (cards *you* played) and chose the spell on resolution.
+    def opp_played_other(g, c):
+        t = c.vars.get("__sp")
+        return any(u != t and u in g.objects and g.objects[u].base_defn().type == "spell"
+                   for q, ps in enumerate(g.players) if q != c.controller for u in ps.played_this_turn)
+    sel = Sel("spell", zone="chain", pred=lambda g, c, u: any(it.uid == u and it.kind == "spell" for it in g.chain))
+    return [SpellEffect([O.Choose(sel, out="__sp"),
+                         O.If(opp_played_other, [O.CounterItem(lambda g, c: next((it.id for it in g.chain if it.uid == c.vars.get("__sp")), None))])],
+                        label=defn.name, source_text=defn.text)]
