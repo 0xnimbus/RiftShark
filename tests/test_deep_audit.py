@@ -3200,3 +3200,82 @@ def test_tryndamere_counts_the_excess_of_the_conquering_combat_only(db):
     g.combat = None
     settle(g)
     assert gained == 0 and g.players[0].points - pts == 1
+
+
+def _ready_runes_left(g, p):
+    return sum(1 for u in g.players[p].runes if not g.objects[u].exhausted)
+
+
+def test_immortal_phoenix_plays_from_the_trash_when_your_spell_kills_a_unit(db):
+    """Immortal Phoenix: "When you kill a unit with a spell, you may pay [1][Fury] to play me from your trash." The
+    trigger works from the trash (CR 383.2.c.1), and a unit dying to a spell's lethal damage in the cleanup is killed
+    by that spell (429.5.c). It was a board trigger and no die event was ever marked as a spell kill, so it never
+    fired. Paying [1][Fury] is all it costs (like Flame Chompers' "pay [Fury] to play me")."""
+    spent = {}
+    for yes in (False, True):
+        g, ray = _spell_setup(db, "kaisa_void", "Hextech Ray")
+        ph = give(g, 0, "Immortal Phoenix", db)
+        g._to_zone(g.objects[ph], "trash")
+        foe = put(g, db, 1, "Legion Rearguard", ("bf", 0))
+        g.objects[foe].defn = _card(db, "Legion Rearguard")
+        g.restruct()
+        before = (len(g.players[0].runes), _ready_runes_left(g, 0))
+        d = g.run()
+        g.choose(next(o for o in d.options if o[0] == "play" and o[1] == ray))
+        asked = []
+
+        def pick(d):
+            if d.kind == "choose" and foe in d.options:
+                return foe
+            if d.kind == "yesno" and any("play me from your trash" in str(x) for x in (d.labels or ())):
+                asked.append(1)
+                return yes
+            return None
+        _drive(g, pick=pick)
+        assert g.objects[foe].zone == "trash" and asked
+        assert g.objects[ph].zone == ("board" if yes else "trash")
+        spent[yes] = (before[0] - len(g.players[0].runes), before[1] - _ready_runes_left(g, 0))
+    # the trigger's [1][Fury] is at most two rune actions (exhaust one, recycle one); the Phoenix's [3][Fury] isn't
+    # paid on top of it (that made it 6)
+    assert sum(spent[True]) - sum(spent[False]) <= 2
+
+
+def test_immortal_phoenix_triggers_when_your_spell_kills_the_phoenix_itself(db):
+    """CR 383.2.c.1 example: Immortal Phoenix triggers from the trash even if the unit you killed with a spell was
+    that Immortal Phoenix. A unit killed by an ability, or by damage from an earlier spell, isn't killed with a spell."""
+    g, ray = _spell_setup(db, "kaisa_void", "Hextech Ray")
+    ph = put(g, db, 0, "Immortal Phoenix", ("bf", 0))
+    g.objects[ph].defn = _card(db, "Immortal Phoenix")
+    g.restruct()
+    dies = []
+    emit = g.emit
+    g.emit = lambda kind, ctx=None, **kw: (dies.append(kw) if kind == "die" else None, emit(kind, ctx=ctx, **kw))[1]
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == ray))
+    asked = []
+
+    def pick(d):
+        if d.kind == "choose" and ph in d.options:
+            return ph
+        if d.kind == "yesno" and any("play me from your trash" in str(x) for x in (d.labels or ())):
+            asked.append(1)
+            return False
+        return None
+    _drive(g, pick=pick)
+    assert g.objects[ph].zone == "trash" and asked
+    ev = next(e for e in dies if e["uid"] == ph)
+    assert ev["killer"] == 0 and ev["kill_kind"] == "spell"
+
+
+def test_mask_mother_triggers_when_discarded(db):
+    """Mask Mother: "When you discard me, you may pay [1] to give a friendly unit +2 [M] this turn." The trigger fires
+    as she goes to the trash; the auto-script had it on the board, where a discarded card never is."""
+    g, _ = _spell_setup(db, "kaisa_void", "Hextech Ray")
+    mm = give(g, 0, "Mask Mother", db)
+    ally = put(g, db, 0, "Legion Rearguard", ("bf", 0))
+    g.objects[ally].defn = _card(db, "Legion Rearguard")
+    g.restruct()
+    m0 = g.chars(ally).might
+    g.do_discard(0, [mm], Context(0, None))
+    _drive(g, pick=lambda d: True if d.kind == "yesno" else (ally if d.kind == "choose" and ally in d.options else None))
+    assert g.objects[mm].zone == "trash" and g.chars(ally).might == m0 + 2

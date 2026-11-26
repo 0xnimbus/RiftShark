@@ -1620,6 +1620,7 @@ class FlowMixin:
             return
         self.chain.remove(it)
         it.removed = True
+        self.last_resolved = it.id
         if it.kind == "spell":
             o = self.objects[it.uid]
             if o.zone == "chain":

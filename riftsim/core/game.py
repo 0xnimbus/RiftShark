@@ -146,6 +146,7 @@ class Game(flow.FlowMixin):
         self.scored = set()            # (player, bf idx) scored this turn
         self.conquered_from = None     # previous controller of the battlefield last conquered
         self.turn_memo = {}            # per-turn memory (cleared at end of turn)
+        self.last_resolved = None      # id of the chain item that resolved last (kill attribution, CR 429.5.c)
         self.turns_taken = {}          # player -> number of turns they have started (Forgotten Monument)
         self.known = {}                # viewer -> {uid: entered_stamp} of hidden cards revealed to them (hand reveals)
         self.peek_facedown = {}        # viewer -> turn in which they can look at opponents' facedown cards (Scuttle Crab)
@@ -897,6 +898,7 @@ class Game(flow.FlowMixin):
         kind = ev.get("kind")
         picks = sorted(by_kind.get(kind, []) + by_kind.get("*", []))
         leaving = getattr(self, "_leaving", None)
+        entering_trash = getattr(self, "_entering_trash", None)
         for k in picks:
             uid, o, ab, _, equip = entries[k]
             if leaving and (uid in leaving or (equip and o.attached_to in leaving)) \
@@ -930,6 +932,22 @@ class Game(flow.FlowMixin):
                 if getattr(ab, "keyword", None) == "deathknell":
                     who = o.controller if o.controller is not None else o.owner
                     for _ in self.rules("deathknell_twice", player=who):      # Karthus, Eternal
+                        pend.append((uid, ab, None))
+        if entering_trash and kind == "die":
+            # CR 383.2.c.1: a card dying now enters the trash as this death happens, so its trash abilities see it
+            # (Immortal Phoenix killed by your spell, or killed with the unit your spell killed, triggers itself)
+            for uid in sorted(entering_trash):
+                o = self.objects.get(uid)
+                if o is None or o.zone != "board":
+                    continue                                # already in the trash: the index has it
+                for ab, _k in _defn_triggers(o.base_defn(), "trash"):
+                    if ab.zone != "trash" or (ab.once_per_turn and o.temp.get(("opt", id(ab))) == self.turn):
+                        continue
+                    try:
+                        ok = ab.matches(self, uid, ev)
+                    except (KeyError, AttributeError, TypeError):
+                        ok = False
+                    if ok:
                         pend.append((uid, ab, None))
         for d in list(self.delayed):
             if d.fired and d.once:
@@ -1547,6 +1565,9 @@ class Game(flow.FlowMixin):
                 continue
             o.damage += amt
             o.temp["dmg_item"] = ctx.item if ctx is not None else None
+            # who would be responsible for killing it with this damage, and with what (CR 429.5.c): "combat" damage,
+            # damage a unit deals (fights, CR 418.6.b.3), else the spell or ability dealing it
+            o.temp["dmg_resp"] = (by, "combat" if combat else "unit" if unit_source else self._item_kind(ctx))
             o.temp[("dealt_damage", self.turn)] = True          # "if I haven't been dealt damage this turn"
             if by is not None:
                 o.temp[("damaged_by", by)] = True                # Elder Dragon: "any amount of your damage"
@@ -1608,6 +1629,13 @@ class Game(flow.FlowMixin):
         return any(o.temp.get(("damaged_by", self.objects[src].controller)) and not self.is_friendly(self.objects[src].controller, o.controller)
                    for src, _ in self.rules("any_damage_kills_enemies"))
 
+    def _item_kind(self, ctx):
+        """"spell" when ctx is a spell's (or an ability a spell made: "do this", CR 429.5.d), else "ability"."""
+        if ctx is None:
+            return None
+        so = self.objects.get(ctx.source)
+        return "spell" if so is not None and so.base_defn().type == "spell" else "ability"
+
     def do_kill(self, uids, ctx=None, by=None, in_combat=False, _first=None):
         """Kill permanents (CR 429): they are sent to their owner's trash; deathknell triggers first.
         `_first`: {uid: replacement key} picked by _ReplacementOrderStep (those deaths are replaced first, by that key)."""
@@ -1619,10 +1647,25 @@ class Game(flow.FlowMixin):
             if o is not None and o.zone == "board" and o.location is not None:
                 alone[u] = len([x for x in self.units_at(o.location, o.controller)]) == 1
         killer = ctx.controller if ctx is not None else None
+        kill_kind = "cost" if by == "cost" else self._item_kind(ctx) if ctx is not None else None
+
+        def attribution(u):
+            """(player, kind) the kill is attributed to (CR 429.5). A death to lethal damage in a cleanup goes to the
+            spell or ability that resolved just before it and dealt that damage, or to the combat damage (429.5.c)."""
+            if by != "damage":
+                return killer, kill_kind
+            o = self.objects[u]
+            resp = o.temp.get("dmg_resp")
+            if resp is None:
+                return None, None
+            if resp[1] == "combat" or (o.temp.get("dmg_item") is not None and o.temp.get("dmg_item") == getattr(self, "last_resolved", None)):
+                return resp
+            return None, None
 
         def base_ev(u):
             o = self.objects[u]
-            return {"kind": "die", "uid": u, "player": o.controller, "loc": o.location, "killer": killer,
+            who, what = attribution(u)
+            return {"kind": "die", "uid": u, "player": o.controller, "loc": o.location, "killer": who, "kill_kind": what,
                     "in_combat": in_combat or self.combat is not None and o.location == ("bf", self.combat["bf"]),
                     "card_type": "unit" if "unit" in self.chars(u).types else "gear", "by": by,
                     "token": o.defn.is_token, "might": self.chars(u).might, "stunned": o.stunned, "buffed": o.buffs > 0, "empowered": bool(o.empowered),
@@ -1667,6 +1710,11 @@ class Game(flow.FlowMixin):
         prev = getattr(self, "_leaving", frozenset())
         self._leaving = prev | {u for u, ev in events
                                 if not ev.get("deferred") and ev.get("replaced_with") != "recall"}
+        # CR 383.2.c.1: a trash ability of a card dying now sees this death (and the batch's) as it enters the trash
+        # (Immortal Phoenix killed by your spell triggers itself)
+        prev_tr = getattr(self, "_entering_trash", frozenset())
+        self._entering_trash = prev_tr | {u for u, ev in events if not ev.get("deferred") and ev.get("replaced_with") is None
+                                          and not self.objects[u].defn.is_token}
         try:
             for u, ev in events:
                 if ev.get("deferred"):                      # "you may ... instead": its controller decides first
@@ -1675,6 +1723,7 @@ class Game(flow.FlowMixin):
                 self._finish_death(u, ev, ctx)
         finally:
             self._leaving = prev
+            self._entering_trash = prev_tr
 
     def _contested_single_use(self, dying, base_ev, first):
         """A single-use 'die' replacement (not yet assigned in `first`) that applies to 2+ of `dying`, as

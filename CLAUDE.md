@@ -440,6 +440,14 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   you score 1 point") summed the excess of every combat that turn (auto condition read a whole-turn memo), so 3 excess
   in one combat and 2 in a later one scored; it now reads that combat's excess like Sivir, Ambitious (`combat_excess`).
   Checked OK: Ahri, Confident's -[M] watch, Solari Shrine needs your kill, Storm Raptor, Blast Cone's move trigger.
+  10:20: kill attribution (CR 429.5) was missing: a death to lethal damage in a cleanup had no killer and no die event
+  was ever a spell kill, so Immortal Phoenix ("When you kill a unit with a spell, you may pay [1][Fury] to play me from
+  your trash") and Solari Shrine never fired on damage kills. Die events now carry `killer` + `kill_kind`
+  (spell/ability/combat/unit/cost): a Kill instruction is its item's; lethal damage goes to the item that resolved just
+  before the cleanup if it dealt that damage (`Game.last_resolved`, temp `dmg_resp`), or to combat damage (429.5.c.2);
+  fight damage (units as the source, 418.6.b.3) is "unit", not a spell kill. Auto triggers now work from the trash for
+  "When you discard me" (Mask Mother never triggered) and "... me from your trash" (Phoenix), a card dying now sees its
+  own death from the trash (383.2.c.1 example), and "pay [X] to play me" pays only X.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
