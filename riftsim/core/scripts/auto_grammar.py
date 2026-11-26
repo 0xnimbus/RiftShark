@@ -1146,7 +1146,8 @@ def parse_condition(c):
         return O.not_(O.is_my_turn)
     m = re.match(r"you assigned (\d+) or more excess damage(?: to enemy units)?$", c)
     if m:
-        return lambda g, cx, n=int(m.group(1)): g.turn_memo.get(("excess_damage", cx.controller), 0) >= n
+        # "after an attack ... you assigned": the excess of that combat (flow resets it per combat damage step)
+        return lambda g, cx, n=int(m.group(1)): g.turn_memo.get(("combat_excess", cx.controller), 0) >= n
     m = re.match(r"you control (\d+) or fewer runes$", c)
     if m:
         return lambda g, cx, n=int(m.group(1)): len(g.players[cx.controller].runes) <= n
