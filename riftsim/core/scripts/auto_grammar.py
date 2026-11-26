@@ -496,6 +496,12 @@ def parse_sentence(s, state):
         from . import parse_cost
         c = parse_cost(m.group(1))
         lead, eff = _lift_choices(parse_sentence(m.group(2), state))
+        # "pay [1][Fury] to play me (from your trash)" (Immortal Phoenix): the payment is what playing me costs,
+        # like Flame Chompers' "pay [Fury] to play me", so the card's own cost isn't paid again
+        if re.match(r"play (?:me|this)(?: from your trash)?$", m.group(2), re.I):
+            for ins in eff:
+                if isinstance(ins, O.PlayCard) and isinstance(ins.card, Ref) and ins.card.name == "self":
+                    ins.ignore = "all"
         return lead + [O.PayResources(c["energy"], c["power"], out="__paid", optional=False), O.If(O.has_var("__paid"), eff + [O.SetVar("__did", True)])]
     m = re.match(r"you score (\w+) points?$", sl)
     if m:
@@ -1291,7 +1297,7 @@ TRIGGER_PATTERNS = [
     (r"when you move an enemy unit", lambda g, s, ev: ev.get("kind") == "move" and ev.get("player") != g.objects[s].controller and not ev.get("standard")),
     (r"when a stunned enemy unit here dies", lambda g, s, ev: ev.get("kind") == "die" and ev.get("player") != g.objects[s].controller and ev.get("stunned") and ev.get("loc") == g.objects[s].place),
     (r"when you hide a card here", lambda g, s, ev: ev.get("kind") == "hide" and ev.get("player") == g.objects[s].controller and ev.get("loc") == g.objects[s].place),
-    (r"when you kill a unit with a spell", lambda g, s, ev: ev.get("kind") == "die" and ev.get("killer") == g.objects[s].controller and ev.get("by") == "spell"),
+    (r"when you kill a unit with a spell", lambda g, s, ev: ev.get("kind") == "die" and ev.get("killer") == g.objects[s].controller and ev.get("kill_kind") == "spell"),
     (r"the first time i win a combat each turn", "win_combat_self"),
     (r"when a friendly unit attacks or defends alone", lambda g, s, ev: ev.get("kind") in ("attack", "defend") and ev.get("player") == g.objects[s].controller and len(g.units_at(ev["loc"], ev["player"])) == 1),
     (r"when i attack or defend one on one", lambda g, s, ev: ev.get("kind") in ("attack", "defend") and ev.get("uid") == s and len(g.units_at(ev["loc"])) == 2),
@@ -1986,7 +1992,11 @@ def _script_line(defn, line, cond=None):
                 if g.turn_memo.get(("first_unit_die_batch", g.objects[s].controller)) != ev.get("batch"):
                     return False
                 return inner is None or inner(g, s, ev)
-        return [Triggered(ev, eff, filt=filt, once_per_turn=once_flag, label=line[:40], source_text=line, store=store, cond=cond, optional=optional)]
+        # where the trigger works (CR 383.2.c.1): "When you discard me" fires as I go to the trash, and "... play/return
+        # me from your trash" from the trash (Mask Mother, Immortal Phoenix never triggered from the board)
+        zone = "trash" if ev == "discard_self" or re.search(r"\b(?:me|this) from your trash\b", rest, re.I) else "board"
+        return [Triggered(ev, eff, filt=filt, once_per_turn=once_flag, label=line[:40], source_text=line, store=store, cond=cond,
+                          optional=optional, zone=zone)]
     # play permissions
     if bl in ("you may play me to an open battlefield.", "you may play me to an open battlefield"):
         return [PlayPermission("open_bf", label=line)]            # CR 170.11.c: unoccupied and uncontrolled

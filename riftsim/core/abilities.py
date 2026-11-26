@@ -168,7 +168,7 @@ TRIGGERS = {
     "enemy_unit_damaged": lambda g, s, ev: _ev_is(ev, "damage") and not _mine(g, s, ev) and ev.get("amount", 0) > 0,
     "unit_becomes_mighty": lambda g, s, ev: _ev_is(ev, "becomes_mighty") and _mine(g, s, ev),
     "friendly_unit_leaves_here": lambda g, s, ev: _ev_is(ev, "leave_loc") and _mine(g, s, ev) and ev.get("from") == g.objects[s].location and ev.get("uid") != s,
-    "friendly_unit_killed_by_spell": lambda g, s, ev: _ev_is(ev, "die") and _mine(g, s, ev) and ev.get("by") == "spell",
+    "friendly_unit_killed_by_spell": lambda g, s, ev: _ev_is(ev, "die") and _mine(g, s, ev) and ev.get("kill_kind") == "spell",
     "friendly_gear_enters": lambda g, s, ev: _ev_is(ev, "enter") and _mine(g, s, ev) and ev.get("card_type") == "gear" and ev.get("uid") != s,
     "friendly_unit_enters": lambda g, s, ev: _ev_is(ev, "enter") and _mine(g, s, ev) and ev.get("card_type") == "unit" and ev.get("uid") != s,
     "friendly_token_enters": lambda g, s, ev: _ev_is(ev, "enter") and _mine(g, s, ev) and ev.get("token") and ev.get("uid") != s,
