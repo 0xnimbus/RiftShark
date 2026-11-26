@@ -3176,3 +3176,27 @@ def test_garen_legend_draws_when_you_conquer_with_4_units_at_that_battlefield(db
         _drive(g)
         assert g.battlefields[0].controller == 0
         assert len(g.players[0].hand) - h == drawn, n
+
+
+def test_tryndamere_counts_the_excess_of_the_conquering_combat_only(db):
+    """Tryndamere, Barbarian: "When I conquer after an attack, if you assigned 5 or more excess damage to enemy units,
+    you score 1 point." The excess is that combat's (like Sivir, Ambitious); it summed every combat of the turn, so
+    3 excess in an earlier combat plus 2 in this one scored."""
+    g = main_phase(db, [_deck(db, "sett_the_boss"), _deck(db, "riven_exile")])
+    _clear_bfs(g, db)
+    bf = ("bf", 0)
+    tr = put(g, db, 0, "Tryndamere, Barbarian", bf)
+    pts = g.players[0].points
+    g.turn_memo[("combat_excess", 0)] = 2                # this combat: 2 (an earlier combat this turn had 3)
+    g.turn_memo[("excess_damage", 0)] = 5                # the old whole-turn count
+    g.combat = {"attacker": 0, "defender": 1, "bf": 0}
+    g.emit("conquer", player=0, loc=bf, bf=0, units=(tr,))
+    g.combat = None
+    settle(g)
+    gained = g.players[0].points - pts
+    g.turn_memo[("combat_excess", 0)] = 5
+    g.combat = {"attacker": 0, "defender": 1, "bf": 0}
+    g.emit("conquer", player=0, loc=bf, bf=0, units=(tr,))
+    g.combat = None
+    settle(g)
+    assert gained == 0 and g.players[0].points - pts == 1
