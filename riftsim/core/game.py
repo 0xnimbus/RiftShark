@@ -933,6 +933,20 @@ class Game(flow.FlowMixin):
                     who = o.controller if o.controller is not None else o.owner
                     for _ in self.rules("deathknell_twice", player=who):      # Karthus, Eternal
                         pend.append((uid, ab, None))
+        if kind == "leave" and ev.get("uid") in self.objects and self.objects[ev["uid"]].zone != "board":
+            # CR 383.2.c.3: "When this leaves the board" is processed just before the object changes zones (it is
+            # emitted after the move): look back at its board abilities (Treasure Trove, Runeblade Anvil never fired)
+            uid = ev["uid"]
+            o = self.objects[uid]
+            for ab, _k in _defn_triggers(o.base_defn(), "board"):
+                if ab.zone != "board" or (ab.once_per_turn and o.temp.get(("opt", id(ab))) == self.turn):
+                    continue
+                try:
+                    ok = ab.matches(self, uid, ev)
+                except (KeyError, AttributeError, TypeError):
+                    ok = False
+                if ok:
+                    pend.append((uid, ab, None))
         if entering_trash and kind == "die":
             # CR 383.2.c.1: a card dying now enters the trash as this death happens, so its trash abilities see it
             # (Immortal Phoenix killed by your spell, or killed with the unit your spell killed, triggers itself)
@@ -1000,7 +1014,10 @@ class Game(flow.FlowMixin):
             self.log("trigger", item=item.id, source=uid, label=item.label)
             self.dirty = True
             return item
-        if ab.controller == "self":
+        left = ev.get("kind") == "leave" and ev.get("uid") == uid and o.zone != "board"
+        if ab.controller == "self" and left:
+            ctrl = o.temp.get("__lk_controller", o.owner)      # its last known controller (CR 383.2.c.3.b)
+        elif ab.controller == "self":
             ctrl = o.controller
             if ctrl is None:
                 ctrl = self.turn_player      # CR 190.6.b: an uncontrolled battlefield's ability is the turn player's
@@ -1010,7 +1027,7 @@ class Game(flow.FlowMixin):
             ctrl = ev["player"]          # "they": the player the event is about (battlefield abilities)
         else:
             ctrl = self.turn_player
-        ctx = Context(ctrl, uid, here=o.place)
+        ctx = Context(ctrl, uid, here=ev.get("loc") if left else o.place)
         ctx.event = ev
         ctx.vars["ev"] = ev
         ctx.vars["self"] = uid

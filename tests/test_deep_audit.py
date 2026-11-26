@@ -3319,3 +3319,29 @@ def test_armored_tusker_chooses_its_target_as_the_trigger_is_finalized(db):
     _drive(g, pick=pick)
     assert seen == [[False]]                           # chosen before the trigger was finalized
     assert g.objects[foe].zone == "trash"              # 3 damage (Shield 3) kills the 2 [M] Rearguard
+
+
+def test_treasure_trove_triggers_when_it_leaves_the_board(db):
+    """Treasure Trove: "When this leaves the board, draw 1 and channel 1 rune exhausted." CR 383.2.c.3 processes a
+    leaves-the-board trigger just before the object changes zones, but the "leave" event was only announced after the
+    move, when its board ability no longer worked: it never drew. Also when its death is replaced by a banish
+    (383.2.c.3.a example) and when it is returned to hand."""
+    for how in ("kill", "banish", "hand"):
+        g, _ = _spell_setup(db, "kaisa_void", "Hextech Ray")
+        tt = put(g, db, 0, "Treasure Trove", ("base", 0))
+        g.objects[tt].defn = _card(db, "Treasure Trove")
+        r = g.players[0].runes.pop()                   # one rune left in the rune deck to channel
+        g.players[0].rune_deck.append(r)
+        g.objects[r].zone = "rune_deck"
+        g.restruct()
+        h, runes = len(g.players[0].hand), len(g.players[0].runes)
+        if how == "kill":
+            g.do_kill([tt], Context(0, tt))
+        elif how == "banish":
+            g.do_banish([tt], Context(1, None))
+        else:
+            g.put_in_hand(tt, Context(1, None))
+        _drive(g)
+        in_hand = 1 if how == "hand" else 0
+        assert len(g.players[0].hand) - h == 1 + in_hand, how
+        assert len(g.players[0].runes) - runes == 1, how
