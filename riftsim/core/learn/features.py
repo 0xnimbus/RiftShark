@@ -18,7 +18,7 @@ CARD_BUCKETS = 64
 # held interaction (feature version 3, appended again): reaction-speed cards in p's own hand and whether p's ready runes
 # can pay for them, so the value model can learn what open energy with a counter or trick in hand is worth on the
 # opponent's turn (self-play labels those positions by playing the opponent's turn while p may respond)
-FEATURE_VERSION = 4
+FEATURE_VERSION = 5
 # turn structure: the same board is worth different amounts before and after the turn player's Awaken/Channel/Draw,
 # so the net must know where in the turn it is (without this, gen 1 rated "end my turn" above every attack because
 # the next own decision came in the opponent's Beginning phase with their runes and units still exhausted)
@@ -128,7 +128,7 @@ def encode(g, p):
         if o.zone == "board" and ("unit" in o.defn.types or "gear" in o.defn.types):
             base = CARD_BUCKETS if o.controller == p else 2 * CARD_BUCKETS
             cards[base + _card_bucket(o.defn.id)] += 0.5
-    return out + cards + _interaction(g, p) + _held_answers(g, p)
+    return out + cards + _interaction(g, p) + _held_answers(g, p) + _decks(g, p)
 
 
 def _interaction(g, p):
@@ -174,6 +174,60 @@ def _held_answers(g, p):
     return [removal / 3, bounce / 3, fast / 3, loose / 2]
 
 
+def _kinds(d, ready):
+    """(reaction, counter, removal, bounce, fast-and-payable, unit) flags of one card definition."""
+    t = (d.text or "").lower()
+    spell = d.type == "spell"
+    reaction = bool(d.keywords.get("reaction"))
+    return (reaction, reaction and "counter" in t, spell and ("kill" in t or "deal " in t),
+            spell and ("owner's hand" in t or "owners' hands" in t),
+            spell and (reaction or bool(d.keywords.get("action"))) and (d.energy or 0) <= ready, "unit" in d.types)
+
+
+def _decks(g, p):
+    """Version 5 (2026-11-26): what is left in each deck. The opponent's decklist is public (Derrick, 2026-11-09), so
+    decklist minus every card p has seen is public too: the opponent's unseen pool is their hidden hand + deck +
+    facedown cards p can't look at (exactly what `policies.determinize` shuffles), and each pool card is in their hand
+    with probability hidden-hand size / pool size. From that: how many reactions, counters, removal, bounce and payable
+    fast spells they are expected to hold now. For p's own deck (composition known, order not): the share of units,
+    removal and reactions still to draw, and the remaining units' average Might."""
+    q = g.opponent(p)
+    qs = g.players[q]
+    ready_q = sum(1 for u in qs.runes if not g.objects[u].exhausted)
+    hidden_hand = [u for u in qs.hand if not g.knows(p, u)]
+    pool = hidden_hand + list(qs.deck) + [u for bf in g.battlefields for u in bf.facedown.values()
+                                         if g.objects[u].controller == q and not g.knows(p, u)]
+    exp = [0.0] * 5
+    if pool:
+        ph = len(hidden_hand) / len(pool)
+        for u in pool:
+            k = _kinds(g.objects[u].base_defn(), ready_q)
+            for i in range(5):
+                if k[i]:
+                    exp[i] += ph
+    known = [0.0] * 5                              # opponent hand cards p has seen (returned to hand, revealed)
+    for u in qs.hand:
+        if g.knows(p, u):
+            k = _kinds(g.objects[u].base_defn(), ready_q)
+            for i in range(5):
+                if k[i]:
+                    known[i] += 1
+    opp = [(exp[i] + known[i]) / 2 for i in range(5)]
+    ps = g.players[p]
+    n = len(ps.deck)
+    units = removal = reactions = might = 0
+    for u in ps.deck:                              # composition only: the same for any order of p's deck
+        d = g.objects[u].base_defn()
+        k = _kinds(d, 0)
+        reactions += k[0]
+        removal += k[2]
+        if k[5]:
+            units += 1
+            might += d.might or 0
+    mine = [units / n, removal / n, reactions / n, (might / units) / 5 if units else 0.0] if n else [0.0] * 4
+    return opp + mine
+
+
 def _card_bucket(card_id):
     return zlib.crc32(b"card:" + card_id.encode()) % CARD_BUCKETS
 
@@ -190,5 +244,9 @@ def size_v3():
     return size_v2() + 3
 
 
-def size():
+def size_v4():
     return size_v3() + 4
+
+
+def size():
+    return size_v4() + 9
