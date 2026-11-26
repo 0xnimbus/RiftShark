@@ -1098,13 +1098,11 @@ class FlowMixin:
                     dealt.append((ctx_d, u, amt))
         self.log("combat_damage", bf=c["bf"], assignments=[(self.label(u), a) for _, u, a in dealt])
         for q in (c["attacker"], c["defender"]):
-            self.turn_memo[("combat_excess", q)] = 0       # excess assigned in this combat (Sivir, Ambitious)
+            self.turn_memo[("combat_excess", q)] = 0       # excess assigned in this combat (Sivir, Tryndamere)
         for ctx, u, amt in dealt:
             hp = (self.chars(u).might or 0) - self.objects[u].damage
             excess = max(0, amt - max(0, hp))
             if excess:
-                key = ("excess_damage", ctx.controller)
-                self.turn_memo[key] = self.turn_memo.get(key, 0) + excess
                 key = ("combat_excess", ctx.controller)
                 self.turn_memo[key] = self.turn_memo.get(key, 0) + excess
             self.do_deal([u], amt, ctx, source_uid=None, combat=True)

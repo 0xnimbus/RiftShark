@@ -436,6 +436,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   event's location ("here" still the source's). No other legend's auto text reads "here"/"that battlefield"; no auto
   trigger condition reads "it" (the intervening check has no targets yet). Checked OK: Revna / Forgotten Library's
   "if you spent [4] or more" (the spell's play event carries the energy), Akali, Silent's "unless I'm in combat".
+  05:20: Tryndamere, Barbarian ("When I conquer after an attack, if you assigned 5 or more excess damage to enemy units,
+  you score 1 point") summed the excess of every combat that turn (auto condition read a whole-turn memo), so 3 excess
+  in one combat and 2 in a later one scored; it now reads that combat's excess like Sivir, Ambitious (`combat_excess`).
+  Checked OK: Ahri, Confident's -[M] watch, Solari Shrine needs your kill, Storm Raptor, Blast Cone's move trigger.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
