@@ -454,6 +454,11 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   choose" triggers and hidden restrictions apply). Strike Down's damage is dealt by the equipped unit (418.6.b.3).
   None is in a tournament list. Left on resolution on purpose: Call to Battle's opponent move, Angler Wyrm ("must"),
   King's Edict/Whirlwind (each player), trash/hand/deck picks, Strike Down's detach.
+  20:20: "When this leaves the board" (Treasure Trove: draw 1 and channel 1 rune exhausted) never triggered: the "leave"
+  event is announced after the move, when the board ability no longer works. CR 383.2.c.3 processes it just before the
+  zone change, so `_collect_triggers` now looks back at the object's board abilities for its own "leave" (last known
+  controller, "here" = where it was); also when the death is replaced by a banish (383.2.c.3.a) or it goes to hand.
+  Runeblade Anvil (the only other such card) is still partial. Smoke games unchanged.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
