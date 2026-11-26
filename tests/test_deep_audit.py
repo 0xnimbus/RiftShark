@@ -3279,3 +3279,43 @@ def test_mask_mother_triggers_when_discarded(db):
     g.do_discard(0, [mm], Context(0, None))
     _drive(g, pick=lambda d: True if d.kind == "yesno" else (ally if d.kind == "choose" and ally in d.options else None))
     assert g.objects[mm].zone == "trash" and g.chars(ally).might == m0 + 2
+
+
+def test_hand_scripted_unit_choices_are_targets_chosen_when_played(db):
+    """Armored Tusker ("deal damage equal to my [Shield] to a unit at a battlefield"), Durand Memorial ("choose a unit
+    you control here"), Fae Porter ("pay [Chaos] to move a unit you control"), Pack of Wonders ("[T]: Return another
+    friendly gear, unit, or [Hidden] card"), Corrupted Dragon ("move any number of enemy units here"), Zenith Blade
+    ("You may move a friendly unit") and Elder Dragon ("choose up to one enemy unit at each location") picked their
+    units with an untargeted list on resolution: no Deflect, no "when you choose" triggers, no hidden-card
+    restriction, and picked after responses. They are targets chosen as the item goes on the chain (CR 355.10)."""
+    from riftsim.core import ops as O
+    for name in ("Armored Tusker", "Durand Memorial", "Fae Porter", "Pack of Wonders", "Corrupted Dragon",
+                 "Zenith Blade, Leona", "Elder Dragon"):
+        ab = next(a for a in _card(db, name).abilities if hasattr(a, "code") and a.code)
+        assert not any(isinstance(i, O.ChooseFromList) for i in ab.code), name
+        assert any(isinstance(i, O.Choose) and i.targeted for i in (ab.target_code or [])), name
+
+
+def test_armored_tusker_chooses_its_target_as_the_trigger_is_finalized(db):
+    g, _ = _spell_setup(db, "kaisa_void", "Hextech Ray")
+    tu = put(g, db, 0, "Armored Tusker", ("base", 0))
+    g.objects[tu].defn = _card(db, "Armored Tusker")
+    foe = put(g, db, 1, "Legion Rearguard", ("bf", 1))
+    g.objects[foe].defn = _card(db, "Legion Rearguard")
+    g.objects[tu].exhausted = False
+    g.restruct()
+    d = g.run()
+    mv = next(o for o in d.options if o[0] == "move" and tu in (o[1] if isinstance(o[1], tuple) else (o[1],)) and o[-1] == ("bf", 0))
+    g.choose(mv)
+    seen = []
+
+    def pick(d):
+        if d.kind == "yesno":
+            return True
+        if d.kind == "choose" and foe in d.options:
+            seen.append([it.finalized for it in g.chain if it.kind == "trigger"])
+            return foe
+        return None
+    _drive(g, pick=pick)
+    assert seen == [[False]]                           # chosen before the trigger was finalized
+    assert g.objects[foe].zone == "trash"              # 3 damage (Shield 3) kills the 2 [M] Rearguard

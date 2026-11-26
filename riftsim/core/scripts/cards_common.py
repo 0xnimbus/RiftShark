@@ -198,6 +198,13 @@ def solari_shrine(defn):
                       label=defn.name, source_text=defn.text)]
 
 
+def _as_list(v):
+    """A Choose result as a list (a single uid for n == 1, a tuple, or None)."""
+    if v is None:
+        return []
+    return list(v) if isinstance(v, (list, tuple)) else [v]
+
+
 def _ctrl(g, u):
     o = g.objects[u]
     return o.controller if o.controller is not None else o.owner
@@ -1469,8 +1476,9 @@ def corrupted_dragon(defn):
     small_here = lambda g, c: [u for u in g.units_at(g.objects[c.source].location) if _enemy(g, c, u)
                                and (g.chars(u).might or 0) <= 5]
     return [_enter_ready_if(defn, far, "enter ready when not close to winning"),
-            Triggered("attack_self", [O.ChooseFromList(small_here, out="__cd", n=99, up_to=True, label="move enemy units to base"),
-                                      O.Move(lambda g, c: list(c.vars.get("__cd") or ()), "base")],
+            # "any number of enemy units here": targets chosen as the trigger goes on the chain (CR 355.10, 355.13)
+            Triggered("attack_self", [O.Choose(Sel("unit", side="enemy", where="here", max_might=5), out="__cd", n=99, up_to=True),
+                                      O.Move(lambda g, c: [u for u in _as_list(c.vars.get("__cd")) if u in small_here(g, c)], "base")],
                       label=defn.name, source_text=defn.text)]
 
 
@@ -1699,7 +1707,7 @@ def pack_of_wonders(defn):
                 out.append(u)
         return out
     return [Activated({"energy": 0, "power": [], "exhaust": True},
-                      [O.ChooseFromList(opts, out="__pw", label="return to its owner's hand"), O.ToHand(Ref("__pw"))],
+                      [O.Choose(Sel("card", zone="any", pred=lambda g, c, u: u in opts(g, c)), out="__pw"), O.ToHand(Ref("__pw"))],
                       timing="main", label=defn.name, source_text=defn.text)]
 
 
@@ -1879,8 +1887,9 @@ def zenith_blade(defn):
     movers = lambda g, c: [u for u, o in g.objects.items() if o.zone == "board" and g.is_friendly(o.controller, c.controller)
                            and "unit" in g.chars(u).types and o.location != bf(g, c) and g.valid_destination(u, bf(g, c), mover=c.controller)]
     return [SpellEffect([O.Choose(Sel("unit", side="enemy", where="battlefield"), out="t"), O.Stun(Ref("t")),
-                         O.ChooseFromList(movers, out="__zm", up_to=True, label="you may move a friendly unit there"),
-                         O.Move(lambda g, c: list(c.vars.get("__zm") or ()), bf)],
+                         # the friendly unit is a target too, chosen as the spell is played (CR 355.10)
+                         O.Choose(Sel("unit", side="friendly", pred=lambda g, c, u: u in movers(g, c)), out="__zm", up_to=True),
+                         O.Move(lambda g, c: [u for u in _as_list(c.vars.get("__zm")) if u in g.objects and g.objects[u].zone == "board"], bf)],
                         label=defn.name, source_text=defn.text)]
 
 
@@ -1891,7 +1900,7 @@ def strike_down(defn):
     equipped = Sel("unit", side="friendly", pred=lambda g, c, u: bool(g.objects[u].attachments))
     gear = lambda g, c: list(g.objects[c.vars["t"]].attachments) if c.vars.get("t") in g.objects else []
     return [SpellEffect([O.Choose(equipped, out="t"), O.Choose(Sel("unit", side="enemy"), out="t2"),
-                         O.Deal(lambda g, c: g.chars(c.vars["t"]).might or 0, Ref("t2")),
+                         O.Deal(lambda g, c: g.chars(c.vars["t"]).might or 0, Ref("t2"), source=Ref("t")),     # dealt by it
                          O.ChooseFromList(gear, out="__sd", label="detach an Equipment"),
                          O.If(Ref("__sd"), [O.Detach(Ref("__sd"))])], label=defn.name, source_text=defn.text)]
 
@@ -2070,18 +2079,14 @@ def explosimian(defn):
 def elder_dragon(defn):
     # Any amount of your damage is enough to kill enemy units.  When you play me, choose up to one enemy unit at each
     # location. Deal 1 to them.
-    def pick_code():
-        return [O.Do(lambda g, c: c.vars.__setitem__("__ed", []), label="choose up to one enemy unit at each location")]
-    def locs(g, c):
-        return sorted({g.objects[u].location for u, o in g.objects.items() if o.zone == "board" and "unit" in g.chars(u).types
-                       and _enemy(g, c, u)}, key=str)
-    code = pick_code()
+    # the units are targets, chosen as the trigger goes on the chain (CR 355.10): up to one per location
+    code = []
     for i in range(8):        # at most one pick per location (bases and battlefields)
-        at = lambda g, c, i=i: [u for u in g.objects if g.objects[u].zone == "board" and "unit" in g.chars(u).types and _enemy(g, c, u)
-                                and g.objects[u].location == (locs(g, c)[i] if i < len(locs(g, c)) else None)]
-        code += [O.ChooseFromList(at, out=f"__ed{i}", up_to=True, label="deal 1 to an enemy unit here"),
-                 O.Do(lambda g, c, i=i: c.vars["__ed"].extend(c.vars.get(f"__ed{i}") or ()), label="")]
-    code += [O.Deal(1, lambda g, c: list(c.vars["__ed"]))]
+        # an enemy unit at a location none of the earlier picks is at
+        at = lambda g, c, u, i=i: _enemy(g, c, u) and all(g.objects[u].location != g.objects[v].location
+                                                          for j in range(i) for v in _as_list(c.vars.get(f"__ed{j}")) if v in g.objects)
+        code += [O.Choose(Sel("unit", pred=at), out=f"__ed{i}", up_to=True)]
+    code += [O.Deal(1, lambda g, c: [u for i in range(8) for u in _as_list(c.vars.get(f"__ed{i}"))])]
     return [Static("self", "rule", ("any_damage_kills_enemies",), source_text=defn.text),
             Triggered("play_self", code, label=defn.name, source_text=defn.text)]
 
@@ -2136,9 +2141,8 @@ def ntofo_strikes(defn):
 @script("Armored Tusker")
 def armored_tusker(defn):
     # [Shield 3]  [Tank]  When I move, you may deal damage equal to my [Shield] to a unit at a battlefield.
-    return [Triggered("move_self", [O.May([O.ChooseFromList(lambda g, c: [u for u, o in g.objects.items() if o.zone == "board"
-                                                                         and "unit" in g.chars(u).types and o.location and o.location[0] == "bf"],
-                                                            out="__at", label="deal damage equal to my [Shield]"),
+    # the unit is a target, chosen as the trigger goes on the chain (CR 355.10, 383.3.a)
+    return [Triggered("move_self", [O.May([O.Choose(Sel("unit", where="battlefield"), out="__at"),
                                            O.Deal(lambda g, c: g.chars(c.source).kw("shield"), Ref("__at"))],
                                           label="deal damage equal to my [Shield] to a unit at a battlefield")],
                       label=defn.name, source_text=defn.text)]
@@ -2260,8 +2264,9 @@ def durand_memorial(defn):
             return False
         g.turn_memo[key] = True
         return True
-    here = lambda g, c: [u for u in g.units_at(g.objects[c.source].place) if g.objects[u].controller == c.controller]
-    return [Triggered(defend, [O.ChooseFromList(here, out="__dm", label="give it [Tank] this combat"),
+    # "choose a unit you control here": a target, chosen as the trigger goes on the chain (CR 355.10)
+    return [Triggered(defend, [O.Choose(Sel("unit", side="friendly", where="here",
+                                            pred=lambda g, c, u: g.objects[u].controller == c.controller), out="__dm"),
                                O.Do(lambda g, c: g.add_mod(c.vars["__dm"], "keyword", ("tank", True), duration="combat", source=c.source)
                                     if c.vars.get("__dm") is not None else None, label="[Tank] this combat")],
                       label=defn.name, source_text=defn.text)]
@@ -2675,9 +2680,11 @@ def fae_porter(defn):
     others = lambda g, c: [u for u, o in g.objects.items() if o.zone == "board" and o.controller == c.controller and u != c.source
                            and "unit" in g.chars(u).types and o.location != g.objects[c.source].location
                            and g.valid_destination(u, g.objects[c.source].location, mover=c.controller)]
-    return [Triggered(to_bf, [O.PayResources(0, ["chaos"], out="__fp"),
-                              O.If(Ref("__fp"), [O.ChooseFromList(others, out="__fpu", label="move a unit you control here"),
-                                                 O.Move(Ref("__fpu"), lambda g, c: g.objects[c.source].location)])],
+    # the unit to move is a target, chosen with the yes/no and the [Chaos] as the trigger goes on the chain (CR 355.12)
+    return [Triggered(to_bf, [O.May([O.Choose(Sel("unit", pred=lambda g, c, u: u in others(g, c)), out="__fpu"),
+                                     O.PayResources(0, ["chaos"], out="__fp", optional=False),
+                                     O.If(Ref("__fp"), [O.Move(Ref("__fpu"), lambda g, c: g.objects[c.source].location)])],
+                                    label="pay [Chaos] to move a unit you control to the same battlefield")],
                       label=defn.name, source_text=defn.text)]
 
 

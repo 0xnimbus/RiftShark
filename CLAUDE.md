@@ -448,6 +448,12 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   fight damage (units as the source, 418.6.b.3) is "unit", not a spell kill. Auto triggers now work from the trash for
   "When you discard me" (Mask Mother never triggered) and "... me from your trash" (Phoenix), a card dying now sees its
   own death from the trash (383.2.c.1 example), and "pay [X] to play me" pays only X.
+  15:20: a scan of hand scripts' `ChooseFromList` (untargeted, picked on resolution) found seven that pick units on the
+  board as targets (CR 355.10): Armored Tusker, Durand Memorial, Fae Porter, Pack of Wonders, Corrupted Dragon, Zenith
+  Blade, Leona and Elder Dragon now use targeted `Choose`, picked as the item goes on the chain (Deflect, "when you
+  choose" triggers and hidden restrictions apply). Strike Down's damage is dealt by the equipped unit (418.6.b.3).
+  None is in a tournament list. Left on resolution on purpose: Call to Battle's opponent move, Angler Wyrm ("must"),
+  King's Edict/Whirlwind (each player), trash/hand/deck picks, Strike Down's detach.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
