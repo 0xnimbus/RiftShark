@@ -430,6 +430,12 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   (cards_manual.py: target at play, opponents' spells other than the chosen one checked on resolution); the grammar's
   "an opponent has played another X" no longer maps to Legion. Smoke games with it in a random deck change. Twisted
   Fate, Gambler's choices stay on resolution (they depend on the rune revealed then).
+  2026-11-26 00:20: a read through the auto-grammar's conditions found "you have N+ units at that battlefield" (Garen,
+  Might of Demacia legend and its Starter: "When you conquer, if you have 4+ units at that battlefield, draw 2") counting
+  units at the trigger source's place, which a legend doesn't have: it never drew. "That battlefield" now reads the
+  event's location ("here" still the source's). No other legend's auto text reads "here"/"that battlefield"; no auto
+  trigger condition reads "it" (the intervening check has no targets yet). Checked OK: Revna / Forgotten Library's
+  "if you spent [4] or more" (the spell's play event carries the energy), Akali, Silent's "unless I'm in combat".
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
