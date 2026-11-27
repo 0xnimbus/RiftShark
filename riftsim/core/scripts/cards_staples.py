@@ -1184,6 +1184,17 @@ def clocktower_guardian(defn):
                                     keyword="deathknell")], "replace": False}
 
 
+@script("Heartening Soul")
+def heartening_soul(defn):
+    # (line 1 auto-scripted) When you play me, ready a friendly legend.
+    # Friendly legends have "[T]: Give a unit +3 [M] this turn."
+    pump = Activated({"energy": 0, "power": [], "exhaust": True}, [O.GiveMight(Ref("t"), 3)],
+                     targets=[O.Choose(Sel("unit"), out="t", targeted=True)],
+                     label="[T]: Give a unit +3 [M] this turn.", source_text="[T]: Give a unit +3 [M] this turn.")
+    return {"abilities": [Static(Sel("legend", side="friendly"), "ability", pump, label=defn.name, source_text=defn.text)],
+            "replace": False}
+
+
 @script("Kennen, Storm of Shuriken")
 def kennen_storm(defn):
     # (line 1 auto-scripted) When I conquer, give a spell in your trash [Flow] equal to its cost this turn.
