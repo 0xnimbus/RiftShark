@@ -19,8 +19,8 @@ def db():
 
 @pytest.fixture(scope="module")
 def decks(db):
-    return [Deck.load(str(ROOT / "data/decks/tournament/kaisa_void.json"), db),
-            Deck.load(str(ROOT / "data/decks/tournament/riven_exile.json"), db)]
+    return [Deck.load(str(ROOT / "data/decks/preban/kaisa_void.json"), db),
+            Deck.load(str(ROOT / "data/decks/preban/riven_exile.json"), db)]
 
 
 def main_phase(db, decks, seed=0):

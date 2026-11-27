@@ -1,72 +1,62 @@
 {
- "name": "Master Yi, Wuju Bladesman (Derpinox, 24th Convergence IV)",
- "legend": "OPP-019",
+ "name": "Wuju Master (Talos90, 132nd Demacia League Bologna - [Post-Ban Meta])",
+ "legend": "UNL-191",
  "champion": "UNL-113",
  "main": [
   {
-   "id": "UNL-221",
-   "name": "Lonely Poro",
-   "count": 3
-  },
-  {
-   "id": "OGN-136",
-   "name": "Pit Rookie",
+   "id": "UNL-094",
+   "name": "Gemhand Hunter",
    "count": 3
   },
   {
    "id": "UNL-053",
    "name": "Scuttle Crab",
-   "count": 3
-  },
-  {
-   "id": "OGN-132",
-   "name": "First Mate",
-   "count": 3
-  },
-  {
-   "id": "SFD-057",
-   "name": "Irelia, Fervent",
    "count": 2
   },
   {
-   "id": "UNL-120A",
-   "name": "Rengar, Trophy Hunter",
+   "id": "UNL-040",
+   "name": "Wuju Apprentice",
    "count": 3
   },
   {
-   "id": "OGN-077",
-   "name": "Zhonya's Hourglass",
-   "count": 2
+   "id": "UNL-034",
+   "name": "Herald of Spring",
+   "count": 3
   },
   {
-   "id": "OGN-043",
-   "name": "Charm",
+   "id": "UNL-100",
+   "name": "Voracious Gromp",
    "count": 3
+  },
+  {
+   "id": "UNL-117",
+   "name": "Arachnoid Horror",
+   "count": 1
+  },
+  {
+   "id": "UNL-059",
+   "name": "Master Yi, Unstoppable",
+   "count": 3
+  },
+  {
+   "id": "RAD-087",
+   "name": "Portable Portal",
+   "count": 1
   },
   {
    "id": "OGN-045",
    "name": "Defy",
-   "count": 3
-  },
-  {
-   "id": "OGN-046",
-   "name": "En Garde",
-   "count": 3
+   "count": 2
   },
   {
    "id": "SFD-097",
    "name": "Punch First",
-   "count": 3
+   "count": 2
   },
   {
    "id": "OGN-156",
    "name": "Sabotage",
-   "count": 1
-  },
-  {
-   "id": "VEN-031",
-   "name": "Twilight Shroud",
-   "count": 1
+   "count": 2
   },
   {
    "id": "OGN-058",
@@ -74,64 +64,81 @@
    "count": 3
   },
   {
+   "id": "SFD-043",
+   "name": "Emperor's Divide",
+   "count": 1
+  },
+  {
+   "id": "UNL-095",
+   "name": "Grim Resolve",
+   "count": 2
+  },
+  {
+   "id": "UNL-038",
+   "name": "Skyward Strike",
+   "count": 2
+  },
+  {
    "id": "UNL-192",
    "name": "Alpha Strike",
+   "count": 1
+  },
+  {
+   "id": "UNL-042",
+   "name": "Back Off",
    "count": 1
   },
   {
    "id": "VEN-083",
    "name": "Rampage",
    "count": 2
+  },
+  {
+   "id": "UNL-091",
+   "name": "Concentrate",
+   "count": 2
   }
  ],
  "runes": {
-  "body": 7,
-  "calm": 5
+  "body": 6,
+  "calm": 6
  },
  "battlefields": [
-  "SFD-207",
-  "SFD-217",
-  "UNL-215"
+  "UNL-213",
+  "RAD-163",
+  "OGN-286"
  ],
  "source": {
-  "url": "https://riftdecks.com/riftbound-metagame/deck-master-yi-wuju-bladesman-341772",
-  "player": "Derpinox",
-  "placement": 24,
-  "tournament": "Convergence IV",
-  "players": 272,
-  "date": "2026-10-31",
+  "url": "https://riftdecks.com/riftbound-metagame/deck-best-of-yi-exp-demacia-league-bologna-361477",
+  "player": "Talos90",
+  "placement": 132,
+  "tournament": "Demacia League Bologna - [Post-Ban Meta]",
+  "players": 406,
+  "date": "2026-11-22",
   "set": "Radiance",
   "sideboard": [
+   [
+    "Decree of Focus",
+    2
+   ],
    [
     "Decree of Strength",
     2
    ],
    [
-    "Repulse",
+    "Defy",
     1
    ],
    [
-    "Sabotage",
+    "Hush",
     1
    ],
    [
-    "Twilight Shroud",
-    1
+    "Ruin Runner",
+    2
    ],
    [
-    "Unyielding Spirit",
-    1
-   ],
-   [
-    "Not So Fast",
-    1
-   ],
-   [
-    "Alpha Strike",
-    1
-   ],
-   [
-    "Tomb-Raider Barbara",
+    "Vilemaw",
     2
    ]
   ]

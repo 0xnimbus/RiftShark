@@ -1,12 +1,12 @@
 {
- "name": "Heart of the Tempest (Tilted2211, 1st Radiance Standard Challenge Friday - Riftbound Regional Championship: Europe)",
+ "name": "Heart of the Tempest (LorenzTheDoc, 11th Demacia League Bologna - [Post-Ban Meta])",
  "legend": "VEN-197",
  "champion": "VEN-113",
  "main": [
   {
    "id": "RAD-107",
    "name": "Bedeviling Stranger",
-   "count": 1
+   "count": 2
   },
   {
    "id": "OGN-199",
@@ -16,7 +16,7 @@
   {
    "id": "OGN-185",
    "name": "Traveling Merchant",
-   "count": 3
+   "count": 2
   },
   {
    "id": "RAD-129",
@@ -24,29 +24,29 @@
    "count": 3
   },
   {
-   "id": "SFD-149",
-   "name": "Ezreal, Prodigy",
+   "id": "SFD-140",
+   "name": "Fizz, Trickster",
    "count": 2
   },
   {
-   "id": "SFD-140",
-   "name": "Fizz, Trickster",
-   "count": 1
+   "id": "RAD-105",
+   "name": "Reckless Innovator",
+   "count": 2
   },
   {
-   "id": "OGN-194",
-   "name": "Nocturne, Horrifying",
+   "id": "VEN-099",
+   "name": "Tornado Warrior",
    "count": 3
   },
   {
-   "id": "UNL-150",
-   "name": "Vex, Apathetic",
-   "count": 1
+   "id": "VEN-104",
+   "name": "Tail-Cloaked Matriarch",
+   "count": 3
   },
   {
-   "id": "OGN-195",
-   "name": "Rhasa the Sunderer",
-   "count": 3
+   "id": "VEN-114",
+   "name": "Kharox",
+   "count": 1
   },
   {
    "id": "OGN-204",
@@ -56,7 +56,7 @@
   {
    "id": "SFD-139",
    "name": "Edge of Night",
-   "count": 1
+   "count": 2
   },
   {
    "id": "SFD-150",
@@ -74,13 +74,8 @@
    "count": 3
   },
   {
-   "id": "RAD-101",
-   "name": "An Offer You Can't Refuse",
-   "count": 1
-  },
-  {
-   "id": "OGS-011",
-   "name": "Flash",
+   "id": "SFD-163",
+   "name": "Deathgrip",
    "count": 1
   },
   {
@@ -89,14 +84,9 @@
    "count": 1
   },
   {
-   "id": "OGN-172",
-   "name": "Rebuke",
-   "count": 1
-  },
-  {
    "id": "OGN-173",
    "name": "Ride the Wind",
-   "count": 3
+   "count": 2
   },
   {
    "id": "SFD-145",
@@ -106,7 +96,7 @@
   {
    "id": "UNL-128",
    "name": "Star-Crossed",
-   "count": 1
+   "count": 2
   }
  ],
  "runes": {
@@ -115,17 +105,54 @@
  },
  "battlefields": [
   "SFD-212",
-  "RAD-166",
+  "SFD-221",
   "OGN-298"
  ],
  "source": {
-  "url": "https://riftdecks.com/riftbound-metagame/deck-kennen-heart-of-the-tempest-343353",
-  "player": "Tilted2211",
-  "placement": 1,
-  "tournament": "Radiance Standard Challenge Friday - Riftbound Regional Championship: Europe",
-  "players": 1792,
-  "date": "2026-11-06",
+  "url": "https://riftdecks.com/riftbound-metagame/deck-kennen-heart-of-the-tempest-361462",
+  "player": "LorenzTheDoc",
+  "placement": 11,
+  "tournament": "Demacia League Bologna - [Post-Ban Meta]",
+  "players": 406,
+  "date": "2026-11-22",
   "set": "Radiance",
-  "sideboard": []
+  "sideboard": [
+   [
+    "Existential Dread",
+    1
+   ],
+   [
+    "Abandon",
+    1
+   ],
+   [
+    "An Offer You Can't Refuse",
+    1
+   ],
+   [
+    "Decree of Unity",
+    2
+   ],
+   [
+    "Lacerate",
+    1
+   ],
+   [
+    "Rebuke",
+    1
+   ],
+   [
+    "Salvage",
+    1
+   ],
+   [
+    "Angler Beast",
+    1
+   ],
+   [
+    "Kharox",
+    1
+   ]
+  ]
  }
 }

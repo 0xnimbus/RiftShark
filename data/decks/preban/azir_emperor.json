@@ -1,0 +1,106 @@
+{
+ "name": "Azir, Emperor of the Sands (Giovanni, 30th Riftbound Regional Championship: Europe)",
+ "legend": "OPP-197",
+ "champion": "SFD-177",
+ "main": [
+  {
+   "id": "VEN-135",
+   "name": "Kennen, Keeper of Balance",
+   "count": 1
+  },
+  {
+   "id": "SFD-033",
+   "name": "Doran's Shield",
+   "count": 3
+  },
+  {
+   "id": "SFD-153",
+   "name": "Eye of the Herald",
+   "count": 3
+  },
+  {
+   "id": "UNL-039",
+   "name": "Soul Sword",
+   "count": 3
+  },
+  {
+   "id": "SFD-042",
+   "name": "Brutalizer",
+   "count": 3
+  },
+  {
+   "id": "VEN-027",
+   "name": "Hand Hammer",
+   "count": 2
+  },
+  {
+   "id": "SFD-161",
+   "name": "B.F. Sword",
+   "count": 3
+  },
+  {
+   "id": "OGN-043",
+   "name": "Charm",
+   "count": 1
+  },
+  {
+   "id": "OGN-045",
+   "name": "Defy",
+   "count": 2
+  },
+  {
+   "id": "RAD-032",
+   "name": "Battle Preparations",
+   "count": 2
+  },
+  {
+   "id": "SFD-163",
+   "name": "Deathgrip",
+   "count": 2
+  },
+  {
+   "id": "OGN-058",
+   "name": "Discipline",
+   "count": 3
+  },
+  {
+   "id": "OGN-213",
+   "name": "Hidden Blade",
+   "count": 3
+  },
+  {
+   "id": "UNL-042",
+   "name": "Back Off",
+   "count": 2
+  },
+  {
+   "id": "SFD-154",
+   "name": "Guards!",
+   "count": 3
+  },
+  {
+   "id": "SFD-198",
+   "name": "Arise!",
+   "count": 3
+  }
+ ],
+ "runes": {
+  "calm": 7,
+  "order": 5
+ },
+ "battlefields": [
+  "SFD-210",
+  "OGN-294",
+  "OGN-295"
+ ],
+ "source": {
+  "url": "https://riftdecks.com/riftbound-metagame/deck-azir-emperor-of-the-sands-345200",
+  "player": "Giovanni",
+  "placement": 30,
+  "tournament": "Riftbound Regional Championship: Europe",
+  "players": 315,
+  "date": "2026-11-08",
+  "set": "Radiance",
+  "sideboard": []
+ }
+}

@@ -1932,6 +1932,13 @@ class FlowMixin:
                 loc = ("bf", bf.idx)
                 if bf.controller is None and not self.units_at(loc) and loc not in locs:
                     locs.append(loc)
+        if "unit" in d.types and (self.rules("play_lone_enemy_bf", player=p) or any(
+                isinstance(ab, PlayPermission) and ab.perm == "lone_enemy_bf" for ab in self._abilities_of(uid, o))):
+            for bf in self.battlefields:          # Arachnoid Horror: "... to an occupied battlefield if an enemy unit is alone there"
+                loc = ("bf", bf.idx)
+                units = self.units_at(loc)
+                if len(units) == 1 and not self.is_friendly(self.objects[units[0]].controller, p) and loc not in locs:
+                    locs.append(loc)
         if "unit" in d.types and self._opp_warden(p):
             locs = [l for l in locs if l[0] == "base"]       # Mageseeker Warden
         for ab in self._abilities_of(uid, o):

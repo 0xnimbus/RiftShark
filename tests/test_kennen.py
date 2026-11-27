@@ -20,7 +20,7 @@ def db():
 
 
 def _game(db):
-    decks = [Deck.load(str(ROOT / f"data/decks/tournament/{k}.json"), db) for k in ("kennen_tempest", "riven_exile")]
+    decks = [Deck.load(str(ROOT / f"data/decks/preban/{k}.json"), db) for k in ("kennen_tempest", "riven_exile")]
     return main_phase(db, decks)
 
 
@@ -32,7 +32,7 @@ def _to_trash(g, db, p, name):
 
 
 def test_kennen_deck_is_fully_scripted(db):
-    d = Deck.load(str(ROOT / "data/decks/tournament/kennen_tempest.json"), db)
+    d = Deck.load(str(ROOT / "data/decks/preban/kennen_tempest.json"), db)
     assert not d.validate(db)
 
 

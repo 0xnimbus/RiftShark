@@ -26,8 +26,8 @@ def db():
 
 @pytest.fixture(scope="module")
 def decks(db):
-    return [Deck.load(str(ROOT / "data/decks/tournament/kaisa_void.json"), db),
-            Deck.load(str(ROOT / "data/decks/tournament/riven_exile.json"), db)]
+    return [Deck.load(str(ROOT / "data/decks/preban/kaisa_void.json"), db),
+            Deck.load(str(ROOT / "data/decks/preban/riven_exile.json"), db)]
 
 
 def _positions(db, decks, n=60, seed=3):
@@ -70,8 +70,8 @@ def test_value_net_forward_matches_numpy(db, decks):
 
 def test_selfplay_train_and_learned_policy(db, decks, tmp_path):
     import train_loop as T
-    r = T._selfplay_game(([str(ROOT / "data/decks/tournament/kaisa_void.json"),
-                           str(ROOT / "data/decks/tournament/riven_exile.json")], 5, "greedy", 3, 0.0))
+    r = T._selfplay_game(([str(ROOT / "data/decks/preban/kaisa_void.json"),
+                           str(ROOT / "data/decks/preban/riven_exile.json")], 5, "greedy", 3, 0.0))
     assert r["winner"] in (0, 1) and len(r["x"]) == len(r["y"]) > 0
     np = pytest.importorskip("numpy")
     f = tmp_path / "d.npz"

@@ -51,7 +51,12 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   RAD gallery data had wrong types/domains/tags on 84 cards: checked against the card images, fixed in data/cards/overrides.json.
   Common cards are hand-scripted in `riftsim/core/scripts/cards_common.py` (tests: tests/test_common_cards.py).
   Hand scripts for staples/legends/champions live in `riftsim/core/scripts/cards_staples.py` (tests: tests/test_legends.py, tests/test_champions.py).
-- `data/decks/tournament/`: 12 decks (Rek'Sai added 2026-11-06 13:15; Sett added 2026-11-11 from Nation Clash Saturday, which now has individual ranks; specs in tools/deckspecs/radiance_2026-11.json). Top Radiance lists (Riven 1st CoolStuffCon Orlando $25k; Kai'Sa 3rd Convergence IV) from
+- 2026-11-27 (Derrick chose "switch to post-ban lists"): Standard ban list effective 2026-11-23 in data/cards/banlist.json
+  (`Deck.banned_cards`). data/decks/tournament/ now holds post-ban lists only: Azir, Vex, Kai'Sa, Kennen, Irelia, Master Yi from
+  Demacia League Bologna (406, spec tools/deckspecs/radiance_2026-11-27_postban.json) + unchanged Rek'Sai, Sett, Nasus, Viktor.
+  Riven and Akali have no post-ban list yet. data/decks/preban/ is the pre-ban snapshot; older tests load decks from there.
+  Daily check: only events on/after 2026-11-23 (or labelled post-ban) count; decks must pass tests/test_postban_refresh.py.
+- `data/decks/tournament/`: (pre-ban history) 12 decks (Rek'Sai added 2026-11-06 13:15; Sett added 2026-11-11 from Nation Clash Saturday, which now has individual ranks; specs in tools/deckspecs/radiance_2026-11.json). Top Radiance lists (Riven 1st CoolStuffCon Orlando $25k; Kai'Sa 3rd Convergence IV) from
   riftdecks.com qualifying events (3 relevance stars, 256+ players). Derrick wants these refreshed daily and every
   relevant legend covered eventually; Kai'Sa vs Riven is the matchup he cares about now.
 - First Kai'Sa vs Riven batch (200 greedy games): Kai'Sa 52.5%, Riven 47.5%; first player ~58%. Exported to web/data.

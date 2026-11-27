@@ -1,22 +1,12 @@
 {
- "name": "Irelia, Blade Dancer (Arito, 2nd Convergence IV)",
+ "name": "Irelia, Blade Dancer (ECL Diabloz89, 9th Demacia League Bologna - [Post-Ban Meta])",
  "legend": "OPP-195",
  "champion": "SFD-057",
  "main": [
   {
-   "id": "VEN-101",
-   "name": "Gust Monk",
-   "count": 1
-  },
-  {
-   "id": "UNL-221",
-   "name": "Lonely Poro",
-   "count": 1
-  },
-  {
    "id": "UNL-053",
    "name": "Scuttle Crab",
-   "count": 1
+   "count": 3
   },
   {
    "id": "OGN-199",
@@ -24,24 +14,24 @@
    "count": 3
   },
   {
-   "id": "RAD-042A",
-   "name": "Orianna, Exquisite",
-   "count": 3
-  },
-  {
-   "id": "SFD-048",
-   "name": "Stellacorn Herder",
+   "id": "RAD-105",
+   "name": "Reckless Innovator",
    "count": 3
   },
   {
    "id": "UNL-150",
    "name": "Vex, Apathetic",
-   "count": 1
+   "count": 2
+  },
+  {
+   "id": "VEN-044",
+   "name": "Astral Heron",
+   "count": 3
   },
   {
    "id": "SFD-051",
    "name": "Guardian Angel",
-   "count": 2
+   "count": 3
   },
   {
    "id": "SFD-133",
@@ -54,8 +44,8 @@
    "count": 2
   },
   {
-   "id": "OGN-043",
-   "name": "Charm",
+   "id": "RAD-106",
+   "name": "The Good Stuff",
    "count": 2
   },
   {
@@ -69,24 +59,9 @@
    "count": 3
   },
   {
-   "id": "OGN-046",
-   "name": "En Garde",
-   "count": 1
-  },
-  {
-   "id": "RAD-034",
-   "name": "Hunker Down",
-   "count": 1
-  },
-  {
-   "id": "VEN-031",
-   "name": "Twilight Shroud",
-   "count": 1
-  },
-  {
-   "id": "RAD-032",
-   "name": "Battle Preparations",
-   "count": 1
+   "id": "OGN-169",
+   "name": "Gust",
+   "count": 2
   },
   {
    "id": "OGN-058",
@@ -104,8 +79,8 @@
    "count": 1
   },
   {
-   "id": "OGN-173",
-   "name": "Ride the Wind",
+   "id": "SFD-145",
+   "name": "Switcheroo",
    "count": 2
   },
   {
@@ -115,8 +90,8 @@
   }
  ],
  "runes": {
-  "calm": 6,
-  "chaos": 6
+  "calm": 5,
+  "chaos": 7
  },
  "battlefields": [
   "UNL-205",
@@ -124,12 +99,12 @@
   "OGN-289"
  ],
  "source": {
-  "url": "https://riftdecks.com/riftbound-metagame/deck-irelia-blade-dancer-341750",
-  "player": "Arito",
-  "placement": 2,
-  "tournament": "Convergence IV",
-  "players": 272,
-  "date": "2026-10-31",
+  "url": "https://riftdecks.com/riftbound-metagame/deck-irelia-blade-dancer-361460",
+  "player": "ECL Diabloz89",
+  "placement": 9,
+  "tournament": "Demacia League Bologna - [Post-Ban Meta]",
+  "players": 406,
+  "date": "2026-11-22",
   "set": "Radiance",
   "sideboard": [
    [
@@ -137,23 +112,31 @@
     2
    ],
    [
-    "Gust",
-    2
-   ],
-   [
-    "Abandon",
+    "Hush",
     1
    ],
    [
-    "Ravenbloom Prefect",
-    2
+    "An Offer You Can't Refuse",
+    1
+   ],
+   [
+    "Not So Fast",
+    1
+   ],
+   [
+    "Rebuke",
+    1
+   ],
+   [
+    "The Good Stuff",
+    1
    ],
    [
     "Adaptatron",
     2
    ],
    [
-    "Vex, Apathetic",
+    "Angler Beast",
     1
    ]
   ]

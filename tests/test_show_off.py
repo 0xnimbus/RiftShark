@@ -18,8 +18,8 @@ def db():
 
 @pytest.fixture(scope="module")
 def decks(db):
-    return [Deck.load(str(ROOT / "data/decks/tournament/riven_exile.json"), db),
-            Deck.load(str(ROOT / "data/decks/tournament/kaisa_void.json"), db)]
+    return [Deck.load(str(ROOT / "data/decks/preban/riven_exile.json"), db),
+            Deck.load(str(ROOT / "data/decks/preban/kaisa_void.json"), db)]
 
 
 def _play_until(g, uid, answer):
@@ -85,8 +85,8 @@ def test_battle_preparations_without_show_off_does_not_ready(db, decks):
 
 
 def test_empyrean_predicts_the_shown_off_cards_power_then_draws_2(db):
-    dk = [Deck.load(str(ROOT / "data/decks/tournament/nasus_curator.json"), db),
-          Deck.load(str(ROOT / "data/decks/tournament/kaisa_void.json"), db)]
+    dk = [Deck.load(str(ROOT / "data/decks/preban/nasus_curator.json"), db),
+          Deck.load(str(ROOT / "data/decks/preban/kaisa_void.json"), db)]
     g = main_phase(db, dk)
     g.do_channel(0, 4)
     for u in g.players[0].runes:

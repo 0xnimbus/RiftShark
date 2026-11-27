@@ -1,17 +1,17 @@
 {
- "name": "Kai'Sa, Daughter of the Void (Dan Bridges, 3rd Convergence IV)",
+ "name": "Kai'Sa, Daughter of the Void (darkchri99, 6th Demacia League Bologna - [Post-Ban Meta])",
  "legend": "OPP-247",
  "champion": "OGN-039",
  "main": [
   {
-   "id": "SFD-065",
-   "name": "Forecaster",
+   "id": "SFD-069",
+   "name": "Plundering Poro",
    "count": 3
   },
   {
    "id": "OGN-096",
    "name": "Watchful Sentry",
-   "count": 1
+   "count": 3
   },
   {
    "id": "RAD-003",
@@ -21,22 +21,17 @@
   {
    "id": "OGN-087",
    "name": "Lecturing Yordle",
-   "count": 2
-  },
-  {
-   "id": "OGN-039",
-   "name": "Kai'Sa, Survivor",
-   "count": 1
+   "count": 3
   },
   {
    "id": "OGN-012",
    "name": "Noxus Hopeful",
-   "count": 3
+   "count": 2
   },
   {
-   "id": "OGN-026",
-   "name": "Brynhir Thundersong",
-   "count": 3
+   "id": "SFD-021",
+   "name": "Ferrous Forerunner",
+   "count": 2
   },
   {
    "id": "OGN-116",
@@ -49,19 +44,14 @@
    "count": 2
   },
   {
-   "id": "OGN-090",
-   "name": "Orb of Regret",
-   "count": 1
-  },
-  {
    "id": "SFD-080",
    "name": "Bellows Breath",
-   "count": 1
+   "count": 2
   },
   {
    "id": "OGN-009",
    "name": "Hextech Ray",
-   "count": 2
+   "count": 3
   },
   {
    "id": "OGN-095",
@@ -74,6 +64,11 @@
    "count": 3
   },
   {
+   "id": "OGN-008",
+   "name": "Get Excited!",
+   "count": 1
+  },
+  {
    "id": "OGN-093",
    "name": "Smoke Screen",
    "count": 2
@@ -81,11 +76,11 @@
   {
    "id": "VEN-066",
    "name": "Temporal Breach",
-   "count": 3
+   "count": 1
   },
   {
-   "id": "RAD-013",
-   "name": "Lost to the Sands",
+   "id": "OGN-014",
+   "name": "Sky Splitter",
    "count": 1
   },
   {
@@ -104,24 +99,24 @@
   "OGN-296"
  ],
  "source": {
-  "url": "https://riftdecks.com/riftbound-metagame/deck-kai-sa-daughter-of-the-void-341751",
-  "player": "Dan Bridges",
-  "placement": 3,
-  "tournament": "Convergence IV",
-  "players": 272,
-  "date": "2026-10-31",
+  "url": "https://riftdecks.com/riftbound-metagame/deck-kai-sa-daughter-of-the-void-361457",
+  "player": "darkchri99",
+  "placement": 6,
+  "tournament": "Demacia League Bologna - [Post-Ban Meta]",
+  "players": 406,
+  "date": "2026-11-22",
   "set": "Radiance",
   "sideboard": [
    [
-    "Decree of Rage",
-    3
-   ],
-   [
-    "Retreat",
+    "Decree of Insight",
     1
    ],
    [
     "Brittle Steel",
+    2
+   ],
+   [
+    "Get Excited!",
     1
    ],
    [
@@ -129,19 +124,19 @@
     1
    ],
    [
-    "Lecturing Yordle",
-    1
-   ],
-   [
-    "Thermo Beam",
-    1
+    "Pickpocket",
+    2
    ],
    [
     "Ferrous Forerunner",
     1
    ],
    [
-    "Icathian Rain",
+    "Singularity",
+    1
+   ],
+   [
+    "The Empyrean",
     1
    ]
   ]

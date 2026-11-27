@@ -1793,3 +1793,32 @@ def kharox(defn):
                O.PlayCard(Ref("__kx"), ignore="all")],
               label="choose a unit in their trash and play it, ignoring its cost")],
         label=defn.name, source_text=defn.text)])
+
+
+@script("Tail-Cloaked Matriarch")
+def tail_cloaked_matriarch(defn):
+    # [Empower] [2][Chaos]  (keyword, kept)
+    # When I become [Empowered], you may choose a unit in your trash with Energy cost no more than [3] and Power cost
+    # no more than [A]. Play it to your base, ignoring its cost.
+    def small_units(g, c):
+        out = []
+        for u in g.players[c.controller].trash:
+            d = g.objects[u].base_defn()
+            if d.is_unit and (d.energy or 0) <= 3 and (d.power or 0) <= 1:
+                out.append(u)
+        return out
+    return _keep([Triggered("empowered_self", [
+        O.May([O.Choose(small_units, out="__tm", targeted=False),
+               O.PlayCard(Ref("__tm"), ignore="all", loc=lambda g, c: ("base", c.controller))],
+              label="choose a unit in your trash and play it to your base, ignoring its cost")],
+        label=defn.name, source_text=defn.text)])
+
+
+@script("Arachnoid Horror")
+def arachnoid_horror(defn):
+    # [Hunt 2]  (keyword, kept)
+    # I can be played to an occupied battlefield if an enemy unit is alone there.
+    # Friendly units can be played to an occupied battlefield if an enemy unit is alone there.
+    return _keep([PlayPermission("lone_enemy_bf", label="play me where an enemy unit is alone", source_text=defn.text),
+                  Static("self", "rule", ("play_lone_enemy_bf",), label="friendly units: play where an enemy unit is alone",
+                         source_text=defn.text)])

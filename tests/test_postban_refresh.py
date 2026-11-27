@@ -90,8 +90,65 @@ def test_kharox_empower_burns_3_and_plays_their_unit(db, decks):
 
 
 def test_banned_cards_helper(db):
-    riven = Deck.load(str(ROOT / "data/decks/tournament/riven_exile.json"), db)
+    riven = Deck.load(str(ROOT / "data/decks/preban/riven_exile.json"), db)
     assert "Riven, Broken Blade" in riven.banned_cards(db)
     assert riven.banned_cards(db, on_date="2026-11-22") == []
     azir = Deck.load(str(ROOT / "data/decks/tournament/azir_emperor.json"), db)
     assert azir.banned_cards(db, on_date="2026-11-23") == []
+
+
+def test_matriarch_empower_plays_small_unit_from_trash_to_base(db, decks):
+    g = main_phase(db, decks)
+    tm = put(g, db, 0, "Tail-Cloaked Matriarch", ("base", 0))
+    small = next(u for u in g.players[0].deck if u != tm and g.objects[u].zone == "deck")
+    g.objects[small].defn = db.card("Pit Rookie")
+    g._to_zone(g.objects[small], "trash")
+    big = next(u for u in g.players[0].deck if u not in (tm, small) and g.objects[u].zone == "deck")
+    g.objects[big].defn = db.card("Kharox")
+    g._to_zone(g.objects[big], "trash")
+    g.restruct()
+    g.do_empower(tm)
+    seen = []
+
+    def pick(d):
+        seen.append(list(d.options))
+        if small in d.options:
+            return small
+        return True if True in d.options and d.kind != "action" else None
+    _settle(g, pick=pick)
+    assert not any(big in opts for opts in seen)          # Energy cost 6: not offered
+    o = g.objects[small]
+    assert o.zone == "board" and o.location == ("base", 0)
+
+
+def test_arachnoid_horror_lone_enemy_battlefield(db, decks):
+    g = main_phase(db, decks)
+    i = 0
+    loc = ("bf", i)
+    for u in list(g.units_at(loc)):
+        g._to_zone(g.objects[u], "trash")
+    g.set_bf_controller(i, 1)
+    enemy = put(g, db, 1, "Pit Rookie", loc)
+    ah = next(u for u in g.players[0].deck if g.objects[u].zone == "deck")
+    g.objects[ah].defn = db.card("Arachnoid Horror")
+    g._to_zone(g.objects[ah], "hand")
+    other = next(u for u in g.players[0].deck if g.objects[u].zone == "deck")
+    g.objects[other].defn = db.card("Pit Rookie")
+    g._to_zone(g.objects[other], "hand")
+    g.restruct()
+    assert loc in g._play_locations(0, ah, "hand")
+    assert loc not in g._play_locations(0, other, "hand")
+    put(g, db, 0, "Arachnoid Horror", ("base", 0))       # on the board: friendly units may go there too
+    assert loc in g._play_locations(0, other, "hand")
+    put(g, db, 1, "Pit Rookie", loc, exclude=(enemy,))    # two enemies: no longer alone
+    assert loc not in g._play_locations(0, ah, "hand")
+
+
+def test_active_tournament_decks_are_legal_scripted_and_ban_free(db):
+    import glob
+    paths = sorted(glob.glob(str(ROOT / "data/decks/tournament/*.json")))
+    assert len(paths) >= 10
+    for p in paths:
+        d = Deck.load(p, db)
+        assert d.validate(db) == [], p
+        assert d.banned_cards(db) == [], (p, d.banned_cards(db))

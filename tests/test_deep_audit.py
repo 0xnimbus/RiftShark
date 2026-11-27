@@ -21,7 +21,7 @@ def db():
 
 
 def _deck(db, name):
-    return Deck.load(str(ROOT / f"data/decks/tournament/{name}.json"), db)
+    return Deck.load(str(ROOT / f"data/decks/preban/{name}.json"), db)
 
 
 def _ready_runes(g, p):

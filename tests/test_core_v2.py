@@ -21,8 +21,8 @@ def db():
 
 @pytest.fixture(scope="module")
 def decks(db):
-    return [Deck.load(str(ROOT / "data/decks/tournament/kaisa_void.json"), db),
-            Deck.load(str(ROOT / "data/decks/tournament/riven_exile.json"), db)]
+    return [Deck.load(str(ROOT / "data/decks/preban/kaisa_void.json"), db),
+            Deck.load(str(ROOT / "data/decks/preban/riven_exile.json"), db)]
 
 
 def test_tournament_decks_are_legal(db, decks):
@@ -160,8 +160,8 @@ def test_add_restriction_limits_spending(db):
     from riftsim.core import payment
     from riftsim.core.deck import Deck
     from riftsim.core.game import Game
-    deck = Deck.load(str(ROOT / "data/decks/tournament/kaisa_void.json"), db)
-    other = Deck.load(str(ROOT / "data/decks/tournament/riven_exile.json"), db)
+    deck = Deck.load(str(ROOT / "data/decks/preban/kaisa_void.json"), db)
+    other = Deck.load(str(ROOT / "data/decks/preban/riven_exile.json"), db)
     g = Game(db, [deck, other], seed=3)
     g.run()
     p = 0
@@ -200,8 +200,8 @@ def test_runes_are_a_choice_when_domains_differ(db, decks):
 def test_play_session_seat_decides_who_goes_first(db):
     """Derrick's report: as first player he must start turn 1 with 2 runes; second player gets 3 on turn 2."""
     from riftsim.core.playsession import PlaySession
-    d0 = json.load(open(ROOT / "data/decks/tournament/kaisa_void.json"))
-    d1 = json.load(open(ROOT / "data/decks/tournament/riven_exile.json"))
+    d0 = json.load(open(ROOT / "data/decks/preban/kaisa_void.json"))
+    d1 = json.load(open(ROOT / "data/decks/preban/riven_exile.json"))
     for human in (0, 1):
         s = PlaySession(db)
         s.new(d0, d1, human=human, ai="greedy", analysis=20)
@@ -225,8 +225,8 @@ def test_play_session_seat_decides_who_goes_first(db):
 
 def test_mulligan_sets_aside_draws_and_recycles(db):
     """CR 117: in turn order, set aside up to two cards, draw that many, then recycle the set-aside cards."""
-    d0 = Deck.load(str(ROOT / "data/decks/tournament/kaisa_void.json"), db)
-    d1 = Deck.load(str(ROOT / "data/decks/tournament/riven_exile.json"), db)
+    d0 = Deck.load(str(ROOT / "data/decks/preban/kaisa_void.json"), db)
+    d1 = Deck.load(str(ROOT / "data/decks/preban/riven_exile.json"), db)
     g = Game(db, [d0, d1], seed=3, first_player=1)
     d = g.run()
     assert d.kind == "mulligan" and d.player == 1 and d.options[0] == ()

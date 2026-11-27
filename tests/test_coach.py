@@ -18,8 +18,8 @@ def db():
 
 
 def test_rune_floats_are_not_recommended_or_graded(db):
-    decks = [Deck.load(str(ROOT / "data/decks/tournament/riven_exile.json"), db),
-             Deck.load(str(ROOT / "data/decks/tournament/kaisa_void.json"), db)]
+    decks = [Deck.load(str(ROOT / "data/decks/preban/riven_exile.json"), db),
+             Deck.load(str(ROOT / "data/decks/preban/kaisa_void.json"), db)]
     g = main_phase(db, decks)
     d = g.run()
     floats = [o for o in d.options if o[0] == "rune"]

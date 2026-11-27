@@ -74,7 +74,7 @@ class H(SimpleHTTPRequestHandler):
             if self.path.startswith("/api/new"):
                 with LOCK:
                     d0 = json.load(open(os.path.join(ROOT, body.get("deck0", "data/decks/tournament/kaisa_void.json")), encoding="utf-8"))
-                    d1 = json.load(open(os.path.join(ROOT, body.get("deck1", "data/decks/tournament/riven_exile.json")), encoding="utf-8"))
+                    d1 = json.load(open(os.path.join(ROOT, body.get("deck1", "data/decks/tournament/kennen_tempest.json")), encoding="utf-8"))
                     return self._json(SESSION.new(d0, d1, human=body.get("human", 0), seed=body.get("seed"),
                                                   ai=body.get("ai", DEFAULTS["ai"]), analysis=body.get("analysis", DEFAULTS["analysis"])))
             if self.path.startswith("/api/choose"):

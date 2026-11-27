@@ -1,0 +1,113 @@
+{
+ "name": "Void Burrower (MICE Ramekiano, 1st Radiance Standard Challenge Sunday - RC Stuttgart)",
+ "legend": "SFD-243",
+ "champion": "SFD-029",
+ "main": [
+  {
+   "id": "UNL-153",
+   "name": "Carrion Dredger",
+   "count": 3
+  },
+  {
+   "id": "UNL-002",
+   "name": "Inferna",
+   "count": 3
+  },
+  {
+   "id": "RAD-005",
+   "name": "Lingering Animus",
+   "count": 2
+  },
+  {
+   "id": "VEN-128",
+   "name": "Noxian Emissary",
+   "count": 3
+  },
+  {
+   "id": "RAD-003",
+   "name": "Bilgewater Tracker",
+   "count": 3
+  },
+  {
+   "id": "OGN-211",
+   "name": "Faithful Manufactor",
+   "count": 3
+  },
+  {
+   "id": "RAD-119",
+   "name": "Hunting Dog",
+   "count": 3
+  },
+  {
+   "id": "OGN-012",
+   "name": "Noxus Hopeful",
+   "count": 3
+  },
+  {
+   "id": "SFD-175",
+   "name": "Undertitan",
+   "count": 3
+  },
+  {
+   "id": "SFD-003",
+   "name": "Blood Rush",
+   "count": 2
+  },
+  {
+   "id": "OGN-004",
+   "name": "Cleave",
+   "count": 2
+  },
+  {
+   "id": "OGN-209",
+   "name": "Cull the Weak",
+   "count": 3
+  },
+  {
+   "id": "OGN-029",
+   "name": "Falling Star",
+   "count": 3
+  },
+  {
+   "id": "OGN-221",
+   "name": "Imperial Decree",
+   "count": 3
+  }
+ ],
+ "runes": {
+  "fury": 6,
+  "order": 6
+ },
+ "battlefields": [
+  "UNL-210",
+  "SFD-216",
+  "OGN-291"
+ ],
+ "source": {
+  "url": "https://riftdecks.com/riftbound-metagame/deck-reksai-void-burrower-347836",
+  "player": "MICE Ramekiano",
+  "placement": 1,
+  "tournament": "Radiance Standard Challenge Sunday - RC Stuttgart",
+  "players": 1208,
+  "date": "2026-11-08",
+  "set": "Radiance",
+  "sideboard": [
+   [
+    "Decree of Rage",
+    2
+   ],
+   [
+    "Decree of Unity",
+    3
+   ],
+   [
+    "Salvage",
+    2
+   ],
+   [
+    "Pyke, Dockside Butcher",
+    3
+   ]
+  ]
+ }
+}

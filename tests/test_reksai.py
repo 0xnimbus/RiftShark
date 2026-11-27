@@ -18,8 +18,8 @@ def db():
 
 @pytest.fixture(scope="module")
 def decks(db):
-    return [Deck.load(str(ROOT / "data/decks/tournament/reksai_void_burrower.json"), db),
-            Deck.load(str(ROOT / "data/decks/tournament/kaisa_void.json"), db)]
+    return [Deck.load(str(ROOT / "data/decks/preban/reksai_void_burrower.json"), db),
+            Deck.load(str(ROOT / "data/decks/preban/kaisa_void.json"), db)]
 
 
 def _drain(g, answer=lambda d: d.options[0]):
