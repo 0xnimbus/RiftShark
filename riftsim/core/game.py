@@ -282,7 +282,16 @@ class Game(flow.FlowMixin):
 
     def no_combat_damage(self, uid):
         """'I don't deal combat damage' (possibly conditional, e.g. Orianna, Exquisite)."""
-        return self.has_keyword(uid, "no_combat_damage") or any(src == uid for src, _ in self.rules("no_combat_damage"))
+        if self.has_keyword(uid, "no_combat_damage") or any(src == uid for src, _ in self.rules("no_combat_damage")):
+            return True
+        # Vilemaw: "Enemy units here with less Might than me don't deal combat damage."
+        o = self.objects.get(uid)
+        for src, _ in self.rules("weaker_enemies_here_no_combat_damage"):
+            so = self.objects[src]
+            if src != uid and o is not None and so.controller != o.controller and so.location is not None \
+                    and o.location == so.location and (self.chars(uid).might or 0) < (self.chars(src).might or 0):
+                return True
+        return False
 
     def board_items(self):
         """[(uid, obj)] of the objects on the board, in board (creation) order. Zones only change with restruct, so
