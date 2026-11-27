@@ -3345,3 +3345,27 @@ def test_treasure_trove_triggers_when_it_leaves_the_board(db):
         in_hand = 1 if how == "hand" else 0
         assert len(g.players[0].hand) - h == 1 + in_hand, how
         assert len(g.players[0].runes) - runes == 1, how
+
+
+def test_runeblade_anvil_banishes_the_top_card_when_played_and_when_it_leaves(db):
+    """Runeblade Anvil: "When you play this or when this leaves the board, banish the top card of your Main Deck.
+    Until your next Ending Phase, you may play that card." Only its "[2][Chaos], [T]: Kill this." line was scripted,
+    so neither trigger did anything (script status partial)."""
+    g, anvil = _spell_setup(db, "kaisa_void", "Runeblade Anvil")
+    g.objects[anvil].defn = _card(db, "Runeblade Anvil")
+    g.restruct()
+    deck = g.players[0].deck
+    top = next(u for u in deck if g.objects[u].base_defn().type == "unit" and (g.objects[u].base_defn().energy or 0) <= 3)
+    deck.remove(top)
+    deck.insert(0, top)
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == anvil))
+    _drive(g, stop=lambda d: d.kind == "action" and not g.chain and d.player == 0)
+    assert g.objects[anvil].zone == "board"
+    assert g.objects[top].zone == "banish"
+    assert any(o[0] == "play" and o[1] == top for o in g.legal_actions(0))
+    top2 = g.players[0].deck[0]
+    g.do_kill([anvil], Context(0, anvil))
+    _drive(g, stop=lambda d: d.kind == "action" and not g.chain and d.player == 0)
+    assert g.objects[top2].zone == "banish"
+    assert any(t["kind"] == "may_play" and t["data"]["uid"] == top2 for t in g.turn_effects)
