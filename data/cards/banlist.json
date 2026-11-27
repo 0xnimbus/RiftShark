@@ -1,0 +1,8 @@
+{
+ "source": "https://playriftbound.com/en-us/news/announcements/radiance-ban-list-updates-effective-november-23-2026/",
+ "note": "Standard and Constructed 2v2 ban list additions announced 2026-11-13. Korea and Traditional Chinese circuits apply them only once Radiance releases there. Earlier bans (Stacked Deck, Reaver's Row, ...) are not listed yet.",
+ "bans": [
+  {"effective": "2026-11-23", "cards": ["Riven, Broken Blade", "Zhonya's Hourglass", "Stellacorn Herder", "Nocturne, Horrifying",
+   "Rhasa the Sunderer", "Brynhir Thundersong", "Dazzling Aurora", "Baited Hook", "Emperor's Dais", "Star Spring"]}
+ ]
+}

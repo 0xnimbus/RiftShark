@@ -1758,3 +1758,38 @@ def the_boss(defn):
                     source_text=defn.text),
         Triggered(conquer, [O.Do(lambda g, c: g.do_ready(c.source, c))],
                   label="Sett: when you conquer, ready me", source_text=defn.text)], "replace": True}
+
+
+# ----------------------------------------------------------------------------- post-ban deck refresh (2026-11-27)
+@script("Forge of the Fluft")
+def forge_of_the_fluft(defn):
+    # While you control this battlefield, friendly legends have "[T]: Attach an Equipment you control to a unit you
+    # control." (A battlefield's controller is its card's controller, CR 190.6.d: with no controller no legend has it.)
+    equipment = Sel("gear", side="friendly", pred=lambda g, c, u: "Equipment" in g.chars(u).tags)
+    attach = Activated({"energy": 0, "power": [], "exhaust": True},
+                       [O.Choose(equipment, out="__eq", targeted=False),
+                        O.Choose(Sel("unit", side="friendly"), out="__eu", targeted=False),
+                        O.Attach(Ref("__eq"), Ref("__eu"))],
+                       label="[T]: Attach an Equipment you control to a unit you control.",
+                       source_text="[T]: Attach an Equipment you control to a unit you control.")
+    return {"abilities": [Static(Sel("legend", side="friendly"), "ability", attach, label=defn.name, source_text=defn.text)],
+            "replace": False}
+
+
+@script("Kharox")
+def kharox(defn):
+    # [Empower] [6][Chaos][Chaos]  (keyword, kept)
+    # When I become [Empowered], choose an opponent. They [Burn 3]. Then you may do this: Choose a unit in their trash
+    # and play it, ignoring its cost.
+    def their_units(g, c):
+        p = c.vars.get("__opp")
+        if p is None:
+            return []
+        return [u for u in g.players[p].trash if g.objects[u].base_defn().is_unit]
+    return _keep([Triggered("empowered_self", [
+        O.ChoosePlayer(out="__opp", opponent=True),
+        O.Burn(3, player=Ref("__opp")),
+        O.May([O.Choose(their_units, out="__kx", targeted=False),
+               O.PlayCard(Ref("__kx"), ignore="all")],
+              label="choose a unit in their trash and play it, ignoring its cost")],
+        label=defn.name, source_text=defn.text)])

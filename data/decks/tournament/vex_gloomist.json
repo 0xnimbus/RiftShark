@@ -1,5 +1,5 @@
 {
- "name": "Gloomist (vince, 9th Convergence IV)",
+ "name": "Gloomist (CC JustSR, 2nd Demacia League Bologna - [Post-Ban Meta])",
  "legend": "UNL-193",
  "champion": "UNL-150",
  "main": [
@@ -11,32 +11,27 @@
   {
    "id": "RAD-107",
    "name": "Bedeviling Stranger",
-   "count": 1
+   "count": 3
   },
   {
-   "id": "OGN-044",
-   "name": "Clockwork Keeper",
-   "count": 1
-  },
-  {
-   "id": "UNL-141",
-   "name": "Evelynn, Entrancing",
+   "id": "UNL-053",
+   "name": "Scuttle Crab",
    "count": 2
   },
   {
-   "id": "VEN-101",
-   "name": "Gust Monk",
+   "id": "SFD-053",
+   "name": "Janna, Savior",
    "count": 1
   },
   {
-   "id": "UNL-036",
-   "name": "Mutated Mouser",
-   "count": 1
-  },
-  {
-   "id": "RAD-103",
-   "name": "Gutter Guardian",
+   "id": "UNL-145",
+   "name": "Pyke, Returned",
    "count": 2
+  },
+  {
+   "id": "OGN-176",
+   "name": "Sneaky Deckhand",
+   "count": 3
   },
   {
    "id": "VEN-099",
@@ -44,18 +39,13 @@
    "count": 3
   },
   {
-   "id": "OGN-167",
-   "name": "Ember Monk",
-   "count": 1
-  },
-  {
-   "id": "UNL-143",
-   "name": "Kha'Zix, Mutating Horror",
-   "count": 1
-  },
-  {
    "id": "OGN-067",
    "name": "Blitzcrank, Impassive",
+   "count": 1
+  },
+  {
+   "id": "VEN-114",
+   "name": "Kharox",
    "count": 1
   },
   {
@@ -64,49 +54,39 @@
    "count": 3
   },
   {
-   "id": "OGN-204",
-   "name": "Seal of Discord",
+   "id": "UNL-147",
+   "name": "Baron Nashor",
    "count": 1
-  },
-  {
-   "id": "OGN-077",
-   "name": "Zhonya's Hourglass",
-   "count": 2
   },
   {
    "id": "SFD-133",
    "name": "Boots of Swiftness",
-   "count": 3
+   "count": 2
   },
   {
-   "id": "SFD-139",
-   "name": "Edge of Night",
-   "count": 1
-  },
-  {
-   "id": "SFD-056",
-   "name": "Sterak's Gage",
-   "count": 1
-  },
-  {
-   "id": "RAD-044",
-   "name": "Hunting Blind",
-   "count": 1
+   "id": "RAD-106",
+   "name": "The Good Stuff",
+   "count": 2
   },
   {
    "id": "OGN-045",
    "name": "Defy",
-   "count": 2
+   "count": 3
   },
   {
-   "id": "RAD-029",
-   "name": "Life from Stone",
+   "id": "OGN-169",
+   "name": "Gust",
+   "count": 1
+  },
+  {
+   "id": "UNL-131",
+   "name": "Abandon",
    "count": 1
   },
   {
    "id": "OGN-058",
    "name": "Discipline",
-   "count": 2
+   "count": 1
   },
   {
    "id": "OGN-172",
@@ -122,6 +102,11 @@
    "id": "UNL-042",
    "name": "Back Off",
    "count": 1
+  },
+  {
+   "id": "UNL-128",
+   "name": "Star-Crossed",
+   "count": 1
   }
  ],
  "runes": {
@@ -130,17 +115,50 @@
  },
  "battlefields": [
   "RAD-157",
-  "OGN-278",
+  "RAD-163",
   "OGN-288"
  ],
  "source": {
-  "url": "https://riftdecks.com/riftbound-metagame/deck-vex-gloomist-341757",
-  "player": "vince",
-  "placement": 9,
-  "tournament": "Convergence IV",
-  "players": 272,
-  "date": "2026-10-31",
+  "url": "https://riftdecks.com/riftbound-metagame/deck-vex-gloomist-361456",
+  "player": "CC JustSR",
+  "placement": 2,
+  "tournament": "Demacia League Bologna - [Post-Ban Meta]",
+  "players": 406,
+  "date": "2026-11-22",
   "set": "Radiance",
-  "sideboard": []
+  "sideboard": [
+   [
+    "Decree of Focus",
+    2
+   ],
+   [
+    "Gust",
+    1
+   ],
+   [
+    "Hush",
+    1
+   ],
+   [
+    "An Offer You Can't Refuse",
+    1
+   ],
+   [
+    "Not So Fast",
+    1
+   ],
+   [
+    "Star-Crossed",
+    1
+   ],
+   [
+    "Tomb-Raider Barbara",
+    2
+   ],
+   [
+    "Vilemaw",
+    1
+   ]
+  ]
  }
 }

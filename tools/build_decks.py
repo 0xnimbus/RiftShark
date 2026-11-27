@@ -59,6 +59,9 @@ def main(path):
         deck = Deck.from_dict(d, db) if hasattr(Deck, "from_dict") else Deck.load(str(out), db)
         errs = list(dict.fromkeys(deck.validate(db) or []))
         print(f"{key}: {sum(c['count'] for c in d['main'])} main, {len(errs)} problems")
+        banned = deck.banned_cards(db, on_date=spec.get("date"))
+        if banned:
+            print("    BANNED on", spec.get("date"), ":", ", ".join(banned))
         for e in errs:
             print("   ", e)
             if "not fully scripted" in e:

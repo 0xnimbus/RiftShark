@@ -1,11 +1,16 @@
 {
- "name": "Azir, Emperor of the Sands (Giovanni, 30th Riftbound Regional Championship: Europe)",
+ "name": "Azir, Emperor of the Sands (misseri90, 1st Demacia League Bologna - [Post-Ban Meta])",
  "legend": "OPP-197",
  "champion": "SFD-177",
  "main": [
   {
    "id": "VEN-135",
    "name": "Kennen, Keeper of Balance",
+   "count": 1
+  },
+  {
+   "id": "UNL-176",
+   "name": "Vi, Peacekeeper",
    "count": 1
   },
   {
@@ -31,7 +36,7 @@
   {
    "id": "VEN-027",
    "name": "Hand Hammer",
-   "count": 2
+   "count": 1
   },
   {
    "id": "SFD-161",
@@ -39,14 +44,9 @@
    "count": 3
   },
   {
-   "id": "OGN-043",
-   "name": "Charm",
-   "count": 1
-  },
-  {
    "id": "OGN-045",
    "name": "Defy",
-   "count": 2
+   "count": 3
   },
   {
    "id": "RAD-032",
@@ -66,7 +66,12 @@
   {
    "id": "OGN-213",
    "name": "Hidden Blade",
-   "count": 3
+   "count": 2
+  },
+  {
+   "id": "OGN-224",
+   "name": "Salvage",
+   "count": 1
   },
   {
    "id": "UNL-042",
@@ -89,18 +94,47 @@
   "order": 5
  },
  "battlefields": [
+  "SFD-208",
   "SFD-210",
-  "OGN-294",
-  "OGN-295"
+  "OGN-294"
  ],
  "source": {
-  "url": "https://riftdecks.com/riftbound-metagame/deck-azir-emperor-of-the-sands-345200",
-  "player": "Giovanni",
-  "placement": 30,
-  "tournament": "Riftbound Regional Championship: Europe",
-  "players": 315,
-  "date": "2026-11-08",
+  "url": "https://riftdecks.com/riftbound-metagame/deck-azir-emperor-of-the-sands-361455",
+  "player": "misseri90",
+  "placement": 1,
+  "tournament": "Demacia League Bologna - [Post-Ban Meta]",
+  "players": 406,
+  "date": "2026-11-22",
   "set": "Radiance",
-  "sideboard": []
+  "sideboard": [
+   [
+    "Charm",
+    2
+   ],
+   [
+    "Decree of Focus",
+    2
+   ],
+   [
+    "Hush",
+    1
+   ],
+   [
+    "Decree of Unity",
+    2
+   ],
+   [
+    "Salvage",
+    1
+   ],
+   [
+    "Disarming Rake",
+    1
+   ],
+   [
+    "Vi, Peacekeeper",
+    1
+   ]
+  ]
  }
 }

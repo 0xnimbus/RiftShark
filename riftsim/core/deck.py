@@ -51,6 +51,30 @@ class Deck:
                 "main": [{"id": k, "count": v} for k, v in counts.items()], "runes": rc, "battlefields": self.battlefields,
                 **({"extra_legends": self.extra_legends} if self.extra_legends else {})}
 
+    def banned_cards(self, db, on_date=None):
+        """Cards in this deck (legend, champion, main deck, battlefields) on the Standard ban list in force on
+        `on_date` (ISO date, default: every listed ban). The list is data/cards/banlist.json. Not part of validate:
+        pre-ban tournament lists stay playable as records of the format they were built for."""
+        import json, os
+        path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "cards", "banlist.json")
+        try:
+            bans = json.load(open(path))["bans"]
+        except (OSError, KeyError, ValueError):
+            return []
+        names = set()
+        for b in bans:
+            if on_date is None or b["effective"] <= on_date:
+                names.update(b["cards"])
+        out = []
+        for x in [self.legend, self.champion] + list(self.main) + list(self.battlefields):
+            try:
+                n = db.card(x).name
+            except KeyError:
+                continue
+            if n in names and n not in out:
+                out.append(n)
+        return out
+
     def validate(self, db, raise_on_error=False, strict=True):
         errs = []
         try:
