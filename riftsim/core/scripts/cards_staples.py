@@ -1169,6 +1169,21 @@ def runeblade_anvil(defn):
                                     source_text=defn.text)], "replace": False}
 
 
+@script("Clocktower Guardian")
+def clocktower_guardian(defn):
+    # (line 1 auto-scripted) When you play me or when I hold, [Predict 3].
+    # [Deathknell][>] Banish the top card of your Main Deck. You may play it, ignoring its Energy cost.
+    def banish_top(g, c):
+        deck = g.players[c.controller].deck
+        c.vars["__ctg"] = deck[0] if deck else None
+        if deck:
+            g.do_banish([deck[0]], c)
+    return {"abilities": [Triggered("die_self", [O.Do(banish_top), O.If(O.has_var("__ctg"), [O.May([O.PlayCard(Ref("__ctg"), ignore="energy")],
+                                                                                    label="play the banished card")])], zone="any",
+                                    label="Deathknell: banish the top card, you may play it", source_text=defn.text,
+                                    keyword="deathknell")], "replace": False}
+
+
 @script("Kennen, Storm of Shuriken")
 def kennen_storm(defn):
     # (line 1 auto-scripted) When I conquer, give a spell in your trash [Flow] equal to its cost this turn.

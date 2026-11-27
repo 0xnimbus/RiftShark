@@ -3369,3 +3369,29 @@ def test_runeblade_anvil_banishes_the_top_card_when_played_and_when_it_leaves(db
     _drive(g, stop=lambda d: d.kind == "action" and not g.chain and d.player == 0)
     assert g.objects[top2].zone == "banish"
     assert any(t["kind"] == "may_play" and t["data"]["uid"] == top2 for t in g.turn_effects)
+
+
+def test_clocktower_guardian_deathknell_banishes_and_plays_the_top_card(db):
+    """Clocktower Guardian: "[Deathknell][>] Banish the top card of your Main Deck. You may play it, ignoring its Energy
+    cost." Only its Predict line was scripted (partial), so dying did nothing."""
+    for accept in (True, False):
+        g, _ = _spell_setup(db, "kaisa_void", "Hextech Ray")
+        cg = put(g, db, 0, "Clocktower Guardian", ("base", 0))
+        g.objects[cg].defn = _card(db, "Clocktower Guardian")
+        g.restruct()
+        deck = g.players[0].deck
+        top = max((u for u in deck if g.objects[u].base_defn().type == "unit"),
+                  key=lambda u: g.objects[u].base_defn().energy or 0)
+        deck.remove(top)
+        deck.insert(0, top)
+        seen = []
+
+        def pick(d):
+            if d.kind == "yesno" and g.chain and g.chain[-1].uid == cg:
+                seen.append(d.kind)
+                return accept
+            return None
+        g.do_kill([cg], Context(1, None))
+        _drive(g, pick=pick, stop=lambda d: d.kind == "action" and not g.chain and d.player == 0)
+        assert seen, "no may-play decision"
+        assert g.objects[top].zone == ("board" if accept else "banish"), (accept, g.objects[top].zone)
