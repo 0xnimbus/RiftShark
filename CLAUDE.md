@@ -459,6 +459,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   zone change, so `_collect_triggers` now looks back at the object's board abilities for its own "leave" (last known
   controller, "here" = where it was); also when the death is replaced by a banish (383.2.c.3.a) or it goes to hand.
   Runeblade Anvil (the only other such card) is still partial. Smoke games unchanged.
+  2026-11-27 00:20: Runeblade Anvil had only its "Kill this" line scripted (partial): "When you play this or when this
+  leaves the board, banish the top card of your Main Deck. Until your next Ending Phase, you may play that card" now
+  works (cards_staples.py, shared `_banish_top_may_play` with Akali, Brash). Not in any tournament list; smoke games with
+  it in a random deck change. rules_audit (40 random + 2x20 greedy) clean.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

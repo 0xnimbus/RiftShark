@@ -1138,22 +1138,35 @@ def _grant_may_play(g, c, uid, zone, until_your_next_ending=False):
     g.add_turn_effect(c, "may_play", {"uid": uid, "zone": zone, "until_turn": until}, expires=None)
 
 
+def _banish_top_may_play(g, c):
+    """Banish the top card of your Main Deck. Until your next Ending Phase, you may play that card."""
+    deck = g.players[c.controller].deck
+    if not deck:
+        return
+    u = deck[0]
+    g.do_banish([u], c)
+    _grant_may_play(g, c, u, "banish", until_your_next_ending=True)
+
+
 @script("Akali, Brash")
 def akali_brash(defn):
     # The first time I move each turn, [Add] [1][A].
     # The second time I move each turn, banish the top card of your Main Deck. Until your next Ending Phase, you may
     # play that card. (You still pay its costs.)
-    def banish_top(g, c):
-        deck = g.players[c.controller].deck
-        if not deck:
-            return
-        u = deck[0]
-        g.do_banish([u], c)
-        _grant_may_play(g, c, u, "banish", until_your_next_ending=True)
     return {"abilities": [Triggered("move_self", [O.Add(1, ["any"])], filt=lambda g, s, ev: _moves_this_turn(g, s) == 1,
                                     label=defn.name, source_text=defn.text),
-                          Triggered("move_self", [O.Do(banish_top)], filt=lambda g, s, ev: _moves_this_turn(g, s) == 2,
+                          Triggered("move_self", [O.Do(_banish_top_may_play)], filt=lambda g, s, ev: _moves_this_turn(g, s) == 2,
                                     label=defn.name, source_text=defn.text)], "replace": True}
+
+
+@script("Runeblade Anvil")
+def runeblade_anvil(defn):
+    # When you play this or when this leaves the board, banish the top card of your Main Deck. Until your next
+    # Ending Phase, you may play that card. (You still pay its costs.)
+    # [2][Chaos], [T]: Kill this.  (activated line auto-scripted)
+    return {"abilities": [Triggered("play_self", [O.Do(_banish_top_may_play)], label=defn.name, source_text=defn.text),
+                          Triggered("leave_self", [O.Do(_banish_top_may_play)], label=defn.name,
+                                    source_text=defn.text)], "replace": False}
 
 
 @script("Kennen, Storm of Shuriken")
