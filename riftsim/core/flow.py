@@ -158,6 +158,9 @@ class _FinalizeCosts(Instr):
         if ctx.vars.get("__ignore_cost"):          # "If you do, ignore this spell's cost" (Call to Glory, Wallop)
             it.cost = {"energy": 0, "power": []}
         ctx.vars.setdefault("__costs", {})
+        if it.cost.get("target_energy_reduction") and not ctx.vars.get("__target_reduce_done"):
+            ctx.vars["__target_reduce_done"] = True
+            ctx.vars["__cost_reduce"] = ctx.vars.get("__cost_reduce", 0) + it.cost["target_energy_reduction"](game, ctx)
         if it.kind == "spell" and not ctx.vars.get("__chosen_reduce_done"):
             ctx.vars["__chosen_reduce_done"] = True
             chosen = set(u for u in game._target_uids(ctx) if u is not None)
@@ -2177,7 +2180,7 @@ class FlowMixin:
                 return False
         if cost.get("kill_self") and o.zone != "board":
             return False
-        e = self.ability_energy(ab, uid)
+        e = self.ability_energy(ab, uid, best=True)
         pw = list(cost.get("power", ()))
         pw = [payment.own_power(o.base_defn().domains) if d == "C" else d for d in pw]
         if not self.can_pay(p, e, pw, purpose={"kind": "ability", "types": set(self.chars(uid).types), "uid": uid}):
@@ -2408,6 +2411,8 @@ class FlowMixin:
             c["spend_buff"] = uid
         if cost.get("xp"):
             c["xp"] = cost["xp"]
+        if cost.get("target_energy_reduction"):    # "reduced by the Might of the unit you choose": known once chosen
+            c["target_energy_reduction"] = cost["target_energy_reduction"]
         if ab.once_per_turn:
             o.temp[("act", idx)] = self.turn
         kind = "add" if ab.is_add else "ability"
@@ -2426,12 +2431,17 @@ class FlowMixin:
         self.priority = p
         self.dirty = True
 
-    def ability_energy(self, ab, uid):
-        """Energy cost of an activated ability, after the ability's own reduction ("costs [1] less for each ...")."""
+    def ability_energy(self, ab, uid, best=False):
+        """Energy cost of an activated ability, after the ability's own reduction ("costs [1] less for each ...").
+        best: also the largest reduction a choice could give ("reduced by the Might of the unit you choose", Hextech
+        Gauntlets), for deciding whether the ability can be activated at all; the item pays its real cost."""
         e = ab.cost.get("energy", 0)
         f = ab.cost.get("energy_reduction")
         if f is not None:
             e = max(0, e - f(self, uid))
+        fb = ab.cost.get("energy_reduction_max")
+        if best and fb is not None:
+            e = max(0, e - fb(self, uid))
         return e
 
     def _cost_choices(self, ab, uid):

@@ -148,6 +148,37 @@ def blade_of_the_exile(defn):
     return {"abilities": [alt], "replace": False}
 
 
+@script("Hextech Gauntlets")
+def hextech_gauntlets(defn):
+    # [Equip] [3][A]. This ability's Energy cost is reduced by the Might of the unit you choose.
+    # The keyword Equip paid [3][A] whatever the unit; the reduction is known once the unit is chosen (CR 355 then the
+    # cost), so the ability can be activated if some friendly unit's Might makes it payable, and only such a unit
+    # can be chosen.
+    def might(g, u):
+        return max(0, g.chars(u).might or 0)
+
+    def payable(g, c, u):
+        e = max(0, 3 - might(g, u))
+        return g.objects[c.source].attached_to != u and g.can_pay(c.controller, e, ["any"], purpose={
+            "kind": "ability", "types": set(g.chars(c.source).types), "uid": c.source})
+
+    def best(g, uid):
+        p = g.objects[uid].controller
+        return max([might(g, u) for u, o in g.board_items() if o.controller == p and g.is_unit(u)
+                    and g.objects[uid].attached_to != u] or [0])
+
+    def chosen(g, c):
+        t = c.vars.get("t")
+        return might(g, t) if t in g.objects and g.objects[t].zone == "board" else 0
+    equip = Activated({"energy": 3, "power": ["any"], "energy_reduction_max": best, "target_energy_reduction": chosen,
+                       "energy_reduction_by_unit": might},
+                      [O.Attach(Ref("self"), Ref("t"))],
+                      targets=[O.Choose(Sel("unit", side="friendly", pred=payable), targeted=True)],
+                      timing="main", label="Equip", is_equip=True, keyword="equip", source_text=defn.text)
+    defn.abilities[:] = [a for a in defn.abilities if not getattr(a, "is_equip", False)]
+    return {"abilities": [equip], "replace": False}
+
+
 @script("Baron Nashor")
 def baron_nashor(defn):
     # "As you play me, add the Baron Pit battlefield token to the board if it's not there already. If you do, I enter

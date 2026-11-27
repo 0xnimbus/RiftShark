@@ -3395,3 +3395,37 @@ def test_clocktower_guardian_deathknell_banishes_and_plays_the_top_card(db):
         _drive(g, pick=pick, stop=lambda d: d.kind == "action" and not g.chain and d.player == 0)
         assert seen, "no may-play decision"
         assert g.objects[top].zone == ("board" if accept else "banish"), (accept, g.objects[top].zone)
+
+
+def test_hextech_gauntlets_equip_cost_is_reduced_by_the_chosen_units_might(db):
+    """Hextech Gauntlets: "[Equip] [3][A]. This ability's Energy cost is reduced by the Might of the unit you choose."
+    The keyword Equip always cost [3][A] (card partial). With one rune left, only a 3+ Might unit can be chosen, and
+    attaching to it costs just the [A]."""
+    vanilla = lambda m: next(c.name for c in db if c.is_unit and c.script_status == "vanilla" and c.might == m
+                             and not c.is_champion)
+    g, _ = _spell_setup(db, "kaisa_void", "Hextech Ray")
+    gl = put(g, db, 0, "Hextech Gauntlets", ("base", 0))
+    g.objects[gl].defn = _card(db, "Hextech Gauntlets")
+    big = put(g, db, 0, vanilla(3), ("base", 0), exclude=(gl,))
+    small = put(g, db, 0, vanilla(1), ("base", 0), exclude=(gl, big))
+    for u, n in ((big, vanilla(3)), (small, vanilla(1))):
+        g.objects[u].defn = _card(db, n)
+    for r in g.players[0].runes[1:]:
+        g.objects[r].exhausted = True
+    g.restruct()
+    d = g.run()
+    act = [o for o in d.options if o[0] == "activate" and o[1] == gl]
+    assert act, "Equip should be offered: the 3-Might unit makes it cost only [A]"
+    g.choose(act[0])
+    seen = {}
+
+    def pick(d):
+        if d.kind in ("choose", "choose_many", "target") and big in d.options:
+            seen["opts"] = list(d.options)
+            return big
+        return None
+    _drive(g, pick=pick, stop=lambda d: d.kind == "action" and not g.chain and d.player == 0)
+    assert small not in seen.get("opts", ())          # (a single legal target is chosen without asking)
+    assert g.objects[gl].attached_to == big
+    pays = [e for e in g.events if e.get("kind") == "event:pay" and e.get("player") == 0]
+    assert pays and pays[-1]["energy"] == 0 and len(pays[-1]["power"]) == 1

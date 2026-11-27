@@ -467,6 +467,11 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   Energy cost" was missing (partial): now hand-scripted in cards_staples.py, asked after the card is banished (yes/no;
   a no leaves it banished). Note `ops.PlayCard(may=True)` does not ask: a "you may play" needs an O.May or an up_to
   choice around it (every other "you may play" script has one). Not in any tournament list; smoke games unchanged.
+  10:20: Hextech Gauntlets ("[Equip] [3][A]. This ability's Energy cost is reduced by the Might of the unit you choose")
+  always cost [3][A] (partial). Activated costs can now carry `energy_reduction_max` (legality: the best choice) and
+  `target_energy_reduction(g, ctx)` (applied as the cost is paid, after the targets; flow `_FinalizeCost`); only a unit
+  that makes it payable can be chosen; under Weaponmaster (`ops.PayEquip`) the unit is the Weaponmaster unit
+  (`energy_reduction_by_unit`). Not in any tournament list; smoke games with it in a random deck change.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

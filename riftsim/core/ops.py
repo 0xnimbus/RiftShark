@@ -1176,7 +1176,11 @@ class PayEquip(Instr):
                 pw = [own_power(d.domains) if x == "C" else x for x in ab.cost.get("power", ())]
                 if pw:
                     pw = pw[1:]      # "reduced by [A]": one Power symbol of any domain is waived (CR 821.1.c.3)
-                return ab.cost.get("energy", 0), pw
+                e = ab.cost.get("energy", 0)
+                f = ab.cost.get("energy_reduction_by_unit")     # Hextech Gauntlets: the unit it attaches to
+                if f is not None and ctx.source in game.objects:
+                    e = max(0, e - f(game, ctx.source))
+                return e, pw
         return None
 
     def run(self, game, ctx):
