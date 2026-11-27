@@ -3429,3 +3429,28 @@ def test_hextech_gauntlets_equip_cost_is_reduced_by_the_chosen_units_might(db):
     assert g.objects[gl].attached_to == big
     pays = [e for e in g.events if e.get("kind") == "event:pay" and e.get("player") == 0]
     assert pays and pays[-1]["energy"] == 0 and len(pays[-1]["power"]) == 1
+
+
+def test_heartening_soul_gives_friendly_legends_a_might_ability(db):
+    """Heartening Soul: 'Friendly legends have "[T]: Give a unit +3 [M] this turn."' The grant was never scripted
+    (card partial): the legend had no such ability."""
+    vanilla = next(c.name for c in db if c.is_unit and c.script_status == "vanilla" and (c.might or 0) >= 1
+                   and not c.is_champion)
+    g, _ = _spell_setup(db, "kaisa_void", "Hextech Ray")
+    hs = put(g, db, 0, "Heartening Soul", ("base", 0))
+    g.objects[hs].defn = _card(db, "Heartening Soul")
+    u = put(g, db, 0, vanilla, ("base", 0), exclude=(hs,))
+    g.objects[u].defn = _card(db, vanilla)
+    lg = g.players[0].legend
+    g.objects[lg].exhausted = False
+    g.restruct()
+    m0 = g.chars(u).might
+    d = g.run()
+    acts = [o for o in d.options if o[0] == "activate" and o[1] == lg
+            and "+3" in (g.abilities(lg)[o[2]].label or "")]
+    assert acts, "the legend should have the granted [T] ability"
+    g.choose(acts[0])
+    _drive(g, pick=lambda d: u if u in (d.options or ()) and d.kind != "action" else None,
+           stop=lambda d: d.kind == "action" and not g.chain and d.player == 0)
+    assert g.objects[lg].exhausted
+    assert g.chars(u).might == m0 + 3
