@@ -463,6 +463,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   leaves the board, banish the top card of your Main Deck. Until your next Ending Phase, you may play that card" now
   works (cards_staples.py, shared `_banish_top_may_play` with Akali, Brash). Not in any tournament list; smoke games with
   it in a random deck change. rules_audit (40 random + 2x20 greedy) clean.
+  05:20: Clocktower Guardian's "[Deathknell][>] Banish the top card of your Main Deck. You may play it, ignoring its
+  Energy cost" was missing (partial): now hand-scripted in cards_staples.py, asked after the card is banished (yes/no;
+  a no leaves it banished). Note `ops.PlayCard(may=True)` does not ask: a "you may play" needs an O.May or an up_to
+  choice around it (every other "you may play" script has one). Not in any tournament list; smoke games unchanged.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
