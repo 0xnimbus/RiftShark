@@ -479,6 +479,9 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   (`energy_reduction_by_unit`). Not in any tournament list; smoke games with it in a random deck change.
   15:20: Heartening Soul's 'Friendly legends have "[T]: Give a unit +3 [M] this turn."' was never granted (partial);
   now a Static "ability" grant in cards_staples.py (like Gardens of Becoming). Not in any tournament list; smoke unchanged.
+  20:20: after the post-ban deck switch the only partial card left in any active list (sideboards in `source`) was Vilemaw
+  (Master Yi, Vex): "Enemy units here with less Might than me don't deal combat damage" is now rule
+  `weaker_enemies_here_no_combat_damage`, read by `Game.no_combat_damage` when combat damage is totalled. Smoke unchanged.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

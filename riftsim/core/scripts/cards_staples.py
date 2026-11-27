@@ -1195,6 +1195,14 @@ def heartening_soul(defn):
             "replace": False}
 
 
+@script("Vilemaw")
+def vilemaw(defn):
+    # [Ambush] / When I hold, draw 1.  (keyword + auto-scripted)
+    # Enemy units here with less Might than me don't deal combat damage. (checked when damage is dealt, game.no_combat_damage)
+    return {"abilities": [Static("self", "rule", ("weaker_enemies_here_no_combat_damage",), label=defn.name,
+                                 source_text=defn.text)], "replace": False}
+
+
 @script("Kennen, Storm of Shuriken")
 def kennen_storm(defn):
     # (line 1 auto-scripted) When I conquer, give a spell in your trash [Flow] equal to its cost this turn.

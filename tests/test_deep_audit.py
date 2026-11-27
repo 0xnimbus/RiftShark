@@ -3454,3 +3454,25 @@ def test_heartening_soul_gives_friendly_legends_a_might_ability(db):
            stop=lambda d: d.kind == "action" and not g.chain and d.player == 0)
     assert g.objects[lg].exhausted
     assert g.chars(u).might == m0 + 3
+
+
+def test_vilemaw_stops_weaker_enemy_units_here_from_dealing_combat_damage(db):
+    """Vilemaw (Master Yi and Vex sideboards): "Enemy units here with less Might than me don't deal combat damage." The
+    line was never scripted (card partial)."""
+    vanilla = lambda m: next(c.name for c in db if c.is_unit and c.script_status == "vanilla" and c.might == m
+                             and not c.is_champion)
+    g, _ = _spell_setup(db, "kaisa_void", "Hextech Ray")
+    bf = ("bf", 0)
+    vm = put(g, db, 1, "Vilemaw", bf)
+    g.objects[vm].defn = _card(db, "Vilemaw")
+    foe = put(g, db, 0, vanilla(3), bf, exclude=(vm,))
+    g.objects[foe].defn = _card(db, vanilla(3))
+    mine = put(g, db, 1, vanilla(1), bf, exclude=(vm, foe))
+    g.objects[mine].defn = _card(db, vanilla(1))
+    g.restruct()
+    assert g.no_combat_damage(foe)                  # enemy, here, 3 < 8
+    assert not g.no_combat_damage(mine)             # Vilemaw's own side
+    assert not g.no_combat_damage(vm)
+    g.objects[foe].location = ("base", 0)
+    g.restruct()
+    assert not g.no_combat_damage(foe)              # not here any more
