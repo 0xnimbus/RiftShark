@@ -3526,3 +3526,21 @@ def test_skyward_strike_is_playable_below_level_6_and_stuns_from_level_6(db):
         assert g.objects[s].zone == "trash", xp
         assert g.objects[e].location == ("base", 1), xp
         assert g.objects[e].stunned == (xp >= 6), xp
+
+
+def test_reckoners_arena_activates_hunt_as_a_conquer_effect(db):
+    """Reckoner's Arena (Master Yi list): "When you hold here, activate the conquer effects of units here." [Hunt N] is
+    "When I conquer or hold, gain N XP" (CR 823.1.c.1), a conquer effect too (383.4.c), so holding there with a Hunt 3
+    unit gains 3 XP for the hold and 3 more when the Arena activates it (383.4.g). The activation only looked for
+    "conquer" triggers, so Hunt (a score trigger) gained once."""
+    g, _ = _spell_setup(db, "master_yi_wuju", "Discipline")
+    g.objects[g.battlefields[0].uid].defn = _card(db, "Reckoner's Arena")
+    u = put(g, db, 0, "Voracious Gromp", ("bf", 0))
+    g.set_bf_controller(0, 0)
+    g.restruct()
+    g.players[0].xp = 0
+    g.scored.discard((0, 0))
+    g._score(0, 0, "hold")
+    settle(g)
+    assert g.objects[u].zone == "board"
+    assert g.players[0].xp == 6

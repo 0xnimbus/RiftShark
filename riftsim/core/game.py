@@ -1259,23 +1259,36 @@ class Game(flow.FlowMixin):
         if o is None:
             return
         fake = {"kind": event, "units": (uid,), "player": o.controller, "loc": o.location, "uid": uid}
-        for ab in self.abilities(uid):
-            if isinstance(ab, Triggered) and ab.active(self, uid):
+        if o.location is not None and o.location[0] == "bf":
+            fake["bf"] = o.location[1]
+        fakes = [fake]
+        if event in ("conquer", "hold"):
+            # "When I conquer or hold" ([Hunt], CR 823.1.c.1) / "When I score" trigger on the score event: they are
+            # conquer (hold) effects too (CR 383.4.c-d), so they are activated as if that unit's controller scored
+            # by conquering (holding) there. No actual event occurs (383.4.g.2).
+            fakes.append(dict(fake, kind="score", how=event))
+
+        def first_match(ab, src):
+            for ev in fakes:
                 try:
-                    if ab.matches(self, uid, fake):
-                        self._add_trigger(uid, ab, fake)
+                    if ab.matches(self, src, ev):
+                        return ev
                 except (KeyError, AttributeError, TypeError):
                     pass
+            return None
+        for ab in self.abilities(uid):
+            if isinstance(ab, Triggered) and ab.active(self, uid):
+                ev = first_match(ab, uid)
+                if ev is not None:
+                    self._add_trigger(uid, ab, ev)
         for gu, go in list(self.objects.items()):        # its Equipment's effects are its abilities too
             if go.attached_to != uid or go.zone != "board":
                 continue
             for ab in go.defn.effect_abilities:
                 if isinstance(ab, Triggered):
-                    try:
-                        if ab.matches(self, uid, fake):
-                            self._add_trigger(gu, ab, fake, me=uid)
-                    except (KeyError, AttributeError, TypeError):
-                        pass
+                    ev = first_match(ab, uid)
+                    if ev is not None:
+                        self._add_trigger(gu, ab, ev, me=uid)
 
     # ------------------------------------------------------------------ game actions
     def do_draw(self, p, n, ctx=None):
