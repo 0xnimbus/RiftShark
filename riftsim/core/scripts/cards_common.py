@@ -550,8 +550,12 @@ def combat_experience(defn):
 def skyward_strike(defn):
     # Move an enemy unit.  [Level 6][>] [Stun] an enemy unit.
     from .auto_grammar import parse_sentence
-    leveled = Sel("unit", side="enemy", pred=lambda g, c, u: _xp(g, c.controller) >= 6)     # chosen as played
-    return [SpellEffect(parse_sentence("move an enemy unit", {"tcount": 0}) + [O.Choose(leveled, out="s2"), O.Stun(Ref("s2"))],
+    # Below level 6 the Stun line doesn't apply: no second target, and the spell is still playable just to move.
+    # At level 6+ its target is required and chosen as the spell is played (it may be the moved unit).
+    n = lambda g, c: 1 if _xp(g, c.controller) >= 6 else 0
+    n.at_finalize = True
+    return [SpellEffect(parse_sentence("move an enemy unit", {"tcount": 0}) +
+                        [O.Choose(Sel("unit", side="enemy"), out="s2", n=n), O.Stun(Ref("s2"))],
                         label=defn.name, source_text=defn.text)]
 
 

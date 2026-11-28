@@ -2137,6 +2137,8 @@ class FlowMixin:
                            for _, body in ins.modes):
                     return False
             elif isinstance(ins, Choose) and not ins.up_to and not ins.allow_none and not _depends_on_choice(ins):
+                if callable(ins.n) and ins.n(self, ctx) == 0:
+                    continue        # an instruction that doesn't apply (Skyward Strike's [Level 6] Stun below level 6)
                 if not self.choice_candidates(ctx, ins.sel, targeted=ins.targeted):
                     return False
         return True
