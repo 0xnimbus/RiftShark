@@ -3504,3 +3504,25 @@ def test_emperors_divide_moves_any_number_of_units_from_one_battlefield(db):
     _drive(g, stop=lambda d: d.kind == "action" and not g.chain and d.player == 0)
     assert all(g.objects[u].location == ("base", 0) for u in at0)
     assert g.objects[at1[0]].location == ("bf", 1)
+
+
+def test_skyward_strike_is_playable_below_level_6_and_stuns_from_level_6(db):
+    """Skyward Strike (Master Yi list): "Move an enemy unit. [Level 6][>] [Stun] an enemy unit." Below level 6 the
+    Stun line doesn't apply, so it is played just to move (it needed a second target and was never playable); from
+    level 6 the Stun target is required and chosen as the spell is played."""
+    van = next(c.name for c in db if c.is_unit and c.script_status == "vanilla" and c.might == 3 and not c.is_champion)
+    for xp in (0, 6):
+        g, s = _spell_setup(db, "kaisa_void", "Skyward Strike")
+        g.players[0].xp = xp
+        e = put(g, db, 1, van, ("bf", 0))
+        g.objects[e].defn = _card(db, van)
+        g.restruct()
+        d = g.run()
+        acts = [o for o in d.options if o[0] == "play" and o[1] == s]
+        assert acts, xp
+        g.choose(acts[0])
+        _drive(g, pick=lambda d: ("base", 1) if ("base", 1) in d.options else None,
+               stop=lambda d: g.objects[s].zone == "trash")
+        assert g.objects[s].zone == "trash", xp
+        assert g.objects[e].location == ("base", 1), xp
+        assert g.objects[e].stunned == (xp >= 6), xp

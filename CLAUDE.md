@@ -486,6 +486,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   "... friendly units at a battlefield to their base") could mix units from two battlefields. No cap now (also Bard,
   Mercurial, Azir, Sovereign), and "at a battlefield" makes it a same-location group; `ops.Choose(same_loc=True)` now
   builds combinations per location instead of filtering every combination. Smoke unchanged.
+  05:20: Skyward Strike (Master Yi list: "Move an enemy unit. [Level 6][>] [Stun] an enemy unit.") always needed a
+  Stun target restricted to level 6+, so below level 6 it was never playable; the Stun line now has no target below
+  level 6 (Choose `n` callable with `at_finalize`; `flow._targets_possible` skips a Choose whose n is 0). Smoke games
+  with it in a random deck change.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
