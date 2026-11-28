@@ -490,6 +490,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   Stun target restricted to level 6+, so below level 6 it was never playable; the Stun line now has no target below
   level 6 (Choose `n` callable with `at_finalize`; `flow._targets_possible` skips a Choose whose n is 0). Smoke games
   with it in a random deck change.
+  10:20: Reckoner's Arena (Master Yi list: "When you hold here, activate the conquer effects of units here") only
+  activated "conquer" triggers; [Hunt] ("When I conquer or hold", CR 823.1.c.1) and other score triggers are conquer
+  effects too (383.4.c), so Hunt units there gained XP once instead of twice. `Game.activate_named_triggers` now also
+  tries a score event (`how` = conquer/hold) and the fake event carries `bf`. Smoke unchanged.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs
