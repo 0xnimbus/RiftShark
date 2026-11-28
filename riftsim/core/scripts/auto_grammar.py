@@ -1006,7 +1006,9 @@ def parse_sentence(s, state):
         if tgt.startswith("all ") or tgt.startswith("each ") or tgt.startswith("any number of") or tgt.startswith("friendly units") or tgt.startswith("enemy units") or tgt.startswith("units"):
             sel, n, up_to, _ = parse_sel(tgt)
             if tgt.startswith("any number of"):
-                return dins + [O.Choose(sel, out="__mv", n=6, up_to=True), O.Move(Ref("__mv"), dref)]
+                # "any number" has no cap; "... at a battlefield" makes them a group at one battlefield (CR 355.11)
+                return dins + [O.Choose(sel, out="__mv", n=99, up_to=True, same_loc=" at a battlefield" in tgt),
+                               O.Move(Ref("__mv"), dref)]
             return dins + [O.Move(sel, dref)]
         ins, ref, _ = choose(tgt, _next_out(state))
         return ins + [O.SetVar("__tloc", O.loc_of(ref))] + dins + [O.Move(ref, dref)]

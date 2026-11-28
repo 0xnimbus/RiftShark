@@ -3476,3 +3476,31 @@ def test_vilemaw_stops_weaker_enemy_units_here_from_dealing_combat_damage(db):
     g.objects[foe].location = ("base", 0)
     g.restruct()
     assert not g.no_combat_damage(foe)              # not here any more
+
+
+def test_emperors_divide_moves_any_number_of_units_from_one_battlefield(db):
+    """Emperor's Divide (Master Yi list): "Move any number of friendly units at a battlefield to their base." The
+    auto-script capped the choice at 6 units and let the units come from different battlefields."""
+    vanilla = next(c.name for c in db if c.is_unit and c.script_status == "vanilla" and not c.is_champion)
+    g, ed = _spell_setup(db, "kaisa_void", "Emperor's Divide")
+    g.objects[ed].defn = _card(db, "Emperor's Divide")
+    at0, at1 = [], []
+    used = [ed]
+    for i in range(8):
+        loc = ("bf", 0) if i < 7 else ("bf", 1)
+        u = put(g, db, 0, vanilla, loc, exclude=tuple(used))
+        g.objects[u].defn = _card(db, vanilla)
+        used.append(u)
+        (at0 if i < 7 else at1).append(u)
+    g.restruct()
+    d = g.run()
+    g.choose(next(o for o in d.options if o[0] == "play" and o[1] == ed))
+    d = _drive(g, stop=lambda d: d.kind == "choose_many")
+    assert d is not None
+    opts = [set(o) for o in d.options]
+    assert set(at0) in opts                                   # all seven from one battlefield
+    assert not any(o & set(at0) and o & set(at1) for o in opts)
+    g.choose(next(o for o in d.options if set(o) == set(at0)))
+    _drive(g, stop=lambda d: d.kind == "action" and not g.chain and d.player == 0)
+    assert all(g.objects[u].location == ("base", 0) for u in at0)
+    assert g.objects[at1[0]].location == ("bf", 1)
