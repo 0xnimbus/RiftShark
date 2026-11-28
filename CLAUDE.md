@@ -482,6 +482,10 @@ replays, batch runner, web frontend. Owner: Derrick (GitHub `0xnimbus`).
   20:20: after the post-ban deck switch the only partial card left in any active list (sideboards in `source`) was Vilemaw
   (Master Yi, Vex): "Enemy units here with less Might than me don't deal combat damage" is now rule
   `weaker_enemies_here_no_combat_damage`, read by `Game.no_combat_damage` when combat damage is totalled. Smoke unchanged.
+  2026-11-28 00:20: auto "move any number of X to Y" capped the choice at 6 units, and Emperor's Divide (Master Yi list:
+  "... friendly units at a battlefield to their base") could mix units from two battlefields. No cap now (also Bard,
+  Mercurial, Azir, Sovereign), and "at a battlefield" makes it a same-location group; `ops.Choose(same_loc=True)` now
+  builds combinations per location instead of filtering every combination. Smoke unchanged.
 - Testing speed (2026-11-06): `tools/audit_games.py --adaptive 40` stops each matchup once its 95% Wilson interval is
   clear (min 6, even game counts) and prints a matchup table; `--shard I/N` + `--merge` split a round-robin; the
   `Round-robin (sharded)` GitHub Actions workflow (manual, repo is private so it uses Derrick's Actions minutes) runs

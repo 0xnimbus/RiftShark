@@ -249,9 +249,21 @@ class Choose(Instr):
         maxn = min(n, len(cands))
         opts = []
         lo = 0 if self.up_to else maxn
-        for k in range(lo, maxn + 1):
-            opts += [tuple(c) for c in itertools.combinations(cands, k)
-                     if not self.same_loc or len({game.objects[u].location for u in c}) <= 1]
+        if self.same_loc:
+            # combinations within each location only (a group sharing one location), each listed once
+            groups = {}
+            for u in cands:
+                groups.setdefault(game.objects[u].location, []).append(u)
+            seen = set()
+            for k in range(lo, maxn + 1):
+                for v in groups.values():
+                    for c in itertools.combinations(v, k):
+                        if c not in seen:
+                            seen.add(c)
+                            opts.append(c)
+        else:
+            for k in range(lo, maxn + 1):
+                opts += [tuple(c) for c in itertools.combinations(cands, k)]
         if not opts and self.same_loc:
             groups = {}
             for u in cands:
